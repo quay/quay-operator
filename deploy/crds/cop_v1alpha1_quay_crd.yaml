@@ -1,0 +1,15 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: quays.cop.redhat.com
+spec:
+  group: cop.redhat.com
+  names:
+    kind: Quay
+    listKind: QuayList
+    plural: quays
+    singular: quay
+  scope: Namespaced
+  version: v1alpha1
+  subresources:
+    status: {}
