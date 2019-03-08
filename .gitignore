@@ -6,6 +6,8 @@ build/_test
 vendor/
 Gopkg.lock
 
+# Platform Dependencies
+.DS_Store
 
 # Temporary Build Files
 build/_output

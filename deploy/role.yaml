@@ -7,30 +7,44 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods
   - services
-  - endpoints
-  - persistentvolumeclaims
-  - events
+  - serviceaccounts
+  - pods
   - configmaps
+  verbs:
+  - 'create'
+  - 'update'
+  - 'get'
+  - 'list'
+  - 'watch'
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
-  - '*'
+  - 'create'
+  - 'update'
+  - 'put'
+  - 'patch'
+  - 'get'
+  - 'list'
+  - 'watch'
 - apiGroups:
   - ""
   resources:
   - namespaces
   verbs:
-  - get
+  - 'get'
 - apiGroups:
   - apps
   resources:
   - deployments
-  - daemonsets
-  - replicasets
-  - statefulsets
   verbs:
-  - '*'
+  - 'create'
+  - 'update'
+  - 'get'
+  - 'list'
+  - 'watch'
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -42,5 +56,36 @@ rules:
   - cop.redhat.com
   resources:
   - '*'
+  - quayecosystems
   verbs:
   - '*'
+- apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - 'update'
+  - 'get'
+  - 'list'
+  - 'watch'
+- apiGroups:
+  - route.openshift.io
+  resources:
+  - routes
+  verbs:
+  - 'create'
+  - 'update'
+  - 'get'
+  - 'list'
+  - 'watch'
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - 'create'
+  - 'update'
+  - 'get'
+  - 'list'
+  - 'watch'
