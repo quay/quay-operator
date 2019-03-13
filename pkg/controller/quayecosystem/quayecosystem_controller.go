@@ -5,7 +5,7 @@ import (
 
 	"k8s.io/client-go/tools/record"
 
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
 
 	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration"
@@ -151,6 +151,45 @@ func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *copv1alpha1.QuayEcos
 			quayEcosystem.Spec.Redis.Replicas = &oneInt32
 		}
 
+	}
+
+	if (copv1alpha1.Database{}) != quayEcosystem.Spec.Quay.Database {
+
+		// Check if database type has been defined
+		if len(quayEcosystem.Spec.Quay.Database.Type) == 0 {
+			changed = true
+			quayEcosystem.Spec.Quay.Database.Type = copv1alpha1.DatabaseMySQL
+		}
+
+		if len(quayEcosystem.Spec.Quay.Database.Image) == 0 {
+			changed = true
+			switch quayEcosystem.Spec.Quay.Database.Type {
+			case copv1alpha1.DatabaseMySQL:
+				quayEcosystem.Spec.Quay.Database.Image = constants.MySQLImage
+			case copv1alpha1.DatabasePostgresql:
+				quayEcosystem.Spec.Quay.Database.Image = constants.PostgresqlImage
+			}
+		}
+
+		if len(quayEcosystem.Spec.Quay.Database.VolumeSize) == 0 {
+			changed = true
+			quayEcosystem.Spec.Quay.Database.VolumeSize = constants.QuayPVCSize
+		}
+
+		if len(quayEcosystem.Spec.Quay.Database.Memory) == 0 {
+			changed = true
+			quayEcosystem.Spec.Quay.Database.Memory = constants.DatabaseMemory
+		}
+
+		if len(quayEcosystem.Spec.Quay.Database.CPU) == 0 {
+			changed = true
+			quayEcosystem.Spec.Quay.Database.CPU = constants.DatabaseCPU
+		}
+
+		if len(quayEcosystem.Spec.Quay.Database.DatabaseName) == 0 {
+			changed = true
+			quayEcosystem.Spec.Quay.Database.DatabaseName = constants.QuayDatabaseName
+		}
 	}
 
 	if changed {

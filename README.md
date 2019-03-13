@@ -38,8 +38,6 @@ $ oc create -f deploy/operator.yaml
 
 ### Deploy a Quay Ecosystem
 
-_Note: The persistence layer to support the Quay ecosystem are not a component of this operator at this time. You must provide this resource either wihtin the cluster or from an external source_
-
 Create a pull secret to retrieve Quay images from quay.io
 
 ```
@@ -61,6 +59,23 @@ You can also run the following command to create the `QuayEnterprise` custom res
 
 ```
 $ oc create -f deploy/crds/cop_v1alpha1_quayecosystem_cr.yaml
+```
+
+#### Persistence Support
+
+MySQL or PostgreSQL can be deployed to provide persistence for quay.
+
+The following QuayEcosystem custom resource can be used to provision Quay along with a backing MySQL database:
+
+```
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  imagePullSecretName: coreos-pull-secret
+  quay:
+    database:
+      type: mysql
 ```
 
 ## Local Development

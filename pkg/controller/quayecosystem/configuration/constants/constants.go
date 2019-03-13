@@ -19,10 +19,32 @@ const (
 	LabelComponentAppValue = "app"
 	// LabelComponentRedisValue is the name of the Redis label
 	LabelComponentRedisValue = "redis"
+	// LabelComponentQuayDatabaseValue is the name of the Quay database label
+	LabelComponentQuayDatabaseValue = "quay-database"
 	// LabelQuayCRKey is the label name of the quay custom resource
 	LabelQuayCRKey = "quay-enterprise-cr"
 	// AnyUIDSCC is the name of the anyuid SCC
 	AnyUIDSCC = "anyuid"
 	// QuayEcosystemServiceAccount is the name of the Quay ServiceAccount
 	QuayEcosystemServiceAccount = "quayecosystem"
+	// MySQLName is the name used to represent MySQL
+	MySQLName = "mysql"
+	// PostgresqlName is the name used to represent MySQL
+	PostgresqlName = "postgresql"
+	// PostgresqlImage is the Postgresql image
+	PostgresqlImage = "registry.access.redhat.com/rhscl/postgresql-96-rhel7:1"
+	// PostgreSQLPort is the database port for MySQL
+	PostgreSQLPort = 5432
+	// MySQLImage is the PostgreSQL image
+	MySQLImage = "registry.access.redhat.com/rhscl/mysql-57-rhel7:5.7"
+	// MySQLPort is the database port for MySQL
+	MySQLPort = 3306
+	// DatabaseMemory is the default memory amount
+	DatabaseMemory = "512Mi"
+	// DatabaseCPU is the default CPU amount
+	DatabaseCPU = "300m"
+	// QuayDatabaseName is the default database name
+	QuayDatabaseName = "quay"
+	// QuayPVCSize is the size of the PVC for Quay
+	QuayPVCSize = "1Gi"
 )

@@ -40,10 +40,11 @@ type QuayEcosystemList struct {
 
 // Quay defines the properies of a deployment of Quay
 type Quay struct {
-	EnableNodePortService bool   `json:"enableNodePortService,omitempty"`
-	Image                 string `json:"image,omitempty"`
-	RouteHost             string `json:"routeHost,omitempty"`
-	Replicas              *int32 `json:"replicas,omitempty"`
+	EnableNodePortService bool     `json:"enableNodePortService,omitempty"`
+	Image                 string   `json:"image,omitempty"`
+	RouteHost             string   `json:"routeHost,omitempty"`
+	Replicas              *int32   `json:"replicas,omitempty"`
+	Database              Database `json:"database,omitempty"`
 }
 
 // Redis defines the properies of a deployment of Redis
@@ -51,6 +52,26 @@ type Redis struct {
 	Skip     bool   `json:"skip,omitempty"`
 	Image    string `json:"image,omitempty"`
 	Replicas *int32 `json:"replicas,omitempty"`
+}
+
+// DatabaseType defines type of database
+type DatabaseType string
+
+const (
+	// DatabaseMySQL defines the name associated with the MySQL database instance
+	DatabaseMySQL DatabaseType = "mysql"
+	// DatabasePostgresql defines the name associated with the PostgreSQL database instance
+	DatabasePostgresql DatabaseType = "postgresql"
+)
+
+// Database defines a database that will be deployed to support a particular component
+type Database struct {
+	Type         DatabaseType `json:"type,omitempty"`
+	Image        string       `json:"image,omitempty"`
+	VolumeSize   string       `json:"volumeSize,omitempty"`
+	Memory       string       `json:"memory,omitempty"`
+	CPU          string       `json:"cpu,omitempty"`
+	DatabaseName string       `json:"databaseName,omitempty"`
 }
 
 func init() {
