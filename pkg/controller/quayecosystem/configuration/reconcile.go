@@ -77,9 +77,8 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 
 	}
 
-	// TODO: Database (PostgreSQL/MySQL)
+	// Database (PostgreSQL/MySQL)
 	if (copv1alpha1.Database{}) != r.quayEcosystem.Spec.Quay.Database {
-		logrus.Info("Deploying Database Resources")
 
 		if err := r.createQuayDatabase(metaObject); err != nil {
 			return nil, err
@@ -105,12 +104,46 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 
 func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.ObjectMeta) error {
 
+	var database databases.Database
+
 	// Update Metadata
 	meta = resources.UpdateMetaWithName(meta, resources.GetQuayDatabaseName(r.quayEcosystem))
 	resources.BuildQuayDatabaseResourceLabels(meta.Labels)
 
+	switch r.quayEcosystem.Spec.Quay.Database.Type {
+	case copv1alpha1.DatabaseMySQL:
+		database = new(databases.MySQLDatabase)
+	case copv1alpha1.DatabasePostgresql:
+		database = new(databases.PostgreSQLDatabase)
+	default:
+		logrus.Warn("Unknown database type")
+	}
+
+	var existingValidSecret = false
+	databaseSecret := &corev1.Secret{}
+
+	// Check if Secret Exists
+	if len(r.quayEcosystem.Spec.Quay.Database.CredentialsSecretName) != 0 {
+
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: r.quayEcosystem.Spec.Quay.Database.CredentialsSecretName, Namespace: r.quayEcosystem.ObjectMeta.Namespace}, databaseSecret)
+
+		if err == nil && database.ValidateProvidedSecret(databaseSecret) {
+			existingValidSecret = true
+		}
+	}
+
+	// Create Secret if no valid secret found
+	if !existingValidSecret {
+		databaseSecret = database.GetDefaultSecret(meta, constants.DefaultQuayDatabaseCredentials)
+		err := r.createResource(databaseSecret, r.quayEcosystem)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+
+	}
+
 	// Generate Database Object
-	databaseConfig := databases.GenerateDatabaseConfig(meta, r.quayEcosystem.Spec.Quay.Database)
+	databaseConfig := databases.GenerateDatabaseConfig(meta, r.quayEcosystem.Spec.Quay.Database, databaseSecret, constants.DefaultQuayDatabaseCredentials)
 
 	// Create PVC
 	databasePvc := databases.GenerateDatabasePVC(meta, databaseConfig)
@@ -120,26 +153,12 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.Obj
 		return err
 	}
 
-	var database databases.Database
-
-	switch r.quayEcosystem.Spec.Quay.Database.Type {
-	case copv1alpha1.DatabaseMySQL:
-		logrus.Info("About to handle mysql")
-		database = new(databases.MySQLDatabase)
-	case copv1alpha1.DatabasePostgresql:
-		logrus.Info("About to handle postgresql")
-		database = new(databases.PostgreSQLDatabase)
-	default:
-		logrus.Info("Unknown database type")
-	}
-
 	resources, err := database.GenerateResources(meta, r.quayEcosystem, databaseConfig)
 
 	if err != nil {
 		return err
 	}
 
-	logrus.Infof("Applying Resources")
 	for _, resource := range resources {
 		err = r.createResource(resource, r.quayEcosystem)
 		if err != nil && !apierrors.IsAlreadyExists(err) {

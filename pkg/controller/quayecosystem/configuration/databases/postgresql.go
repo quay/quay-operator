@@ -3,7 +3,6 @@ package databases
 import (
 	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,24 +34,43 @@ func (m *PostgreSQLDatabase) GenerateResources(meta metav1.ObjectMeta, quayEcosy
 
 func generatePostgreSQLDatabaseResource(meta metav1.ObjectMeta, quayEcosystem *copv1alpha1.QuayEcosystem, database DatabaseConfig) (*appsv1.Deployment, error) {
 
-	meta.Name = resources.GetQuayDatabaseName(quayEcosystem)
-
 	databaseDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: database.Image,
 			Name:  meta.Name,
 			Env: []corev1.EnvVar{
 				{
-					Name:  "POSTGRESQL_USER",
-					Value: database.Username,
+					Name: "POSTGRESQL_USER",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: database.CredentialsName,
+							},
+							Key: constants.DatabaseCredentialsUsernameKey,
+						},
+					},
 				},
 				{
-					Name:  "POSTGRESQL_PASSWORD",
-					Value: database.Password,
+					Name: "POSTGRESQL_PASSWORD",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: database.CredentialsName,
+							},
+							Key: constants.DatabaseCredentialsPasswordKey,
+						},
+					},
 				},
 				{
-					Name:  "POSTGRESQL_DATABASE",
-					Value: database.Database,
+					Name: "POSTGRESQL_DATABASE",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: database.CredentialsName,
+							},
+							Key: constants.DatabaseCredentialsDatabaseKey,
+						},
+					},
 				},
 			},
 			VolumeMounts: []corev1.VolumeMount{
@@ -129,5 +147,31 @@ func generatePostgreSQLDatabaseResource(meta metav1.ObjectMeta, quayEcosystem *c
 	}
 
 	return databaseDeployment, nil
+
+}
+
+func (m *PostgreSQLDatabase) GetDefaultSecret(meta metav1.ObjectMeta, credentials map[string]string) *corev1.Secret {
+
+	defaultSecret := &corev1.Secret{
+		ObjectMeta: meta,
+		StringData: map[string]string{
+			constants.DatabaseCredentialsDatabaseKey: credentials[constants.DatabaseCredentialsDatabaseKey],
+			constants.DatabaseCredentialsUsernameKey: credentials[constants.DatabaseCredentialsUsernameKey],
+			constants.DatabaseCredentialsPasswordKey: credentials[constants.DatabaseCredentialsPasswordKey],
+		},
+	}
+
+	return defaultSecret
+
+}
+
+func (m *PostgreSQLDatabase) ValidateProvidedSecret(secret *corev1.Secret) bool {
+
+	for _, item := range []string{constants.DatabaseCredentialsDatabaseKey, constants.DatabaseCredentialsPasswordKey, constants.DatabaseCredentialsUsernameKey} {
+		if _, found := secret.Data[item]; !found {
+			return false
+		}
+	}
+	return true
 
 }

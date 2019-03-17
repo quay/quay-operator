@@ -3,7 +3,6 @@ package databases
 import (
 	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -35,28 +34,54 @@ func (m *MySQLDatabase) GenerateResources(meta metav1.ObjectMeta, quayEcosystem 
 
 func generateMySQLDatabaseResource(meta metav1.ObjectMeta, quayEcosystem *copv1alpha1.QuayEcosystem, database DatabaseConfig) (*appsv1.Deployment, error) {
 
-	meta.Name = resources.GetQuayDatabaseName(quayEcosystem)
-
 	databaseDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: database.Image,
 			Name:  meta.Name,
 			Env: []corev1.EnvVar{
 				{
-					Name:  "MYSQL_USER",
-					Value: database.Username,
+					Name: "MYSQL_USER",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: database.CredentialsName,
+							},
+							Key: constants.DatabaseCredentialsUsernameKey,
+						},
+					},
 				},
 				{
-					Name:  "MYSQL_PASSWORD",
-					Value: database.Password,
+					Name: "MYSQL_PASSWORD",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: database.CredentialsName,
+							},
+							Key: constants.DatabaseCredentialsPasswordKey,
+						},
+					},
 				},
 				{
-					Name:  "MYSQL_ROOT_PASSWORD",
-					Value: database.RootPassword,
+					Name: "MYSQL_ROOT_PASSWORD",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: database.CredentialsName,
+							},
+							Key: constants.DatabaseCredentialsRootPasswordKey,
+						},
+					},
 				},
 				{
-					Name:  "MYSQL_DATABASE",
-					Value: database.Database,
+					Name: "MYSQL_DATABASE",
+					ValueFrom: &corev1.EnvVarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: database.CredentialsName,
+							},
+							Key: constants.DatabaseCredentialsDatabaseKey,
+						},
+					},
 				},
 			},
 			VolumeMounts: []corev1.VolumeMount{
@@ -133,5 +158,32 @@ func generateMySQLDatabaseResource(meta metav1.ObjectMeta, quayEcosystem *copv1a
 	}
 
 	return databaseDeployment, nil
+
+}
+
+func (m *MySQLDatabase) GetDefaultSecret(meta metav1.ObjectMeta, credentials map[string]string) *corev1.Secret {
+
+	defaultSecret := &corev1.Secret{
+		ObjectMeta: meta,
+		StringData: map[string]string{
+			constants.DatabaseCredentialsDatabaseKey:     credentials[constants.DatabaseCredentialsDatabaseKey],
+			constants.DatabaseCredentialsUsernameKey:     credentials[constants.DatabaseCredentialsUsernameKey],
+			constants.DatabaseCredentialsPasswordKey:     credentials[constants.DatabaseCredentialsPasswordKey],
+			constants.DatabaseCredentialsRootPasswordKey: credentials[constants.DatabaseCredentialsRootPasswordKey],
+		},
+	}
+
+	return defaultSecret
+
+}
+
+func (m *MySQLDatabase) ValidateProvidedSecret(secret *corev1.Secret) bool {
+
+	for _, item := range []string{constants.DatabaseCredentialsDatabaseKey, constants.DatabaseCredentialsPasswordKey, constants.DatabaseCredentialsRootPasswordKey, constants.DatabaseCredentialsUsernameKey} {
+		if _, found := secret.Data[item]; !found {
+			return false
+		}
+	}
+	return true
 
 }

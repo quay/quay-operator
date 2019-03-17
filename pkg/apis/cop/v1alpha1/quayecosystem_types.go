@@ -66,12 +66,12 @@ const (
 
 // Database defines a database that will be deployed to support a particular component
 type Database struct {
-	Type         DatabaseType `json:"type,omitempty"`
-	Image        string       `json:"image,omitempty"`
-	VolumeSize   string       `json:"volumeSize,omitempty"`
-	Memory       string       `json:"memory,omitempty"`
-	CPU          string       `json:"cpu,omitempty"`
-	DatabaseName string       `json:"databaseName,omitempty"`
+	Type                  DatabaseType `json:"type,omitempty"`
+	Image                 string       `json:"image,omitempty"`
+	VolumeSize            string       `json:"volumeSize,omitempty"`
+	Memory                string       `json:"memory,omitempty"`
+	CPU                   string       `json:"cpu,omitempty"`
+	CredentialsSecretName string       `json:"credentialsSecretName,omitempty"`
 }
 
 func init() {

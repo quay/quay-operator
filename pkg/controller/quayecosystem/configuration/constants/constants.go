@@ -47,4 +47,29 @@ const (
 	QuayDatabaseName = "quay"
 	// QuayPVCSize is the size of the PVC for Quay
 	QuayPVCSize = "1Gi"
+	// DatabaseCredentialsUsernameKey represents the key for the database username
+	DatabaseCredentialsUsernameKey = "database-username"
+	// DatabaseCredentialsPasswordKey represents the key for the database password
+	DatabaseCredentialsPasswordKey = "database-password"
+	// DatabaseCredentialsDatabaseKey represents the key for the database name
+	DatabaseCredentialsDatabaseKey = "database-name"
+	// DatabaseCredentialsRootPasswordKey represents the key for the database root password
+	DatabaseCredentialsRootPasswordKey = "database-root-password"
+)
+
+var (
+	// DefaultQuayDatabaseCredentials represents a map containing the default values for Quay database
+	DefaultQuayDatabaseCredentials = map[string]string{
+		DatabaseCredentialsUsernameKey:     "quay",
+		DatabaseCredentialsPasswordKey:     "quayPassword",
+		DatabaseCredentialsDatabaseKey:     "quay",
+		DatabaseCredentialsRootPasswordKey: "quayAdmin",
+	}
+	// DefaultClairDatabaseCredentials represents a map containing the default values for Clair database
+	DefaultClairDatabaseCredentials = map[string]string{
+		DatabaseCredentialsUsernameKey:     "clair",
+		DatabaseCredentialsPasswordKey:     "clairPassword",
+		DatabaseCredentialsDatabaseKey:     "clair",
+		DatabaseCredentialsRootPasswordKey: "clairAdmin",
+	}
 )

@@ -186,10 +186,6 @@ func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *copv1alpha1.QuayEcos
 			quayEcosystem.Spec.Quay.Database.CPU = constants.DatabaseCPU
 		}
 
-		if len(quayEcosystem.Spec.Quay.Database.DatabaseName) == 0 {
-			changed = true
-			quayEcosystem.Spec.Quay.Database.DatabaseName = constants.QuayDatabaseName
-		}
 	}
 
 	if changed {

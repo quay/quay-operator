@@ -1,7 +1,10 @@
 package databases
 
 import (
+	"encoding/base64"
+
 	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -9,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GenerateDatabaseConfig(meta metav1.ObjectMeta, inputDatabase copv1alpha1.Database) DatabaseConfig {
+func GenerateDatabaseConfig(meta metav1.ObjectMeta, inputDatabase copv1alpha1.Database, credentials *corev1.Secret, defaultCredentials map[string]string) DatabaseConfig {
 	database := DatabaseConfig{}
 	database.Name = meta.Name
 	database.Image = inputDatabase.Image
@@ -18,10 +21,11 @@ func GenerateDatabaseConfig(meta metav1.ObjectMeta, inputDatabase copv1alpha1.Da
 	database.LimitsCPU = inputDatabase.CPU
 	database.RequestsCPU = inputDatabase.Memory
 	database.VolumeSize = inputDatabase.VolumeSize
-	database.Database = inputDatabase.DatabaseName
-	database.Username = "quay"
-	database.Password = "quayPassword"
-	database.RootPassword = "rootPassword"
+	database.Database = GetCredentialValue(constants.DatabaseCredentialsDatabaseKey, credentials, defaultCredentials)
+	database.Username = GetCredentialValue(constants.DatabaseCredentialsUsernameKey, credentials, defaultCredentials)
+	database.Password = GetCredentialValue(constants.DatabaseCredentialsPasswordKey, credentials, defaultCredentials)
+	database.RootPassword = GetCredentialValue(constants.DatabaseCredentialsRootPasswordKey, credentials, defaultCredentials)
+	database.CredentialsName = credentials.Name
 	return database
 }
 
@@ -43,7 +47,6 @@ func GenerateDatabasePVC(meta metav1.ObjectMeta, database DatabaseConfig) *corev
 			},
 		},
 	}
-
 }
 
 func GenerateDatabaseServiceResource(meta metav1.ObjectMeta, port int) *corev1.Service {
@@ -67,4 +70,15 @@ func GenerateDatabaseServiceResource(meta metav1.ObjectMeta, port int) *corev1.S
 	}
 
 	return service
+}
+
+func GetCredentialValue(key string, credentials *corev1.Secret, defaultCredentials map[string]string) string {
+
+	if len(credentials.Data) != 0 {
+		if val, ok := credentials.Data[key]; ok {
+			return base64.StdEncoding.EncodeToString(val)
+		}
+	}
+
+	return defaultCredentials[key]
 }
