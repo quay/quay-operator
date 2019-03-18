@@ -82,6 +82,8 @@ A type of `postgresql` is also available to deploy an instance of PostgreSQL
 
 ##### Database Configuration
 
+_Note: The use of databases that are managed as part of the `QuayEcosystem` are intended for development purposes. For production scenarios, it is recommended that database either reside off cluster or managed by a dedicated operator._
+
 Support is available to customize the configuration of the database backing Quay
 
 Underneath the _database_ property, the following options are available:
