@@ -10,7 +10,9 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/databases"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/resources"
 	appsv1 "k8s.io/api/apps/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
@@ -45,7 +47,7 @@ func New(client client.Client, scheme *runtime.Scheme,
 
 // Reconcile takes care of base configuration
 func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, error) {
-	metaObject := NewResourceObjectMeta(r.quayEcosystem)
+	metaObject := resources.NewResourceObjectMeta(r.quayEcosystem)
 
 	if err := r.createQuayConfigSecret(metaObject); err != nil {
 		return &reconcile.Result{}, err
@@ -75,7 +77,14 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 
 	}
 
-	// TODO: Database (PostgreSQL/MySQL)
+	// Database (PostgreSQL/MySQL)
+	if (copv1alpha1.Database{}) != r.quayEcosystem.Spec.Quay.Database {
+
+		if err := r.createQuayDatabase(metaObject); err != nil {
+			return nil, err
+		}
+
+	}
 
 	// Quay Resources
 	if err := r.createQuayService(metaObject); err != nil {
@@ -93,9 +102,78 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 	return nil, nil
 }
 
+func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.ObjectMeta) error {
+
+	var database databases.Database
+
+	// Update Metadata
+	meta = resources.UpdateMetaWithName(meta, resources.GetQuayDatabaseName(r.quayEcosystem))
+	resources.BuildQuayDatabaseResourceLabels(meta.Labels)
+
+	switch r.quayEcosystem.Spec.Quay.Database.Type {
+	case copv1alpha1.DatabaseMySQL:
+		database = new(databases.MySQLDatabase)
+	case copv1alpha1.DatabasePostgresql:
+		database = new(databases.PostgreSQLDatabase)
+	default:
+		logrus.Warn("Unknown database type")
+	}
+
+	var existingValidSecret = false
+	databaseSecret := &corev1.Secret{}
+
+	// Check if Secret Exists
+	if len(r.quayEcosystem.Spec.Quay.Database.CredentialsSecretName) != 0 {
+
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: r.quayEcosystem.Spec.Quay.Database.CredentialsSecretName, Namespace: r.quayEcosystem.ObjectMeta.Namespace}, databaseSecret)
+
+		if err == nil && database.ValidateProvidedSecret(databaseSecret) {
+			existingValidSecret = true
+		}
+	}
+
+	// Create Secret if no valid secret found
+	if !existingValidSecret {
+		databaseSecret = database.GetDefaultSecret(meta, constants.DefaultQuayDatabaseCredentials)
+		err := r.createResource(databaseSecret, r.quayEcosystem)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+
+	}
+
+	// Generate Database Object
+	databaseConfig := databases.GenerateDatabaseConfig(meta, r.quayEcosystem.Spec.Quay.Database, databaseSecret, constants.DefaultQuayDatabaseCredentials)
+
+	// Create PVC
+	databasePvc := databases.GenerateDatabasePVC(meta, databaseConfig)
+
+	err := r.createResource(databasePvc, r.quayEcosystem)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	resources, err := database.GenerateResources(meta, r.quayEcosystem, databaseConfig)
+
+	if err != nil {
+		return err
+	}
+
+	for _, resource := range resources {
+		err = r.createResource(resource, r.quayEcosystem)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			logrus.Errorf("Error applying Resource: %v", err)
+			return err
+		}
+	}
+
+	return nil
+
+}
+
 func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1.ObjectMeta) error {
 
-	configSecretName := GetConfigMapSecretName(r.quayEcosystem)
+	configSecretName := resources.GetConfigMapSecretName(r.quayEcosystem)
 
 	meta.Name = configSecretName
 
@@ -148,7 +226,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayEcosystemServiceAccount(
 
 func (r *ReconcileQuayEcosystemConfiguration) createRBAC(meta metav1.ObjectMeta) error {
 
-	meta.Name = GetGenericResourcesName(r.quayEcosystem)
+	meta.Name = resources.GetGenericResourcesName(r.quayEcosystem)
 
 	role := &rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
@@ -206,7 +284,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createRBAC(meta metav1.ObjectMeta)
 
 func (r *ReconcileQuayEcosystemConfiguration) createQuayService(meta metav1.ObjectMeta) error {
 
-	meta.Name = GetQuayResourcesName(r.quayEcosystem)
+	meta.Name = resources.GetQuayResourcesName(r.quayEcosystem)
 
 	service := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -226,7 +304,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayService(meta metav1.Obje
 		},
 	}
 
-	service.ObjectMeta.Labels = BuildQuayResourceLabels(meta.Labels)
+	service.ObjectMeta.Labels = resources.BuildQuayResourceLabels(meta.Labels)
 
 	if r.quayEcosystem.Spec.Quay.EnableNodePortService {
 		service.Spec.Type = corev1.ServiceTypeNodePort
@@ -245,7 +323,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayService(meta metav1.Obje
 
 func (r *ReconcileQuayEcosystemConfiguration) createQuayRoute(meta metav1.ObjectMeta) error {
 
-	meta.Name = GetQuayResourcesName(r.quayEcosystem)
+	meta.Name = resources.GetQuayResourcesName(r.quayEcosystem)
 
 	route := &routev1.Route{
 		TypeMeta: metav1.TypeMeta{
@@ -264,7 +342,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayRoute(meta metav1.Object
 		},
 	}
 
-	route.ObjectMeta.Labels = BuildQuayResourceLabels(meta.Labels)
+	route.ObjectMeta.Labels = resources.BuildQuayResourceLabels(meta.Labels)
 
 	if len(r.quayEcosystem.Spec.Quay.RouteHost) != 0 {
 		route.Spec.Host = r.quayEcosystem.Spec.Quay.RouteHost
@@ -314,7 +392,7 @@ func (r *ReconcileQuayEcosystemConfiguration) configureSCC(meta metav1.ObjectMet
 
 func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectMeta) error {
 
-	meta.Name = GetQuayResourcesName(r.quayEcosystem)
+	meta.Name = resources.GetQuayResourcesName(r.quayEcosystem)
 
 	quayDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
@@ -334,7 +412,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 			Name: "configvolume",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: GetConfigMapSecretName(r.quayEcosystem),
+					SecretName: resources.GetConfigMapSecretName(r.quayEcosystem),
 				},
 			},
 		}},
@@ -378,7 +456,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 
 func (r *ReconcileQuayEcosystemConfiguration) createRedisService(meta metav1.ObjectMeta) error {
 
-	meta.Name = GetRedisResourcesName(r.quayEcosystem)
+	meta.Name = resources.GetRedisResourcesName(r.quayEcosystem)
 
 	service := &corev1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -398,7 +476,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createRedisService(meta metav1.Obj
 		},
 	}
 
-	service.ObjectMeta.Labels = BuildRedisResourceLabels(meta.Labels)
+	service.ObjectMeta.Labels = resources.BuildRedisResourceLabels(meta.Labels)
 
 	err := r.createResource(service, r.quayEcosystem)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -411,7 +489,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createRedisService(meta metav1.Obj
 
 func (r *ReconcileQuayEcosystemConfiguration) redisDeployment(meta metav1.ObjectMeta) error {
 
-	meta.Name = GetRedisResourcesName(r.quayEcosystem)
+	meta.Name = resources.GetRedisResourcesName(r.quayEcosystem)
 
 	redisDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{

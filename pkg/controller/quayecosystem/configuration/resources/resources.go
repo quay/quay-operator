@@ -1,10 +1,10 @@
-package configuration
+package resources
 
 import (
 	"fmt"
 
 	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,6 +36,12 @@ func BuildQuayResourceLabels(resourceMap map[string]string) map[string]string {
 	return resourceMap
 }
 
+// BuildQuayDatabaseResourceLabels builds labels for the Quay app resources
+func BuildQuayDatabaseResourceLabels(resourceMap map[string]string) map[string]string {
+	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentQuayDatabaseValue
+	return resourceMap
+}
+
 // BuildRedisResourceLabels builds labels for the Redis app resources
 func BuildRedisResourceLabels(resourceMap map[string]string) map[string]string {
 	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentRedisValue
@@ -57,4 +63,15 @@ func GetConfigMapSecretName(quayEcosystem *copv1alpha1.QuayEcosystem) string {
 	//configSecretName := fmt.Sprintf("%s-config-secret", GetGenericResourcesName(quayEcosystem))
 	return "quay-enterprise-config-secret"
 	//return configSecretName
+}
+
+// GetQuayDatabaseName returns the name of the Quay database
+func GetQuayDatabaseName(quayEcosystem *copv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-quay-%s", GetGenericResourcesName(quayEcosystem), quayEcosystem.Spec.Quay.Database.Type)
+}
+
+// UpdateMetaWithName updates the name of the resource
+func UpdateMetaWithName(meta metav1.ObjectMeta, name string) metav1.ObjectMeta {
+	meta.Name = name
+	return meta
 }
