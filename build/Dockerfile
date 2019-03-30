@@ -1,7 +1,3 @@
-FROM alpine:3.8
+FROM quay.io/ablock/build-s2i-executable:latest
 
-RUN apk upgrade --update --no-cache
-
-USER nobody
-
-ADD build/_output/bin/quay-operator /usr/local/bin/quay-operator
+ADD build/_output/bin/quay-operator /app/quay-operator
