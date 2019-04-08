@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,11 +42,12 @@ type QuayEcosystemList struct {
 
 // Quay defines the properies of a deployment of Quay
 type Quay struct {
-	EnableNodePortService bool     `json:"enableNodePortService,omitempty"`
-	Image                 string   `json:"image,omitempty"`
-	RouteHost             string   `json:"routeHost,omitempty"`
-	Replicas              *int32   `json:"replicas,omitempty"`
-	Database              Database `json:"database,omitempty"`
+	EnableNodePortService bool            `json:"enableNodePortService,omitempty"`
+	Image                 string          `json:"image,omitempty"`
+	RouteHost             string          `json:"routeHost,omitempty"`
+	Replicas              *int32          `json:"replicas,omitempty"`
+	Database              Database        `json:"database,omitempty"`
+	RegistryStorage       RegistryStorage `json:"registryStorage,omitempty"`
 }
 
 // Redis defines the properies of a deployment of Redis
@@ -72,6 +75,21 @@ type Database struct {
 	Memory                string       `json:"memory,omitempty"`
 	CPU                   string       `json:"cpu,omitempty"`
 	CredentialsSecretName string       `json:"credentialsSecretName,omitempty"`
+}
+
+type RegistryStorage struct {
+	RegistryStorageType `json:",inline" protobuf:"bytes,2,opt,name=registryStorageType"`
+	StorageDirectory    string `json:"storageDirectory,omitempty"`
+}
+
+type RegistryStorageType struct {
+	PersistentVolume PersistentVolumeRegistryStorageType `json:"persistentVolume,omitempty"`
+}
+
+type PersistentVolumeRegistryStorageType struct {
+	StorageClassName string                              `json:"storageClassName,omitempty"`
+	Capacity         resource.Quantity                   `json:"capacity,omitempty"`
+	AccessModes      []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 }
 
 func init() {

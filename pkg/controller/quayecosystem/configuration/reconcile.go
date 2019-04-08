@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"reflect"
+
 	"github.com/sirupsen/logrus"
 
 	ossecurityv1 "github.com/openshift/api/security/v1"
@@ -78,7 +80,7 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 	}
 
 	// Database (PostgreSQL/MySQL)
-	if (copv1alpha1.Database{}) != r.quayEcosystem.Spec.Quay.Database {
+	if !reflect.DeepEqual(copv1alpha1.Database{}, r.quayEcosystem.Spec.Quay.Database) {
 
 		if err := r.createQuayDatabase(metaObject); err != nil {
 			return nil, err
@@ -93,6 +95,14 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 
 	if err := r.createQuayRoute(metaObject); err != nil {
 		return nil, err
+	}
+
+	if !reflect.DeepEqual(copv1alpha1.RegistryStorage{}, r.quayEcosystem.Spec.Quay.RegistryStorage) {
+
+		if err := r.quayRegistryStorage(metaObject); err != nil {
+			return nil, err
+		}
+
 	}
 
 	if err := r.quayDeployment(metaObject); err != nil {
@@ -390,6 +400,35 @@ func (r *ReconcileQuayEcosystemConfiguration) configureSCC(meta metav1.ObjectMet
 
 }
 
+func (r *ReconcileQuayEcosystemConfiguration) quayRegistryStorage(meta metav1.ObjectMeta) error {
+	meta.Name = resources.GetQuayRegistryStorageName(r.quayEcosystem)
+
+	registryStoragePVC := &corev1.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta,
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: r.quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes,
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceName(corev1.ResourceStorage): r.quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity,
+				},
+			},
+		},
+	}
+
+	err := r.createResource(registryStoragePVC, r.quayEcosystem)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		logrus.Errorf("%v", err)
+		return err
+	}
+
+	return nil
+
+}
+
 func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectMeta) error {
 
 	meta.Name = resources.GetQuayResourcesName(r.quayEcosystem)
@@ -423,6 +462,23 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 			Name: r.quayEcosystem.Spec.ImagePullSecretName,
 		},
 		}
+	}
+
+	if !reflect.DeepEqual(copv1alpha1.RegistryStorage{}, r.quayEcosystem.Spec.Quay.RegistryStorage) && !reflect.DeepEqual(copv1alpha1.PersistentVolumeRegistryStorageType{}, r.quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume) {
+
+		quayDeploymentPodSpec.Volumes = append(quayDeploymentPodSpec.Volumes, corev1.Volume{
+			Name: "registryvolume",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: resources.GetQuayRegistryStorageName(r.quayEcosystem),
+				},
+			},
+		})
+		quayDeploymentPodSpec.Containers[0].VolumeMounts = append(quayDeploymentPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      "registryvolume",
+			MountPath: r.quayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory,
+			ReadOnly:  false,
+		})
 	}
 
 	quayDeployment := &appsv1.Deployment{
@@ -570,7 +626,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createOrUpdateResource(obj metav1.
 		return fmt.Errorf("is not a %T a runtime.Object", obj)
 	}
 
-	// set Jenkins instance as the owner and controller, don't check error(can be already set)
+	// set QuayEcosystem instance as the owner and controller, don't check error(can be already set)
 	_ = controllerutil.SetControllerReference(r.quayEcosystem, obj, r.scheme)
 
 	err := r.client.Create(context.TODO(), runtimeObj)

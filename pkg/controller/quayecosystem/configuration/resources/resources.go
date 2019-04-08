@@ -70,6 +70,11 @@ func GetQuayDatabaseName(quayEcosystem *copv1alpha1.QuayEcosystem) string {
 	return fmt.Sprintf("%s-quay-%s", GetGenericResourcesName(quayEcosystem), quayEcosystem.Spec.Quay.Database.Type)
 }
 
+// GetQuayRegistryStorageName returns the name of the Quay registry storage
+func GetQuayRegistryStorageName(quayEcosystem *copv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-registry", GetGenericResourcesName(quayEcosystem))
+}
+
 // UpdateMetaWithName updates the name of the resource
 func UpdateMetaWithName(meta metav1.ObjectMeta, name string) metav1.ObjectMeta {
 	meta.Name = name
