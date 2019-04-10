@@ -1,5 +1,10 @@
 package constants
 
+import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
+
 const (
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
@@ -55,6 +60,8 @@ const (
 	DatabaseCredentialsDatabaseKey = "database-name"
 	// DatabaseCredentialsRootPasswordKey represents the key for the database root password
 	DatabaseCredentialsRootPasswordKey = "database-root-password"
+	// QuayRegistryStorageDirectory represents the location where registry storage is mounted in the container
+	QuayRegistryStorageDirectory = "/datastorage/registry"
 )
 
 var (
@@ -72,4 +79,10 @@ var (
 		DatabaseCredentialsDatabaseKey:     "clair",
 		DatabaseCredentialsRootPasswordKey: "clairAdmin",
 	}
+
+	// QuayRegistryStoragePersistentVolumeAccessModes represents the access modes for the registry storage persistent volume
+	QuayRegistryStoragePersistentVolumeAccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}
+
+	// QuayRegistryStoragePersistentVolumeStoreSize represents the size of the PersistentVolume that should be used for registry storage
+	QuayRegistryStoragePersistentVolumeStoreSize, _ = resource.ParseQuantity("20Gi")
 )

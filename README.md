@@ -127,6 +127,20 @@ _Note:_ When provisioning a MySQL database, the key `database-root-password` is 
 
 As of this time, additional steps are required in order to finalize the configurations for PostgreSQL. Please see the [Setting up Quay on OpenShift documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/2.9/html/deploy_red_hat_quay_on_openshift/set_up_red_hat_quay_services) to configure the `pg_trgm` extension.
 
+## Registry Storage
+
+Quay supports a number of registry storage options. One such option (for development environments) is to leverage local storage. To enable the contents of the registry leveraging local storage to be retained beyond the lifespan of a single pod, a PersistentVolume can be utilized.
+
+The following can be added to the _quay_ section of the _QuayEcosystem_ object to enable PersistentVolume support for local storage:
+
+```
+quay:
+  registryStorage:
+    persistentVolume:
+      accessModes:
+      - ReadWriteOnce
+      capacity: 20Gi
+```
 
 ## Local Development
 

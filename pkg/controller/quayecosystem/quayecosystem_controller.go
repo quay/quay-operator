@@ -2,6 +2,7 @@ package quayecosystem
 
 import (
 	"context"
+	"reflect"
 
 	"k8s.io/client-go/tools/record"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -184,6 +186,25 @@ func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *copv1alpha1.QuayEcos
 		if len(quayEcosystem.Spec.Quay.Database.CPU) == 0 {
 			changed = true
 			quayEcosystem.Spec.Quay.Database.CPU = constants.DatabaseCPU
+		}
+
+	}
+
+	if !reflect.DeepEqual(copv1alpha1.RegistryStorage{}, quayEcosystem.Spec.Quay.RegistryStorage) {
+
+		if len(quayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory) == 0 {
+			changed = true
+			quayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory = constants.QuayRegistryStorageDirectory
+		}
+
+		if len(quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes) == 0 {
+			changed = true
+			quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes = constants.QuayRegistryStoragePersistentVolumeAccessModes
+		}
+
+		if reflect.DeepEqual(resource.Quantity{}, quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity) {
+			changed = true
+			quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity = constants.QuayRegistryStoragePersistentVolumeStoreSize
 		}
 
 	}
