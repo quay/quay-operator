@@ -20,6 +20,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -56,24 +57,29 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 	}
 
 	if err := r.createRBAC(metaObject); err != nil {
+		logrus.Errorf("Failed to create RBAC: %v", err)
 		return nil, err
 	}
 
 	if err := r.createQuayEcosystemServiceAccount(metaObject); err != nil {
+		logrus.Errorf("Failed to create Service Account: %v", err)
 		return nil, err
 	}
 
 	if err := r.configureSCC(metaObject); err != nil {
+		logrus.Errorf("Failed to configure SCC: %v", err)
 		return nil, err
 	}
 
 	// Redis
 	if !r.quayEcosystem.Spec.Redis.Skip {
 		if err := r.createRedisService(metaObject); err != nil {
+			logrus.Errorf("Failed to create Redis service: %v", err)
 			return nil, err
 		}
 
 		if err := r.redisDeployment(metaObject); err != nil {
+			logrus.Errorf("Failed to create Redis deployment: %v", err)
 			return nil, err
 		}
 
@@ -83,6 +89,7 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 	if !reflect.DeepEqual(copv1alpha1.Database{}, r.quayEcosystem.Spec.Quay.Database) {
 
 		if err := r.createQuayDatabase(metaObject); err != nil {
+			logrus.Errorf("Failed to create Quay database: %v", err)
 			return nil, err
 		}
 
@@ -90,22 +97,26 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 
 	// Quay Resources
 	if err := r.createQuayService(metaObject); err != nil {
+		logrus.Errorf("Failed to create Quay service: %v", err)
 		return nil, err
 	}
 
 	if err := r.createQuayRoute(metaObject); err != nil {
+		logrus.Errorf("Failed to create Quay route: %v", err)
 		return nil, err
 	}
 
 	if !reflect.DeepEqual(copv1alpha1.RegistryStorage{}, r.quayEcosystem.Spec.Quay.RegistryStorage) {
 
 		if err := r.quayRegistryStorage(metaObject); err != nil {
+			logrus.Errorf("Failed to create registry storage: %v", err)
 			return nil, err
 		}
 
 	}
 
 	if err := r.quayDeployment(metaObject); err != nil {
+		logrus.Errorf("Failed to create Quay deployment: %v", err)
 		return nil, err
 	}
 
@@ -413,7 +424,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayRegistryStorage(meta metav1.Ob
 			AccessModes: r.quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceName(corev1.ResourceStorage): r.quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity,
+					corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(r.quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity),
 				},
 			},
 		},
@@ -421,7 +432,6 @@ func (r *ReconcileQuayEcosystemConfiguration) quayRegistryStorage(meta metav1.Ob
 
 	err := r.createResource(registryStoragePVC, r.quayEcosystem)
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		logrus.Errorf("%v", err)
 		return err
 	}
 

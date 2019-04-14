@@ -2,15 +2,14 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // QuayEcosystemSpec defines the desired state of QuayEcosystem
 type QuayEcosystemSpec struct {
 	ImagePullSecretName string `json:"imagePullSecretName,omitempty"`
-	Quay                Quay   `json:"quay"`
-	Redis               Redis  `json:"redis"`
+	Quay                Quay   `json:"quay,omitempty"`
+	Redis               Redis  `json:"redis,omitempty"`
 }
 
 // QuayEcosystemStatus defines the observed state of QuayEcosystem
@@ -88,7 +87,7 @@ type RegistryStorageType struct {
 
 type PersistentVolumeRegistryStorageType struct {
 	StorageClassName string                              `json:"storageClassName,omitempty"`
-	Capacity         resource.Quantity                   `json:"capacity,omitempty"`
+	Capacity         string                              `json:"capacity,omitempty"`
 	AccessModes      []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 }
 
