@@ -12,7 +12,6 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -96,6 +95,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	err = r.setDefaults(quayEcosystem)
 	if err != nil {
+		logrus.Errorf("Failed to set default values: %v", err)
 		return reconcile.Result{}, err
 	}
 
@@ -202,7 +202,7 @@ func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *copv1alpha1.QuayEcos
 			quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes = constants.QuayRegistryStoragePersistentVolumeAccessModes
 		}
 
-		if reflect.DeepEqual(resource.Quantity{}, quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity) {
+		if len(quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity) == 0 {
 			changed = true
 			quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity = constants.QuayRegistryStoragePersistentVolumeStoreSize
 		}

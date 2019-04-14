@@ -1,6 +1,7 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
+  creationTimestamp: null
   name: quayecosystems.cop.redhat.com
 spec:
   group: cop.redhat.com
@@ -10,6 +11,79 @@ spec:
     plural: quayecosystems
     singular: quayecosystem
   scope: Namespaced
-  version: v1alpha1
   subresources:
     status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            imagePullSecretName:
+              type: string
+            quay:
+              properties:
+                database:
+                  properties:
+                    cpu:
+                      type: string
+                    credentialsSecretName:
+                      type: string
+                    image:
+                      type: string
+                    memory:
+                      type: string
+                    type:
+                      type: string
+                    volumeSize:
+                      type: string
+                  type: object
+                enableNodePortService:
+                  type: boolean
+                image:
+                  type: string
+                registryStorage:
+                  properties:
+                    persistentVolume:
+                      properties:
+                        accessModes:
+                          items:
+                            type: string
+                          type: array
+                        capacity:
+                          type: string
+                        storageClassName:
+                          type: string
+                      type: object
+                    storageDirectory:
+                      type: string
+                  type: object
+                replicas:
+                  format: int32
+                  type: integer
+                routeHost:
+                  type: string
+              type: object
+            redis:
+              properties:
+                image:
+                  type: string
+                replicas:
+                  format: int32
+                  type: integer
+                skip:
+                  type: boolean
+              type: object
+          type: object
+        status:
+          type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
