@@ -1,0 +1,11 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: quay-subscription
+  namespace: quay-enterprise
+spec:
+  source: quay
+  sourceNamespace: openshift-operator-lifecycle-manager
+  name: quay
+  startingCSV: quay.v0.0.1
+  channel: alpha
