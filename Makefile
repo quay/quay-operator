@@ -5,7 +5,7 @@ REPOSITORY ?= $(REGISTRY)/redhat-cop/quay-operator
 
 IMG := $(REPOSITORY):latest
 
-VERSION := v0.0.1
+VERSION := v0.0.2
 
 BUILD_COMMIT := $(shell ./scripts/build/get-build-commit.sh)
 BUILD_TIMESTAMP := $(shell ./scripts/build/get-build-timestamp.sh)
