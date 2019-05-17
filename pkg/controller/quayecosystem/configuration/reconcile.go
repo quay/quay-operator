@@ -101,8 +101,18 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 		return nil, err
 	}
 
+	if err := r.createQuayConfigService(metaObject); err != nil {
+		logrus.Errorf("Failed to create Quay Config service: %v", err)
+		return nil, err
+	}
+
 	if err := r.createQuayRoute(metaObject); err != nil {
 		logrus.Errorf("Failed to create Quay route: %v", err)
+		return nil, err
+	}
+
+	if err := r.createQuayConfigRoute(metaObject); err != nil {
+		logrus.Errorf("Failed to create Quay Config route: %v", err)
 		return nil, err
 	}
 
@@ -117,6 +127,11 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 
 	if err := r.quayDeployment(metaObject); err != nil {
 		logrus.Errorf("Failed to create Quay deployment: %v", err)
+		return nil, err
+	}
+
+	if err := r.quayConfigDeployment(metaObject); err != nil {
+		logrus.Errorf("Failed to create Quay Config deployment: %v", err)
 		return nil, err
 	}
 
@@ -266,6 +281,11 @@ func (r *ReconcileQuayEcosystemConfiguration) createRBAC(meta metav1.ObjectMeta)
 				Resources: []string{"namespaces"},
 				Verbs:     []string{"get"},
 			},
+			{
+				APIGroups: []string{"extensions", "apps"},
+				Resources: []string{"deployments"},
+				Verbs:     []string{"get", "list", "patch", "update", "watch"},
+			},
 		},
 	}
 
@@ -319,13 +339,52 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayService(meta metav1.Obje
 				{
 					Port:       80,
 					Protocol:   "TCP",
-					TargetPort: intstr.FromInt(80),
+					TargetPort: intstr.FromInt(8080),
 				},
 			},
 		},
 	}
 
 	service.ObjectMeta.Labels = resources.BuildQuayResourceLabels(meta.Labels)
+
+	if r.quayEcosystem.Spec.Quay.EnableNodePortService {
+		service.Spec.Type = corev1.ServiceTypeNodePort
+	} else {
+		service.Spec.Type = corev1.ServiceTypeClusterIP
+	}
+
+	err := r.createResource(service, r.quayEcosystem)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigService(meta metav1.ObjectMeta) error {
+
+	meta.Name = resources.GetQuayConfigResourcesName(r.quayEcosystem)
+
+	service := &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta,
+		Spec: corev1.ServiceSpec{
+			Selector: meta.Labels,
+			Ports: []corev1.ServicePort{
+				{
+					Port:       443,
+					Protocol:   "TCP",
+					TargetPort: intstr.FromInt(8443),
+				},
+			},
+		},
+	}
+
+	service.ObjectMeta.Labels = resources.BuildQuayConfigResourceLabels(meta.Labels)
 
 	if r.quayEcosystem.Spec.Quay.EnableNodePortService {
 		service.Spec.Type = corev1.ServiceTypeNodePort
@@ -358,7 +417,11 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayRoute(meta metav1.Object
 				Name: meta.Name,
 			},
 			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromInt(80),
+				TargetPort: intstr.FromInt(8080),
+			},
+			TLS: &routev1.TLSConfig{
+				Termination:                   routev1.TLSTerminationEdge,
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 			},
 		},
 	}
@@ -367,6 +430,46 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayRoute(meta metav1.Object
 
 	if len(r.quayEcosystem.Spec.Quay.RouteHost) != 0 {
 		route.Spec.Host = r.quayEcosystem.Spec.Quay.RouteHost
+	}
+
+	err := r.createResource(route, r.quayEcosystem)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigRoute(meta metav1.ObjectMeta) error {
+
+	meta.Name = resources.GetQuayConfigResourcesName(r.quayEcosystem)
+
+	route := &routev1.Route{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Route",
+			APIVersion: routev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta,
+		Spec: routev1.RouteSpec{
+			To: routev1.RouteTargetReference{
+				Kind: "Service",
+				Name: meta.Name,
+			},
+			Port: &routev1.RoutePort{
+				TargetPort: intstr.FromInt(8443),
+			},
+			TLS: &routev1.TLSConfig{
+				Termination:                   routev1.TLSTerminationPassthrough,
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+			},
+		},
+	}
+
+	route.ObjectMeta.Labels = resources.BuildQuayConfigResourceLabels(meta.Labels)
+
+	if len(r.quayEcosystem.Spec.Quay.ConfigRouteHost) != 0 {
+		route.Spec.Host = r.quayEcosystem.Spec.Quay.ConfigRouteHost
 	}
 
 	err := r.createResource(route, r.quayEcosystem)
@@ -442,13 +545,18 @@ func (r *ReconcileQuayEcosystemConfiguration) quayRegistryStorage(meta metav1.Ob
 func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectMeta) error {
 
 	meta.Name = resources.GetQuayResourcesName(r.quayEcosystem)
+	resources.BuildQuayResourceLabels(meta.Labels)
 
 	quayDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: r.quayEcosystem.Spec.Quay.Image,
 			Name:  meta.Name,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 80,
+				ContainerPort: 8080,
+				Name:          "http",
+			}, {
+				ContainerPort: 8443,
+				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
 				Name:      "configvolume",
@@ -460,8 +568,16 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 		Volumes: []corev1.Volume{corev1.Volume{
 			Name: "configvolume",
 			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: resources.GetConfigMapSecretName(r.quayEcosystem),
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: resources.GetConfigMapSecretName(r.quayEcosystem),
+								},
+							},
+						},
+					},
 				},
 			},
 		}},
@@ -499,6 +615,91 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 		ObjectMeta: meta,
 		Spec: appsv1.DeploymentSpec{
 			Replicas: r.quayEcosystem.Spec.Quay.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: meta.Labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: meta.Labels,
+				},
+				Spec: quayDeploymentPodSpec,
+			},
+		},
+	}
+
+	err := r.createResource(quayDeployment, r.quayEcosystem)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.ObjectMeta) error {
+
+	meta.Name = resources.GetQuayConfigResourcesName(r.quayEcosystem)
+	resources.BuildQuayConfigResourceLabels(meta.Labels)
+
+	quayDeploymentPodSpec := corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Image: r.quayEcosystem.Spec.Quay.Image,
+			Name:  meta.Name,
+			Env: []corev1.EnvVar{
+				{
+					Name:  constants.QuayEntryName,
+					Value: constants.QuayEntryConfigValue,
+				},
+				{
+					Name:  constants.QuayConfigPasswordName,
+					Value: "quay",
+				},
+			},
+			Ports: []corev1.ContainerPort{{
+				ContainerPort: 8080,
+				Name:          "http",
+			}, {
+				ContainerPort: 8443,
+				Name:          "https",
+			}},
+			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
+				Name:      "configvolume",
+				MountPath: "/conf/stack",
+				ReadOnly:  false,
+			}},
+		}},
+		ServiceAccountName: constants.QuayEcosystemServiceAccount,
+		Volumes: []corev1.Volume{corev1.Volume{
+			Name: "configvolume",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: resources.GetConfigMapSecretName(r.quayEcosystem),
+								},
+							},
+						},
+					},
+				},
+			}}},
+	}
+
+	if len(r.quayEcosystem.Spec.ImagePullSecretName) != 0 {
+		quayDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
+			Name: r.quayEcosystem.Spec.ImagePullSecretName,
+		},
+		}
+	}
+
+	quayDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
+		ObjectMeta: meta,
+		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: meta.Labels,
 			},

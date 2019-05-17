@@ -41,7 +41,7 @@ $ oc create -f deploy/operator.yaml
 Create a pull secret to retrieve Quay images from quay.io
 
 ```
-$ oc create secret generic coreos-pull-secret --from-file=".dockerconfigjson=<location of docker.json file>" --type='kubernetes.io/dockerconfigjson'
+$ oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=<location of docker.json file>" --type='kubernetes.io/dockerconfigjson'
 ```
 
 Create a custom resource to deploy the Quay ecosystem. The following is an example of a `QuayEcosystem` custom resource to support a deployment of the Quay ecosystem
@@ -52,7 +52,7 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  imagePullSecretName: coreos-pull-secret
+  imagePullSecretName: redhat-pull-secret
 ```
 
 You can also run the following command to create the `QuayEnterprise` custom resource
@@ -72,7 +72,7 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  imagePullSecretName: coreos-pull-secret
+  imagePullSecretName: redhat-pull-secret
   quay:
     database:
       type: mysql
@@ -105,7 +105,7 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  imagePullSecretName: coreos-pull-secret
+  imagePullSecretName: redhat-pull-secret
   quay:
     database:
       type: mysql

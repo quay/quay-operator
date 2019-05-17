@@ -8,9 +8,9 @@ const (
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
 	// QuayImage is the Quay image
-	QuayImage = "quay.io/coreos/quay:v2.9.3"
+	QuayImage = "quay.io/redhat/quay:v3.0.1"
 	// ImagePullSecret is the name of the image pull secret for retrieving images from a protected image registry
-	ImagePullSecret = "coreos-pull-secret"
+	ImagePullSecret = "redhat-pull-secret"
 	// RedisImage is the name of the Redis Image
 	RedisImage = "quay.io/quay/redis:latest"
 	// LabelAppKey is the name of the label key
@@ -18,9 +18,11 @@ const (
 	// LabelAppValue is the name of the label
 	LabelAppValue = OperatorName
 	// LabelCompoentKey com
-	LabelCompoentKey = OperatorName + "-component"
+	LabelCompoentKey = "quay-enterprise-component"
 	// LabelComponentAppValue is the name of the app label
 	LabelComponentAppValue = "app"
+	// LabelComponentConfigValue is the name of the config label
+	LabelComponentConfigValue = "config"
 	// LabelComponentRedisValue is the name of the Redis label
 	LabelComponentRedisValue = "redis"
 	// LabelComponentQuayDatabaseValue is the name of the Quay database label
@@ -63,6 +65,12 @@ const (
 	QuayRegistryStorageDirectory = "/datastorage/registry"
 	// QuayRegistryStoragePersistentVolumeStoreSize represents the size of the PersistentVolume that should be used for registry storage
 	QuayRegistryStoragePersistentVolumeStoreSize = "20Gi"
+	// QuayEntryName represents the name of the operation to execute
+	QuayEntryName = "QUAYENTRY"
+	// QuayEntryConfigValue represents the value that will start the Quay config container
+	QuayEntryConfigValue = "config"
+	// QuayConfigPasswordName represents the name of the environment variable contining the Quay configuration password
+	QuayConfigPasswordName = "CONFIG_APP_PASSWORD"
 )
 
 var (

@@ -44,6 +44,7 @@ type Quay struct {
 	EnableNodePortService bool            `json:"enableNodePortService,omitempty"`
 	Image                 string          `json:"image,omitempty"`
 	RouteHost             string          `json:"routeHost,omitempty"`
+	ConfigRouteHost       string          `json:"configRouteHost,omitempty"`
 	Replicas              *int32          `json:"replicas,omitempty"`
 	Database              Database        `json:"database,omitempty"`
 	RegistryStorage       RegistryStorage `json:"registryStorage,omitempty"`

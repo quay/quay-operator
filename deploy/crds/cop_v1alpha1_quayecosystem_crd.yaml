@@ -28,6 +28,8 @@ spec:
               type: string
             quay:
               properties:
+                configRouteHost:
+                  type: string
                 database:
                   properties:
                     cpu:

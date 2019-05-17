@@ -36,6 +36,12 @@ func BuildQuayResourceLabels(resourceMap map[string]string) map[string]string {
 	return resourceMap
 }
 
+// BuildQuayConfigResourceLabels builds labels for the Quay config resources
+func BuildQuayConfigResourceLabels(resourceMap map[string]string) map[string]string {
+	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentConfigValue
+	return resourceMap
+}
+
 // BuildQuayDatabaseResourceLabels builds labels for the Quay app resources
 func BuildQuayDatabaseResourceLabels(resourceMap map[string]string) map[string]string {
 	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentQuayDatabaseValue
@@ -51,6 +57,11 @@ func BuildRedisResourceLabels(resourceMap map[string]string) map[string]string {
 // GetQuayResourcesName returns name of Kubernetes resource name
 func GetQuayResourcesName(quayEcosystem *copv1alpha1.QuayEcosystem) string {
 	return fmt.Sprintf("%s-quay", GetGenericResourcesName(quayEcosystem))
+}
+
+// GetQuayConfigResourcesName returns name of Kubernetes resource name
+func GetQuayConfigResourcesName(quayEcosystem *copv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-quay-config", GetGenericResourcesName(quayEcosystem))
 }
 
 // GetRedisResourcesName returns name of Kubernetes resource name
