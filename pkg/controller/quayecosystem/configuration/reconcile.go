@@ -555,7 +555,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 				ContainerPort: 8080,
 				Name:          "http",
 			}, {
-				ContainerPort: 8080,
+				ContainerPort: 8443,
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
@@ -659,7 +659,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 				ContainerPort: 8080,
 				Name:          "http",
 			}, {
-				ContainerPort: 8080,
+				ContainerPort: 8443,
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
