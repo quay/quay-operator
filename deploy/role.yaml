@@ -46,6 +46,18 @@ rules:
   - 'get'
   - 'list'
   - 'watch'
+  - 'patch'
+- apiGroups:
+  - extensions
+  resources:
+  - deployments
+  verbs:
+  - 'create'
+  - 'update'
+  - 'get'
+  - 'list'
+  - 'watch'
+  - 'patch'
 - apiGroups:
   - monitoring.coreos.com
   resources:
