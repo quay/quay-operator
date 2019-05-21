@@ -592,7 +592,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 	quayDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: r.quayEcosystem.Spec.Quay.Image,
-			Name:  meta.Name,
+			Name:  constants.QuayContainerAppName,
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 8080,
 				Name:          "http",
@@ -686,7 +686,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 	quayDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: r.quayEcosystem.Spec.Quay.Image,
-			Name:  meta.Name,
+			Name:  constants.QuayContainerConfigName,
 			Env: []corev1.EnvVar{
 				{
 					Name:  constants.QuayEntryName,
