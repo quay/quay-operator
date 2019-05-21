@@ -73,6 +73,10 @@ const (
 	QuayEntryConfigValue = "config"
 	// QuayConfigPasswordName represents the name of the environment variable contining the Quay configuration password
 	QuayConfigPasswordName = "CONFIG_APP_PASSWORD"
+	// QuayContainerConfigName represents the name of the Quay config container
+	QuayContainerConfigName = "quay-enterprise-config"
+	// QuayContainerAppName represents the name of the Quay app container
+	QuayContainerAppName = "quay-enterprise-app"
 )
 
 var (
