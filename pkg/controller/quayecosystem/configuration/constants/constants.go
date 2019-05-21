@@ -31,8 +31,10 @@ const (
 	LabelQuayCRKey = "quay-enterprise-cr"
 	// AnyUIDSCC is the name of the anyuid SCC
 	AnyUIDSCC = "anyuid"
-	// QuayEcosystemServiceAccount is the name of the Quay ServiceAccount
-	QuayEcosystemServiceAccount = "quayecosystem"
+	// RedisServiceAccount is the name of the Redis ServiceAccount
+	RedisServiceAccount = "redis"
+	// QuayServiceAccount is the name of the Quay ServiceAccount
+	QuayServiceAccount = "quay"
 	// MySQLName is the name used to represent MySQL
 	MySQLName = "mysql"
 	// PostgresqlName is the name used to represent MySQL

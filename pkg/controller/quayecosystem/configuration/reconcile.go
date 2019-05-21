@@ -61,13 +61,13 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 		return nil, err
 	}
 
-	if err := r.createQuayEcosystemServiceAccount(metaObject); err != nil {
-		logrus.Errorf("Failed to create Service Account: %v", err)
+	if err := r.createServiceAccounts(metaObject); err != nil {
+		logrus.Errorf("Failed to create Service Accounts: %v", err)
 		return nil, err
 	}
 
-	if err := r.configureSCC(metaObject); err != nil {
-		logrus.Errorf("Failed to configure SCC: %v", err)
+	if err := r.configureAnyUIDSCCs(metaObject); err != nil {
+		logrus.Errorf("Failed to configure SCCs: %v", err)
 		return nil, err
 	}
 
@@ -234,12 +234,54 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1
 	return nil
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) createQuayEcosystemServiceAccount(meta metav1.ObjectMeta) error {
+func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCCs(meta metav1.ObjectMeta) error {
+	// Configure Redis Service Account for AnyUID SCC
+	if !r.quayEcosystem.Spec.Redis.Skip {
+		err := r.configureAnyUIDSCC(constants.RedisServiceAccount, meta)
 
-	meta.Name = constants.QuayEcosystemServiceAccount
+		if err != nil {
+			return err
+		}
+	}
+
+	// Configure Quay Service Account for AnyUID SCC
+	err := r.configureAnyUIDSCC(constants.QuayServiceAccount, meta)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) createServiceAccounts(meta metav1.ObjectMeta) error {
+	// Create Redis Service Account
+	if !r.quayEcosystem.Spec.Redis.Skip {
+		err := r.createServiceAccount(constants.RedisServiceAccount, meta)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	// Create Quay Service Account
+	err := r.createServiceAccount(constants.QuayServiceAccount, meta)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) createServiceAccount(serviceAccountName string, meta metav1.ObjectMeta) error {
+
+	meta.Name = serviceAccountName
 
 	found := &corev1.ServiceAccount{}
-	err := r.client.Get(context.TODO(), types.NamespacedName{Name: constants.QuayEcosystemServiceAccount, Namespace: r.quayEcosystem.ObjectMeta.Namespace}, found)
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: serviceAccountName, Namespace: r.quayEcosystem.ObjectMeta.Namespace}, found)
 
 	if err != nil && apierrors.IsNotFound(err) {
 
@@ -308,7 +350,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createRBAC(meta metav1.ObjectMeta)
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
-				Name:      constants.QuayEcosystemServiceAccount,
+				Name:      constants.QuayServiceAccount,
 				Namespace: meta.Namespace,
 			},
 		},
@@ -481,9 +523,9 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigRoute(meta metav1.
 
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) configureSCC(meta metav1.ObjectMeta) error {
+func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountName string, meta metav1.ObjectMeta) error {
 
-	sccUser := "system:serviceaccount:" + meta.Namespace + ":" + constants.QuayEcosystemServiceAccount
+	sccUser := "system:serviceaccount:" + meta.Namespace + ":" + serviceAccountName
 
 	anyUIDSCC := &ossecurityv1.SecurityContextConstraints{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: constants.AnyUIDSCC, Namespace: ""}, anyUIDSCC)
@@ -564,7 +606,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 				ReadOnly:  false,
 			}},
 		}},
-		ServiceAccountName: constants.QuayEcosystemServiceAccount,
+		ServiceAccountName: constants.QuayServiceAccount,
 		Volumes: []corev1.Volume{corev1.Volume{
 			Name: "configvolume",
 			VolumeSource: corev1.VolumeSource{
@@ -668,7 +710,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 				ReadOnly:  false,
 			}},
 		}},
-		ServiceAccountName: constants.QuayEcosystemServiceAccount,
+		ServiceAccountName: constants.QuayServiceAccount,
 		Volumes: []corev1.Volume{corev1.Volume{
 			Name: "configvolume",
 			VolumeSource: corev1.VolumeSource{
@@ -766,7 +808,7 @@ func (r *ReconcileQuayEcosystemConfiguration) redisDeployment(meta metav1.Object
 				ContainerPort: 6379,
 			}},
 		}},
-		ServiceAccountName: constants.QuayEcosystemServiceAccount,
+		ServiceAccountName: constants.RedisServiceAccount,
 	}
 
 	if len(r.quayEcosystem.Spec.ImagePullSecretName) != 0 {

@@ -17,7 +17,7 @@ func (m *PostgreSQLDatabase) GenerateResources(meta metav1.ObjectMeta, quayEcosy
 
 	var resources []metav1.Object
 
-	service := GenerateDatabaseServiceResource(meta, constants.MySQLPort)
+	service := GenerateDatabaseServiceResource(meta, constants.PostgreSQLPort)
 	resources = append(resources, service)
 
 	deployment, err := generatePostgreSQLDatabaseResource(meta, quayEcosystem, database)
