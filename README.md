@@ -26,7 +26,7 @@ $ oc new-project quay-enterprise
 Deploy the cluster resources. Given that a number of elevated permissions are required to resources at a cluster scope the account you are currently logged in must have elevated rights
 
 ```
-$ oc create -f deploy/crds/cop_v1alpha1_quayecosystem_crd.yaml
+$ oc create -f deploy/crds/redhatcop_v1alpha1_quayecosystem_crd.yaml
 $ oc create -f deploy/service_account.yaml
 $ oc create -f deploy/cluster_role.yaml
 $ oc create -f deploy/cluster_role_binding.yaml
@@ -47,7 +47,7 @@ $ oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=<lo
 Create a custom resource to deploy the Quay ecosystem. The following is an example of a `QuayEcosystem` custom resource to support a deployment of the Quay ecosystem
 
 ```
-apiVersion: cop.redhat.com/v1alpha1
+apiVersion: redhatcop.redhat.io/v1alpha1
 kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
@@ -58,7 +58,7 @@ spec:
 You can also run the following command to create the `QuayEnterprise` custom resource
 
 ```
-$ oc create -f deploy/crds/cop_v1alpha1_quayecosystem_cr.yaml
+$ oc create -f deploy/crds/redhatcop_v1alpha1_quayecosystem_cr.yaml
 ```
 
 #### Persistence Support
@@ -68,6 +68,7 @@ MySQL or PostgreSQL can be deployed to provide persistence for quay.
 The following QuayEcosystem custom resource can be used to provision Quay along with a backing MySQL database:
 
 ```
+apiVersion: redhatcop.redhat.io/v1alpha1
 kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
@@ -101,6 +102,7 @@ Underneath the _database_ property, the following options are available:
 When a database is provisioned, a _secret_ is utilized which contain the database name as well as authentication details. A existing secret can be provided within the `QuayEcosystem` object as shown below:
 
 ```
+apiVersion: redhatcop.redhat.io/v1alpha1
 kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
@@ -146,10 +148,10 @@ quay:
 
 Execute the following steps to develop the functionality locally. It is recommended that development be done using a cluster with `cluster-admin` permissions. 
 
-Clone the repository, then resolve all depdendencies using `dep`
+Clone the repository, then resolve all dependencies using `go mod`
 
 ```
-$ dep ensure
+$ go mod vendor
 ```
 
 Using the [operator-sdk](https://github.com/operator-framework/operator-sdk), run the operator locally

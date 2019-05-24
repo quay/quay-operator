@@ -4,15 +4,14 @@ import (
 	"context"
 	"reflect"
 
-	"k8s.io/client-go/tools/record"
-
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
 
-	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration"
-	"github.com/sirupsen/logrus"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -33,7 +32,7 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileQuayEcosystem{client: mgr.GetClient(), scheme: mgr.GetScheme(), recorder: mgr.GetRecorder("quayecosystem-recorder")}
+	return &ReconcileQuayEcosystem{client: mgr.GetClient(), scheme: mgr.GetScheme(), recorder: mgr.GetRecorder("quayecosystem-controller")}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -45,42 +44,37 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource QuayEcosystem
-	err = c.Watch(&source.Kind{Type: &copv1alpha1.QuayEcosystem{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &redhatcopv1alpha1.QuayEcosystem{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner QuayEcosystem
-	//	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-	//		IsController: true,
-	//		OwnerType:    &copv1alpha1.QuayEcosystem{},
-	//	})
-	//	if err != nil {
-	//		return err
-	//	}
-
 	return nil
 }
 
+// blank assignment to verify that ReconcileQuayEcosystem implements reconcile.Reconciler
 var _ reconcile.Reconciler = &ReconcileQuayEcosystem{}
 
 // ReconcileQuayEcosystem reconciles a QuayEcosystem object
 type ReconcileQuayEcosystem struct {
-	// This client, initialized using mgr.Client() above, is a split client
-	// that reads objects from the cache and writes to the apiserver
 	client   client.Client
 	scheme   *runtime.Scheme
 	recorder record.EventRecorder
 }
 
-// Reconcile reads that state of the cluster for a QuayEcosytem object and makes changes based on the state read
-// and what is in the Quay.Spec
+// Reconcile reads that state of the cluster for a QuayEcosystem object and makes changes based on the state read
+// and what is in the QuayEcosystem.Spec
+// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
+// a Pod as an example
+// Note:
+// The Controller will requeue the Request to be processed again if the returned error is non-nil or
+// Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	logrus.Info("Reconciling QuayEcosystem")
+	reqLogger := logging.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger.Info("Reconciling QuayEcosystem")
 
 	// Fetch the Quay instance
-	quayEcosystem := &copv1alpha1.QuayEcosystem{}
+	quayEcosystem := &redhatcopv1alpha1.QuayEcosystem{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, quayEcosystem)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -95,7 +89,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	err = r.setDefaults(quayEcosystem)
 	if err != nil {
-		logrus.Errorf("Failed to set default values: %v", err)
+		logging.Log.Error(err, "Failed to set default values")
 		return reconcile.Result{}, err
 	}
 
@@ -123,18 +117,18 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *copv1alpha1.QuayEcosystem) error {
+func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) error {
 
 	changed := false
 
 	if len(quayEcosystem.Spec.Quay.Image) == 0 {
-		logrus.Info("Setting default Quay image: " + constants.QuayImage)
+		logging.Log.Info("Setting default Quay image: " + constants.QuayImage)
 		changed = true
 		quayEcosystem.Spec.Quay.Image = constants.QuayImage
 	}
 
 	if quayEcosystem.Spec.Quay.Replicas == nil {
-		logrus.Info("Setting default Quay replicas: 1")
+		logging.Log.Info("Setting default Quay replicas: 1")
 		changed = true
 		quayEcosystem.Spec.Quay.Replicas = &oneInt32
 	}
@@ -142,33 +136,33 @@ func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *copv1alpha1.QuayEcos
 	if !quayEcosystem.Spec.Redis.Skip {
 
 		if len(quayEcosystem.Spec.Redis.Image) == 0 {
-			logrus.Info("Setting default Redis image: " + constants.RedisImage)
+			logging.Log.Info("Setting default Redis image: " + constants.RedisImage)
 			changed = true
 			quayEcosystem.Spec.Redis.Image = constants.RedisImage
 		}
 
 		if quayEcosystem.Spec.Redis.Replicas == nil {
-			logrus.Info("Setting default Redis replicas: 1")
+			logging.Log.Info("Setting default Redis replicas: 1")
 			changed = true
 			quayEcosystem.Spec.Redis.Replicas = &oneInt32
 		}
 
 	}
 
-	if (copv1alpha1.Database{}) != quayEcosystem.Spec.Quay.Database {
+	if (redhatcopv1alpha1.Database{}) != quayEcosystem.Spec.Quay.Database {
 
 		// Check if database type has been defined
 		if len(quayEcosystem.Spec.Quay.Database.Type) == 0 {
 			changed = true
-			quayEcosystem.Spec.Quay.Database.Type = copv1alpha1.DatabaseMySQL
+			quayEcosystem.Spec.Quay.Database.Type = redhatcopv1alpha1.DatabaseMySQL
 		}
 
 		if len(quayEcosystem.Spec.Quay.Database.Image) == 0 {
 			changed = true
 			switch quayEcosystem.Spec.Quay.Database.Type {
-			case copv1alpha1.DatabaseMySQL:
+			case redhatcopv1alpha1.DatabaseMySQL:
 				quayEcosystem.Spec.Quay.Database.Image = constants.MySQLImage
-			case copv1alpha1.DatabasePostgresql:
+			case redhatcopv1alpha1.DatabasePostgresql:
 				quayEcosystem.Spec.Quay.Database.Image = constants.PostgresqlImage
 			}
 		}
@@ -190,7 +184,7 @@ func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *copv1alpha1.QuayEcos
 
 	}
 
-	if !reflect.DeepEqual(copv1alpha1.RegistryStorage{}, quayEcosystem.Spec.Quay.RegistryStorage) {
+	if !reflect.DeepEqual(redhatcopv1alpha1.RegistryStorage{}, quayEcosystem.Spec.Quay.RegistryStorage) {
 
 		if len(quayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory) == 0 {
 			changed = true

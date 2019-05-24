@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
+	"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 )
 
 func init() {

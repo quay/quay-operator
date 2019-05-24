@@ -1,7 +1,7 @@
 package databases
 
 import (
-	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,7 +13,7 @@ import (
 // PostgreSQLDatabase represents a PostgreSQL database
 type PostgreSQLDatabase struct{}
 
-func (m *PostgreSQLDatabase) GenerateResources(meta metav1.ObjectMeta, quayEcosystem *copv1alpha1.QuayEcosystem, database DatabaseConfig) ([]metav1.Object, error) {
+func (m *PostgreSQLDatabase) GenerateResources(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem, database DatabaseConfig) ([]metav1.Object, error) {
 
 	var resources []metav1.Object
 
@@ -32,7 +32,7 @@ func (m *PostgreSQLDatabase) GenerateResources(meta metav1.ObjectMeta, quayEcosy
 
 }
 
-func generatePostgreSQLDatabaseResource(meta metav1.ObjectMeta, quayEcosystem *copv1alpha1.QuayEcosystem, database DatabaseConfig) (*appsv1.Deployment, error) {
+func generatePostgreSQLDatabaseResource(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem, database DatabaseConfig) (*appsv1.Deployment, error) {
 
 	databaseDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{

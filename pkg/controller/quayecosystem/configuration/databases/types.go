@@ -1,14 +1,14 @@
 package databases
 
 import (
-	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Database represents a contract for a persistent store
 type Database interface {
-	GenerateResources(meta metav1.ObjectMeta, quatEcosystem *copv1alpha1.QuayEcosystem, database DatabaseConfig) ([]metav1.Object, error)
+	GenerateResources(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem, database DatabaseConfig) ([]metav1.Object, error)
 	ValidateProvidedSecret(secret *corev1.Secret) bool
 	GetDefaultSecret(metav1.ObjectMeta, map[string]string) *corev1.Secret
 }

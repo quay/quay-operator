@@ -3,7 +3,7 @@ package databases
 import (
 	"encoding/base64"
 
-	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GenerateDatabaseConfig(meta metav1.ObjectMeta, inputDatabase copv1alpha1.Database, credentials *corev1.Secret, defaultCredentials map[string]string) DatabaseConfig {
+func GenerateDatabaseConfig(meta metav1.ObjectMeta, inputDatabase redhatcopv1alpha1.Database, credentials *corev1.Secret, defaultCredentials map[string]string) DatabaseConfig {
 	database := DatabaseConfig{}
 	database.Name = meta.Name
 	database.Image = inputDatabase.Image

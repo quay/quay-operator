@@ -1,14 +1,8 @@
-# Temporary Build Files
-build/_output
-build/_test
-
 # Build dependencies
 vendor/
-Gopkg.lock
 
 # Platform Dependencies
 .DS_Store
-
 # Temporary Build Files
 build/_output
 build/_test

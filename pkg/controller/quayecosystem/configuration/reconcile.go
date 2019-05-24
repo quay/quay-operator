@@ -6,15 +6,14 @@ import (
 
 	"reflect"
 
-	"github.com/sirupsen/logrus"
-
 	ossecurityv1 "github.com/openshift/api/security/v1"
 
 	routev1 "github.com/openshift/api/route/v1"
-	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/databases"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/resources"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
@@ -35,12 +34,12 @@ import (
 type ReconcileQuayEcosystemConfiguration struct {
 	client        client.Client
 	scheme        *runtime.Scheme
-	quayEcosystem *copv1alpha1.QuayEcosystem
+	quayEcosystem *redhatcopv1alpha1.QuayEcosystem
 }
 
 // New creates the structure for the Quay configuration
 func New(client client.Client, scheme *runtime.Scheme,
-	quayEcosystem *copv1alpha1.QuayEcosystem) *ReconcileQuayEcosystemConfiguration {
+	quayEcosystem *redhatcopv1alpha1.QuayEcosystem) *ReconcileQuayEcosystemConfiguration {
 	return &ReconcileQuayEcosystemConfiguration{
 		client:        client,
 		scheme:        scheme,
@@ -57,39 +56,40 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 	}
 
 	if err := r.createRBAC(metaObject); err != nil {
-		logrus.Errorf("Failed to create RBAC: %v", err)
+		logging.Log.Error(err, "Failed to create RBAC")
 		return nil, err
 	}
 
 	if err := r.createServiceAccounts(metaObject); err != nil {
-		logrus.Errorf("Failed to create Service Accounts: %v", err)
+		logging.Log.Error(err, "Failed to create Service Accounts")
 		return nil, err
 	}
 
 	if err := r.configureAnyUIDSCCs(metaObject); err != nil {
-		logrus.Errorf("Failed to configure SCCs: %v", err)
+		logging.Log.Error(err, "Failed to configure SCCs")
 		return nil, err
 	}
 
 	// Redis
 	if !r.quayEcosystem.Spec.Redis.Skip {
 		if err := r.createRedisService(metaObject); err != nil {
-			logrus.Errorf("Failed to create Redis service: %v", err)
+			logging.Log.Error(err, "Failed to create Redis service")
 			return nil, err
 		}
 
 		if err := r.redisDeployment(metaObject); err != nil {
-			logrus.Errorf("Failed to create Redis deployment: %v", err)
+			logging.Log.Error(err, "Failed to create Redis deployment")
+
 			return nil, err
 		}
 
 	}
 
 	// Database (PostgreSQL/MySQL)
-	if !reflect.DeepEqual(copv1alpha1.Database{}, r.quayEcosystem.Spec.Quay.Database) {
+	if !reflect.DeepEqual(redhatcopv1alpha1.Database{}, r.quayEcosystem.Spec.Quay.Database) {
 
 		if err := r.createQuayDatabase(metaObject); err != nil {
-			logrus.Errorf("Failed to create Quay database: %v", err)
+			logging.Log.Error(err, "Failed to create Quay database")
 			return nil, err
 		}
 
@@ -97,41 +97,41 @@ func (r *ReconcileQuayEcosystemConfiguration) Reconcile() (*reconcile.Result, er
 
 	// Quay Resources
 	if err := r.createQuayService(metaObject); err != nil {
-		logrus.Errorf("Failed to create Quay service: %v", err)
+		logging.Log.Error(err, "Failed to create Quay service")
 		return nil, err
 	}
 
 	if err := r.createQuayConfigService(metaObject); err != nil {
-		logrus.Errorf("Failed to create Quay Config service: %v", err)
+		logging.Log.Error(err, "Failed to create Quay Config service")
 		return nil, err
 	}
 
 	if err := r.createQuayRoute(metaObject); err != nil {
-		logrus.Errorf("Failed to create Quay route: %v", err)
+		logging.Log.Error(err, "Failed to create Quay route")
 		return nil, err
 	}
 
 	if err := r.createQuayConfigRoute(metaObject); err != nil {
-		logrus.Errorf("Failed to create Quay Config route: %v", err)
+		logging.Log.Error(err, "Failed to create Quay Config route")
 		return nil, err
 	}
 
-	if !reflect.DeepEqual(copv1alpha1.RegistryStorage{}, r.quayEcosystem.Spec.Quay.RegistryStorage) {
+	if !reflect.DeepEqual(redhatcopv1alpha1.RegistryStorage{}, r.quayEcosystem.Spec.Quay.RegistryStorage) {
 
 		if err := r.quayRegistryStorage(metaObject); err != nil {
-			logrus.Errorf("Failed to create registry storage: %v", err)
+			logging.Log.Error(err, "Failed to create registry storage")
 			return nil, err
 		}
 
 	}
 
-	if err := r.quayDeployment(metaObject); err != nil {
-		logrus.Errorf("Failed to create Quay deployment: %v", err)
+	if err := r.quayConfigDeployment(metaObject); err != nil {
+		logging.Log.Error(err, "Failed to create Quay Config deployment")
 		return nil, err
 	}
 
-	if err := r.quayConfigDeployment(metaObject); err != nil {
-		logrus.Errorf("Failed to create Quay Config deployment: %v", err)
+	if err := r.quayDeployment(metaObject); err != nil {
+		logging.Log.Error(err, "Failed to create Quay deployment")
 		return nil, err
 	}
 
@@ -147,12 +147,12 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.Obj
 	resources.BuildQuayDatabaseResourceLabels(meta.Labels)
 
 	switch r.quayEcosystem.Spec.Quay.Database.Type {
-	case copv1alpha1.DatabaseMySQL:
+	case redhatcopv1alpha1.DatabaseMySQL:
 		database = new(databases.MySQLDatabase)
-	case copv1alpha1.DatabasePostgresql:
+	case redhatcopv1alpha1.DatabasePostgresql:
 		database = new(databases.PostgreSQLDatabase)
 	default:
-		logrus.Warn("Unknown database type")
+		logging.Log.Info("Unknown database type")
 	}
 
 	var existingValidSecret = false
@@ -198,7 +198,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.Obj
 	for _, resource := range resources {
 		err = r.createResource(resource, r.quayEcosystem)
 		if err != nil && !apierrors.IsAlreadyExists(err) {
-			logrus.Errorf("Error applying Resource: %v", err)
+			logging.Log.Error(err, "Error applying Resource")
 			return err
 		}
 	}
@@ -531,7 +531,7 @@ func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountN
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: constants.AnyUIDSCC, Namespace: ""}, anyUIDSCC)
 
 	if err != nil {
-		logrus.Errorf("Error occurred retrieving SCC: %v", err)
+		logging.Log.Error(err, "Error occurred retrieving SCC")
 		return err
 	}
 
@@ -632,7 +632,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 		}
 	}
 
-	if !reflect.DeepEqual(copv1alpha1.RegistryStorage{}, r.quayEcosystem.Spec.Quay.RegistryStorage) && !reflect.DeepEqual(copv1alpha1.PersistentVolumeRegistryStorageType{}, r.quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume) {
+	if !reflect.DeepEqual(redhatcopv1alpha1.RegistryStorage{}, r.quayEcosystem.Spec.Quay.RegistryStorage) && !reflect.DeepEqual(redhatcopv1alpha1.PersistentVolumeRegistryStorageType{}, r.quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume) {
 
 		quayDeploymentPodSpec.Volumes = append(quayDeploymentPodSpec.Volumes, corev1.Volume{
 			Name: "registryvolume",
@@ -847,7 +847,7 @@ func (r *ReconcileQuayEcosystemConfiguration) redisDeployment(meta metav1.Object
 
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) createResource(obj metav1.Object, quayEcosystem *copv1alpha1.QuayEcosystem) error {
+func (r *ReconcileQuayEcosystemConfiguration) createResource(obj metav1.Object, quayEcosystem *redhatcopv1alpha1.QuayEcosystem) error {
 	runtimeObj, ok := obj.(runtime.Object)
 	if !ok {
 		return fmt.Errorf("is not a %T a runtime.Object", obj)
@@ -888,6 +888,27 @@ func (r *ReconcileQuayEcosystemConfiguration) createOrUpdateResource(obj metav1.
 	} else if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
+
+	return nil
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) executeConfiguration(meta metav1.ObjectMeta) error {
+
+	err := r.removeQuayConfiguration(meta)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Removal of the resources related to Quay Configuration
+func (r *ReconcileQuayEcosystemConfiguration) removeQuayConfiguration(meta metav1.ObjectMeta) error {
+
+	//quayConfigurationName := resources.GetQuayConfigResourcesName(r.quayEcosystem)
+
+	//r.client.List(context.TODO, metav1.ListOptions{})
 
 	return nil
 }

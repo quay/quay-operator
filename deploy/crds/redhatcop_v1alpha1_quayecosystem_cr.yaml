@@ -1,4 +1,4 @@
-apiVersion: cop.redhat.com/v1alpha1
+apiVersion: redhatcop.redhat.io/v1alpha1
 kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
