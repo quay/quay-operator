@@ -151,6 +151,7 @@ Execute the following steps to develop the functionality locally. It is recommen
 Clone the repository, then resolve all dependencies using `go mod`
 
 ```
+$ export GO111MODULE=on
 $ go mod vendor
 ```
 

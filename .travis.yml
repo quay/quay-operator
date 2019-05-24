@@ -4,6 +4,9 @@ go_import_path: github.com/redhat-cop/quay-operator
 go:
 - "1.12"
 
+env:
+  - GO111MODULE=on
+
 before_install:
   - travis_retry go mod vendor -v
 
