@@ -10,6 +10,7 @@ rules:
   - services
   - serviceaccounts
   - pods
+  - pods/exec
   - configmaps
   - persistentvolumeclaims
   verbs:

@@ -35,6 +35,8 @@ spec:
               properties:
                 configRouteHost:
                   type: string
+                configSecretName:
+                  type: string
                 database:
                   properties:
                     cpu:
@@ -45,7 +47,10 @@ spec:
                       type: string
                     memory:
                       type: string
-                    type:
+                    replicas:
+                      format: int32
+                      type: integer
+                    server:
                       type: string
                     volumeSize:
                       type: string
@@ -54,6 +59,10 @@ spec:
                   type: boolean
                 image:
                   type: string
+                isOpenShift:
+                  type: boolean
+                keepConfigDeployment:
+                  type: boolean
                 registryStorage:
                   properties:
                     persistentVolume:
@@ -75,24 +84,58 @@ spec:
                   type: integer
                 routeHost:
                   type: string
+                skipSetup:
+                  type: boolean
+                superuserCredentialsName:
+                  type: string
               type: object
             redis:
               properties:
+                hostname:
+                  type: string
                 image:
                   type: string
+                port:
+                  format: int32
+                  type: integer
                 replicas:
                   format: int32
                   type: integer
-                skip:
-                  type: boolean
               type: object
           type: object
         status:
           properties:
+            conditions:
+              description: +patchMergeKey=type +patchStrategy=merge
+              items:
+                properties:
+                  lastTransitionTime:
+                    format: date-time
+                    type: string
+                  lastUpdateTime:
+                    format: date-time
+                    type: string
+                  message:
+                    type: string
+                  reason:
+                    type: string
+                  status:
+                    type: string
+                  type:
+                    type: string
+                required:
+                - type
+                - status
+                type: object
+              type: array
+            hostname:
+              type: string
             message:
               type: string
             phase:
               type: string
+            setupComplete:
+              type: boolean
           type: object
   version: v1alpha1
   versions:

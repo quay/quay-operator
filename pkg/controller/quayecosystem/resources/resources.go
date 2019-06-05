@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -78,7 +78,12 @@ func GetConfigMapSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) stri
 
 // GetQuayDatabaseName returns the name of the Quay database
 func GetQuayDatabaseName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
-	return fmt.Sprintf("%s-quay-%s", GetGenericResourcesName(quayEcosystem), quayEcosystem.Spec.Quay.Database.Type)
+	return fmt.Sprintf("%s-quay-%s", GetGenericResourcesName(quayEcosystem), constants.PostgresqlName)
+}
+
+// GetClairDatabaseName returns the name of the Quay database
+func GetClairDatabaseName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-clair-%s", GetGenericResourcesName(quayEcosystem), constants.PostgresqlName)
 }
 
 // GetQuayRegistryStorageName returns the name of the Quay registry storage

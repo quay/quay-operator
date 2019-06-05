@@ -110,9 +110,40 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref common.Reference
 							Format: "",
 						},
 					},
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition"),
+									},
+								},
+							},
+						},
+					},
+					"setupComplete": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
 				},
 			},
 		},
-		Dependencies: []string{},
+		Dependencies: []string{
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition"},
 	}
 }
