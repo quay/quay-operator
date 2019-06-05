@@ -30,3 +30,4 @@ deploy:
     script: make travis-dev-deploy DEV_TAG=$TRAVIS_COMMIT
     on:
       condition: $PUSH_LATEST_COMMIT = yes
+      all_branches: true
