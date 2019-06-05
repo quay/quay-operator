@@ -57,7 +57,7 @@ docker-login:
 
 # Tag for Dev
 docker-tag-dev:
-	@docker tag $(IMG) $(REPOSITORY):$(dev)
+	@docker tag $(IMG) $(REPOSITORY):$(DEV_TAG)
 
 # Tag for Dev
 docker-tag-release:
@@ -66,7 +66,7 @@ docker-tag-release:
 
 # Push for Dev
 docker-push-dev:  docker-tag-dev
-	@docker push $(REPOSITORY):$(dev)
+	@docker push $(REPOSITORY):$(DEV_TAG)
 
 # Push for Release
 docker-push-release:  docker-tag-release
