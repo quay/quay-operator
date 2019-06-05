@@ -28,20 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-/*
-
-Primary Phases
-
-1. Defaulting and Validation
-2. Deploy Core Resources (RBAC, DB, Redis etc)
-3. Configure Postgresql?
-4. Deploy Quay Config
-5. Setup Quay
-6. Remove Config (part of quay config?)
-7. Deploy Quay
-
-*/
-
 // Add creates a new QuayEcosystem Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -157,6 +143,9 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	if !quayConfiguration.QuayEcosystem.Status.SetupComplete {
+
+		// Wait 5 seconds prior to kicking off setup
+		time.Sleep(time.Duration(5) * time.Second)
 
 		deployQuayConfigResult, err := configuration.DeployQuayConfiguration(metaObject)
 		if err != nil {

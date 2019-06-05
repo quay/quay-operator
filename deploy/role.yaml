@@ -10,6 +10,7 @@ rules:
   - services
   - serviceaccounts
   - pods
+  - events
   - pods/exec
   - configmaps
   - persistentvolumeclaims
@@ -19,6 +20,7 @@ rules:
   - 'get'
   - 'list'
   - 'watch'
+  - 'delete'
 - apiGroups:
   - ""
   resources:
@@ -48,6 +50,7 @@ rules:
   - 'list'
   - 'watch'
   - 'patch'
+  - 'delete'
 - apiGroups:
   - extensions
   resources:
@@ -59,6 +62,7 @@ rules:
   - 'list'
   - 'watch'
   - 'patch'
+  - 'delete'
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -67,7 +71,7 @@ rules:
   - get
   - create
 - apiGroups:
-  - cop.redhat.com
+  - redhatcop.redhat.io
   resources:
   - '*'
   - quayecosystems
@@ -92,6 +96,7 @@ rules:
   - 'get'
   - 'list'
   - 'watch'
+  - 'delete'
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
