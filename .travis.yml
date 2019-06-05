@@ -25,3 +25,8 @@ deploy:
       repo: redhat-cop/quay-operator
       branch: master
       tags: true
+  - provider: script
+    skip_cleanup: true
+    script: make travis-dev-deploy DEV_TAG=$TRAVIS_COMMIT
+    on:
+      condition: "! -z $PUSH_LATEST_COMMIT"
