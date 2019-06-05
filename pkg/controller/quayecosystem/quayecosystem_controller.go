@@ -144,9 +144,6 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	if !quayConfiguration.QuayEcosystem.Status.SetupComplete {
 
-		// Wait 5 seconds prior to kicking off setup
-		time.Sleep(time.Duration(5) * time.Second)
-
 		deployQuayConfigResult, err := configuration.DeployQuayConfiguration(metaObject)
 		if err != nil {
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
@@ -156,6 +153,9 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to deploy Quay config", "Failed to deploy Quay config")
 			return *deployQuayConfigResult, nil
 		}
+
+		// Wait 5 seconds prior to kicking off setup
+		time.Sleep(time.Duration(5) * time.Second)
 
 		err = r.quaySetupManager.PrepareForSetup(r.reconcilerBase.GetClient(), &quayConfiguration)
 
