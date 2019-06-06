@@ -47,7 +47,7 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 		}
 
 		if !validQuayConfigSecret {
-			return false, fmtErrorf.("Failed to validate provided Quay Config Secret")
+			return false, fmt.Errorf("Failed to validate provided Quay Config Secret")
 		}
 
 		quayConfiguration.QuayConfigPassword = string(quayConfigSecret.Data[constants.QuayConfigPasswordKey])
