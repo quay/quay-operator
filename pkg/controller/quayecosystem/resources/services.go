@@ -18,7 +18,8 @@ func GetRedisServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv
 		},
 		ObjectMeta: meta,
 		Spec: corev1.ServiceSpec{
-			Selector: meta.Labels,
+			ClusterIP: "",
+			Selector:  meta.Labels,
 			Ports: []corev1.ServicePort{
 				{
 					Port:       6379,
@@ -45,7 +46,8 @@ func GetQuayServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1
 		},
 		ObjectMeta: meta,
 		Spec: corev1.ServiceSpec{
-			Selector: meta.Labels,
+			ClusterIP: "",
+			Selector:  meta.Labels,
 			Ports: []corev1.ServicePort{
 				{
 					Port:       80,
@@ -111,7 +113,8 @@ func GetDatabaseServiceResourceDefinition(meta metav1.ObjectMeta, port int) *cor
 		},
 		ObjectMeta: meta,
 		Spec: corev1.ServiceSpec{
-			Selector: meta.Labels,
+			ClusterIP: "",
+			Selector:  meta.Labels,
 			Ports: []corev1.ServicePort{
 				{
 					Port:       int32(port),

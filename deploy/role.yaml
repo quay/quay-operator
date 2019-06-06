@@ -20,6 +20,8 @@ rules:
   - 'list'
   - 'watch'
   - 'delete'
+  - 'patch'
+  - 'put'
 - apiGroups:
   - ""
   resources:
@@ -50,6 +52,7 @@ rules:
   - 'list'
   - 'watch'
   - 'patch'
+  - 'put'
   - 'delete'
 - apiGroups:
   - extensions
@@ -62,6 +65,7 @@ rules:
   - 'list'
   - 'watch'
   - 'patch'
+  - 'put'
   - 'delete'
 - apiGroups:
   - monitoring.coreos.com
@@ -90,12 +94,15 @@ rules:
   - route.openshift.io
   resources:
   - routes
+  - routes/custom-host
   verbs:
   - 'create'
   - 'update'
   - 'get'
   - 'list'
   - 'watch'
+  - 'patch'
+  - 'put'
   - 'delete'
 - apiGroups:
   - rbac.authorization.k8s.io
@@ -106,5 +113,7 @@ rules:
   - 'create'
   - 'update'
   - 'get'
+  - 'patch'
+  - 'put'
   - 'list'
   - 'watch'

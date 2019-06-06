@@ -177,8 +177,6 @@ func (r *ReconcileQuayEcosystemConfiguration) DeployQuay(metaObject metav1.Objec
 // DeployQuay takes care of base configuration
 func (r *ReconcileQuayEcosystemConfiguration) RemoveQuayConfigResources(metaObject metav1.ObjectMeta) (*reconcile.Result, error) {
 
-	logging.Log.Info("Removing Quay Configuration")
-
 	quayName := resources.GetQuayConfigResourcesName(r.quayConfiguration.QuayEcosystem)
 
 	err := r.k8sclient.AppsV1().Deployments(r.quayConfiguration.QuayEcosystem.Namespace).Delete(quayName, &metav1.DeleteOptions{})
@@ -373,7 +371,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createServiceAccount(serviceAccoun
 
 	if err != nil && apierrors.IsNotFound(err) {
 
-		return r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, resources.GetServiceAccountDefinition(meta))
+		return r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, resources.GetServiceAccountDefinition(meta))
 
 	} else if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -441,6 +439,8 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayRoute(meta metav1.Object
 		return err
 	}
 
+	time.Sleep(time.Duration(2) * time.Second)
+
 	createdRoute := &routev1.Route{}
 	err = r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: meta.Name, Namespace: r.quayConfiguration.QuayEcosystem.Namespace}, createdRoute)
 
@@ -464,7 +464,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigRoute(meta metav1.
 
 	route := resources.GetQuayConfigRouteDefinition(meta, r.quayConfiguration.QuayEcosystem)
 
-	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, route)
+	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, route)
 
 	if err != nil {
 		return err
@@ -525,7 +525,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 
 	quayDeployment := resources.GetQuayDeploymentDefinition(meta, r.quayConfiguration)
 
-	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
+	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
 
 	if err != nil {
 		return err
@@ -540,7 +540,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 	if !r.quayConfiguration.ValidProvidedQuayConfigPasswordSecret {
 		quayConfigSecret := resources.GetSecretDefinitionFromCredentialsMap(resources.GetQuayConfigResourcesName(r.quayConfiguration.QuayEcosystem), meta, constants.DefaultQuayConfigCredentials)
 
-		err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayConfigSecret)
+		err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayConfigSecret)
 
 		if err != nil {
 			return err
@@ -550,7 +550,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 
 	quayDeployment := resources.GetQuayConfigDeploymentDefinition(meta, r.quayConfiguration)
 
-	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
+	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
 
 	if err != nil {
 		return err

@@ -12,7 +12,6 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/provisioning"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/setup"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/validation"
 	"github.com/redhat-cop/quay-operator/pkg/k8sutils"
@@ -142,7 +141,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		return *result, nil
 	}
 
-	if !quayConfiguration.QuayEcosystem.Status.SetupComplete {
+	if quayConfiguration.DeployQuayConfiguration {
 
 		deployQuayConfigResult, err := configuration.DeployQuayConfiguration(metaObject)
 		if err != nil {
@@ -153,6 +152,10 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to deploy Quay config", "Failed to deploy Quay config")
 			return *deployQuayConfigResult, nil
 		}
+	}
+
+	// Execute setup if it has not been completed
+	if !quayConfiguration.QuayEcosystem.Status.SetupComplete {
 
 		// Wait 5 seconds prior to kicking off setup
 		time.Sleep(time.Duration(5) * time.Second)
@@ -199,7 +202,8 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		return *deployQuayResult, nil
 	}
 
-	if (!quayConfiguration.QuayEcosystem.Spec.Quay.SkipSetup) || (utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) || !quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) {
+	if !quayConfiguration.DeployQuayConfiguration {
+
 		removeQuayConfigResult, err := configuration.RemoveQuayConfigResources(metaObject)
 
 		if err != nil {
