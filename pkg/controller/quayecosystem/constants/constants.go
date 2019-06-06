@@ -133,7 +133,7 @@ var (
 	// DefaultClairDatabaseCredentials represents a map containing the default values for Clair database
 	DefaultClairDatabaseCredentials = map[string]string{
 		DatabaseCredentialsUsernameKey:     ClairDatabaseCredentialsDefaultUsername,
-		DatabaseCredentialsPasswordKey:     ClairDatabaseCredentialsDefaultUsername,
+		DatabaseCredentialsPasswordKey:     ClairDatabaseCredentialsDefaultPassword,
 		DatabaseCredentialsDatabaseKey:     ClairDatabaseCredentialsDefaultDatabaseName,
 		DatabaseCredentialsRootPasswordKey: ClairDatabaseCredentialsDefaultRootPassword,
 	}
