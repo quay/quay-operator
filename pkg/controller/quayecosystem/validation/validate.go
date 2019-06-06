@@ -47,7 +47,7 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 		}
 
 		if !validQuayConfigSecret {
-			return false, fmt.Errorf("Failed to validate provided Quay Config Secret")
+			return false, fmtErrorf.("Failed to validate provided Quay Config Secret")
 		}
 
 		quayConfiguration.QuayConfigPassword = string(quayConfigSecret.Data[constants.QuayConfigPasswordKey])
@@ -121,6 +121,7 @@ func validateSecret(client client.Client, namespace string, name string, require
 	err := client.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: name}, secret)
 	if err != nil && errors.IsNotFound(err) {
 		logging.Log.Error(fmt.Errorf("Secret not Found"), "Secret Validation", "Namespace", namespace, "Name", name)
+		return false, nil, err
 	} else if err != nil && !errors.IsNotFound(err) {
 		logging.Log.Error(fmt.Errorf("Error retrieving secret"), "Secret Validation", "Namespace", namespace, "Name", name)
 		return false, nil, err
