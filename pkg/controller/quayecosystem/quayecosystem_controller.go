@@ -2,18 +2,25 @@ package quayecosystem
 
 import (
 	"context"
-	"reflect"
+	"math"
+	"time"
 
-	"k8s.io/client-go/tools/record"
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration/constants"
+	"github.com/redhat-cop/operator-utils/pkg/util"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/provisioning"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/setup"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 
-	copv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/cop/v1alpha1"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/configuration"
-	"github.com/sirupsen/logrus"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/validation"
+	"github.com/redhat-cop/quay-operator/pkg/k8sutils"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -21,19 +28,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-var (
-	oneInt32 int32 = 1
-)
-
 // Add creates a new QuayEcosystem Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+
+	k8sclient, err := k8sutils.GetK8sClient(mgr.GetConfig())
+
+	if err != nil {
+		return err
+	}
+
+	return add(mgr, newReconciler(mgr, k8sclient))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileQuayEcosystem{client: mgr.GetClient(), scheme: mgr.GetScheme(), recorder: mgr.GetRecorder("quayecosystem-recorder")}
+func newReconciler(mgr manager.Manager, k8sclient kubernetes.Interface) reconcile.Reconciler {
+
+	reconcilerBase := util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetRecorder("quayecosystem-controller"))
+
+	return &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: k8sclient, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, k8sclient)}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -45,173 +58,229 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource QuayEcosystem
-	err = c.Watch(&source.Kind{Type: &copv1alpha1.QuayEcosystem{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &redhatcopv1alpha1.QuayEcosystem{}}, &handler.EnqueueRequestForObject{}, util.ResourceGenerationOrFinalizerChangedPredicate{})
 	if err != nil {
 		return err
 	}
 
-	// TODO(user): Modify this to be the types you create that are owned by the primary resource
-	// Watch for changes to secondary resource Pods and requeue the owner QuayEcosystem
-	//	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
-	//		IsController: true,
-	//		OwnerType:    &copv1alpha1.QuayEcosystem{},
-	//	})
-	//	if err != nil {
-	//		return err
-	//	}
-
 	return nil
 }
 
+// blank assignment to verify that ReconcileQuayEcosystem implements reconcile.Reconciler
 var _ reconcile.Reconciler = &ReconcileQuayEcosystem{}
 
 // ReconcileQuayEcosystem reconciles a QuayEcosystem object
 type ReconcileQuayEcosystem struct {
-	// This client, initialized using mgr.Client() above, is a split client
-	// that reads objects from the cache and writes to the apiserver
-	client   client.Client
-	scheme   *runtime.Scheme
-	recorder record.EventRecorder
+	reconcilerBase   util.ReconcilerBase
+	k8sclient        kubernetes.Interface
+	quaySetupManager *setup.QuaySetupManager
 }
 
-// Reconcile reads that state of the cluster for a QuayEcosytem object and makes changes based on the state read
-// and what is in the Quay.Spec
+// Reconcile performs the primary reconciliation loop
 func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	logrus.Info("Reconciling QuayEcosystem")
+	reqLogger := logging.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	reqLogger.Info("Reconciling QuayEcosystem")
 
 	// Fetch the Quay instance
-	quayEcosystem := &copv1alpha1.QuayEcosystem{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, quayEcosystem)
+	quayEcosystem := &redhatcopv1alpha1.QuayEcosystem{}
+	err := r.reconcilerBase.GetClient().Get(context.TODO(), request.NamespacedName, quayEcosystem)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
 			return reconcile.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 
-	err = r.setDefaults(quayEcosystem)
-	if err != nil {
-		logrus.Errorf("Failed to set default values: %v", err)
-		return reconcile.Result{}, err
+	// Initialize a new Quay Configuration Resource
+	quayConfiguration := resources.QuayConfiguration{
+		QuayEcosystem: quayEcosystem,
 	}
 
-	configuration := configuration.New(r.client, r.scheme, quayEcosystem)
+	// Initialize Configuration
+	configuration := provisioning.New(r.reconcilerBase, r.k8sclient, &quayConfiguration)
+	metaObject := resources.NewResourceObjectMeta(quayConfiguration.QuayEcosystem)
 
-	valid, err := configuration.Validate(quayEcosystem)
+	// Set default values
+	changed := validation.SetDefaults(r.reconcilerBase.GetClient(), &quayConfiguration)
+
+	if changed {
+
+		err := r.reconcilerBase.GetClient().Update(context.TODO(), quayConfiguration.QuayEcosystem)
+
+		if err != nil {
+			logging.Log.Error(err, "Failed to update QuayEcosystem after setting defaults")
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+
+		}
+
+		_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemUpdateDefaultConfigurationConditionSuccess, "", "Configuration Updated Successfully")
+
+		if err != nil {
+			logging.Log.Error(err, "Failed to update QuayEcosystem status after setting defaults")
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemUpdateDefaultConfigurationConditionFailure, err)
+		}
+
+		return reconcile.Result{}, nil
+
+	}
+
+	// Validate Configuration
+	valid, err := validation.Validate(r.reconcilerBase.GetClient(), &quayConfiguration)
 	if err != nil {
-		return reconcile.Result{}, err
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemValidationFailure, err)
 	}
 	if !valid {
-		r.recorder.Event(quayEcosystem, "Warning", "QuayEcosystem Validation Failure", "Failed to validate QuayEcosystem Custom Resource")
-		return reconcile.Result{}, nil
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemValidationFailure, err)
 	}
 
-	result, err := configuration.Reconcile()
-
+	result, err := configuration.CoreResourceDeployment(metaObject)
 	if err != nil {
-		return reconcile.Result{}, err
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
 	}
 
 	if result != nil {
 		return *result, nil
 	}
 
+	if !quayConfiguration.QuayEcosystem.Status.SetupComplete {
+
+		deployQuayConfigResult, err := configuration.DeployQuayConfiguration(metaObject)
+		if err != nil {
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+		}
+
+		if deployQuayConfigResult != nil {
+			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to deploy Quay config", "Failed to deploy Quay config")
+			return *deployQuayConfigResult, nil
+		}
+
+		// Wait 5 seconds prior to kicking off setup
+		time.Sleep(time.Duration(5) * time.Second)
+
+		err = r.quaySetupManager.PrepareForSetup(r.reconcilerBase.GetClient(), &quayConfiguration)
+
+		if err != nil {
+			logging.Log.Error(err, "Failed to prepare for Quay Setup")
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupFailure, err)
+		}
+
+		quaySetupInstance, err := r.quaySetupManager.NewQuaySetupInstance(&quayConfiguration)
+
+		if err != nil {
+			logging.Log.Error(err, "Failed to obtain QuaySetupInstance")
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupFailure, err)
+		}
+
+		err = r.quaySetupManager.SetupQuay(quaySetupInstance)
+
+		if err != nil {
+			logging.Log.Error(err, "Failed to Setup Quay")
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupFailure, err)
+		}
+
+		quayConfiguration.QuayEcosystem.Status.SetupComplete = true
+
+		_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupSuccess, "", "Setup Completed Successfully")
+		if err != nil {
+			logging.Log.Error(err, "Failed to update QuayEcosystem status after Quay Setup Completion")
+			return reconcile.Result{}, err
+		}
+
+	}
+
+	deployQuayResult, err := configuration.DeployQuay(metaObject)
+	if err != nil {
+		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Deploy Quay", err.Error())
+		return reconcile.Result{}, err
+	}
+
+	if deployQuayResult != nil {
+		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Deploy Quay", "Failed to Deploy Quay")
+		return *deployQuayResult, nil
+	}
+
+	if (!quayConfiguration.QuayEcosystem.Spec.Quay.SkipSetup) || (utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) || !quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) {
+		removeQuayConfigResult, err := configuration.RemoveQuayConfigResources(metaObject)
+
+		if err != nil {
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+		}
+
+		if removeQuayConfigResult != nil {
+			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Remove Quay Config", "Failed to Remove Quay Config")
+			return *removeQuayConfigResult, nil
+		}
+
+	}
+
+	return reconcile.Result{}, nil
+
+}
+
+func (r *ReconcileQuayEcosystem) manageSuccess(instance *redhatcopv1alpha1.QuayEcosystem, conditionType redhatcopv1alpha1.QuayEcosystemConditionType, reason string, message string) (reconcile.Result, error) {
+
+	condition := redhatcopv1alpha1.QuayEcosystemCondition{
+		Type:    conditionType,
+		Reason:  reason,
+		Message: message,
+		Status:  corev1.ConditionTrue,
+	}
+
+	instance.SetCondition(condition)
+
+	err := r.reconcilerBase.GetClient().Status().Update(context.TODO(), instance)
+
+	if err != nil {
+		return reconcile.Result{
+			RequeueAfter: time.Second,
+			Requeue:      true,
+		}, nil
+	}
+
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileQuayEcosystem) setDefaults(quayEcosystem *copv1alpha1.QuayEcosystem) error {
+func (r *ReconcileQuayEcosystem) manageError(instance *redhatcopv1alpha1.QuayEcosystem, conditionType redhatcopv1alpha1.QuayEcosystemConditionType, issue error) (reconcile.Result, error) {
 
-	changed := false
+	r.reconcilerBase.GetRecorder().Event(instance, "Warning", "ProcessingError", issue.Error())
 
-	if len(quayEcosystem.Spec.Quay.Image) == 0 {
-		logrus.Info("Setting default Quay image: " + constants.QuayImage)
-		changed = true
-		quayEcosystem.Spec.Quay.Image = constants.QuayImage
+	existingCondition, found := instance.FindConditionByType(conditionType)
+
+	lastUpdate := existingCondition.LastUpdateTime
+
+	if !found {
+		lastUpdate = metav1.NewTime(time.Now())
 	}
 
-	if quayEcosystem.Spec.Quay.Replicas == nil {
-		logrus.Info("Setting default Quay replicas: 1")
-		changed = true
-		quayEcosystem.Spec.Quay.Replicas = &oneInt32
+	condition := redhatcopv1alpha1.QuayEcosystemCondition{
+		Type:    conditionType,
+		Reason:  "ProcessingError",
+		Message: issue.Error(),
+		Status:  corev1.ConditionFalse,
 	}
 
-	if !quayEcosystem.Spec.Redis.Skip {
+	instance.SetCondition(condition)
 
-		if len(quayEcosystem.Spec.Redis.Image) == 0 {
-			logrus.Info("Setting default Redis image: " + constants.RedisImage)
-			changed = true
-			quayEcosystem.Spec.Redis.Image = constants.RedisImage
-		}
+	err := r.reconcilerBase.GetClient().Status().Update(context.TODO(), instance)
 
-		if quayEcosystem.Spec.Redis.Replicas == nil {
-			logrus.Info("Setting default Redis replicas: 1")
-			changed = true
-			quayEcosystem.Spec.Redis.Replicas = &oneInt32
-		}
-
+	if err != nil {
+		return reconcile.Result{
+			RequeueAfter: time.Second,
+			Requeue:      true,
+		}, nil
 	}
 
-	if (copv1alpha1.Database{}) != quayEcosystem.Spec.Quay.Database {
-
-		// Check if database type has been defined
-		if len(quayEcosystem.Spec.Quay.Database.Type) == 0 {
-			changed = true
-			quayEcosystem.Spec.Quay.Database.Type = copv1alpha1.DatabaseMySQL
-		}
-
-		if len(quayEcosystem.Spec.Quay.Database.Image) == 0 {
-			changed = true
-			switch quayEcosystem.Spec.Quay.Database.Type {
-			case copv1alpha1.DatabaseMySQL:
-				quayEcosystem.Spec.Quay.Database.Image = constants.MySQLImage
-			case copv1alpha1.DatabasePostgresql:
-				quayEcosystem.Spec.Quay.Database.Image = constants.PostgresqlImage
-			}
-		}
-
-		if len(quayEcosystem.Spec.Quay.Database.VolumeSize) == 0 {
-			changed = true
-			quayEcosystem.Spec.Quay.Database.VolumeSize = constants.QuayPVCSize
-		}
-
-		if len(quayEcosystem.Spec.Quay.Database.Memory) == 0 {
-			changed = true
-			quayEcosystem.Spec.Quay.Database.Memory = constants.DatabaseMemory
-		}
-
-		if len(quayEcosystem.Spec.Quay.Database.CPU) == 0 {
-			changed = true
-			quayEcosystem.Spec.Quay.Database.CPU = constants.DatabaseCPU
-		}
-
+	var retryInterval time.Duration
+	if !found || existingCondition.Status == corev1.ConditionTrue {
+		retryInterval = time.Second
+	} else {
+		retryInterval = time.Now().Sub(lastUpdate.Time).Round(time.Second)
 	}
 
-	if !reflect.DeepEqual(copv1alpha1.RegistryStorage{}, quayEcosystem.Spec.Quay.RegistryStorage) {
+	requeue := time.Duration(math.Min(float64(retryInterval.Nanoseconds()*2), float64(time.Hour.Nanoseconds()*6)))
 
-		if len(quayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory) == 0 {
-			changed = true
-			quayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory = constants.QuayRegistryStorageDirectory
-		}
-
-		if len(quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes) == 0 {
-			changed = true
-			quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes = constants.QuayRegistryStoragePersistentVolumeAccessModes
-		}
-
-		if len(quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity) == 0 {
-			changed = true
-			quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity = constants.QuayRegistryStoragePersistentVolumeStoreSize
-		}
-
-	}
-
-	if changed {
-		return r.client.Update(context.TODO(), quayEcosystem)
-	}
-
-	return nil
+	return reconcile.Result{
+		RequeueAfter: requeue,
+		Requeue:      true,
+	}, nil
 }
