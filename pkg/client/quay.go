@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,6 +16,17 @@ type QuayClient struct {
 	Username   string
 	Password   string
 }
+
+type QuayValidationType string
+
+const (
+	DatabaseValidation    QuayValidationType = "database"
+	RedisValidation       QuayValidationType = "redis"
+	RegistryValidation    QuayValidationType = "registry-storage"
+	TimeMachineValidation QuayValidationType = "time-machine"
+	AccessValidation      QuayValidationType = "access"
+	SslValidation         QuayValidationType = "ssl"
+)
 
 func (c *QuayClient) InitializationConfiguration() (*http.Response, StringValue, error) {
 	req, err := c.newRequest("POST", "/api/v1/configapp/initialization", StringValue{})
@@ -62,6 +74,17 @@ func (c *QuayClient) GetRegistryStatus() (*http.Response, RegistryStatus, error)
 
 func (c *QuayClient) ValidateDatabase(config QuayConfig) (*http.Response, QuayStatusResponse, error) {
 	req, err := c.newRequest("POST", "/api/v1/superuser/config/validate/database", config)
+	if err != nil {
+		return nil, QuayStatusResponse{}, err
+	}
+	var quayStatusResponse QuayStatusResponse
+	resp, err := c.do(req, &quayStatusResponse)
+
+	return resp, quayStatusResponse, err
+}
+
+func (c *QuayClient) ValidateComponent(config QuayConfig, validationType QuayValidationType) (*http.Response, QuayStatusResponse, error) {
+	req, err := c.newRequest("POST", fmt.Sprintf("/api/v1/superuser/config/validate/%s", validationType), config)
 	if err != nil {
 		return nil, QuayStatusResponse{}, err
 	}

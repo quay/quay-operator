@@ -113,7 +113,7 @@ func (*QuaySetupManager) NewQuaySetupInstance(quayConfiguration *resources.QuayC
 }
 
 // SetupQuay performs the initialization and initial configuration of the Quay server
-func (*QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) error {
+func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) error {
 
 	_, _, err := quaySetupInstance.setupClient.GetRegistryStatus()
 
@@ -135,15 +135,10 @@ func (*QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) error {
 
 	quayConfig.Config["DB_URI"] = fmt.Sprintf("postgresql://%s:%s@%s/%s", quaySetupInstance.quayConfiguration.QuayDatabase.Username, quaySetupInstance.quayConfiguration.QuayDatabase.Password, quaySetupInstance.quayConfiguration.QuayDatabase.Server, quaySetupInstance.quayConfiguration.QuayDatabase.Database)
 
-	_, validDatabaseResponse, err := quaySetupInstance.setupClient.ValidateDatabase(quayConfig)
+	err = qm.validateComponent(quaySetupInstance, quayConfig, client.DatabaseValidation)
 
 	if err != nil {
-		logging.Log.Error(err, "Error attempting to validate database")
 		return err
-	}
-
-	if !validDatabaseResponse.Status {
-		return fmt.Errorf("Database Validation Failed: %s", validDatabaseResponse.Reason)
 	}
 
 	redisConfiguration := map[string]interface{}{
@@ -187,6 +182,15 @@ func (*QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) error {
 		logging.Log.Error(err, "Failed to get Quay Configuration")
 	}
 
+	// Validate multiple components
+	for _, validationComponent := range []client.QuayValidationType{client.RedisValidation, client.RegistryValidation, client.TimeMachineValidation, client.AccessValidation, client.SslValidation} {
+		err = qm.validateComponent(quaySetupInstance, quayConfig, validationComponent)
+
+		if err != nil {
+			return err
+		}
+	}
+
 	quayConfig.Config["SETUP_COMPLETE"] = true
 
 	_, quayConfig, err = quaySetupInstance.setupClient.UpdateQuayConfiguration(quayConfig)
@@ -203,4 +207,19 @@ func (*QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) error {
 
 	return nil
 
+}
+
+func (*QuaySetupManager) validateComponent(quaySetupInstance *QuaySetupInstance, quayConfig client.QuayConfig, validationType client.QuayValidationType) error {
+
+	_, validateResponse, err := quaySetupInstance.setupClient.ValidateComponent(quayConfig, validationType)
+
+	if err != nil {
+		return err
+	}
+
+	if !validateResponse.Status {
+		return fmt.Errorf("%s Validation Failed: %s", validationType, validateResponse.Reason)
+	}
+
+	return nil
 }

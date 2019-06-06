@@ -10,7 +10,6 @@ rules:
   - services
   - serviceaccounts
   - pods
-  - events
   - pods/exec
   - configmaps
   - persistentvolumeclaims
@@ -25,6 +24,7 @@ rules:
   - ""
   resources:
   - secrets
+  - events
   verbs:
   - 'create'
   - 'update'

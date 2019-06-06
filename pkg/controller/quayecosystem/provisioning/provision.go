@@ -76,9 +76,10 @@ func (r *ReconcileQuayEcosystemConfiguration) CoreResourceDeployment(metaObject 
 			return nil, err
 		}
 
-		if err := r.redisDeployment(metaObject); err != nil {
+		redisDeploymentResult, err := r.redisDeployment(metaObject)
+		if err != nil {
 			logging.Log.Error(err, "Failed to create Redis deployment")
-			return nil, err
+			return redisDeploymentResult, err
 		}
 
 	}
@@ -151,23 +152,8 @@ func (r *ReconcileQuayEcosystemConfiguration) DeployQuayConfiguration(metaObject
 
 	// Verify Deployment
 	deploymentName := resources.GetQuayConfigResourcesName(r.quayConfiguration.QuayEcosystem)
-	deployment := &appsv1.Deployment{}
-	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: deploymentName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, deployment)
 
-	if err != nil {
-		return nil, err
-	}
-
-	if deployment.Status.AvailableReplicas != 1 {
-		scaled := k8sutils.GetDeploymentStatus(r.k8sclient, r.quayConfiguration.QuayEcosystem.Namespace, deploymentName)
-
-		if !scaled {
-			return &reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-		}
-
-	}
-
-	return nil, nil
+	return r.verifyDeployment(deploymentName, r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace)
 
 }
 
@@ -183,23 +169,9 @@ func (r *ReconcileQuayEcosystemConfiguration) DeployQuay(metaObject metav1.Objec
 
 	// Verify Deployment
 	deploymentName := resources.GetQuayResourcesName(r.quayConfiguration.QuayEcosystem)
-	deployment := &appsv1.Deployment{}
-	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: deploymentName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, deployment)
 
-	if err != nil {
-		return nil, err
-	}
+	return r.verifyDeployment(deploymentName, r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace)
 
-	if deployment.Status.AvailableReplicas != 1 {
-		scaled := k8sutils.GetDeploymentStatus(r.k8sclient, r.quayConfiguration.QuayEcosystem.Namespace, deploymentName)
-
-		if !scaled {
-			return &reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-		}
-
-	}
-
-	return nil, nil
 }
 
 // DeployQuay takes care of base configuration
@@ -282,23 +254,10 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.Obj
 
 	// Verify Deployment
 	deploymentName := meta.Name
-	deployedPostgreSQL := &appsv1.Deployment{}
-	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: deploymentName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, deployedPostgreSQL)
 
-	if err != nil {
-		return nil, err
-	}
+	time.Sleep(time.Duration(2) * time.Second)
 
-	if deployedPostgreSQL.Status.AvailableReplicas != 1 {
-		scaled := k8sutils.GetDeploymentStatus(r.k8sclient, r.quayConfiguration.QuayEcosystem.Namespace, deploymentName)
-
-		if !scaled {
-			return &reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
-		}
-
-	}
-
-	return nil, nil
+	return r.verifyDeployment(deploymentName, r.quayConfiguration.QuayEcosystem.Namespace)
 
 }
 
@@ -615,15 +574,41 @@ func (r *ReconcileQuayEcosystemConfiguration) createRedisService(meta metav1.Obj
 
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) redisDeployment(meta metav1.ObjectMeta) error {
+func (r *ReconcileQuayEcosystemConfiguration) redisDeployment(meta metav1.ObjectMeta) (*reconcile.Result, error) {
 
 	redisDeployment := resources.GetRedisDeploymentDefinition(meta, r.quayConfiguration)
 
 	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, redisDeployment)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	time.Sleep(time.Duration(2) * time.Second)
+
+	// Verify Deployment
+	redisDeploymentName := resources.GetRedisResourcesName(r.quayConfiguration.QuayEcosystem)
+	return r.verifyDeployment(redisDeploymentName, r.quayConfiguration.QuayEcosystem.Namespace)
+}
+
+// Verify Deployment
+func (r *ReconcileQuayEcosystemConfiguration) verifyDeployment(deploymentName string, deploymentNamespace string) (*reconcile.Result, error) {
+
+	deployment := &appsv1.Deployment{}
+	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: deploymentName, Namespace: deploymentNamespace}, deployment)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if deployment.Status.AvailableReplicas != 1 {
+		scaled := k8sutils.GetDeploymentStatus(r.k8sclient, deploymentNamespace, deploymentName)
+
+		if !scaled {
+			return &reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
+		}
+
+	}
+
+	return nil, nil
 
 }
