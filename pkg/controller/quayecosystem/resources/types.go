@@ -38,8 +38,7 @@ type QuayConfiguration struct {
 	ValidProvidedQuayConfigPasswordSecret bool
 	QuayImage                             string
 	QuayReplicas                          *int32
-
-	DeployQuayConfiguration bool
+	DeployQuayConfiguration               bool
 }
 
 // DatabaseConfig is an internal structure representing a database
