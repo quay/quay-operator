@@ -53,6 +53,14 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 
 	}
 
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) && quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment {
+		quayConfiguration.DeployQuayConfiguration = true
+	}
+
+	if !quayConfiguration.QuayEcosystem.Status.SetupComplete {
+		quayConfiguration.DeployQuayConfiguration = true
+	}
+
 	/*
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) {
 
