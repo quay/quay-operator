@@ -29,8 +29,6 @@ spec:
           type: object
         spec:
           properties:
-            imagePullSecretName:
-              type: string
             quay:
               properties:
                 configRouteHost:
@@ -44,6 +42,8 @@ spec:
                     credentialsSecretName:
                       type: string
                     image:
+                      type: string
+                    imagePullSecretName:
                       type: string
                     memory:
                       type: string
@@ -59,25 +59,13 @@ spec:
                   type: boolean
                 image:
                   type: string
+                imagePullSecretName:
+                  type: string
                 isOpenShift:
                   type: boolean
                 keepConfigDeployment:
                   type: boolean
                 registryStorage:
-                  properties:
-                    persistentVolume:
-                      properties:
-                        accessModes:
-                          items:
-                            type: string
-                          type: array
-                        capacity:
-                          type: string
-                        storageClassName:
-                          type: string
-                      type: object
-                    storageDirectory:
-                      type: string
                   type: object
                 replicas:
                   format: int32
@@ -94,6 +82,8 @@ spec:
                 hostname:
                   type: string
                 image:
+                  type: string
+                imagePullSecretName:
                   type: string
                 port:
                   format: int32

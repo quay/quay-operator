@@ -52,7 +52,10 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  imagePullSecretName: redhat-pull-secret
+  quay:
+    imagePullSecretName: redhat-pull-secret
+  redis:
+    imagePullSecretName: redhat-pull-secret
 ```
 
 You can also run the following command to create the `QuayEnterprise` custom resource
@@ -90,6 +93,9 @@ spec:
   imagePullSecretName: redhat-pull-secret
   quay:
     superuserCredentialsName: <secret_name>
+    imagePullSecretName: redhat-pull-secret
+  redis:
+    imagePullSecretName: redhat-pull-secret
 ```
 
 #### Quay Configuration
@@ -113,9 +119,11 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  imagePullSecretName: redhat-pull-secret
   quay:
     configSecretName: <secret_name>
+    imagePullSecretName: redhat-pull-secret
+  redis:
+    imagePullSecretName: redhat-pull-secret
 ```
 
 ### Persistent Storage using PostgreSQL
@@ -139,10 +147,12 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  imagePullSecretName: redhat-pull-secret
   quay:
+    imagePullSecretName: redhat-pull-secret
     database:
       volumeSize: 10Gi
+  redis:
+    imagePullSecretName: redhat-pull-secret
 ```
 
 #### Specifying Credentials
@@ -170,9 +180,56 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  imagePullSecretName: redhat-pull-secret
-  database:
-    credentialsSecretName: <secret_name>
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    database:
+      credentialsSecretName: <secret_name>
+  redis:
+    imagePullSecretName: redhat-pull-secret
+```
+
+### Registry Storage
+
+Quay supports multiple storage backends. The quay operator supports aiding in the facilitation of certain storage backends. The following backends are currently supported:
+
+* Local
+
+#### Configuring Local Storage
+
+Local storage references a local directory within the Quay pod for which image metadata is stored. The configuration is specified by using the `registryStorage` parameters underneath the `quay` property. By default, a _PersistentVolumeClaim_ is created to support the registry (no configuration necessary). However, you may specify any of the following parameters as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    registryStorage:
+      local:
+        persistentVolumeAccessMode:
+          - ReadWriteOnce
+        persistentVolumeSize: 10Gi
+  redis:
+    imagePullSecretName: redhat-pull-secret
+```
+
+To disable the creation of a _PersistentVolumeClaim_ and instead use an _EmptyDir_ volume, specify `ephemeral` to `true` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    registryStorage:
+      local:
+        ephemeral: true
+  redis:
+    imagePullSecretName: redhat-pull-secret
 ```
 
 ## Local Development
@@ -207,5 +264,4 @@ spec:
   quay:
     configRouteHost: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
   imagePullSecretName: redhat-pull-secret
-
 ```

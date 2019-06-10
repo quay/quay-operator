@@ -1,9 +1,6 @@
 package resources
 
 import (
-	"reflect"
-
-	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 
@@ -29,9 +26,9 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 		ServiceAccountName: constants.RedisServiceAccount,
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName) {
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.ImagePullSecretName) {
 		redisDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
-			Name: quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName,
+			Name: quayConfiguration.QuayEcosystem.Spec.Redis.ImagePullSecretName,
 		},
 		}
 	}
@@ -128,9 +125,9 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 			}}},
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName) {
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
 		quayDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
-			Name: quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName,
+			Name: quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName,
 		},
 		}
 	}
@@ -209,29 +206,40 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 		}},
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName) {
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
 		quayDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
-			Name: quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName,
+			Name: quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName,
 		},
 		}
 	}
 
-	if !reflect.DeepEqual(redhatcopv1alpha1.RegistryStorage{}, quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) && !reflect.DeepEqual(redhatcopv1alpha1.PersistentVolumeRegistryStorageType{}, quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume) {
+		quayDeploymentPodSpec.Containers[0].VolumeMounts = append(quayDeploymentPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      "registryvolume",
+			MountPath: quayConfiguration.QuayRegistryStorageDirectory,
+			ReadOnly:  false,
+		})
 
+		if quayConfiguration.QuayRegistryIsProvisionPVCVolume {
+			quayDeploymentPodSpec.Volumes = append(quayDeploymentPodSpec.Volumes, corev1.Volume{
+				Name: "registryvolume",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: GetQuayRegistryStorageName(quayConfiguration.QuayEcosystem),
+					},
+				},
+			})
+			
+		} else {
 		quayDeploymentPodSpec.Volumes = append(quayDeploymentPodSpec.Volumes, corev1.Volume{
 			Name: "registryvolume",
 			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: GetQuayRegistryStorageName(quayConfiguration.QuayEcosystem),
-				},
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		})
-		quayDeploymentPodSpec.Containers[0].VolumeMounts = append(quayDeploymentPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "registryvolume",
-			MountPath: quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory,
-			ReadOnly:  false,
-		})
-	}
+
+		}
+
+
 
 	quayReplicas := utils.CheckValue(quayConfiguration.QuayEcosystem.Spec.Quay.Replicas, &constants.OneInt)
 
@@ -326,9 +334,9 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 		Volumes: []corev1.Volume{},
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName) {
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.ImagePullSecretName) {
 		databaseDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
-			Name: quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName,
+			Name: quayConfiguration.QuayEcosystem.Spec.Quay.Database.ImagePullSecretName,
 		},
 		}
 	}

@@ -1,14 +1,14 @@
 package resources
 
 import (
-	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetQuayRegistryStorageDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem) *corev1.PersistentVolumeClaim {
-	meta.Name = GetQuayRegistryStorageName(quayEcosystem)
+func GetQuayPVCRegistryStorageDefinition(meta metav1.ObjectMeta, accessModes []corev1.PersistentVolumeAccessMode, pvSize string, storageClass *string) *corev1.PersistentVolumeClaim {
 
 	registryStoragePVC := &corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
@@ -17,13 +17,17 @@ func GetQuayRegistryStorageDefinition(meta metav1.ObjectMeta, quayEcosystem *red
 		},
 		ObjectMeta: meta,
 		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes,
+			AccessModes: accessModes,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(quayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity),
+					corev1.ResourceName(corev1.ResourceStorage): resource.MustParse(pvSize),
 				},
 			},
 		},
+	}
+
+	if !utils.IsZeroOfUnderlyingType(storageClass) && len(*storageClass) != 0 {
+		registryStoragePVC.Spec.StorageClassName = storageClass
 	}
 
 	return registryStoragePVC

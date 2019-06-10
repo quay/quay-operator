@@ -3,13 +3,11 @@ package provisioning
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	routev1 "github.com/openshift/api/route/v1"
 	ossecurityv1 "github.com/openshift/api/security/v1"
-	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
@@ -128,13 +126,15 @@ func (r *ReconcileQuayEcosystemConfiguration) CoreResourceDeployment(metaObject 
 		return nil, err
 	}
 
-	if !reflect.DeepEqual(redhatcopv1alpha1.RegistryStorage{}, r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) {
+	if r.quayConfiguration.QuayRegistryIsProvisionPVCVolume {
 
 		if err := r.quayRegistryStorage(metaObject); err != nil {
 			logging.Log.Error(err, "Failed to create registry storage")
 			return nil, err
 		}
 
+	} else {
+		logging.Log.Info("Should attempt to remove")
 	}
 
 	return nil, nil
@@ -509,11 +509,28 @@ func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountN
 
 func (r *ReconcileQuayEcosystemConfiguration) quayRegistryStorage(meta metav1.ObjectMeta) error {
 
-	registryStoragePVC := resources.GetQuayRegistryStorageDefinition(meta, r.quayConfiguration.QuayEcosystem)
+	meta.Name = resources.GetQuayRegistryStorageName(r.quayConfiguration.QuayEcosystem)
+
+	registryStoragePVC := resources.GetQuayPVCRegistryStorageDefinition(meta, r.quayConfiguration.QuayRegistryPersistentVolumeAccessModes, r.quayConfiguration.QuayRegistryPersistentVolumeSize, &r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeStorageClassName)
 
 	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, registryStoragePVC)
 
 	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) removeQuayRegistryStorage(meta metav1.ObjectMeta) error {
+
+	registryPVC := resources.GetQuayRegistryStorageName(r.quayConfiguration.QuayEcosystem)
+
+	err := r.k8sclient.CoreV1().PersistentVolumeClaims(r.quayConfiguration.QuayEcosystem.Namespace).Delete(registryPVC, &metav1.DeleteOptions{})
+
+	if err != nil && !apierrors.IsNotFound(err) {
+		logging.Log.Error(err, "Error Deleting Quay Registry PVC", "Namespace", r.quayConfiguration.QuayEcosystem.Namespace, "Name", registryPVC)
 		return err
 	}
 
