@@ -68,12 +68,6 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref common.ReferenceCa
 			SchemaProps: spec.SchemaProps{
 				Description: "QuayEcosystemSpec defines the desired state of QuayEcosystem",
 				Properties: map[string]spec.Schema{
-					"imagePullSecretName": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
 					"quay": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay"),

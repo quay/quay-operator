@@ -7,9 +7,6 @@ go:
 env:
   - GO111MODULE=on
 
-before_install:
-  - travis_retry go mod vendor -v
-
 deploy:
   - provider: script
     skip_cleanup: true

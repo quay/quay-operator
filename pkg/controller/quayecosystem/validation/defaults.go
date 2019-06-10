@@ -19,14 +19,8 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.QuaySuperuserEmail = constants.QuaySuperuserDefaultEmail
 	quayConfiguration.QuayConfigPasswordSecret = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
 
-	if checkEmptyOrNull(quayConfiguration.QuayEcosystem.Spec.Quay.IsOpenShift) || !quayConfiguration.QuayEcosystem.Spec.Quay.IsOpenShift {
-		quayConfiguration.IsOpenShift = false
-	} else {
-		quayConfiguration.IsOpenShift = true
-	}
-
 	// Core Quay Values
-	if checkEmptyOrNull(quayConfiguration.QuayEcosystem.Spec.Quay.Image) {
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Image) {
 		changed = true
 		quayConfiguration.QuayEcosystem.Spec.Quay.Image = constants.QuayImage
 	}
@@ -61,80 +55,28 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		quayConfiguration.DeployQuayConfiguration = true
 	}
 
-	/*
-		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) {
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) || !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local) {
 
-			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory) {
-				changed = true
-				quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.StorageDirectory = constants.QuayRegistryStorageDirectory
+		// Check if we want to provision a PVC to back the registry
+		if !quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local.Ephemeral {
+			quayConfiguration.QuayRegistryIsProvisionPVCVolume = true
+
+			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeAccessModes) {
+				quayConfiguration.QuayRegistryPersistentVolumeAccessModes = constants.QuayRegistryStoragePersistentVolumeAccessModes
+			} else {
+				quayConfiguration.QuayRegistryPersistentVolumeAccessModes = quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local.PersistentVolumeAccessModes
 			}
 
-			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes) {
-				changed = true
-				quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.AccessModes = constants.QuayRegistryStoragePersistentVolumeAccessModes
+			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local.PersistentVolumeSize) {
+				quayConfiguration.QuayRegistryPersistentVolumeSize = constants.QuayRegistryStoragePersistentVolumeStoreSize
 			}
-
-			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity) {
-				changed = true
-				quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolume.Capacity = constants.QuayRegistryStoragePersistentVolumeStoreSize
-			}
-
 		}
-	*/
 
-	/* Things to add
-	1. Superuser
-	*/
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local.StorageDirectory) {
+			quayConfiguration.QuayRegistryStorageDirectory = constants.QuayRegistryStorageDirectory
+		}
 
-	// if !quayConfiguration.QuayEcosystem.Status.ProvisioningComplete {
-	/*
-	  1. Superuser
-	*/
-	/*
-		quayConfiguration.QuaySuperuserUsername = constants.QuaySuperuserDefaultUsername
-		quayConfiguration.QuaySuperuserPassword = constants.QuaySuperuserDefaultPassword
-		quayConfiguration.QuaySuperuserEmail = constants.QuaySuperuserDefaultEmail
+	}
 
-		// }
-
-		quayConfiguration.QuayConfigUsername = constants.QuayConfigUsername
-		quayConfiguration.QuayConfigPassword = constants.QuayConfigDefaultPasswordValue
-
-	*/
 	return changed
 }
-
-// func GetDefaultDatabaseSecret(meta metav1.ObjectMeta, credentials map[string]string) *corev1.Secret {
-
-// 	defaultSecret := &corev1.Secret{
-// 		ObjectMeta: meta,
-// 		StringData: map[string]string{
-// 			constants.DatabaseCredentialsDatabaseKey: credentials[constants.DatabaseCredentialsDatabaseKey],
-// 			constants.DatabaseCredentialsUsernameKey: credentials[constants.DatabaseCredentialsUsernameKey],
-// 			constants.DatabaseCredentialsPasswordKey: credentials[constants.DatabaseCredentialsPasswordKey],
-// 		},
-// 	}
-
-// 	return defaultSecret
-
-// }
-
-func checkEmptyOrNull(valueToCheck interface{}) bool {
-
-	if utils.IsZeroOfUnderlyingType(valueToCheck) {
-		return true
-	}
-
-	return false
-}
-
-/*
-func setValueInt32(valueToCheck *int32, defaultValue *int32) *int32 {
-
-	if utils.IsZeroOfUnderlyingType(valueToCheck) {
-		return defaultValue
-	}
-
-	return valueToCheck
-}
-*/

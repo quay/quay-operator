@@ -2,6 +2,7 @@ package resources
 
 import (
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // QuayConfiguration is a wrapper object around a QuayEcosystem that provides the full set of configurable options
@@ -27,18 +28,20 @@ type QuayConfiguration struct {
 	RedisPort     *int32
 	RedisPassword string
 
-	ValidProvidedImagePullSecret bool
-
 	// Quay
-	QuayHostname                          string
-	QuayConfigHostname                    string
-	QuayConfigUsername                    string
-	QuayConfigPassword                    string
-	QuayConfigPasswordSecret              string
-	ValidProvidedQuayConfigPasswordSecret bool
-	QuayImage                             string
-	QuayReplicas                          *int32
-	DeployQuayConfiguration               bool
+	QuayHostname                            string
+	QuayConfigHostname                      string
+	QuayConfigUsername                      string
+	QuayConfigPassword                      string
+	QuayConfigPasswordSecret                string
+	ValidProvidedQuayConfigPasswordSecret   bool
+	QuayImage                               string
+	QuayReplicas                            *int32
+	DeployQuayConfiguration                 bool
+	QuayRegistryPersistentVolumeAccessModes []corev1.PersistentVolumeAccessMode
+	QuayRegistryPersistentVolumeSize        string
+	QuayRegistryStorageDirectory            string
+	QuayRegistryIsProvisionPVCVolume        bool
 }
 
 // DatabaseConfig is an internal structure representing a database

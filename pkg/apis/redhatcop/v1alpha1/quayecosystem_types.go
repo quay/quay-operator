@@ -11,9 +11,8 @@ import (
 // QuayEcosystemSpec defines the desired state of QuayEcosystem
 // +k8s:openapi-gen=true
 type QuayEcosystemSpec struct {
-	ImagePullSecretName string `json:"imagePullSecretName,omitempty"`
-	Quay                Quay   `json:"quay,omitempty"`
-	Redis               Redis  `json:"redis,omitempty"`
+	Quay  Quay  `json:"quay,omitempty"`
+	Redis Redis `json:"redis,omitempty"`
 }
 
 // QuayEcosystemPhase defines the phase of lifecycle the operator is running in
@@ -82,68 +81,74 @@ type QuayEcosystemList struct {
 
 // Quay defines the properies of a deployment of Quay
 type Quay struct {
+	ConfigRouteHost                string          `json:"configRouteHost,omitempty"`
+	ConfigSecretName               string          `json:"configSecretName,omitempty"`
+	Database                       Database        `json:"database,omitempty"`
 	EnableNodePortService          bool            `json:"enableNodePortService,omitempty"`
 	Image                          string          `json:"image,omitempty"`
-	RouteHost                      string          `json:"routeHost,omitempty"`
-	ConfigRouteHost                string          `json:"configRouteHost,omitempty"`
-	Replicas                       *int32          `json:"replicas,omitempty"`
-	Database                       Database        `json:"database,omitempty"`
-	RegistryStorage                RegistryStorage `json:"registryStorage,omitempty"`
-	SkipSetup                      bool            `json:"skipSetup,omitempty"`
-	KeepConfigDeployment           bool            `json:"keepConfigDeployment,omitempty"`
+	ImagePullSecretName            string          `json:"imagePullSecretName,omitempty"`
 	IsOpenShift                    bool            `json:"isOpenShift,omitempty"`
+	KeepConfigDeployment           bool            `json:"keepConfigDeployment,omitempty"`
+	RegistryStorage                RegistryStorage `json:"registryStorage,omitempty"`
+	Replicas                       *int32          `json:"replicas,omitempty"`
+	RouteHost                      string          `json:"routeHost,omitempty"`
+	SkipSetup                      bool            `json:"skipSetup,omitempty"`
 	SuperuserCredentialsSecretName string          `json:"superuserCredentialsName,omitempty"`
-	ConfigSecretName               string          `json:"configSecretName,omitempty"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
 type QuayEcosystemCondition struct {
+	LastTransitionTime metav1.Time                `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	LastUpdateTime     metav1.Time                `json:"lastUpdateTime,omitempty" protobuf:"bytes,3,opt,name=lastUpdateTime"`
+	Message            string                     `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+	Reason             string                     `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
 	Type               QuayEcosystemConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=QuayEcosystemConditionType"`
 	Status             corev1.ConditionStatus     `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/kubernetes/pkg/api/v1.ConditionStatus"`
-	LastUpdateTime     metav1.Time                `json:"lastUpdateTime,omitempty" protobuf:"bytes,3,opt,name=lastUpdateTime"`
-	LastTransitionTime metav1.Time                `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
-	Reason             string                     `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
-	Message            string                     `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 // Redis defines the properies of a deployment of Redis
 type Redis struct {
-	Image    string `json:"image,omitempty"`
-	Replicas *int32 `json:"replicas,omitempty"`
-	Hostname string `json:"hostname,omitempty"`
-	Port     *int32 `json:"port,omitempty"`
+	Hostname            string `json:"hostname,omitempty"`
+	Image               string `json:"image,omitempty"`
+	ImagePullSecretName string `json:"imagePullSecretName,omitempty"`
+	Port                *int32 `json:"port,omitempty"`
+	Replicas            *int32 `json:"replicas,omitempty"`
 }
 
 // Database defines a database that will be deployed to support a particular component
 type Database struct {
-	Image                 string `json:"image,omitempty"`
-	VolumeSize            string `json:"volumeSize,omitempty"`
-	Memory                string `json:"memory,omitempty"`
 	CPU                   string `json:"cpu,omitempty"`
-	Replicas              *int32 `json:"replicas,omitempty"`
 	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+	Image                 string `json:"image,omitempty"`
+	ImagePullSecretName   string `json:"imagePullSecretName,omitempty"`
+	Memory                string `json:"memory,omitempty"`
+	Replicas              *int32 `json:"replicas,omitempty"`
 	Server                string `json:"server,omitempty"`
+	VolumeSize            string `json:"volumeSize,omitempty"`
 }
 
 type RegistryStorage struct {
-	RegistryStorageType `json:",inline" protobuf:"bytes,2,opt,name=registryStorageType"`
-	StorageDirectory    string `json:"storageDirectory,omitempty"`
+	RegistryStorageType `json:",inline" protobuf:"bytes,2,opt,name=type"`
 }
 
 type RegistryStorageType struct {
-	PersistentVolume PersistentVolumeRegistryStorageType `json:"persistentVolume,omitempty"`
+	Local LocalRegistryStorageType `json:"local,omitempty,name=local"`
 }
 
-type PersistentVolumeRegistryStorageType struct {
-	StorageClassName string                              `json:"storageClassName,omitempty"`
-	Capacity         string                              `json:"capacity,omitempty"`
-	AccessModes      []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+// LocalRegistryStorageType represents the configuration for Quay local registry storage
+type LocalRegistryStorageType struct {
+	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessMode,omitempty,name=local"`
+	PersistentVolumeSize             string                              `json:"persistentVolumeSize,omitempty,name=volumeSize"`
+	PersistentVolumeStorageClassName string                              `json:"persistentVolumeStorageClassName,omitempty,name=storageClassName"`
+	StorageDirectory                 string                              `json:"storageDirectory,omitempty,name=storageDirectory"`
+	Ephemeral                        bool                                `json:"ephemeral,omitempty,name=ephemeral"`
 }
 
 func init() {
 	SchemeBuilder.Register(&QuayEcosystem{}, &QuayEcosystemList{})
 }
 
+// SetCondition applies the condition
 func (q *QuayEcosystem) SetCondition(newCondition QuayEcosystemCondition) *QuayEcosystemCondition {
 
 	now := metav1.NewTime(time.Now())
@@ -175,6 +180,7 @@ func (q *QuayEcosystem) SetCondition(newCondition QuayEcosystemCondition) *QuayE
 
 }
 
+// FindConditionByType locates the Condition by the type
 func (q *QuayEcosystem) FindConditionByType(conditionType QuayEcosystemConditionType) (*QuayEcosystemCondition, bool) {
 
 	for i := range q.Status.Conditions {

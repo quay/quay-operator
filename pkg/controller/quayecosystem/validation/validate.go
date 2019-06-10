@@ -56,20 +56,47 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName) {
+	// Validate Quay ImagePullSecret
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
 
-		validImagePullSecret, _, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.ImagePullSecretName, nil)
+		validImagePullSecret, _, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName, nil)
 
 		if err != nil {
 			return false, err
 		}
 
 		if !validImagePullSecret {
-			return false, fmt.Errorf("Failed to validate provided Image Pull Secret")
+			return false, fmt.Errorf("Failed to validate provided Quay Image Pull Secret")
 		}
 
-		quayConfiguration.ValidProvidedImagePullSecret = true
+	}
 
+	// Validate Redis ImagePullSecret
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.ImagePullSecretName) {
+
+		validImagePullSecret, _, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Redis.ImagePullSecretName, nil)
+
+		if err != nil {
+			return false, err
+		}
+
+		if !validImagePullSecret {
+			return false, fmt.Errorf("Failed to validate provided Redis Image Pull Secret")
+		}
+	}
+
+	// Validate Quay Database ImagePullSecret
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.ImagePullSecretName) {
+
+		validImagePullSecret, _, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.Database.ImagePullSecretName, nil)
+
+		if err != nil {
+			return false, err
+		}
+
+		if !validImagePullSecret {
+			return false, fmt.Errorf("Failed to validate provided Data Database Image Pull Secret")
+		}
 	}
 
 	// Validate Quay Database Credential
@@ -110,6 +137,28 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 		if err != nil {
 			return false, err
 		}
+	}
+
+	// Quay Registry
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local) {
+
+		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.StorageDirectory) {
+			quayConfiguration.QuayRegistryStorageDirectory = quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.StorageDirectory
+		}
+
+		if quayConfiguration.QuayRegistryIsProvisionPVCVolume {
+
+			if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeSize) {
+				_, err := resource.ParseQuantity(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeSize)
+
+				if err != nil {
+					return false, err
+				}
+
+				quayConfiguration.QuayRegistryPersistentVolumeSize = quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeSize
+			}
+		}
+
 	}
 
 	return true, nil
