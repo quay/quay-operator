@@ -321,14 +321,6 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1
 }
 
 func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCCs(meta metav1.ObjectMeta) error {
-	// Configure Redis Service Account for AnyUID SCC
-	if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Redis.Hostname) {
-		err := r.configureAnyUIDSCC(constants.RedisServiceAccount, meta)
-
-		if err != nil {
-			return err
-		}
-	}
 
 	// Configure Quay Service Account for AnyUID SCC
 	err := r.configureAnyUIDSCC(constants.QuayServiceAccount, meta)
