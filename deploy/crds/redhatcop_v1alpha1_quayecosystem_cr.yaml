@@ -5,5 +5,3 @@ metadata:
 spec:
   quay:
     imagePullSecretName: redhat-pull-secret
-  redis:
-    imagePullSecretName: redhat-pull-secret

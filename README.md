@@ -54,8 +54,6 @@ metadata:
 spec:
   quay:
     imagePullSecretName: redhat-pull-secret
-  redis:
-    imagePullSecretName: redhat-pull-secret
 ```
 
 You can also run the following command to create the `QuayEnterprise` custom resource
@@ -94,8 +92,6 @@ spec:
   quay:
     superuserCredentialsName: <secret_name>
     imagePullSecretName: redhat-pull-secret
-  redis:
-    imagePullSecretName: redhat-pull-secret
 ```
 
 #### Quay Configuration
@@ -121,8 +117,6 @@ metadata:
 spec:
   quay:
     configSecretName: <secret_name>
-    imagePullSecretName: redhat-pull-secret
-  redis:
     imagePullSecretName: redhat-pull-secret
 ```
 
@@ -151,8 +145,6 @@ spec:
     imagePullSecretName: redhat-pull-secret
     database:
       volumeSize: 10Gi
-  redis:
-    imagePullSecretName: redhat-pull-secret
 ```
 
 #### Specifying Credentials
@@ -184,8 +176,6 @@ spec:
     imagePullSecretName: redhat-pull-secret
     database:
       credentialsSecretName: <secret_name>
-  redis:
-    imagePullSecretName: redhat-pull-secret
 ```
 
 ### Registry Storage
@@ -211,8 +201,6 @@ spec:
         persistentVolumeAccessMode:
           - ReadWriteOnce
         persistentVolumeSize: 10Gi
-  redis:
-    imagePullSecretName: redhat-pull-secret
 ```
 
 To disable the creation of a _PersistentVolumeClaim_ and instead use an _EmptyDir_ volume, specify `ephemeral` to `true` as shown below:
@@ -228,8 +216,6 @@ spec:
     registryStorage:
       local:
         ephemeral: true
-  redis:
-    imagePullSecretName: redhat-pull-secret
 ```
 
 ## Local Development

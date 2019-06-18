@@ -12,7 +12,7 @@ const (
 	// ImagePullSecret is the name of the image pull secret for retrieving images from a protected image registry
 	ImagePullSecret = "redhat-pull-secret"
 	// RedisImage is the name of the Redis Image
-	RedisImage = "quay.io/quay/redis:latest"
+	RedisImage = "registry.access.redhat.com/rhscl/redis-32-rhel7"
 	// LabelAppKey is the name of the label key
 	LabelAppKey = "app"
 	// LabelAppValue is the name of the label
