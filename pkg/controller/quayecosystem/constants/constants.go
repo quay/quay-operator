@@ -8,7 +8,7 @@ const (
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
 	// QuayImage is the Quay image
-	QuayImage = "quay.io/redhat/quay:v3.0.2"
+	QuayImage = "quay.io/redhat/quay:v3.0.3"
 	// ImagePullSecret is the name of the image pull secret for retrieving images from a protected image registry
 	ImagePullSecret = "redhat-pull-secret"
 	// RedisImage is the name of the Redis Image
