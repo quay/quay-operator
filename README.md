@@ -96,7 +96,7 @@ spec:
 
 #### Quay Configuration
 
-A dedicated deployment of Quay Enterprise is used to manage the configuration. By default, the following values are used:
+A dedicated deployment of Quay Enterprise is used to manage the configuration of Quay. Access to the configuration interface is secured and requires authentication in order for access. By default, the following values are used:
 
 Username: `quayconfig`
 Password: `quay`
@@ -147,6 +147,7 @@ spec:
       volumeSize: 10Gi
 ```
 
+
 #### Specifying Credentials
 
 The credentials for accessing the server can be specified through a _Secret_ or when being provisioned by the operator, leverage the following default values:
@@ -178,6 +179,23 @@ spec:
       credentialsSecretName: <secret_name>
 ```
 
+#### Using an Existing PostgreSQL Instance
+
+Instead of having the operator deploy an instance of PostgreSQL in the project, an existing instance can be leveraged by specifying the location in the `server` field along with the credentials for access as described in the previous section. The following is an example of how to specify connecting to a remote PostgreSQL instance
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    database:
+      credentialsSecretName: <secret_name>
+      server: postgresql.databases.example.com
+```
+
 ### Registry Storage
 
 Quay supports multiple storage backends. The quay operator supports aiding in the facilitation of certain storage backends. The following backends are currently supported:
@@ -186,7 +204,7 @@ Quay supports multiple storage backends. The quay operator supports aiding in th
 
 #### Configuring Local Storage
 
-Local storage references a local directory within the Quay pod for which image metadata is stored. The configuration is specified by using the `registryStorage` parameters underneath the `quay` property. By default, a _PersistentVolumeClaim_ is created to support the registry (no configuration necessary). However, you may specify any of the following parameters as shown below:
+Local storage references a local directory within the Quay pod for which image metadata is stored. The configuration is specified by using the `registryStorage` parameters underneath the `quay` property. By default, Quay operates with no persistent storage. In order to avoid data loss, persistent storage is required. The following example will cause a _PersistentVolumeClaim_ to be created within the project requesting storage of 10Gi and an _access mode_ of `ReadWriteOnce` (Default value is `ReadWriteMany`)
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -203,7 +221,11 @@ spec:
         persistentVolumeSize: 10Gi
 ```
 
-To disable the creation of a _PersistentVolumeClaim_ and instead use an _EmptyDir_ volume, specify `ephemeral` to `true` as shown below:
+A Storage Class can also be provided using the `persistentVolumeStorageClassName` property
+
+### Skipping Automated Setup
+
+The operator by default is configured to complete the automated setup process for Quay. This can be bypassed by setting the `skipSetup` field to `true` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -213,10 +235,30 @@ metadata:
 spec:
   quay:
     imagePullSecretName: redhat-pull-secret
-    registryStorage:
-      local:
-        ephemeral: true
+    skipSetup: true
 ```
+
+### SSL Certificates
+
+Quay, as a secure registry, makes use of SSL certificates to secure communication between the various components within the ecosystem. Transport to the Quay user interface and container registry is secured via SSL certificates. These certificates are generated at startup with the OpenShift route being configured with a TLS termination type of _Passthrough_.
+
+_Note: Future functionality will allow for use provided certificates to be utilized_
+
+### Configuration Deployment Removal
+
+In order to allow for continued access to configure Quay, the configuration deployment of Quay remains active after the initial deployment and configuration of Quay. To reclaim the configuration deployment resources, the `keepConfigDeployment` can be set as `false` as shown below
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    keepConfigDeployment: false
+```
+
 
 ## Local Development
 

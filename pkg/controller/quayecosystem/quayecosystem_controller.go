@@ -141,6 +141,16 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		return *result, nil
 	}
 
+	result, err = configuration.ManageQuayEcosystemCertificates(metaObject)
+
+	if err != nil {
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+	}
+
+	if result != nil {
+		return *result, nil
+	}
+
 	if quayConfiguration.DeployQuayConfiguration {
 
 		deployQuayConfigResult, err := configuration.DeployQuayConfiguration(metaObject)
@@ -155,7 +165,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	}
 
 	// Execute setup if it has not been completed
-	if !quayConfiguration.QuayEcosystem.Status.SetupComplete {
+	if !quayConfiguration.QuayEcosystem.Status.SetupComplete && !quayConfiguration.QuayEcosystem.Spec.Quay.SkipSetup {
 
 		// Wait 5 seconds prior to kicking off setup
 		time.Sleep(time.Duration(5) * time.Second)

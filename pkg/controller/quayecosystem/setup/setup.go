@@ -1,20 +1,18 @@
 package setup
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
+
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 
 	"github.com/redhat-cop/operator-utils/pkg/util"
 	"github.com/redhat-cop/quay-operator/pkg/client"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-
-	routev1 "github.com/openshift/api/route/v1"
 
 	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -52,21 +50,24 @@ func (*QuaySetupManager) PrepareForSetup(kclient kclient.Client, quayConfigurati
 
 	quayConfiguration.QuayConfigHostname = quayConfigHost
 
-	quayRouteHost := quayConfiguration.QuayEcosystem.Spec.Quay.RouteHost
+	/*
+		quayRouteHost := quayConfiguration.QuayEcosystem.Spec.Quay.RouteHost
 
-	if utils.IsZeroOfUnderlyingType(quayRouteHost) {
 
-		quayRoute := &routev1.Route{}
-		err := kclient.Get(context.TODO(), types.NamespacedName{Name: resources.GetQuayResourcesName(quayConfiguration.QuayEcosystem), Namespace: quayConfiguration.QuayEcosystem.Namespace}, quayRoute)
+			if utils.IsZeroOfUnderlyingType(quayRouteHost) {
 
-		if err != nil {
-			logging.Log.Error(err, "Error Finding Quay Route", "Namespace", quayConfiguration.QuayEcosystem.Namespace, "Name", quayConfiguration.QuayEcosystem.Name)
-		}
+				quayRoute := &routev1.Route{}
+				err := kclient.Get(context.TODO(), types.NamespacedName{Name: resources.GetQuayResourcesName(quayConfiguration.QuayEcosystem), Namespace: quayConfiguration.QuayEcosystem.Namespace}, quayRoute)
 
-		quayRouteHost = quayRoute.Spec.Host
-	}
+				if err != nil {
+					logging.Log.Error(err, "Error Finding Quay Route", "Namespace", quayConfiguration.QuayEcosystem.Namespace, "Name", quayConfiguration.QuayEcosystem.Name)
+				}
 
-	quayConfiguration.QuayHostname = quayRouteHost
+				quayRouteHost = quayRoute.Spec.Host
+			}
+
+			quayConfiguration.QuayHostname = quayRouteHost
+	*/
 
 	postgresqlHost := quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server
 
@@ -182,6 +183,37 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		logging.Log.Error(err, "Failed to get Quay Configuration")
 	}
 
+	// Setup Storage
+	distributedStorageConfig := map[string][]interface{}{}
+
+	for _, registryBackend := range quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
+
+		var quayRegistry []interface{}
+
+		if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Local) {
+			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeLocalStorageName)
+			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.Local)
+		}
+
+		distributedStorageConfig[registryBackend.Name] = quayRegistry
+
+	}
+
+	quayConfig.Config["DISTRIBUTED_STORAGE_CONFIG"] = distributedStorageConfig
+
+	// Add Certificates
+	_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLPrivateKeySecretKey, quaySetupInstance.quayConfiguration.QuaySslPrivateKey)
+
+	if err != nil {
+		return err
+	}
+
+	_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLCertificateSecretKey, quaySetupInstance.quayConfiguration.QuaySslCertificate)
+
+	if err != nil {
+		return err
+	}
+
 	// Validate multiple components
 	for _, validationComponent := range []client.QuayValidationType{client.RedisValidation, client.RegistryValidation, client.TimeMachineValidation, client.AccessValidation, client.SslValidation} {
 		err = qm.validateComponent(quaySetupInstance, quayConfig, validationComponent)
@@ -191,8 +223,9 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		}
 	}
 
-	quayConfig.Config["SETUP_COMPLETE"] = true
+	quayConfig.Config["PREFERRED_URL_SCHEME"] = "https"
 
+	quayConfig.Config["SETUP_COMPLETE"] = true
 	_, quayConfig, err = quaySetupInstance.setupClient.UpdateQuayConfiguration(quayConfig)
 
 	if err != nil {

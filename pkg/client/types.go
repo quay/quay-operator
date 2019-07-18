@@ -29,6 +29,10 @@ type QuayCreateSuperuserRequest struct {
 	Email           string `json:"email"`
 }
 
+type ConfigFileStatus struct {
+	Exists bool `json:"exists"`
+}
+
 type StringValue struct {
 	Value string
 }

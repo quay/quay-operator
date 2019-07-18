@@ -1,9 +1,11 @@
 package validation
 
 import (
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -55,27 +57,33 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		quayConfiguration.DeployQuayConfiguration = true
 	}
 
-	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) || !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local) {
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) {
 
-		// Check if we want to provision a PVC to back the registry
-		if !quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local.Ephemeral {
-			quayConfiguration.QuayRegistryIsProvisionPVCVolume = true
-
-			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeAccessModes) {
-				quayConfiguration.QuayRegistryPersistentVolumeAccessModes = constants.QuayRegistryStoragePersistentVolumeAccessModes
-			} else {
-				quayConfiguration.QuayRegistryPersistentVolumeAccessModes = quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local.PersistentVolumeAccessModes
-			}
-
-			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local.PersistentVolumeSize) {
-				quayConfiguration.QuayRegistryPersistentVolumeSize = constants.QuayRegistryStoragePersistentVolumeStoreSize
-			}
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeAccessModes) {
+			quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeAccessModes = constants.QuayRegistryStoragePersistentVolumeAccessModes
+			changed = true
 		}
 
-		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.RegistryStorageType.Local.StorageDirectory) {
-			quayConfiguration.QuayRegistryStorageDirectory = constants.QuayRegistryStorageDirectory
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeSize) {
+			quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeSize = constants.QuayRegistryStoragePersistentVolumeStoreSize
+			changed = true
+		}
+	}
+
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends) {
+		// Generate Default Local Storage
+		quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends = []redhatcopv1alpha1.RegistryBackend{
+			redhatcopv1alpha1.RegistryBackend{
+				Name: constants.RegistryStorageDefaultName,
+				RegistryBackendSource: redhatcopv1alpha1.RegistryBackendSource{
+					Local: &redhatcopv1alpha1.LocalRegistryBackendSource{
+						StoragePath: constants.QuayRegistryStoragePath,
+					},
+				},
+			},
 		}
 
+		changed = true
 	}
 
 	return changed
