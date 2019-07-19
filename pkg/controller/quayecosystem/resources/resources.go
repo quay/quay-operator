@@ -91,6 +91,11 @@ func GetQuayRegistryStorageName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) 
 	return fmt.Sprintf("%s-registry", GetGenericResourcesName(quayEcosystem))
 }
 
+// GetRegistryStorageVolumeName returns the name that should be applied to the volume for the storage backend
+func GetRegistryStorageVolumeName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem, registryBackendName string) string {
+	return fmt.Sprintf("%s-%s", GetGenericResourcesName(quayEcosystem), registryBackendName)
+}
+
 // UpdateMetaWithName updates the name of the resource
 func UpdateMetaWithName(meta metav1.ObjectMeta, name string) metav1.ObjectMeta {
 	meta.Name = name

@@ -139,24 +139,13 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 		}
 	}
 
-	// Quay Registry
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local) {
+	// Quay PVC Generation
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) {
 
-		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.StorageDirectory) {
-			quayConfiguration.QuayRegistryStorageDirectory = quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.StorageDirectory
-		}
+		_, err := resource.ParseQuantity(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeSize)
 
-		if quayConfiguration.QuayRegistryIsProvisionPVCVolume {
-
-			if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeSize) {
-				_, err := resource.ParseQuantity(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeSize)
-
-				if err != nil {
-					return false, err
-				}
-
-				quayConfiguration.QuayRegistryPersistentVolumeSize = quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeSize
-			}
+		if err != nil {
+			return false, err
 		}
 
 	}

@@ -56,10 +56,10 @@ func GetQuayRouteDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1al
 				Name: meta.Name,
 			},
 			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromInt(8080),
+				TargetPort: intstr.FromInt(8443),
 			},
 			TLS: &routev1.TLSConfig{
-				Termination:                   routev1.TLSTerminationEdge,
+				Termination:                   routev1.TLSTerminationPassthrough,
 				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
 			},
 		},

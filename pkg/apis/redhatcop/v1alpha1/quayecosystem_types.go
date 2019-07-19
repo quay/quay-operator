@@ -81,19 +81,20 @@ type QuayEcosystemList struct {
 
 // Quay defines the properies of a deployment of Quay
 type Quay struct {
-	ConfigRouteHost                string          `json:"configRouteHost,omitempty"`
-	ConfigSecretName               string          `json:"configSecretName,omitempty"`
-	Database                       Database        `json:"database,omitempty"`
-	EnableNodePortService          bool            `json:"enableNodePortService,omitempty"`
-	Image                          string          `json:"image,omitempty"`
-	ImagePullSecretName            string          `json:"imagePullSecretName,omitempty"`
-	IsOpenShift                    bool            `json:"isOpenShift,omitempty"`
-	KeepConfigDeployment           bool            `json:"keepConfigDeployment,omitempty"`
-	RegistryStorage                RegistryStorage `json:"registryStorage,omitempty"`
-	Replicas                       *int32          `json:"replicas,omitempty"`
-	RouteHost                      string          `json:"routeHost,omitempty"`
-	SkipSetup                      bool            `json:"skipSetup,omitempty"`
-	SuperuserCredentialsSecretName string          `json:"superuserCredentialsName,omitempty"`
+	ConfigRouteHost                string            `json:"configRouteHost,omitempty"`
+	ConfigSecretName               string            `json:"configSecretName,omitempty"`
+	Database                       Database          `json:"database,omitempty"`
+	EnableNodePortService          bool              `json:"enableNodePortService,omitempty"`
+	Image                          string            `json:"image,omitempty"`
+	ImagePullSecretName            string            `json:"imagePullSecretName,omitempty"`
+	IsOpenShift                    bool              `json:"isOpenShift,omitempty"`
+	KeepConfigDeployment           bool              `json:"keepConfigDeployment,omitempty"`
+	RegistryBackends               []RegistryBackend `json:"registryBackends,omitempty"`
+	RegistryStorage                RegistryStorage   `json:"registryStorage,omitempty"`
+	Replicas                       *int32            `json:"replicas,omitempty"`
+	RouteHost                      string            `json:"routeHost,omitempty"`
+	SkipSetup                      bool              `json:"skipSetup,omitempty"`
+	SuperuserCredentialsSecretName string            `json:"superuserCredentialsName,omitempty"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -127,21 +128,23 @@ type Database struct {
 	VolumeSize            string `json:"volumeSize,omitempty"`
 }
 
+type RegistryBackend struct {
+	Name                  string `json:"name"`
+	RegistryBackendSource `json:",inline" protobuf:"bytes,2,opt,name=registryBackendSource"`
+}
+
+type RegistryBackendSource struct {
+	Local *LocalRegistryBackendSource `json:"local,omitempty,name=local"`
+}
+
 type RegistryStorage struct {
-	RegistryStorageType `json:",inline" protobuf:"bytes,2,opt,name=type"`
-}
-
-type RegistryStorageType struct {
-	Local LocalRegistryStorageType `json:"local,omitempty,name=local"`
-}
-
-// LocalRegistryStorageType represents the configuration for Quay local registry storage
-type LocalRegistryStorageType struct {
-	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessMode,omitempty,name=local"`
+	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessMode,omitempty,name=persistentVolumeAccessMode"`
 	PersistentVolumeSize             string                              `json:"persistentVolumeSize,omitempty,name=volumeSize"`
 	PersistentVolumeStorageClassName string                              `json:"persistentVolumeStorageClassName,omitempty,name=storageClassName"`
-	StorageDirectory                 string                              `json:"storageDirectory,omitempty,name=storageDirectory"`
-	Ephemeral                        bool                                `json:"ephemeral,omitempty,name=ephemeral"`
+}
+
+type LocalRegistryBackendSource struct {
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
 }
 
 func init() {

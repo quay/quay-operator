@@ -5,6 +5,8 @@ import (
 )
 
 const (
+	// QuayEnterprise is the coinical name for Quay
+	QuayEnterprise = "quay-enterprise"
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
 	// QuayImage is the Quay image
@@ -76,8 +78,8 @@ const (
 	// ClairDatabaseCredentialsDefaultDatabaseName represents the default database name
 	ClairDatabaseCredentialsDefaultDatabaseName = "clair"
 
-	// QuayRegistryStorageDirectory represents the location where registry storage is mounted in the container
-	QuayRegistryStorageDirectory = "/datastorage/registry"
+	// QuayRegistryStoragePath represents the location where registry storage is mounted in the container
+	QuayRegistryStoragePath = "/datastorage/registry"
 	// QuayRegistryStoragePersistentVolumeStoreSize represents the size of the PersistentVolume that should be used for registry storage
 	QuayRegistryStoragePersistentVolumeStoreSize = "20Gi"
 	// QuayEntryName represents the name of the operation to execute
@@ -98,6 +100,8 @@ const (
 	QuayContainerConfigName = "quay-enterprise-config"
 	// QuayContainerAppName represents the name of the Quay app container
 	QuayContainerAppName = "quay-enterprise-app"
+	// QuayContainerCertSecret is the name of the secret for extra Quay certificates
+	QuayContainerCertSecret = "quay-enterprise-cert-secret"
 	// QuaySuperuserUsernameKey represents the key for the superuser username
 	QuaySuperuserUsernameKey = "superuser-username"
 	// QuaySuperuserPasswordKey represents the key for the superuser password
@@ -112,6 +116,16 @@ const (
 	QuaySuperuserDefaultPassword = "password"
 	// QuaySuperuserDefaultEmail represents the default Quay superuser password
 	QuaySuperuserDefaultEmail = "quay@redhat.com"
+
+	// RegistryStorageDefaultName is the name of the default storage
+	RegistryStorageDefaultName = "default"
+	// RegistryStorageTypeLocalStorageName is the value of the Local Quay Storage type
+	RegistryStorageTypeLocalStorageName = "LocalStorage"
+
+	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
+	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
+	// QuayAppConfigSSLPrivateKeySecretKey is key in the app-config secret representing the SSL Private Key
+	QuayAppConfigSSLPrivateKeySecretKey = "ssl.key"
 )
 
 var (

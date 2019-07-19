@@ -3,6 +3,7 @@ package provisioning
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/redhat-cop/operator-utils/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -126,15 +128,13 @@ func (r *ReconcileQuayEcosystemConfiguration) CoreResourceDeployment(metaObject 
 		return nil, err
 	}
 
-	if r.quayConfiguration.QuayRegistryIsProvisionPVCVolume {
+	if !utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) {
 
 		if err := r.quayRegistryStorage(metaObject); err != nil {
 			logging.Log.Error(err, "Failed to create registry storage")
 			return nil, err
 		}
 
-	} else {
-		logging.Log.Info("Should attempt to remove")
 	}
 
 	return nil, nil
@@ -165,12 +165,19 @@ func (r *ReconcileQuayEcosystemConfiguration) DeployQuay(metaObject metav1.Objec
 		return nil, err
 	}
 
-	time.Sleep(time.Duration(2) * time.Second)
+	if !r.quayConfiguration.QuayEcosystem.Spec.Quay.SkipSetup {
 
-	// Verify Deployment
-	deploymentName := resources.GetQuayResourcesName(r.quayConfiguration.QuayEcosystem)
+		time.Sleep(time.Duration(2) * time.Second)
 
-	return r.verifyDeployment(deploymentName, r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace)
+		// Verify Deployment
+		deploymentName := resources.GetQuayResourcesName(r.quayConfiguration.QuayEcosystem)
+
+		return r.verifyDeployment(deploymentName, r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace)
+
+	} else {
+		logging.Log.Info("Skipping Quay Deployment verification as setup marked as skipped")
+		return &reconcile.Result{}, nil
+	}
 
 }
 
@@ -501,14 +508,23 @@ func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountN
 
 func (r *ReconcileQuayEcosystemConfiguration) quayRegistryStorage(meta metav1.ObjectMeta) error {
 
-	meta.Name = resources.GetQuayRegistryStorageName(r.quayConfiguration.QuayEcosystem)
+	for _, registryBackend := range r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
 
-	registryStoragePVC := resources.GetQuayPVCRegistryStorageDefinition(meta, r.quayConfiguration.QuayRegistryPersistentVolumeAccessModes, r.quayConfiguration.QuayRegistryPersistentVolumeSize, &r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.Local.PersistentVolumeStorageClassName)
+		if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Local) {
+			registryVolumeName := resources.GetRegistryStorageVolumeName(r.quayConfiguration.QuayEcosystem, registryBackend.Name)
 
-	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, registryStoragePVC)
+			meta.Name = registryVolumeName
 
-	if err != nil {
-		return err
+			registryStoragePVC := resources.GetQuayPVCRegistryStorageDefinition(meta, r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeAccessModes, r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeSize, &r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeStorageClassName)
+
+			err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, registryStoragePVC)
+
+			if err != nil {
+				return err
+			}
+
+		}
+
 	}
 
 	return nil
@@ -528,6 +544,53 @@ func (r *ReconcileQuayEcosystemConfiguration) removeQuayRegistryStorage(meta met
 
 	return nil
 
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(meta metav1.ObjectMeta) (*reconcile.Result, error) {
+
+	configSecretName := resources.GetConfigMapSecretName(r.quayConfiguration.QuayEcosystem)
+
+	meta.Name = configSecretName
+
+	appConfigSecret := &corev1.Secret{}
+	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: configSecretName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, appConfigSecret)
+
+	if err != nil {
+
+		if apierrors.IsNotFound(err) {
+			// Config Secret Not Found. Requeue object
+			return &reconcile.Result{}, nil
+		}
+		return nil, err
+	}
+
+	if !isQuayCertificatesConfigured(appConfigSecret) {
+
+		certBytes, privKeyBytes, err := cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{}, []string{r.quayConfiguration.QuayHostname})
+		if err != nil {
+			logging.Log.Error(err, "Error creating public/private key")
+			return nil, err
+		}
+
+		if appConfigSecret.Data == nil {
+			appConfigSecret.Data = map[string][]byte{}
+		}
+
+		appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey] = privKeyBytes
+		appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = certBytes
+		err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
+
+		if err != nil {
+			logging.Log.Error(err, "Error Updating app secret with certificates")
+			return nil, err
+		}
+
+	}
+
+	r.quayConfiguration.QuaySslCertificate = appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey]
+	r.quayConfiguration.QuaySslPrivateKey = appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]
+
+	return nil, nil
 }
 
 func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectMeta) error {
@@ -620,4 +683,21 @@ func (r *ReconcileQuayEcosystemConfiguration) verifyDeployment(deploymentName st
 
 	return nil, nil
 
+}
+
+func isQuayCertificatesConfigured(secret *corev1.Secret) bool {
+
+	if !utils.IsZeroOfUnderlyingType(secret) {
+		if _, found := secret.Data[constants.QuayAppConfigSSLCertificateSecretKey]; !found {
+			return false
+		}
+
+		if _, found := secret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]; !found {
+			return false
+		}
+
+		return true
+
+	}
+	return false
 }

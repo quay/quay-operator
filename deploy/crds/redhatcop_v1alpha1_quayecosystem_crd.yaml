@@ -65,6 +65,15 @@ spec:
                   type: boolean
                 keepConfigDeployment:
                   type: boolean
+                registryBackends:
+                  items:
+                    properties:
+                      name:
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  type: array
                 registryStorage:
                   type: object
                 replicas:

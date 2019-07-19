@@ -181,8 +181,8 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
 						Path:   "/health/instance",
-						Port:   intstr.IntOrString{IntVal: 8080},
-						Scheme: "HTTP",
+						Port:   intstr.IntOrString{IntVal: 8443},
+						Scheme: "HTTPS",
 					},
 				},
 			},
@@ -213,33 +213,39 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 		}
 	}
 
-		quayDeploymentPodSpec.Containers[0].VolumeMounts = append(quayDeploymentPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "registryvolume",
-			MountPath: quayConfiguration.QuayRegistryStorageDirectory,
-			ReadOnly:  false,
-		})
+	for _, registryBackend := range quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
 
-		if quayConfiguration.QuayRegistryIsProvisionPVCVolume {
-			quayDeploymentPodSpec.Volumes = append(quayDeploymentPodSpec.Volumes, corev1.Volume{
-				Name: "registryvolume",
-				VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-						ClaimName: GetQuayRegistryStorageName(quayConfiguration.QuayEcosystem),
-					},
-				},
+		if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Local) {
+
+			quayDeploymentPodSpec.Containers[0].VolumeMounts = append(quayDeploymentPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
+				Name:      GetRegistryStorageVolumeName(quayConfiguration.QuayEcosystem, registryBackend.Name),
+				MountPath: registryBackend.RegistryBackendSource.Local.StoragePath,
+				ReadOnly:  false,
 			})
-			
-		} else {
-		quayDeploymentPodSpec.Volumes = append(quayDeploymentPodSpec.Volumes, corev1.Volume{
-			Name: "registryvolume",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		})
+
+			if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage) {
+				quayDeploymentPodSpec.Volumes = append(quayDeploymentPodSpec.Volumes, corev1.Volume{
+					Name: GetRegistryStorageVolumeName(quayConfiguration.QuayEcosystem, registryBackend.Name),
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: GetRegistryStorageVolumeName(quayConfiguration.QuayEcosystem, registryBackend.Name),
+						},
+					},
+				})
+
+			} else {
+				quayDeploymentPodSpec.Volumes = append(quayDeploymentPodSpec.Volumes, corev1.Volume{
+					Name: GetRegistryStorageVolumeName(quayConfiguration.QuayEcosystem, registryBackend.Name),
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				})
+
+			}
 
 		}
 
-
+	}
 
 	quayReplicas := utils.CheckValue(quayConfiguration.QuayEcosystem.Spec.Quay.Replicas, &constants.OneInt)
 

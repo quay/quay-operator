@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 )
@@ -136,6 +137,58 @@ func (c *QuayClient) CompleteSetup() (*http.Response, StringValue, error) {
 	resp, err := c.do(req, &setupResponse)
 
 	return resp, setupResponse, err
+}
+
+func (c *QuayClient) GetConfigFileStatus(fileName string) (*http.Response, ConfigFileStatus, error) {
+	req, err := c.newRequest("GET", fmt.Sprintf("/api/v1/superuser/config/file/%s", fileName), nil)
+	if err != nil {
+		return nil, ConfigFileStatus{}, err
+	}
+	var configFileStatus ConfigFileStatus
+	resp, err := c.do(req, &configFileStatus)
+
+	return resp, configFileStatus, err
+}
+
+func (c *QuayClient) UploadFileResource(fileName string, content []byte) (*http.Response, QuayStatusResponse, error) {
+
+	req, err := c.newFileUploadRequest("POST", fmt.Sprintf("/api/v1/superuser/config/file/%s", fileName), fileName, content)
+	if err != nil {
+		return nil, QuayStatusResponse{}, err
+	}
+	var quayStatusResponse QuayStatusResponse
+	resp, err := c.do(req, &quayStatusResponse)
+
+	return resp, quayStatusResponse, err
+}
+
+func (c *QuayClient) newFileUploadRequest(method, path string, fileName string, content []byte) (*http.Request, error) {
+	rel := &url.URL{Path: path}
+	u := c.BaseURL.ResolveReference(rel)
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", fileName)
+	if err != nil {
+		return nil, err
+	}
+	part.Write(content)
+
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(method, u.String(), body)
+	req.SetBasicAuth(c.Username, c.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+	req.Header.Add("Accept", "application/json")
+	return req, nil
+
 }
 
 func (c *QuayClient) newRequest(method, path string, body interface{}) (*http.Request, error) {

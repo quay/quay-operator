@@ -50,9 +50,9 @@ func GetQuayServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1
 			Selector:  meta.Labels,
 			Ports: []corev1.ServicePort{
 				{
-					Port:       80,
+					Port:       443,
 					Protocol:   "TCP",
-					TargetPort: intstr.FromInt(8080),
+					TargetPort: intstr.FromInt(8443),
 				},
 			},
 		},
