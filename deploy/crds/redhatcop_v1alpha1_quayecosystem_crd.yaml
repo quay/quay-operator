@@ -83,6 +83,8 @@ spec:
                   type: string
                 skipSetup:
                   type: boolean
+                sslCertificatesSecretName:
+                  type: string
                 superuserCredentialsName:
                   type: string
               type: object

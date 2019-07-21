@@ -76,6 +76,11 @@ func GetConfigMapSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) stri
 	//return configSecretName
 }
 
+// GetQuayExtraCertsSecretName returns the name of the Quay extra certs secret
+func GetQuayExtraCertsSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return "quay-enterprise-cert-secret"
+}
+
 // GetQuayDatabaseName returns the name of the Quay database
 func GetQuayDatabaseName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
 	return fmt.Sprintf("%s-quay-%s", GetGenericResourcesName(quayEcosystem), constants.PostgresqlName)

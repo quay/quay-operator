@@ -566,29 +566,32 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 
 	if !isQuayCertificatesConfigured(appConfigSecret) {
 
-		certBytes, privKeyBytes, err := cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{}, []string{r.quayConfiguration.QuayHostname})
-		if err != nil {
-			logging.Log.Error(err, "Error creating public/private key")
-			return nil, err
+		if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName) {
+			certBytes, privKeyBytes, err := cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{}, []string{r.quayConfiguration.QuayHostname})
+			if err != nil {
+				logging.Log.Error(err, "Error creating public/private key")
+				return nil, err
+			}
+
+			r.quayConfiguration.QuaySslCertificate = certBytes
+			r.quayConfiguration.QuaySslPrivateKey = privKeyBytes
+
 		}
-
-		if appConfigSecret.Data == nil {
-			appConfigSecret.Data = map[string][]byte{}
-		}
-
-		appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey] = privKeyBytes
-		appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = certBytes
-		err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
-
-		if err != nil {
-			logging.Log.Error(err, "Error Updating app secret with certificates")
-			return nil, err
-		}
-
 	}
 
-	r.quayConfiguration.QuaySslCertificate = appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey]
-	r.quayConfiguration.QuaySslPrivateKey = appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]
+	if appConfigSecret.Data == nil {
+		appConfigSecret.Data = map[string][]byte{}
+	}
+
+	appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey] = r.quayConfiguration.QuaySslPrivateKey
+	appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = r.quayConfiguration.QuaySslCertificate
+
+	err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
+
+	if err != nil {
+		logging.Log.Error(err, "Error Updating app secret with certificates")
+		return nil, err
+	}
 
 	return nil, nil
 }
