@@ -242,7 +242,33 @@ spec:
 
 Quay, as a secure registry, makes use of SSL certificates to secure communication between the various components within the ecosystem. Transport to the Quay user interface and container registry is secured via SSL certificates. These certificates are generated at startup with the OpenShift route being configured with a TLS termination type of _Passthrough_.
 
-_Note: Future functionality will allow for use provided certificates to be utilized_
+#### User Provided Certificates
+
+SSL certificates can be provided and used instead of having the operator generate certificates. Certificates can be provided in a secret which is then referenced in the _QuayEcosystem_ custom resource. 
+
+The secret containing custom certificates must define the following keys:
+
+* `ssl.cert` -  All of the certificates (root, intermediate, certificate) concatinated into a single file 
+* `ssl.key` - Private key as for the SSL certificate
+
+Create a secret containing the certificate and private key
+
+```
+oc create secret generic custom-quay-ssl --from-file=ssl.key=<ssl_private_key> --from-file=ssl.cert=<ssl_certificate>
+```
+
+The secret containing the certificates are referenced using the `sslCertificatesSecretName` proprety as shown below
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    sslCertificatesSecretName: custom-quay-ssl
+```
 
 ### Configuration Deployment Removal
 

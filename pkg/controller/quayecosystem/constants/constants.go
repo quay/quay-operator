@@ -155,6 +155,9 @@ var (
 	// RequiredDatabaseCredentialKeys represents the keys that are required for a provided database credential
 	RequiredDatabaseCredentialKeys = []string{DatabaseCredentialsUsernameKey, DatabaseCredentialsPasswordKey, DatabaseCredentialsDatabaseKey}
 
+	// RequiredSslCertificateKeys represents the keys that are required for a provided SSL certificate
+	RequiredSslCertificateKeys = []string{QuayAppConfigSSLCertificateSecretKey, QuayAppConfigSSLPrivateKeySecretKey}
+
 	// DefaultQuayConfigCredentials represents a map containing the default Quay Config
 	DefaultQuayConfigCredentials = map[string]string{
 		QuayConfigPasswordKey: QuayConfigDefaultPasswordValue,

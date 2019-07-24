@@ -94,6 +94,7 @@ type Quay struct {
 	Replicas                       *int32            `json:"replicas,omitempty"`
 	RouteHost                      string            `json:"routeHost,omitempty"`
 	SkipSetup                      bool              `json:"skipSetup,omitempty"`
+	SslCertificatesSecretName      string            `json:"sslCertificatesSecretName,omitempty"`
 	SuperuserCredentialsSecretName string            `json:"superuserCredentialsName,omitempty"`
 }
 
@@ -128,21 +129,34 @@ type Database struct {
 	VolumeSize            string `json:"volumeSize,omitempty"`
 }
 
+// Clair defines the properties of a deployment of Clair
+type Clair struct {
+	Image                     string   `json:"image,omitempty"`
+	ImagePullSecretName       string   `json:"imagePullSecretName,omitempty"`
+	Database                  Database `json:"database,omitempty"`
+	Replicas                  *int32   `json:"replicas,omitempty"`
+	SslCertificatesSecretName string   `json:"sslCertificatesSecretName,omitempty"`
+}
+
+// RegistryBackend defines a particular backend supporting the Quay registry
 type RegistryBackend struct {
 	Name                  string `json:"name"`
 	RegistryBackendSource `json:",inline" protobuf:"bytes,2,opt,name=registryBackendSource"`
 }
 
+// RegistryBackendSource defines the specific configurations to support the Quay registry
 type RegistryBackendSource struct {
 	Local *LocalRegistryBackendSource `json:"local,omitempty,name=local"`
 }
 
+// RegistryStorage defines the configurations to support persistent storage
 type RegistryStorage struct {
 	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessMode,omitempty,name=persistentVolumeAccessMode"`
 	PersistentVolumeSize             string                              `json:"persistentVolumeSize,omitempty,name=volumeSize"`
 	PersistentVolumeStorageClassName string                              `json:"persistentVolumeStorageClassName,omitempty,name=storageClassName"`
 }
 
+// LocalRegistryBackendSource defines local registry storage
 type LocalRegistryBackendSource struct {
 	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
 }
