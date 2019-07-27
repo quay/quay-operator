@@ -133,9 +133,9 @@ var (
 
 	// DefaultQuaySuperuserCredentials represents a map containing the default values for the Quay Superuser
 	DefaultQuaySuperuserCredentials = map[string]string{
-		DatabaseCredentialsPasswordKey:     QuaySuperuserDefaultUsername,
-		DatabaseCredentialsDatabaseKey:     QuaySuperuserDefaultPassword,
-		DatabaseCredentialsRootPasswordKey: QuaySuperuserDefaultEmail,
+		QuaySuperuserUsernameKey: QuaySuperuserDefaultUsername,
+		QuaySuperuserPasswordKey: QuaySuperuserDefaultPassword,
+		QuaySuperuserEmailKey:    QuaySuperuserDefaultEmail,
 	}
 	// DefaultQuayDatabaseCredentials represents a map containing the default values for Quay database
 	DefaultQuayDatabaseCredentials = map[string]string{
