@@ -577,6 +577,12 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 			r.quayConfiguration.QuaySslPrivateKey = privKeyBytes
 
 		}
+	} else {
+		if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName) {
+			r.quayConfiguration.QuaySslPrivateKey = appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]
+			r.quayConfiguration.QuaySslCertificate = appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey]
+		}
+
 	}
 
 	if appConfigSecret.Data == nil {
@@ -695,7 +701,15 @@ func isQuayCertificatesConfigured(secret *corev1.Secret) bool {
 			return false
 		}
 
+		if len(secret.Data[constants.QuayAppConfigSSLCertificateSecretKey]) == 0 {
+			return false
+		}
+
 		if _, found := secret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]; !found {
+			return false
+		}
+
+		if len(secret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]) == 0 {
 			return false
 		}
 

@@ -95,7 +95,7 @@ type Quay struct {
 	RouteHost                      string            `json:"routeHost,omitempty"`
 	SkipSetup                      bool              `json:"skipSetup,omitempty"`
 	SslCertificatesSecretName      string            `json:"sslCertificatesSecretName,omitempty"`
-	SuperuserCredentialsSecretName string            `json:"superuserCredentialsName,omitempty"`
+	SuperuserCredentialsSecretName string            `json:"superuserCredentialsSecretName,omitempty"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through

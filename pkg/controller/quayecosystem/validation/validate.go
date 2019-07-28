@@ -38,6 +38,10 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 		quayConfiguration.ValidProvidedQuaySuperuserSecret = true
 	}
 
+	if len(quayConfiguration.QuaySuperuserPassword) < 8 {
+		return false, fmt.Errorf("Quay Superuser Password Must Be At Least 8 Characters in Length")
+	}
+
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigSecretName) {
 
 		validQuayConfigSecret, quayConfigSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.ConfigSecretName, constants.DefaultQuayConfigCredentials)
