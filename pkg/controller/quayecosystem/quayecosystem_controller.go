@@ -191,7 +191,13 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupFailure, err)
 		}
 
+		// Update flags when setup is completed
 		quayConfiguration.QuayEcosystem.Status.SetupComplete = true
+
+		// Reset the Config Deployment flag to the default value after successful setup
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) || !quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment {
+			quayConfiguration.DeployQuayConfiguration = false
+		}
 
 		_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupSuccess, "", "Setup Completed Successfully")
 		if err != nil {
