@@ -135,6 +135,8 @@ The following options are a portion of the available options to configure the Po
 | `memory` | Amount of memory in Kubernetes resource units |
 | `cpu` | Amount of cpu in Kubernetes resource units |
 
+Note: It is important to note that persistent storage for the database will **only** be provisioned if the `volumeSize` property is specified.
+
 Define the values as shown below:
 
 ```
@@ -198,15 +200,32 @@ spec:
       server: postgresql.databases.example.com
 ```
 
-### Registry Storage
+### Registry Backends
 
 Quay supports multiple storage backends. The quay operator supports aiding in the facilitation of certain storage backends. The following backends are currently supported:
 
 * Local
 
-#### Configuring Local Storage
+The following is an example of how to define a local backend with a customized location for which images will be stored:
 
-Local storage references a local directory within the Quay pod for which image metadata is stored. The configuration is specified by using the `registryStorage` parameters underneath the `quay` property. By default, Quay operates with no persistent storage. In order to avoid data loss, persistent storage is required. The following example will cause a _PersistentVolumeClaim_ to be created within the project requesting storage of 10Gi and an _access mode_ of `ReadWriteOnce` (Default value is `ReadWriteMany`)
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    registryBackends:
+      - name: local
+        local:
+          storage_path: /opt/quayregistry
+```
+
+
+#### Configuring Persistent Local Storage
+
+By default, Quay uses an ephemeral volume for local storage. In order to avoid data loss, persistent storage is required. To enable the use of a _PersistentVolume_ to store images, specify the `registryStorage` parameter underneath the `quay` property. The following example will cause a _PersistentVolumeClaim_ to be created within the project requesting storage of 10Gi and an _access mode_ of `ReadWriteOnce` (Default value is `ReadWriteMany`)
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -217,10 +236,9 @@ spec:
   quay:
     imagePullSecretName: redhat-pull-secret
     registryStorage:
-      local:
-        persistentVolumeAccessMode:
-          - ReadWriteOnce
-        persistentVolumeSize: 10Gi
+      persistentVolumeAccessMode:
+        - ReadWriteOnce
+      persistentVolumeSize: 10Gi
 ```
 
 A Storage Class can also be provided using the `persistentVolumeStorageClassName` property
