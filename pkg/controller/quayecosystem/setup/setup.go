@@ -158,7 +158,7 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 	if err != nil {
 		logging.Log.Error(err, "Failed to update quay configuration")
-		return fmt.Errorf(" Failed to update quay configuration: %s", err.Error())
+		return fmt.Errorf("Failed to update quay configuration: %s", err.Error())
 	}
 
 	_, _, err = quaySetupInstance.setupClient.SetupDatabase()
@@ -210,7 +210,7 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 	if err != nil {
 		logging.Log.Error(err, "Failed to upload SSL certificates")
-		return fmt.Errorf(" Failed to upload SSL certificates: %s", err.Error())
+		return fmt.Errorf("Failed to upload SSL certificates: %s", err.Error())
 	}
 
 	_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLCertificateSecretKey, quaySetupInstance.quayConfiguration.QuaySslCertificate)
