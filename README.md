@@ -90,7 +90,7 @@ metadata:
 spec:
   imagePullSecretName: redhat-pull-secret
   quay:
-    superuserCredentialsName: <secret_name>
+    superuserCredentialsSecretName: <secret_name>
     imagePullSecretName: redhat-pull-secret
 ```
 
@@ -119,6 +119,8 @@ spec:
     configSecretName: <secret_name>
     imagePullSecretName: redhat-pull-secret
 ```
+
+_Note: The superuser password must be at least eight characters._
 
 ### Persistent Storage using PostgreSQL
 
@@ -283,6 +285,18 @@ spec:
   quay:
     imagePullSecretName: redhat-pull-secret
     keepConfigDeployment: false
+```
+
+## Troubleshooting
+
+To resolve issues running, configuring and utilzing the operator, the following steps may be utilized:
+
+### Errors during initial setup
+
+The _QuayEcosystem_custom resource will attempt to provide the progress of the status of the deployment and configuration of Quay. Additional information related to any errors in the setup process can be found by viewing the log messages of the _config_ pod as shown below:
+
+```
+oc logs $(oc get pods -l=quay-enterprise-component=config -o name)
 ```
 
 

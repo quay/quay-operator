@@ -158,12 +158,14 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 	if err != nil {
 		logging.Log.Error(err, "Failed to update quay configuration")
+		return fmt.Errorf("Failed to update quay configuration: %s", err.Error())
 	}
 
 	_, _, err = quaySetupInstance.setupClient.SetupDatabase()
 
 	if err != nil {
 		logging.Log.Error(err, "Failed to setup database")
+		return fmt.Errorf("Failed to setup database: %s", err.Error())
 	}
 
 	_, _, err = quaySetupInstance.setupClient.CreateSuperuser(client.QuayCreateSuperuserRequest{
@@ -175,12 +177,14 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 	if err != nil {
 		logging.Log.Error(err, "Failed to create superuser")
+		return fmt.Errorf("Failed to create superuser: %s", err.Error())
 	}
 
 	_, quayConfig, err = quaySetupInstance.setupClient.GetQuayConfiguration()
 
 	if err != nil {
 		logging.Log.Error(err, "Failed to get Quay Configuration")
+		return fmt.Errorf("Failed to get Quay Configuration: %s", err.Error())
 	}
 
 	// Setup Storage
@@ -205,7 +209,8 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 	_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLPrivateKeySecretKey, quaySetupInstance.quayConfiguration.QuaySslPrivateKey)
 
 	if err != nil {
-		return err
+		logging.Log.Error(err, "Failed to upload SSL certificates")
+		return fmt.Errorf("Failed to upload SSL certificates: %s", err.Error())
 	}
 
 	_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLCertificateSecretKey, quaySetupInstance.quayConfiguration.QuaySslCertificate)
@@ -219,7 +224,8 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		err = qm.validateComponent(quaySetupInstance, quayConfig, validationComponent)
 
 		if err != nil {
-			return err
+			logging.Log.Error(err, "Failed to Validate Component")
+			return fmt.Errorf("Failed to Validate Component: %s", err.Error())
 		}
 	}
 
@@ -230,12 +236,14 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 	if err != nil {
 		logging.Log.Error(err, "Failed to update Quay Configuration")
+		return fmt.Errorf("Failed to update Quay Configuration: %s", err.Error())
 	}
 
 	_, _, err = quaySetupInstance.setupClient.CompleteSetup()
 
 	if err != nil {
 		logging.Log.Error(err, "Failed to complete Quay Configuration setup")
+		return fmt.Errorf("Failed to complete Quay Configuration setup: %s", err.Error())
 	}
 
 	return nil

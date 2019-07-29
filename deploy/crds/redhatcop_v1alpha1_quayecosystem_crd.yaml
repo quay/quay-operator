@@ -85,7 +85,7 @@ spec:
                   type: boolean
                 sslCertificatesSecretName:
                   type: string
-                superuserCredentialsName:
+                superuserCredentialsSecretName:
                   type: string
               type: object
             redis:
