@@ -6,7 +6,7 @@ DEV_TAG ?= dev
 
 IMG := $(REPOSITORY):latest
 
-VERSION := v0.0.2
+VERSION := v0.0.3
 
 BUILD_COMMIT := $(shell ./scripts/build/get-build-commit.sh)
 BUILD_TIMESTAMP := $(shell ./scripts/build/get-build-timestamp.sh)
