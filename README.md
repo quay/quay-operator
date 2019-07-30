@@ -18,7 +18,9 @@ The following components are supported to be maintained by the Operator:
 
 ### Deploy the Operator
 
-Quay recommends that it by deployed in a namespace called `quay-enterprise`, however support is available for deploying the operator to a namespace of your choosing. The steps described below assume the namespace that will be utilized is called `quay-enterprise`.
+Quay recommends that it by deployed in a namespace called `quay-enterprise`, however support is available for deploying the operator to a namespace of your choosing. When choosing a namespace other than `quay-enterprise`, the _namespace_ field in the [deploy/cluster_role_binding.yaml](deploy/cluster_role_binding.yaml) must be updated with the new namespace otherwise permission issues will occur.
+
+The steps described below assume the namespace that will be utilized is called `quay-enterprise`.
 
 ```
 $ oc new-project quay-enterprise
