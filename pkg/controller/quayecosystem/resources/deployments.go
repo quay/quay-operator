@@ -84,6 +84,15 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 						},
 					},
 				},
+				{
+					Name: constants.QuayNamespaceEnvironmentVariable,
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  "metadata.namespace",
+						},
+					},
+				},
 			},
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 8080,
@@ -163,6 +172,17 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 		Containers: []corev1.Container{{
 			Image: quayConfiguration.QuayEcosystem.Spec.Quay.Image,
 			Name:  constants.QuayContainerAppName,
+			Env: []corev1.EnvVar{
+				{
+					Name: constants.QuayNamespaceEnvironmentVariable,
+					ValueFrom: &corev1.EnvVarSource{
+						FieldRef: &corev1.ObjectFieldSelector{
+							APIVersion: "v1",
+							FieldPath:  "metadata.namespace",
+						},
+					},
+				},
+			},
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 8080,
 				Name:          "http",

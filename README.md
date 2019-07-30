@@ -18,7 +18,7 @@ The following components are supported to be maintained by the Operator:
 
 ### Deploy the Operator
 
-Quay requires that it be deployed in a namespace called `quay-enterprise`.
+Quay recommends that it by deployed in a namespace called `quay-enterprise`, however support is available for deploying the operator to a namespace of your choosing. The steps described below assume the namespace that will be utilized is called `quay-enterprise`.
 
 ```
 $ oc new-project quay-enterprise

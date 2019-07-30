@@ -126,6 +126,8 @@ const (
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
 	// QuayAppConfigSSLPrivateKeySecretKey is key in the app-config secret representing the SSL Private Key
 	QuayAppConfigSSLPrivateKeySecretKey = "ssl.key"
+	//QuayNamespaceEnvironmentVariable is the name of the environment variable to specify the namespace Quay is deployed within
+	QuayNamespaceEnvironmentVariable = "QE_K8S_NAMESPACE"
 )
 
 var (
