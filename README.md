@@ -90,7 +90,6 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  imagePullSecretName: redhat-pull-secret
   quay:
     superuserCredentialsSecretName: <secret_name>
     imagePullSecretName: redhat-pull-secret
