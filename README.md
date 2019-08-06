@@ -40,7 +40,7 @@ $ oc create -f deploy/operator.yaml
 
 ### Deploy a Quay Ecosystem
 
-Create a pull secret to retrieve Quay images from quay.io
+Create a pull secret to retrieve Quay images from quay.io. If unsure what to use for the pull secret see [Accessing Red Hat Quay (formerly Quay Enterprise) without a CoreOS login](https://access.redhat.com/solutions/3533201).
 
 ```
 $ oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=<location of docker.json file>" --type='kubernetes.io/dockerconfigjson'
