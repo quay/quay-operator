@@ -758,7 +758,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 	}
 
 	clairConfigFile.JwtProxy.VerifierProxies[0].Verifier.Audience = qclient.URL{
-		clairAudience,
+		URL: clairAudience,
 	}
 
 	clairConfigFile.JwtProxy.SignerProxy.Signer.PrivateKey.Options["key_id"] = r.quayConfiguration.SecurityScannerKeyID
