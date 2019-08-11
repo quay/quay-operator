@@ -66,7 +66,7 @@ func GenerateDefaultClairConfigFile() client.ClairFile {
 					ListenAddr: ":6060",
 					Verifier: client.VerifierConfig{
 						Upstream: client.URL{
-							verifierProxy,
+							URL: verifierProxy,
 						},
 						KeyServer: client.RegistrableComponentConfig{
 							Type:    "keyregistry",

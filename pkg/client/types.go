@@ -189,13 +189,13 @@ type RegistrableComponentConfig struct {
 }
 
 type URL struct {
-	*url.URL
+	URL *url.URL
 }
 
 // MarshalYAML implements the yaml.Marshaler interface for URLs.
 func (u URL) MarshalYAML() (interface{}, error) {
 	if u.URL != nil {
-		return u.String(), nil
+		return u.URL.String(), nil
 	}
 	return nil, nil
 }
