@@ -42,9 +42,21 @@ func BuildQuayConfigResourceLabels(resourceMap map[string]string) map[string]str
 	return resourceMap
 }
 
+// BuildClairResourceLabels builds labels for the Quay config resources
+func BuildClairResourceLabels(resourceMap map[string]string) map[string]string {
+	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentClairValue
+	return resourceMap
+}
+
 // BuildQuayDatabaseResourceLabels builds labels for the Quay app resources
 func BuildQuayDatabaseResourceLabels(resourceMap map[string]string) map[string]string {
 	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentQuayDatabaseValue
+	return resourceMap
+}
+
+// BuildClairDatabaseResourceLabels builds labels for the Quay app resources
+func BuildClairDatabaseResourceLabels(resourceMap map[string]string) map[string]string {
+	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentClairDatabaseValue
 	return resourceMap
 }
 
@@ -64,16 +76,41 @@ func GetQuayConfigResourcesName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) 
 	return fmt.Sprintf("%s-quay-config", GetGenericResourcesName(quayEcosystem))
 }
 
+// GetClairResourcesName returns name of Clair app name
+func GetClairResourcesName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-clair", GetGenericResourcesName(quayEcosystem))
+}
+
 // GetRedisResourcesName returns name of Kubernetes resource name
 func GetRedisResourcesName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
 	return fmt.Sprintf("%s-redis", GetGenericResourcesName(quayEcosystem))
 }
 
-// GetConfigMapSecretName returns the name of the Quay config secret
-func GetConfigMapSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+// GetQuayConfigMapSecretName returns the name of the Quay config secret
+func GetQuayConfigMapSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
 	//configSecretName := fmt.Sprintf("%s-config-secret", GetGenericResourcesName(quayEcosystem))
 	return "quay-enterprise-config-secret"
 	//return configSecretName
+}
+
+// GetClairConfigMapName returns the name of the Clair configuration
+func GetClairConfigMapName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-clair-config", GetGenericResourcesName(quayEcosystem))
+}
+
+// GetClairSecretName returns the name of the Clair secret
+func GetClairSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-clair-secret", GetGenericResourcesName(quayEcosystem))
+}
+
+// GetClairEndpointAddress returns the URL of the Clair endpoint
+func GetClairEndpointAddress(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("https://%s.%s.svc:%s", GetClairResourcesName(quayEcosystem), quayEcosystem.Namespace, constants.ClairPort)
+}
+
+// GetClairSSLSecretName returns the name of the secret containing the SSL certificate
+func GetClairSSLSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-clair-ssl", GetGenericResourcesName(quayEcosystem))
 }
 
 // GetQuayExtraCertsSecretName returns the name of the Quay extra certs secret
@@ -101,8 +138,27 @@ func GetRegistryStorageVolumeName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem
 	return fmt.Sprintf("%s-%s", GetGenericResourcesName(quayEcosystem), registryBackendName)
 }
 
+// GetSecurityScannerSecretName returns the name of the secret containing the security scanner secret
+func GetSecurityScannerSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-security-scanner", GetGenericResourcesName(quayEcosystem))
+}
+
+// GetSecurityScannerKeyNotes returns the notes that will be included with the security scanner key
+func GetSecurityScannerKeyNotes(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("Created by Quay Operator %s", GetGenericResourcesName(quayEcosystem))
+}
+
 // UpdateMetaWithName updates the name of the resource
 func UpdateMetaWithName(meta metav1.ObjectMeta, name string) metav1.ObjectMeta {
 	meta.Name = name
 	return meta
+}
+
+// GenerateClairCertificateSANs generates tthe SANs for the generated certificate
+func GenerateClairCertificateSANs(serviceName, namespace string) []string {
+	return []string{
+		fmt.Sprintf("%s", serviceName),
+		fmt.Sprintf("%s.%s.svc", serviceName, namespace),
+		fmt.Sprintf("%s.%s.svc.local", serviceName, namespace),
+	}
 }

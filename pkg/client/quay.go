@@ -73,6 +73,39 @@ func (c *QuayClient) GetRegistryStatus() (*http.Response, RegistryStatus, error)
 	return resp, registryStatus, err
 }
 
+func (c *QuayClient) GetKeys() (*http.Response, KeysResponse, error) {
+	req, err := c.newRequest("GET", "/api/v1/superuser/keys", nil)
+	if err != nil {
+		return nil, KeysResponse{}, err
+	}
+	var keysResponse KeysResponse
+	resp, err := c.do(req, &keysResponse)
+
+	return resp, keysResponse, err
+}
+
+func (c *QuayClient) GetKey(kid string) (*http.Response, Key, error) {
+	req, err := c.newRequest("GET", fmt.Sprintf("/api/v1/superuser/keys/%s", kid), nil)
+	if err != nil {
+		return nil, Key{}, err
+	}
+	var key Key
+	resp, err := c.do(req, &key)
+
+	return resp, key, err
+}
+
+func (c *QuayClient) CreateKey(key KeyCreationRequest) (*http.Response, KeyCreationResponse, error) {
+	req, err := c.newRequest("POST", "/api/v1/superuser/keys", key)
+	if err != nil {
+		return nil, KeyCreationResponse{}, err
+	}
+	var keyCreationResponse KeyCreationResponse
+	resp, err := c.do(req, &keyCreationResponse)
+
+	return resp, keyCreationResponse, err
+}
+
 func (c *QuayClient) ValidateDatabase(config QuayConfig) (*http.Response, QuayStatusResponse, error) {
 	req, err := c.newRequest("POST", "/api/v1/superuser/config/validate/database", config)
 	if err != nil {

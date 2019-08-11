@@ -1,9 +1,7 @@
 package setup
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
 
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 
@@ -13,8 +11,6 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	"k8s.io/client-go/kubernetes"
-
-	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Registry Represents the status returned from the Quay Registry
@@ -40,70 +36,13 @@ func NewQuaySetupManager(reconcilerBase util.ReconcilerBase, k8sclient kubernete
 	return &QuaySetupManager{reconcilerBase: reconcilerBase, k8sclient: k8sclient}
 }
 
-func (*QuaySetupManager) PrepareForSetup(kclient kclient.Client, quayConfiguration *resources.QuayConfiguration) error {
-
-	quayConfigHost := quayConfiguration.QuayEcosystem.Spec.Quay.ConfigRouteHost
-
-	if utils.IsZeroOfUnderlyingType(quayConfigHost) {
-		quayConfigHost = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
-	}
-
-	quayConfiguration.QuayConfigHostname = quayConfigHost
-
-	/*
-		quayRouteHost := quayConfiguration.QuayEcosystem.Spec.Quay.RouteHost
-
-
-			if utils.IsZeroOfUnderlyingType(quayRouteHost) {
-
-				quayRoute := &routev1.Route{}
-				err := kclient.Get(context.TODO(), types.NamespacedName{Name: resources.GetQuayResourcesName(quayConfiguration.QuayEcosystem), Namespace: quayConfiguration.QuayEcosystem.Namespace}, quayRoute)
-
-				if err != nil {
-					logging.Log.Error(err, "Error Finding Quay Route", "Namespace", quayConfiguration.QuayEcosystem.Namespace, "Name", quayConfiguration.QuayEcosystem.Name)
-				}
-
-				quayRouteHost = quayRoute.Spec.Host
-			}
-
-			quayConfiguration.QuayHostname = quayRouteHost
-	*/
-
-	postgresqlHost := quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server
-
-	if utils.IsZeroOfUnderlyingType(postgresqlHost) {
-		postgresqlHost = resources.GetQuayDatabaseName(quayConfiguration.QuayEcosystem)
-	}
-
-	quayConfiguration.QuayDatabase.Server = postgresqlHost
-
-	redisHost := quayConfiguration.QuayEcosystem.Spec.Redis.Hostname
-
-	if utils.IsZeroOfUnderlyingType(redisHost) {
-		redisHost = resources.GetRedisResourcesName(quayConfiguration.QuayEcosystem)
-	}
-
-	quayConfiguration.RedisHostname = redisHost
-
-	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.Port) {
-		quayConfiguration.RedisPort = quayConfiguration.QuayEcosystem.Spec.Redis.Port
-	}
-
-	return nil
-}
-
 func (*QuaySetupManager) NewQuaySetupInstance(quayConfiguration *resources.QuayConfiguration) (*QuaySetupInstance, error) {
 
-	t := http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	httpClient := http.Client{
-		Transport: &t,
-	}
+	httpClient := resources.GetDefaultHTTPClient()
 
 	quayConfigURL := fmt.Sprintf("https://%s", quayConfiguration.QuayConfigHostname)
 
-	setupClient := client.NewClient(&httpClient, quayConfigURL, quayConfiguration.QuayConfigUsername, quayConfiguration.QuayConfigPassword)
+	setupClient := client.NewClient(httpClient, quayConfigURL, quayConfiguration.QuayConfigUsername, quayConfiguration.QuayConfigPassword)
 
 	quaySetupInstance := QuaySetupInstance{
 		quayConfiguration: *quayConfiguration,
@@ -203,7 +142,12 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 	}
 
-	quayConfig.Config["DISTRIBUTED_STORAGE_CONFIG"] = distributedStorageConfig
+	// Setup Security Scanner
+	if quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Clair != nil && quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
+		quayConfig.Config["SECURITY_SCANNER_ISSUER_NAME"] = constants.SecurityScannerService
+		quayConfig.Config["SECURITY_SCANNER_ENDPOINT"] = resources.GetClairEndpointAddress(quaySetupInstance.quayConfiguration.QuayEcosystem)
+		quayConfig.Config["FEATURE_SECURITY_SCANNER"] = true
+	}
 
 	// Add Certificates
 	_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLPrivateKeySecretKey, quaySetupInstance.quayConfiguration.QuaySslPrivateKey)

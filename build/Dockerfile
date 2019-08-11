@@ -1,3 +1,15 @@
-FROM quay.io/redhat-cop/build-s2i-executable:latest
+FROM registry.access.redhat.com/ubi7/ubi-minimal:latest
 
-ADD build/_output/bin/quay-operator /app/quay-operator
+ENV OPERATOR=/usr/local/bin/quay-operator \
+    USER_UID=1001 \
+    USER_NAME=quay-operator
+
+# install operator binary
+COPY build/_output/bin/quay-operator ${OPERATOR}
+
+COPY build/bin /usr/local/bin
+RUN  /usr/local/bin/user_setup
+
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
+
+USER ${USER_UID}

@@ -22,6 +22,11 @@ type QuayConfiguration struct {
 	QuayDatabase                    DatabaseConfig
 	ProvisionQuayDatabase           bool
 
+	// Database
+	ValidProvidedClairDatabaseSecret bool
+	ClairDatabase                    DatabaseConfig
+	ProvisionClairDatabase           bool
+
 	// Redis
 	RedisHostname string
 	RedisPort     *int32
@@ -39,6 +44,11 @@ type QuayConfiguration struct {
 	DeployQuayConfiguration               bool
 	QuaySslCertificate                    []byte
 	QuaySslPrivateKey                     []byte
+	SecurityScannerKeyID                  string
+
+	// Clair
+	ClairSslCertificate []byte
+	ClairSslPrivateKey  []byte
 }
 
 // DatabaseConfig is an internal structure representing a database
