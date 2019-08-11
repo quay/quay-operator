@@ -378,11 +378,6 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.Obj
 	if !r.quayConfiguration.ValidProvidedQuayDatabaseSecret {
 		quayDatabaseSecret := resources.GetSecretDefinitionFromCredentialsMap(resources.GetQuayDatabaseName(r.quayConfiguration.QuayEcosystem), meta, constants.DefaultQuayDatabaseCredentials)
 		databaseResources = append(databaseResources, quayDatabaseSecret)
-
-		r.quayConfiguration.QuayDatabase.Username = constants.DefaultQuayDatabaseCredentials[constants.DatabaseCredentialsUsernameKey]
-		r.quayConfiguration.QuayDatabase.Password = constants.DefaultQuayDatabaseCredentials[constants.DatabaseCredentialsPasswordKey]
-		r.quayConfiguration.QuayDatabase.Database = constants.DefaultQuayDatabaseCredentials[constants.DatabaseCredentialsDatabaseKey]
-
 	}
 
 	// Create PVC
@@ -426,11 +421,6 @@ func (r *ReconcileQuayEcosystemConfiguration) createClairDatabase(meta metav1.Ob
 	if !r.quayConfiguration.ValidProvidedClairDatabaseSecret {
 		clairDatabaseSecret := resources.GetSecretDefinitionFromCredentialsMap(resources.GetClairDatabaseName(r.quayConfiguration.QuayEcosystem), meta, constants.DefaultClairDatabaseCredentials)
 		databaseResources = append(databaseResources, clairDatabaseSecret)
-
-		// r.quayConfiguration.ClairDatabase.Username = constants.DefaultClairDatabaseCredentials[constants.DatabaseCredentialsUsernameKey]
-		// r.quayConfiguration.ClairDatabase.Password = constants.DefaultClairDatabaseCredentials[constants.DatabaseCredentialsPasswordKey]
-		// r.quayConfiguration.ClairDatabase.Database = constants.DefaultClairDatabaseCredentials[constants.DatabaseCredentialsDatabaseKey]
-
 	}
 
 	// Create PVC

@@ -22,6 +22,7 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.QuayConfigPasswordSecret = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
 	quayConfiguration.QuayDatabase.Username = constants.QuayDatabaseCredentialsDefaultUsername
 	quayConfiguration.QuayDatabase.Password = constants.QuayDatabaseCredentialsDefaultPassword
+	quayConfiguration.QuayDatabase.Database = constants.QuayDatabaseCredentialsDefaultDatabaseName
 	quayConfiguration.QuayDatabase.RootPassword = constants.QuayDatabaseCredentialsDefaultRootPassword
 	quayConfiguration.QuayDatabase.Server = resources.GetQuayDatabaseName(quayConfiguration.QuayEcosystem)
 	quayConfiguration.ClairDatabase.Username = constants.ClairDatabaseCredentialsDefaultUsername
