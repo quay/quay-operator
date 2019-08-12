@@ -5,7 +5,6 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
