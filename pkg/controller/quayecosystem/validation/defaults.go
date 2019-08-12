@@ -5,7 +5,6 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -30,6 +29,7 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.ClairDatabase.Server = resources.GetClairDatabaseName(quayConfiguration.QuayEcosystem)
 	quayConfiguration.ClairDatabase.Database = constants.ClairDatabaseCredentialsDefaultDatabaseName
 	quayConfiguration.ClairDatabase.RootPassword = constants.ClairDatabaseCredentialsDefaultRootPassword
+	quayConfiguration.ClairUpdateInterval = constants.ClairDefaultUpdateInterval
 
 	if quayConfiguration.QuayEcosystem.Spec.Quay == nil {
 		quayConfiguration.QuayEcosystem.Spec.Quay = &redhatcopv1alpha1.Quay{}

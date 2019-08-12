@@ -1,6 +1,7 @@
 package constants
 
 import (
+	"time"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -174,6 +175,8 @@ const (
 	ClairMITMPrivateKey = "/certificates/mitm.key"
 	// ClairMITMCertificate is the location of the MTIM certificate
 	ClairMITMCertificate = "/certificates/mitm.crt"
+	// ClairDefaultUpdateInterval is the default interval for Clair to query for CVE updates
+	ClairDefaultUpdateInterval = time.Hour * 6
 )
 
 var (

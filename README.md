@@ -356,6 +356,27 @@ spec:
     imagePullSecretName: redhat-pull-secret
 ```
 
+#### Update Interval
+
+Clair routinely queries CVE databases in order to build its own internal database. By default, this value is set at 500m. You can modify the time interval between checks by setting the `updateInterval` property as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+  clair:
+    enabled: true
+    imagePullSecretName: redhat-pull-secret
+    updateInterval: "60m"
+```
+
+The above configuration would have Clair update every 60 minutes.
+
+
 
 ## Troubleshooting
 

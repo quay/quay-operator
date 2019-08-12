@@ -21,7 +21,7 @@ func GenerateDefaultClairConfigFile() client.ClairFile {
 				},
 			},
 			Updater: &client.ClairUpdater{
-				Interval: time.Hour * 6,
+				Interval: constants.ClairDefaultUpdateInterval,
 				Notifier: &client.ClairNotifier{
 					Attempts:         1,
 					RenotifyInterval: time.Hour * 1,

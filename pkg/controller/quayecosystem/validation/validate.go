@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"time"
+
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
@@ -186,6 +188,18 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 				return false, fmt.Errorf("Failed to validate provided Clair Image Pull Secret")
 			}
 
+		}
+
+		// Validate Update Interval
+		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.UpdateInterval) {
+
+			duration, durationErr := time.ParseDuration(quayConfiguration.QuayEcosystem.Spec.Clair.UpdateInterval)
+
+			if durationErr != nil {
+				return false, durationErr
+			}
+
+			quayConfiguration.ClairUpdateInterval = duration
 		}
 
 		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database) && !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.Server) && utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.CredentialsSecretName) {

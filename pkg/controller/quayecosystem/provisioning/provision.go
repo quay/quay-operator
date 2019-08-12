@@ -717,8 +717,6 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 		return err
 	}
 
-	// Check if key exists
-
 	var clairConfigFile qclient.ClairFile
 
 	//	if _, configFound := clairConfigMap.Data[constants.ClairConfigFileKey]; configFound {
@@ -733,10 +731,11 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 	clairConfigFile = resources.GenerateDefaultClairConfigFile()
 	//	}
 
-	// TODO: Update ConfigMap with all of the fields we need to manage
 	clairConfigFile.Clair.Database.Options["source"] = fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", r.quayConfiguration.ClairDatabase.Username, r.quayConfiguration.ClairDatabase.Password, r.quayConfiguration.ClairDatabase.Server, r.quayConfiguration.ClairDatabase.Database)
 
 	clairAudience, _ := url.Parse(resources.GetClairEndpointAddress(r.quayConfiguration.QuayEcosystem))
+
+	clairConfigFile.Clair.Updater.Interval = r.quayConfiguration.ClairUpdateInterval
 
 	clairConfigFile.Clair.Updater.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
 		Endpoint: fmt.Sprintf("https://%s/secscan/notify", r.quayConfiguration.QuayEcosystem.Status.Hostname),

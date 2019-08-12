@@ -148,6 +148,7 @@ type Clair struct {
 	Database                  *Database `json:"database,omitempty"`
 	Replicas                  *int32    `json:"replicas,omitempty"`
 	SslCertificatesSecretName string    `json:"sslCertificatesSecretName,omitempty"`
+	UpdateInterval            string    `json:"updateInterval,omitempty"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry
