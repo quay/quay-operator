@@ -32,3 +32,28 @@ func TestDefaultValidation(t *testing.T) {
 	assert.Equal(t, validate, true)
 
 }
+
+func TestShortQuayPwdError(t *testing.T) {
+
+	// Objects to track in the fake client.
+	objs := []runtime.Object{}
+	// Initialize fake client
+	cl := fake.NewFakeClient(objs...)
+	// Stub out object placeholders for test
+	quayEcosystem := &redhatcopv1alpha1.QuayEcosystem{}
+	quayConfiguration := resources.QuayConfiguration{
+		QuayEcosystem: quayEcosystem,
+	}
+
+	// Set default values
+	defaultConfig := SetDefaults(cl, &quayConfiguration)
+	assert.Equal(t, defaultConfig, true)
+
+	quayConfiguration.QuayConfigPassword = "ToShort"
+
+	validate, err := Validate(cl, &quayConfiguration)
+
+	assert.Error(t, err)
+	assert.Equal(t, validate, false)
+
+}
