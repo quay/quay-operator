@@ -26,6 +26,7 @@ func TestDefaultConfiguration(t *testing.T) {
 	// Set default values
 	defaultConfig := SetDefaults(cl, &quayConfiguration)
 
+	// Test for the expected default values
 	assert.Equal(t, defaultConfig, true)
 	assert.Equal(t, constants.QuayConfigUsername, quayConfiguration.QuayConfigUsername)
 	assert.Equal(t, constants.QuayConfigDefaultPasswordValue, quayConfiguration.QuayConfigPassword)
