@@ -13,9 +13,9 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/setup"
 
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/validation"
 	"github.com/redhat-cop/quay-operator/pkg/k8sutils"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

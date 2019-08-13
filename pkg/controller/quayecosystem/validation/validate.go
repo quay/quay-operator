@@ -209,6 +209,7 @@ func validateSecret(client client.Client, namespace string, name string, require
 }
 
 func validateProvidedSecretMap(secret *corev1.Secret, requiredParameters map[string]string) bool {
+
 	for key := range requiredParameters {
 		if _, found := secret.Data[key]; !found {
 			return false
