@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"time"
+
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
@@ -109,7 +111,7 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 			return false, fmt.Errorf("Failed to locate a Quay Database Credential for Externally Provisioned Instance")
 		}
 
-		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database) && !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server) && !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CredentialsSecretName) {
+		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database) && !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CredentialsSecretName) {
 
 			validQuayDatabaseSecret, databaseSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.Database.CredentialsSecretName, constants.RequiredDatabaseCredentialKeys)
 
@@ -168,6 +170,64 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 		quayConfiguration.QuaySslCertificate = quaySslCertificateSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey]
 		quayConfiguration.QuaySslPrivateKey = quaySslCertificateSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]
+
+	}
+
+	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
+
+		// Validate Clair ImagePullSecret
+		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.ImagePullSecretName) {
+
+			validImagePullSecret, _, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Clair.ImagePullSecretName, nil)
+
+			if err != nil {
+				return false, err
+			}
+
+			if !validImagePullSecret {
+				return false, fmt.Errorf("Failed to validate provided Clair Image Pull Secret")
+			}
+
+		}
+
+		// Validate Update Interval
+		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.UpdateInterval) {
+
+			duration, durationErr := time.ParseDuration(quayConfiguration.QuayEcosystem.Spec.Clair.UpdateInterval)
+
+			if durationErr != nil {
+				return false, durationErr
+			}
+
+			quayConfiguration.ClairUpdateInterval = duration
+		}
+
+		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database) && !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.Server) && utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.CredentialsSecretName) {
+			return false, fmt.Errorf("Failed to locate a Clair Database Credential for Externally Provisioned Instance")
+		}
+
+		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database) && !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.CredentialsSecretName) {
+
+			validClairDatabaseSecret, databaseSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Clair.Database.CredentialsSecretName, constants.RequiredDatabaseCredentialKeys)
+
+			if err != nil {
+				return false, err
+			}
+
+			if !validClairDatabaseSecret {
+				return false, fmt.Errorf("Failed to validate provided Clair Database Secret")
+			}
+
+			quayConfiguration.ClairDatabase.Username = string(databaseSecret.Data[constants.DatabaseCredentialsUsernameKey])
+			quayConfiguration.ClairDatabase.Password = string(databaseSecret.Data[constants.DatabaseCredentialsPasswordKey])
+			quayConfiguration.ClairDatabase.Database = string(databaseSecret.Data[constants.DatabaseCredentialsDatabaseKey])
+
+			if _, found := databaseSecret.Data[constants.DatabaseCredentialsRootPasswordKey]; found {
+				quayConfiguration.ClairDatabase.RootPassword = string(databaseSecret.Data[constants.DatabaseCredentialsRootPasswordKey])
+			}
+
+			quayConfiguration.ValidProvidedClairDatabaseSecret = true
+		}
 
 	}
 

@@ -11,8 +11,9 @@ import (
 // QuayEcosystemSpec defines the desired state of QuayEcosystem
 // +k8s:openapi-gen=true
 type QuayEcosystemSpec struct {
-	Quay  Quay  `json:"quay,omitempty"`
-	Redis Redis `json:"redis,omitempty"`
+	Quay  *Quay  `json:"quay,omitempty"`
+	Redis *Redis `json:"redis,omitempty"`
+	Clair *Clair `json:"clair,omitempty"`
 }
 
 // QuayEcosystemPhase defines the phase of lifecycle the operator is running in
@@ -42,6 +43,16 @@ const (
 	QuayEcosystemQuaySetupSuccess QuayEcosystemConditionType = "QuaySetupSuccess"
 	// QuayEcosystemQuaySetupFailure indicates that the Quay setup process failed
 	QuayEcosystemQuaySetupFailure QuayEcosystemConditionType = "QuaySetupFailure"
+
+	// QuayEcosystemClairConfigurationSuccess indicates that the Clair configuration process succeeded
+	QuayEcosystemClairConfigurationSuccess QuayEcosystemConditionType = "QuayEcosystemClairConfigurationSuccess"
+	// QuayEcosystemClairConfigurationFailure indicates that the Clair configuration process failed
+	QuayEcosystemClairConfigurationFailure QuayEcosystemConditionType = "QuayEcosystemClairConfigurationFailure"
+
+	// QuayEcosystemSecurityScannerConfigurationSuccess indicates that the security scanner was configured successfully
+	QuayEcosystemSecurityScannerConfigurationSuccess QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationSuccess"
+	// QuayEcosystemSecurityScannerConfigurationFailure indicates that the security scanner configuration failed
+	QuayEcosystemSecurityScannerConfigurationFailure QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationFailure"
 )
 
 // QuayEcosystemStatus defines the observed state of QuayEcosystem
@@ -83,14 +94,14 @@ type QuayEcosystemList struct {
 type Quay struct {
 	ConfigRouteHost                string            `json:"configRouteHost,omitempty"`
 	ConfigSecretName               string            `json:"configSecretName,omitempty"`
-	Database                       Database          `json:"database,omitempty"`
+	Database                       *Database         `json:"database,omitempty"`
 	EnableNodePortService          bool              `json:"enableNodePortService,omitempty"`
 	Image                          string            `json:"image,omitempty"`
 	ImagePullSecretName            string            `json:"imagePullSecretName,omitempty"`
 	IsOpenShift                    bool              `json:"isOpenShift,omitempty"`
 	KeepConfigDeployment           bool              `json:"keepConfigDeployment,omitempty"`
 	RegistryBackends               []RegistryBackend `json:"registryBackends,omitempty"`
-	RegistryStorage                RegistryStorage   `json:"registryStorage,omitempty"`
+	RegistryStorage                *RegistryStorage  `json:"registryStorage,omitempty"`
 	Replicas                       *int32            `json:"replicas,omitempty"`
 	RouteHost                      string            `json:"routeHost,omitempty"`
 	SkipSetup                      bool              `json:"skipSetup,omitempty"`
@@ -131,11 +142,13 @@ type Database struct {
 
 // Clair defines the properties of a deployment of Clair
 type Clair struct {
-	Image                     string   `json:"image,omitempty"`
-	ImagePullSecretName       string   `json:"imagePullSecretName,omitempty"`
-	Database                  Database `json:"database,omitempty"`
-	Replicas                  *int32   `json:"replicas,omitempty"`
-	SslCertificatesSecretName string   `json:"sslCertificatesSecretName,omitempty"`
+	Enabled                   bool      `json:"enabled,omitempty"`
+	Image                     string    `json:"image,omitempty"`
+	ImagePullSecretName       string    `json:"imagePullSecretName,omitempty"`
+	Database                  *Database `json:"database,omitempty"`
+	Replicas                  *int32    `json:"replicas,omitempty"`
+	SslCertificatesSecretName string    `json:"sslCertificatesSecretName,omitempty"`
+	UpdateInterval            string    `json:"updateInterval,omitempty"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry

@@ -1,6 +1,8 @@
 package resources
 
 import (
+	"time"
+
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 )
 
@@ -22,6 +24,11 @@ type QuayConfiguration struct {
 	QuayDatabase                    DatabaseConfig
 	ProvisionQuayDatabase           bool
 
+	// Database
+	ValidProvidedClairDatabaseSecret bool
+	ClairDatabase                    DatabaseConfig
+	ProvisionClairDatabase           bool
+
 	// Redis
 	RedisHostname string
 	RedisPort     *int32
@@ -39,6 +46,12 @@ type QuayConfiguration struct {
 	DeployQuayConfiguration               bool
 	QuaySslCertificate                    []byte
 	QuaySslPrivateKey                     []byte
+	SecurityScannerKeyID                  string
+
+	// Clair
+	ClairSslCertificate []byte
+	ClairSslPrivateKey  []byte
+	ClairUpdateInterval time.Duration
 }
 
 // DatabaseConfig is an internal structure representing a database
