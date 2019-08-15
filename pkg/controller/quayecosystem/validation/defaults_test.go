@@ -36,8 +36,6 @@ func TestDefaultConfiguration(t *testing.T) {
 	assert.Equal(t, constants.RedisImage, quayConfiguration.QuayEcosystem.Spec.Redis.Image)
 	assert.Equal(t, constants.PostgresqlImage, quayConfiguration.QuayEcosystem.Spec.Quay.Database.Image)
 	assert.Equal(t, true, quayConfiguration.DeployQuayConfiguration)
-	assert.Equal(t, constants.QuayRegistryStoragePersistentVolumeAccessModes, quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeAccessModes)
-	assert.Equal(t, constants.QuayRegistryStoragePersistentVolumeStoreSize, quayConfiguration.QuayEcosystem.Spec.Quay.RegistryStorage.PersistentVolumeSize)
 
 	registry := []redhatcopv1alpha1.RegistryBackend{
 		redhatcopv1alpha1.RegistryBackend{
