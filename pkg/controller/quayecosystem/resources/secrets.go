@@ -29,3 +29,19 @@ func GetSecretDefinitionFromCredentialsMap(name string, meta metav1.ObjectMeta, 
 		StringData: secretMap,
 	}
 }
+
+func GetTLSSecretDefinition(meta metav1.ObjectMeta, tlsPrivateKey []byte, tlsCertKey []byte) *corev1.Secret {
+
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta,
+		Type:       corev1.SecretTypeTLS,
+		Data: map[string][]byte{
+			corev1.TLSPrivateKeyKey: tlsPrivateKey,
+			corev1.TLSCertKey:       tlsCertKey,
+		},
+	}
+}

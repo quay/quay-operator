@@ -78,11 +78,16 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref common.ReferenceCa
 							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis"),
 						},
 					},
+					"clair": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis"},
 	}
 }
 

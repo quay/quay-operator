@@ -29,6 +29,42 @@ spec:
           type: object
         spec:
           properties:
+            clair:
+              properties:
+                database:
+                  properties:
+                    cpu:
+                      type: string
+                    credentialsSecretName:
+                      type: string
+                    image:
+                      type: string
+                    imagePullSecretName:
+                      type: string
+                    memory:
+                      type: string
+                    replicas:
+                      format: int32
+                      type: integer
+                    server:
+                      type: string
+                    volumeSize:
+                      type: string
+                  type: object
+                enabled:
+                  type: boolean
+                image:
+                  type: string
+                imagePullSecretName:
+                  type: string
+                replicas:
+                  format: int32
+                  type: integer
+                sslCertificatesSecretName:
+                  type: string
+                updateInterval:
+                  type: string
+              type: object
             quay:
               properties:
                 configRouteHost:

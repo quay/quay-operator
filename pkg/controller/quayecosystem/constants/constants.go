@@ -1,6 +1,7 @@
 package constants
 
 import (
+	"time"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -10,11 +11,13 @@ const (
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
 	// QuayImage is the Quay image
-	QuayImage = "quay.io/redhat/quay:v3.0.3"
+	QuayImage = "quay.io/redhat/quay:v3.0.4"
 	// ImagePullSecret is the name of the image pull secret for retrieving images from a protected image registry
 	ImagePullSecret = "redhat-pull-secret"
 	// RedisImage is the name of the Redis Image
-	RedisImage = "registry.access.redhat.com/rhscl/redis-32-rhel7"
+	RedisImage = "registry.access.redhat.com/rhscl/redis-32-rhel7:latest"
+	// ClairImage is the Clair image
+	ClairImage = "quay.io/redhat/clair-jwt:v3.0.4"
 	// LabelAppKey is the name of the label key
 	LabelAppKey = "app"
 	// LabelAppValue is the name of the label
@@ -25,10 +28,14 @@ const (
 	LabelComponentAppValue = "app"
 	// LabelComponentConfigValue is the name of the config label
 	LabelComponentConfigValue = "config"
+	// LabelComponentClairValue is the name of the config label
+	LabelComponentClairValue = "clair"
 	// LabelComponentRedisValue is the name of the Redis label
 	LabelComponentRedisValue = "redis"
 	// LabelComponentQuayDatabaseValue is the name of the Quay database label
 	LabelComponentQuayDatabaseValue = "quay-database"
+	// LabelComponentClairDatabaseValue is the name of the Quay database label
+	LabelComponentClairDatabaseValue = "clair-database"
 	// LabelQuayCRKey is the label name of the quay custom resource
 	LabelQuayCRKey = "quay-enterprise-cr"
 	// AnyUIDSCC is the name of the anyuid SCC
@@ -37,6 +44,8 @@ const (
 	RedisServiceAccount = "redis"
 	// QuayServiceAccount is the name of the Quay ServiceAccount
 	QuayServiceAccount = "quay"
+	// ClairServiceAccount is the name of the Clair ServiceAccount
+	ClairServiceAccount = "clair"
 	// PostgresqlName is the name used to represent PostgreSQL
 	PostgresqlName = "postgresql"
 	// PostgresqlImage is the Postgresql image
@@ -77,6 +86,16 @@ const (
 	ClairDatabaseCredentialsDefaultRootPassword = "clairAdmin"
 	// ClairDatabaseCredentialsDefaultDatabaseName represents the default database name
 	ClairDatabaseCredentialsDefaultDatabaseName = "clair"
+
+	// ClairContainerName represents the name of the Clair container
+	ClairContainerName = "clair"
+
+	// ClairSSLCertPath is the location of the SSL certificate in the Clair pod
+	ClairSSLCertPath = "/clair/config/clair.crt"
+	// ClairSSLKeyPath is the location of the SSL private key in the Clair pod
+	ClairSSLKeyPath = "/clair/config/clair.key"
+	// ClairSecurityScannerPath is the location of the Security Scannerr private key in the Clair pod
+	ClairSecurityScannerPath = "/clair/config/security_scanner.pem"
 
 	// QuayRegistryStoragePath represents the location where registry storage is mounted in the container
 	QuayRegistryStoragePath = "/datastorage/registry"
@@ -128,6 +147,36 @@ const (
 	QuayAppConfigSSLPrivateKeySecretKey = "ssl.key"
 	//QuayNamespaceEnvironmentVariable is the name of the environment variable to specify the namespace Quay is deployed within
 	QuayNamespaceEnvironmentVariable = "QE_K8S_NAMESPACE"
+	//QuayExtraCertsDirEnvironmentVariable is the name of the environment variable to specify the location of extra certificates
+	QuayExtraCertsDirEnvironmentVariable = "KUBE_EXTRA_CA_CERTDIR"
+	// SecurityScannerService is the name of the security scanner service
+	SecurityScannerService = "security_scanner"
+	// SecurityScannerServiceSecretKey is the name of the key containing the security service private key
+	SecurityScannerServiceSecretKey = "security_scanner.pem"
+	// SecurityScannerServiceSecretKIDKey is the name of the key containing the scanner kid
+	SecurityScannerServiceSecretKIDKey = "kid"
+	// ClairDefaultPaginationKey is the default Clair Pagination Key
+	ClairDefaultPaginationKey = "XxoPtCUzrUv4JV5dS+yQ+MdW7yLEJnRMwigVY/bpgtQ="
+	// ClairConfigFileKey represents the config.yaml file ConfigMap key
+	ClairConfigFileKey = "config.yaml"
+	// ClairPort is the port to communicate with Clair
+	ClairPort = "6060"
+	// ClairTrustCaPath is the location of the trusted SSL anchors file
+	ClairTrustCaPath = "/etc/pki/ca-trust/source/anchors/ca.crt"
+	// ClairConfigVolumePath is the location of within the Clair pod to mount configuration files
+	ClairConfigVolumePath = "/clair/config"
+	// ClairHealthEndpoint is the endpoint that contains the health status of Clair
+	ClairHealthEndpoint = "/health"
+	// ClairSSLCertificateSecretKey is the key in the Clair secret representing the SSL Certificate
+	ClairSSLCertificateSecretKey = "clair.crt"
+	// ClairSSLPrivateKeySecretKey is the key in the Clair secret representing the SSL Private Key
+	ClairSSLPrivateKeySecretKey = "clair.key"
+	// ClairMITMPrivateKey is the location of the MTIM Private Key
+	ClairMITMPrivateKey = "/certificates/mitm.key"
+	// ClairMITMCertificate is the location of the MTIM certificate
+	ClairMITMCertificate = "/certificates/mitm.crt"
+	// ClairDefaultUpdateInterval is the default interval for Clair to query for CVE updates
+	ClairDefaultUpdateInterval = time.Hour * 6
 )
 
 var (
@@ -159,6 +208,9 @@ var (
 
 	// RequiredSslCertificateKeys represents the keys that are required for a provided SSL certificate
 	RequiredSslCertificateKeys = []string{QuayAppConfigSSLCertificateSecretKey, QuayAppConfigSSLPrivateKeySecretKey}
+
+	// RequiredAnyUIDSccServiceAccounts is a list of service accounts who require access to the anyuid SCC
+	RequiredAnyUIDSccServiceAccounts = []string{QuayServiceAccount}
 
 	// DefaultQuayConfigCredentials represents a map containing the default Quay Config
 	DefaultQuayConfigCredentials = map[string]string{

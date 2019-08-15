@@ -291,9 +291,9 @@ spec:
     sslCertificatesSecretName: custom-quay-ssl
 ```
 
-### Configuration Deployment Removal
+### Specifying the Quay Route
 
-In order to allow for continued access to configure Quay, the configuration deployment of Quay remains active after the initial deployment and configuration of Quay. To reclaim the configuration deployment resources, the `keepConfigDeployment` can be set as `false` as shown below
+Quay makes use of an OpenShift route to enable ingress. The hostname for this route is automatically generated as per the configuration of the OpenShift cluster. Alternatively, the hostname for this route can be explicitly specified using the `routeHost` property under the _quay_ field as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -302,39 +302,10 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
-    keepConfigDeployment: false
+    routeHost: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
+  imagePullSecretName: redhat-pull-secret
 ```
 
-## Troubleshooting
-
-To resolve issues running, configuring and utilzing the operator, the following steps may be utilized:
-
-### Errors during initial setup
-
-The _QuayEcosystem_custom resource will attempt to provide the progress of the status of the deployment and configuration of Quay. Additional information related to any errors in the setup process can be found by viewing the log messages of the _config_ pod as shown below:
-
-```
-oc logs $(oc get pods -l=quay-enterprise-component=config -o name)
-```
-
-
-## Local Development
-
-Execute the following steps to develop the functionality locally. It is recommended that development be done using a cluster with `cluster-admin` permissions. 
-
-Clone the repository, then resolve all dependencies using `go mod`
-
-```
-$ export GO111MODULE=on
-$ go mod vendor
-```
-
-Using the [operator-sdk](https://github.com/operator-framework/operator-sdk), run the operator locally
-
-```
-$ operator-sdk up local --namespace=quay-enterprise
-```
 
 ### Specifying a Quay Configuration Route
 
@@ -351,4 +322,89 @@ spec:
   quay:
     configRouteHost: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
   imagePullSecretName: redhat-pull-secret
+```
+
+### Configuration Deployment After Initial Setup
+
+In order to conserve resources, the configuration deployment of Quay is removed after the initial setup. In certain cases, there may be a need to further configure the quay environment. To specify that the configuration deployment should be retained, the `keepConfigDeployment` property within the _Quay_ object can can be set as `true` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    keepConfigDeployment: true
+```
+
+### Clair
+
+[Clair](https://github.com/coreos/clair) is a vulnerability assessment tool for application container. Support is available to automatically provision and configure both Clair and the integration wtih Quay. A property called `clair` can be specified in the `QuayEcosystem` object along with `enabled: true` within this field in order to deploy Clair. An example is shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+  clair:
+    enabled: true
+    imagePullSecretName: redhat-pull-secret
+```
+
+#### Update Interval
+
+Clair routinely queries CVE databases in order to build its own internal database. By default, this value is set at 500m. You can modify the time interval between checks by setting the `updateInterval` property as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+  clair:
+    enabled: true
+    imagePullSecretName: redhat-pull-secret
+    updateInterval: "60m"
+```
+
+The above configuration would have Clair update every 60 minutes.
+
+
+
+## Troubleshooting
+
+To resolve issues running, configuring and utilzing the operator, the following steps may be utilized:
+
+### Errors during initial setup
+
+The _QuayEcosystem_ custom resource will attempt to provide the progress of the status of the deployment and configuration of Quay. Additional information related to any errors in the setup process can be found by viewing the log messages of the _config_ pod as shown below:
+
+```
+oc logs $(oc get pods -l=quay-enterprise-component=config -o name)
+```
+
+##
+
+## Local Development
+
+Execute the following steps to develop the functionality locally. It is recommended that development be done using a cluster with `cluster-admin` permissions. 
+
+Clone the repository, then resolve all dependencies using `go mod`
+
+```
+$ export GO111MODULE=on
+$ go mod vendor
+```
+
+Using the [operator-sdk](https://github.com/operator-framework/operator-sdk), run the operator locally
+
+```
+$ operator-sdk up local --namespace=quay-enterprise
 ```

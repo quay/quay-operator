@@ -1,9 +1,9 @@
 package resources
 
 import (
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -115,6 +115,15 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 					},
 				},
 			},
+			LivenessProbe: &corev1.Probe{
+				FailureThreshold:    3,
+				InitialDelaySeconds: 30,
+				Handler: corev1.Handler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.IntOrString{IntVal: 8443},
+					},
+				},
+			},
 		}},
 		ServiceAccountName: constants.QuayServiceAccount,
 		Volumes: []corev1.Volume{corev1.Volume{
@@ -125,14 +134,13 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 						{
 							Secret: &corev1.SecretProjection{
 								LocalObjectReference: corev1.LocalObjectReference{
-									Name: GetConfigMapSecretName(quayConfiguration.QuayEcosystem),
+									Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
 								},
 							},
 						},
 					},
 				},
-			}}},
-	}
+			}}}}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
 		quayDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
@@ -168,6 +176,43 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 	meta.Name = GetQuayResourcesName(quayConfiguration.QuayEcosystem)
 	BuildQuayResourceLabels(meta.Labels)
 
+	configVolumeSources := []corev1.VolumeProjection{
+		{
+			Secret: &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+				},
+			},
+		},
+	}
+
+	// Add Clair SSL
+	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
+
+		configVolumeSources = append(configVolumeSources, corev1.VolumeProjection{
+			Secret: &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: GetClairSSLSecretName(quayConfiguration.QuayEcosystem),
+				},
+				Items: []corev1.KeyToPath{
+					corev1.KeyToPath{
+						Key:  "tls.crt",
+						Path: "extra_ca_certs/clair.crt",
+					},
+				},
+			},
+		})
+
+	}
+
+	configVolume := corev1.Volume{
+		Name: "configvolume",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: configVolumeSources,
+			},
+		}}
+
 	quayDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: quayConfiguration.QuayEcosystem.Spec.Quay.Image,
@@ -181,6 +226,10 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 							FieldPath:  "metadata.namespace",
 						},
 					},
+				},
+				{
+					Name:  constants.QuayExtraCertsDirEnvironmentVariable,
+					Value: "/conf/stack/extra_ca_certs",
 				},
 			},
 			Ports: []corev1.ContainerPort{{
@@ -206,24 +255,20 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 					},
 				},
 			},
-		}},
-		ServiceAccountName: constants.QuayServiceAccount,
-		Volumes: []corev1.Volume{corev1.Volume{
-			Name: "configvolume",
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					Sources: []corev1.VolumeProjection{
-						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: GetConfigMapSecretName(quayConfiguration.QuayEcosystem),
-								},
-							},
-						},
+			LivenessProbe: &corev1.Probe{
+				FailureThreshold:    3,
+				InitialDelaySeconds: 30,
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path:   "/health/instance",
+						Port:   intstr.IntOrString{IntVal: 8443},
+						Scheme: "HTTPS",
 					},
 				},
 			},
 		}},
+		ServiceAccountName: constants.QuayServiceAccount,
+		Volumes:            []corev1.Volume{configVolume},
 	}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
@@ -292,11 +337,159 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 	return quayDeployment
 }
 
-func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *QuayConfiguration) *appsv1.Deployment {
+func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *QuayConfiguration) *appsv1.Deployment {
+
+	meta.Name = GetClairResourcesName(quayConfiguration.QuayEcosystem)
+	BuildClairResourceLabels(meta.Labels)
+
+	clairDeploymentPodSpec := corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Image: quayConfiguration.QuayEcosystem.Spec.Clair.Image,
+			Name:  constants.ClairContainerName,
+			Ports: []corev1.ContainerPort{{
+				ContainerPort: 6060,
+				Name:          "clair-api",
+			}, {
+				ContainerPort: 6061,
+				Name:          "clair-health",
+			}},
+			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
+				Name:      "configvolume",
+				MountPath: constants.ClairConfigVolumePath,
+			},
+				corev1.VolumeMount{
+					Name:      "quay-ssl",
+					MountPath: constants.ClairTrustCaPath,
+					SubPath:   "ca.crt",
+				}},
+			ReadinessProbe: &corev1.Probe{
+				FailureThreshold:    3,
+				InitialDelaySeconds: 10,
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path:   constants.ClairHealthEndpoint,
+						Port:   intstr.IntOrString{IntVal: 6061},
+						Scheme: "HTTP",
+					},
+				},
+			},
+			LivenessProbe: &corev1.Probe{
+				FailureThreshold:    3,
+				InitialDelaySeconds: 30,
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path:   constants.ClairHealthEndpoint,
+						Port:   intstr.IntOrString{IntVal: 6061},
+						Scheme: "HTTP",
+					},
+				},
+			},
+		}},
+		ServiceAccountName: constants.ClairServiceAccount,
+		Volumes: []corev1.Volume{corev1.Volume{
+			Name: "configvolume",
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: []corev1.VolumeProjection{
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: GetSecurityScannerSecretName(quayConfiguration.QuayEcosystem),
+								},
+								Items: []corev1.KeyToPath{
+									corev1.KeyToPath{
+										Key:  constants.SecurityScannerServiceSecretKey,
+										Path: constants.SecurityScannerServiceSecretKey,
+									},
+								},
+							},
+						},
+						{
+							Secret: &corev1.SecretProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: GetClairSSLSecretName(quayConfiguration.QuayEcosystem),
+								},
+								Items: []corev1.KeyToPath{
+									corev1.KeyToPath{
+										Key:  corev1.TLSPrivateKeyKey,
+										Path: constants.ClairSSLPrivateKeySecretKey,
+									},
+									corev1.KeyToPath{
+										Key:  corev1.TLSCertKey,
+										Path: constants.ClairSSLCertificateSecretKey,
+									},
+								},
+							},
+						},
+						{
+							ConfigMap: &corev1.ConfigMapProjection{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: GetClairConfigMapName(quayConfiguration.QuayEcosystem),
+								},
+								Items: []corev1.KeyToPath{
+									corev1.KeyToPath{
+										Key:  constants.ClairConfigFileKey,
+										Path: constants.ClairConfigFileKey,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}, corev1.Volume{
+			Name: "quay-ssl",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+					Items: []corev1.KeyToPath{
+						corev1.KeyToPath{
+							Key:  constants.QuayAppConfigSSLCertificateSecretKey,
+							Path: "ca.crt",
+						},
+					},
+				},
+			},
+		}},
+	}
+
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.ImagePullSecretName) {
+		clairDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
+			Name: quayConfiguration.QuayEcosystem.Spec.Clair.ImagePullSecretName,
+		},
+		}
+	}
+
+	clairReplicas := utils.CheckValue(quayConfiguration.QuayEcosystem.Spec.Clair.Replicas, &constants.OneInt)
+
+	clairDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
+		ObjectMeta: meta,
+		Spec: appsv1.DeploymentSpec{
+			Replicas: clairReplicas.(*int32),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: meta.Labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: meta.Labels,
+				},
+				Spec: clairDeploymentPodSpec,
+			},
+		},
+	}
+
+	return clairDeployment
+}
+
+func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *QuayConfiguration, database *redhatcopv1alpha1.Database) *appsv1.Deployment {
 
 	databaseDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
-			Image: quayConfiguration.QuayEcosystem.Spec.Quay.Database.Image,
+			Image: database.Image,
 			Name:  meta.Name,
 			Env: []corev1.EnvVar{
 				{
@@ -304,7 +497,7 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: utils.CheckValue(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CredentialsSecretName, GetQuayDatabaseName(quayConfiguration.QuayEcosystem)).(string),
+								Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
 							},
 							Key: constants.DatabaseCredentialsUsernameKey,
 						},
@@ -315,7 +508,7 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: utils.CheckValue(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CredentialsSecretName, GetQuayDatabaseName(quayConfiguration.QuayEcosystem)).(string),
+								Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
 							},
 							Key: constants.DatabaseCredentialsPasswordKey,
 						},
@@ -326,7 +519,7 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 					ValueFrom: &corev1.EnvVarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: utils.CheckValue(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CredentialsSecretName, GetQuayDatabaseName(quayConfiguration.QuayEcosystem)).(string),
+								Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
 							},
 							Key: constants.DatabaseCredentialsDatabaseKey,
 						},
@@ -360,14 +553,14 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 		Volumes: []corev1.Volume{},
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.ImagePullSecretName) {
+	if !utils.IsZeroOfUnderlyingType(database.ImagePullSecretName) {
 		databaseDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
-			Name: quayConfiguration.QuayEcosystem.Spec.Quay.Database.ImagePullSecretName,
+			Name: database.ImagePullSecretName,
 		},
 		}
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.VolumeSize) {
+	if !utils.IsZeroOfUnderlyingType(database.VolumeSize) {
 		databaseDeploymentPodSpec.Containers[0].VolumeMounts = append(databaseDeploymentPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
 			Name:      "data",
 			MountPath: "/var/lib/pgsql/data",
@@ -384,19 +577,19 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Memory) || !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CPU) {
+	if !utils.IsZeroOfUnderlyingType(database.Memory) || !utils.IsZeroOfUnderlyingType(database.CPU) {
 		databaseResourceRequirements := corev1.ResourceRequirements{}
 		databaseResourceLimits := corev1.ResourceList{}
 		databaseResourceRequests := corev1.ResourceList{}
 
-		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Memory) {
-			databaseResourceLimits[corev1.ResourceMemory] = resource.MustParse(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Memory)
-			databaseResourceRequests[corev1.ResourceMemory] = resource.MustParse(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Memory)
+		if !utils.IsZeroOfUnderlyingType(database.Memory) {
+			databaseResourceLimits[corev1.ResourceMemory] = resource.MustParse(database.Memory)
+			databaseResourceRequests[corev1.ResourceMemory] = resource.MustParse(database.Memory)
 		}
 
-		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CPU) {
-			databaseResourceLimits[corev1.ResourceCPU] = resource.MustParse(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CPU)
-			databaseResourceRequests[corev1.ResourceCPU] = resource.MustParse(quayConfiguration.QuayEcosystem.Spec.Quay.Database.CPU)
+		if !utils.IsZeroOfUnderlyingType(database.CPU) {
+			databaseResourceLimits[corev1.ResourceCPU] = resource.MustParse(database.CPU)
+			databaseResourceRequests[corev1.ResourceCPU] = resource.MustParse(database.CPU)
 		}
 
 		databaseResourceRequirements.Requests = databaseResourceRequests
@@ -411,7 +604,7 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 		},
 		ObjectMeta: meta,
 		Spec: appsv1.DeploymentSpec{
-			Replicas: quayConfiguration.QuayEcosystem.Spec.Quay.Database.Replicas,
+			Replicas: database.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: meta.Labels,
 			},
