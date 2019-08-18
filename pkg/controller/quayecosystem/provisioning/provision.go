@@ -370,13 +370,13 @@ func (r *ReconcileQuayEcosystemConfiguration) coreClairResourceDeployment(metaOb
 func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.ObjectMeta) (*reconcile.Result, error) {
 
 	// Update Metadata
-	meta = resources.UpdateMetaWithName(meta, resources.GetQuayDatabaseName(r.quayConfiguration.QuayEcosystem))
+	meta = resources.UpdateMetaWithName(meta, resources.GetDatabaseResourceName(r.quayConfiguration.QuayEcosystem, constants.DatabaseComponentQuay))
 	resources.BuildQuayDatabaseResourceLabels(meta.Labels)
 
 	var databaseResources []metav1.Object
 
 	if !r.quayConfiguration.ValidProvidedQuayDatabaseSecret {
-		quayDatabaseSecret := resources.GetSecretDefinitionFromCredentialsMap(resources.GetQuayDatabaseName(r.quayConfiguration.QuayEcosystem), meta, constants.DefaultQuayDatabaseCredentials)
+		quayDatabaseSecret := resources.GetSecretDefinitionFromCredentialsMap(resources.GetDatabaseResourceName(r.quayConfiguration.QuayEcosystem, constants.DatabaseComponentQuay), meta, constants.DefaultQuayDatabaseCredentials)
 		databaseResources = append(databaseResources, quayDatabaseSecret)
 	}
 
@@ -389,7 +389,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.Obj
 	service := resources.GetDatabaseServiceResourceDefinition(meta, constants.PostgreSQLPort)
 	databaseResources = append(databaseResources, service)
 
-	deployment := resources.GetDatabaseDeploymentDefinition(meta, r.quayConfiguration, r.quayConfiguration.QuayEcosystem.Spec.Quay.Database)
+	deployment := resources.GetDatabaseDeploymentDefinition(meta, r.quayConfiguration, r.quayConfiguration.QuayEcosystem.Spec.Quay.Database, constants.DatabaseComponentQuay)
 	databaseResources = append(databaseResources, deployment)
 
 	for _, resource := range databaseResources {
@@ -413,13 +413,13 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.Obj
 func (r *ReconcileQuayEcosystemConfiguration) createClairDatabase(meta metav1.ObjectMeta) (*reconcile.Result, error) {
 
 	// Update Metadata
-	meta = resources.UpdateMetaWithName(meta, resources.GetClairDatabaseName(r.quayConfiguration.QuayEcosystem))
+	meta = resources.UpdateMetaWithName(meta, resources.GetDatabaseResourceName(r.quayConfiguration.QuayEcosystem, constants.DatabaseComponentClair))
 	resources.BuildClairDatabaseResourceLabels(meta.Labels)
 
 	var databaseResources []metav1.Object
 
 	if !r.quayConfiguration.ValidProvidedClairDatabaseSecret {
-		clairDatabaseSecret := resources.GetSecretDefinitionFromCredentialsMap(resources.GetClairDatabaseName(r.quayConfiguration.QuayEcosystem), meta, constants.DefaultClairDatabaseCredentials)
+		clairDatabaseSecret := resources.GetSecretDefinitionFromCredentialsMap(resources.GetDatabaseResourceName(r.quayConfiguration.QuayEcosystem, constants.DatabaseComponentClair), meta, constants.DefaultClairDatabaseCredentials)
 		databaseResources = append(databaseResources, clairDatabaseSecret)
 	}
 
@@ -432,7 +432,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createClairDatabase(meta metav1.Ob
 	service := resources.GetDatabaseServiceResourceDefinition(meta, constants.PostgreSQLPort)
 	databaseResources = append(databaseResources, service)
 
-	deployment := resources.GetDatabaseDeploymentDefinition(meta, r.quayConfiguration, r.quayConfiguration.QuayEcosystem.Spec.Clair.Database)
+	deployment := resources.GetDatabaseDeploymentDefinition(meta, r.quayConfiguration, r.quayConfiguration.QuayEcosystem.Spec.Clair.Database, constants.DatabaseComponentClair)
 	databaseResources = append(databaseResources, deployment)
 
 	for _, resource := range databaseResources {

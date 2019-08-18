@@ -23,10 +23,10 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.QuayDatabase.Password = constants.QuayDatabaseCredentialsDefaultPassword
 	quayConfiguration.QuayDatabase.Database = constants.QuayDatabaseCredentialsDefaultDatabaseName
 	quayConfiguration.QuayDatabase.RootPassword = constants.QuayDatabaseCredentialsDefaultRootPassword
-	quayConfiguration.QuayDatabase.Server = resources.GetQuayDatabaseName(quayConfiguration.QuayEcosystem)
+	quayConfiguration.QuayDatabase.Server = resources.GetDatabaseResourceName(quayConfiguration.QuayEcosystem, constants.DatabaseComponentQuay)
 	quayConfiguration.ClairDatabase.Username = constants.ClairDatabaseCredentialsDefaultUsername
 	quayConfiguration.ClairDatabase.Password = constants.ClairDatabaseCredentialsDefaultPassword
-	quayConfiguration.ClairDatabase.Server = resources.GetClairDatabaseName(quayConfiguration.QuayEcosystem)
+	quayConfiguration.ClairDatabase.Server = resources.GetDatabaseResourceName(quayConfiguration.QuayEcosystem, constants.DatabaseComponentClair)
 	quayConfiguration.ClairDatabase.Database = constants.ClairDatabaseCredentialsDefaultDatabaseName
 	quayConfiguration.ClairDatabase.RootPassword = constants.ClairDatabaseCredentialsDefaultRootPassword
 	quayConfiguration.ClairUpdateInterval = constants.ClairDefaultUpdateInterval
@@ -85,21 +85,16 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	// User would like to have a database automatically provisioned if server not provided
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server) {
 
-		// If a user does not provide a server, one needs to be provisoned
-		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server) {
+		quayConfiguration.QuayDatabase.Server = resources.GetDatabaseResourceName(quayConfiguration.QuayEcosystem, constants.DatabaseComponentQuay)
 
-			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Image) {
-				changed = true
-				quayConfiguration.QuayEcosystem.Spec.Quay.Database.Image = constants.PostgresqlImage
-			}
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Image) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Quay.Database.Image = constants.PostgresqlImage
 		}
-	}
 
-	// Set value of Quay Database Server
-	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server) {
-		quayConfiguration.QuayDatabase.Server = resources.GetQuayDatabaseName(quayConfiguration.QuayEcosystem)
 	} else {
 		quayConfiguration.QuayDatabase.Server = quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server
+
 	}
 
 	// Clair Core Values
@@ -120,15 +115,15 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		// User would like to have a database automatically provisioned if server not provided
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.Server) {
 
-			// If a user does not provide a server, one needs to be provisoned
-			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.Server) {
+			quayConfiguration.ClairDatabase.Server = resources.GetDatabaseResourceName(quayConfiguration.QuayEcosystem, constants.DatabaseComponentClair)
 
-				if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.Image) {
-					changed = true
-					quayConfiguration.QuayEcosystem.Spec.Clair.Database.Image = constants.PostgresqlImage
-				}
+			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.Image) {
+				changed = true
+				quayConfiguration.QuayEcosystem.Spec.Clair.Database.Image = constants.PostgresqlImage
 			}
 
+		} else {
+			quayConfiguration.ClairDatabase.Server = quayConfiguration.QuayEcosystem.Spec.Clair.Database.Server
 		}
 
 	}
