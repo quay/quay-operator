@@ -133,10 +133,8 @@ The following options are a portion of the available options to configure the Po
 | --------- | ---------- |
 | `image` | Location of the database image |
 | `volumeSize` | Size of the volume in Kubernetes capacity units |
-| `memory` | Amount of memory in Kubernetes resource units |
-| `cpu` | Amount of cpu in Kubernetes resource units |
 
-Note: It is important to note that persistent storage for the database will **only** be provisioned if the `volumeSize` property is specified.
+Note: It is important to note that persistent storage for the database will **only** be provisioned if the `volumeSize` property is specified when provisioned by the operator.
 
 Define the values as shown below:
 
@@ -376,7 +374,57 @@ spec:
 
 The above configuration would have Clair update every 60 minutes.
 
+## Common Attributes
 
+Each of the following components expose a set of similar properties that can be specified in order to customize the runtime execution:
+
+* Quay
+* Quay Configuration
+* Quay PostgreSQL
+* Redis
+* Clair
+* Clair PostgreSQL
+
+### Image Pull Secret
+
+As referenced in prior sections, an Image Pull Secret can specify the name of the secret containing credentials to an image from a protected registry using the property `imagePullSecret`.
+
+### Compute Resources
+
+[Compute Resources](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#resource-requests-and-limits-of-pod-and-container) such as memory and CPU can be specified in the same form as any other value in a `PodTemplate`. CPU and Memory values for _Requests_ and _Limits_ can be specified under a property called `resources`.
+
+_Note:_ In the case of the QuayConfiguration deployment, `configResources` is the property which should be referenced underneath the `Quay` property.
+
+The following is an example of how compute resources can be specified:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    resources:
+      requests:
+        memory: 512Mi
+```
+
+### Node Selector
+
+It may be desired that components of the `QuayEcosystem` may need to be deployed to only a subset of available nodes in a Kubernetes cluster. This functionality can be set on each of the resources using the `nodeSelector` property as show below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    nodeSelector:
+      node-role.kubernetes.io/infra=true
+```
 
 ## Troubleshooting
 
@@ -389,8 +437,6 @@ The _QuayEcosystem_ custom resource will attempt to provide the progress of the 
 ```
 oc logs $(oc get pods -l=quay-enterprise-component=config -o name)
 ```
-
-##
 
 ## Local Development
 

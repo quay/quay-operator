@@ -2,8 +2,11 @@ package constants
 
 import (
 	"time"
+
 	corev1 "k8s.io/api/core/v1"
 )
+
+type DatabaseComponent string
 
 const (
 	// QuayEnterprise is the coinical name for Quay
@@ -52,6 +55,10 @@ const (
 	PostgresqlImage = "registry.access.redhat.com/rhscl/postgresql-96-rhel7:1"
 	// PostgreSQLPort is the database port for PostgreSQL
 	PostgreSQLPort = 5432
+	// PostgresDataVolumeName is the name given to the  is the database volume
+	PostgresDataVolumeName = "data"
+	// PostgresDataVolumePath is the path the data volume will be mounted into the pod
+	PostgresDataVolumePath = "/var/lib/pgsql/data"
 	// QuayDatabaseMemory is the default memory amount
 	QuayDatabaseMemory = "512Mi"
 	// QuayDatabaseCPU is the default CPU amount
@@ -143,6 +150,12 @@ const (
 
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
+	// QuayConfigVolumeName is the name of the volume containing Quay configurations
+	QuayConfigVolumeName = "configvolume"
+	// QuayConfigVolumePath is the path configuration files are mounted to in the Quay pod
+	QuayConfigVolumePath = "/conf/stack"
+	// QuayHealthEndpoint is the endpoint used for checking instance health
+	QuayHealthEndpoint = "/health/instance"
 	// QuayAppConfigSSLPrivateKeySecretKey is key in the app-config secret representing the SSL Private Key
 	QuayAppConfigSSLPrivateKeySecretKey = "ssl.key"
 	//QuayNamespaceEnvironmentVariable is the name of the environment variable to specify the namespace Quay is deployed within
@@ -177,6 +190,10 @@ const (
 	ClairMITMCertificate = "/certificates/mitm.crt"
 	// ClairDefaultUpdateInterval is the default interval for Clair to query for CVE updates
 	ClairDefaultUpdateInterval = time.Hour * 6
+	// DatabaseComponentQuay is the name of the Quay database
+	DatabaseComponentQuay DatabaseComponent = "quay"
+	// DatabaseComponentClair is the name of the Quay database
+	DatabaseComponentClair DatabaseComponent = "clair"
 )
 
 var (

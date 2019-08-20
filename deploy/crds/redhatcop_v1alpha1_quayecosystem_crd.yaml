@@ -43,9 +43,15 @@ spec:
                       type: string
                     memory:
                       type: string
+                    nodeSelector:
+                      additionalProperties:
+                        type: string
+                      type: object
                     replicas:
                       format: int32
                       type: integer
+                    resources:
+                      type: object
                     server:
                       type: string
                     volumeSize:
@@ -57,9 +63,15 @@ spec:
                   type: string
                 imagePullSecretName:
                   type: string
+                nodeSelector:
+                  additionalProperties:
+                    type: string
+                  type: object
                 replicas:
                   format: int32
                   type: integer
+                resources:
+                  type: object
                 sslCertificatesSecretName:
                   type: string
                 updateInterval:
@@ -67,6 +79,8 @@ spec:
               type: object
             quay:
               properties:
+                configResources:
+                  type: object
                 configRouteHost:
                   type: string
                 configSecretName:
@@ -83,9 +97,15 @@ spec:
                       type: string
                     memory:
                       type: string
+                    nodeSelector:
+                      additionalProperties:
+                        type: string
+                      type: object
                     replicas:
                       format: int32
                       type: integer
+                    resources:
+                      type: object
                     server:
                       type: string
                     volumeSize:
@@ -97,10 +117,12 @@ spec:
                   type: string
                 imagePullSecretName:
                   type: string
-                isOpenShift:
-                  type: boolean
                 keepConfigDeployment:
                   type: boolean
+                nodeSelector:
+                  additionalProperties:
+                    type: string
+                  type: object
                 registryBackends:
                   items:
                     properties:
@@ -115,6 +137,8 @@ spec:
                 replicas:
                   format: int32
                   type: integer
+                resources:
+                  type: object
                 routeHost:
                   type: string
                 skipSetup:
@@ -132,12 +156,18 @@ spec:
                   type: string
                 imagePullSecretName:
                   type: string
+                nodeSelector:
+                  additionalProperties:
+                    type: string
+                  type: object
                 port:
                   format: int32
                   type: integer
                 replicas:
                   format: int32
                   type: integer
+                resources:
+                  type: object
               type: object
           type: object
         status:

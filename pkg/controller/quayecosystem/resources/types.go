@@ -10,9 +10,6 @@ import (
 type QuayConfiguration struct {
 	QuayEcosystem *redhatcopv1alpha1.QuayEcosystem
 
-	// OpenShift Environment
-	IsOpenShift bool
-
 	// Superuser
 	QuaySuperuserUsername            string
 	QuaySuperuserPassword            string
