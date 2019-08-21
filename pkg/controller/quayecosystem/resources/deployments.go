@@ -22,8 +22,10 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 6379,
 			}},
+			Resources: quayConfiguration.QuayEcosystem.Spec.Redis.Resources,
 		}},
 		ServiceAccountName: constants.RedisServiceAccount,
+		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Redis.NodeSelector,
 	}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.ImagePullSecretName) {
@@ -102,10 +104,11 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
-				Name:      "configvolume",
-				MountPath: "/conf/stack",
+				Name:      constants.QuayConfigVolumeName,
+				MountPath: constants.QuayConfigVolumePath,
 				ReadOnly:  false,
 			}},
+			Resources: quayConfiguration.QuayEcosystem.Spec.Quay.ConfigResources,
 			ReadinessProbe: &corev1.Probe{
 				FailureThreshold:    3,
 				InitialDelaySeconds: 10,
@@ -125,9 +128,10 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				},
 			},
 		}},
+		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
 		ServiceAccountName: constants.QuayServiceAccount,
 		Volumes: []corev1.Volume{corev1.Volume{
-			Name: "configvolume",
+			Name: constants.QuayConfigVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Projected: &corev1.ProjectedVolumeSource{
 					Sources: []corev1.VolumeProjection{
@@ -184,6 +188,19 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				},
 			},
 		},
+		{
+			Secret: &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+				},
+				Items: []corev1.KeyToPath{
+					corev1.KeyToPath{
+						Key:  constants.QuayAppConfigSSLCertificateSecretKey,
+						Path: "extra_ca_certs/quay.crt",
+					},
+				},
+			},
+		},
 	}
 
 	// Add Clair SSL
@@ -206,7 +223,7 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 	}
 
 	configVolume := corev1.Volume{
-		Name: "configvolume",
+		Name: constants.QuayConfigVolumeName,
 		VolumeSource: corev1.VolumeSource{
 			Projected: &corev1.ProjectedVolumeSource{
 				Sources: configVolumeSources,
@@ -240,8 +257,8 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
-				Name:      "configvolume",
-				MountPath: "/conf/stack",
+				Name:      constants.QuayConfigVolumeName,
+				MountPath: constants.QuayConfigVolumePath,
 				ReadOnly:  false,
 			}},
 			ReadinessProbe: &corev1.Probe{
@@ -249,18 +266,19 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				InitialDelaySeconds: 10,
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path:   "/health/instance",
+						Path:   constants.QuayHealthEndpoint,
 						Port:   intstr.IntOrString{IntVal: 8443},
 						Scheme: "HTTPS",
 					},
 				},
 			},
+			Resources: quayConfiguration.QuayEcosystem.Spec.Quay.Resources,
 			LivenessProbe: &corev1.Probe{
 				FailureThreshold:    3,
 				InitialDelaySeconds: 30,
 				Handler: corev1.Handler{
 					HTTPGet: &corev1.HTTPGetAction{
-						Path:   "/health/instance",
+						Path:   constants.QuayHealthEndpoint,
 						Port:   intstr.IntOrString{IntVal: 8443},
 						Scheme: "HTTPS",
 					},
@@ -269,6 +287,7 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 		}},
 		ServiceAccountName: constants.QuayServiceAccount,
 		Volumes:            []corev1.Volume{configVolume},
+		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
 	}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
@@ -353,6 +372,7 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 				ContainerPort: 6061,
 				Name:          "clair-health",
 			}},
+			Resources: quayConfiguration.QuayEcosystem.Spec.Clair.Resources,
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
 				Name:      "configvolume",
 				MountPath: constants.ClairConfigVolumePath,
@@ -385,6 +405,7 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 				},
 			},
 		}},
+		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Clair.NodeSelector,
 		ServiceAccountName: constants.ClairServiceAccount,
 		Volumes: []corev1.Volume{corev1.Volume{
 			Name: "configvolume",
@@ -485,7 +506,7 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 	return clairDeployment
 }
 
-func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *QuayConfiguration, database *redhatcopv1alpha1.Database) *appsv1.Deployment {
+func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *QuayConfiguration, database *redhatcopv1alpha1.Database, databaseComponent constants.DatabaseComponent) *appsv1.Deployment {
 
 	databaseDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
@@ -526,7 +547,11 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 					},
 				},
 			},
-			VolumeMounts: []corev1.VolumeMount{},
+			Resources: database.Resources,
+			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
+				Name:      constants.PostgresDataVolumeName,
+				MountPath: constants.PostgresDataVolumePath,
+			}},
 			LivenessProbe: &corev1.Probe{
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
@@ -550,7 +575,8 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 				ContainerPort: constants.PostgreSQLPort,
 			}},
 		}},
-		Volumes: []corev1.Volume{},
+		NodeSelector: database.NodeSelector,
+		Volumes:      []corev1.Volume{},
 	}
 
 	if !utils.IsZeroOfUnderlyingType(database.ImagePullSecretName) {
@@ -561,20 +587,23 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 	}
 
 	if !utils.IsZeroOfUnderlyingType(database.VolumeSize) {
-		databaseDeploymentPodSpec.Containers[0].VolumeMounts = append(databaseDeploymentPodSpec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "data",
-			MountPath: "/var/lib/pgsql/data",
-		})
 
 		databaseDeploymentPodSpec.Volumes = append(databaseDeploymentPodSpec.Volumes, corev1.Volume{
-			Name: "data",
+			Name: constants.PostgresDataVolumeName,
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: GetQuayDatabaseName(quayConfiguration.QuayEcosystem),
+					ClaimName: GetDatabaseResourceName(quayConfiguration.QuayEcosystem, databaseComponent),
 				},
 			},
 		})
 
+	} else {
+		databaseDeploymentPodSpec.Volumes = append(databaseDeploymentPodSpec.Volumes, corev1.Volume{
+			Name: constants.PostgresDataVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
 	}
 
 	if !utils.IsZeroOfUnderlyingType(database.Memory) || !utils.IsZeroOfUnderlyingType(database.CPU) {

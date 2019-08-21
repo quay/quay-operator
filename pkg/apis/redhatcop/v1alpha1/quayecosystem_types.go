@@ -92,21 +92,23 @@ type QuayEcosystemList struct {
 
 // Quay defines the properies of a deployment of Quay
 type Quay struct {
-	ConfigRouteHost                string            `json:"configRouteHost,omitempty"`
-	ConfigSecretName               string            `json:"configSecretName,omitempty"`
-	Database                       *Database         `json:"database,omitempty"`
-	EnableNodePortService          bool              `json:"enableNodePortService,omitempty"`
-	Image                          string            `json:"image,omitempty"`
-	ImagePullSecretName            string            `json:"imagePullSecretName,omitempty"`
-	IsOpenShift                    bool              `json:"isOpenShift,omitempty"`
-	KeepConfigDeployment           bool              `json:"keepConfigDeployment,omitempty"`
-	RegistryBackends               []RegistryBackend `json:"registryBackends,omitempty"`
-	RegistryStorage                *RegistryStorage  `json:"registryStorage,omitempty"`
-	Replicas                       *int32            `json:"replicas,omitempty"`
-	RouteHost                      string            `json:"routeHost,omitempty"`
-	SkipSetup                      bool              `json:"skipSetup,omitempty"`
-	SslCertificatesSecretName      string            `json:"sslCertificatesSecretName,omitempty"`
-	SuperuserCredentialsSecretName string            `json:"superuserCredentialsSecretName,omitempty"`
+	ConfigRouteHost                string                      `json:"configRouteHost,omitempty"`
+	ConfigSecretName               string                      `json:"configSecretName,omitempty"`
+	Database                       *Database                   `json:"database,omitempty"`
+	EnableNodePortService          bool                        `json:"enableNodePortService,omitempty"`
+	Image                          string                      `json:"image,omitempty"`
+	ImagePullSecretName            string                      `json:"imagePullSecretName,omitempty"`
+	KeepConfigDeployment           bool                        `json:"keepConfigDeployment,omitempty"`
+	RegistryBackends               []RegistryBackend           `json:"registryBackends,omitempty"`
+	RegistryStorage                *RegistryStorage            `json:"registryStorage,omitempty"`
+	Replicas                       *int32                      `json:"replicas,omitempty"`
+	RouteHost                      string                      `json:"routeHost,omitempty"`
+	SkipSetup                      bool                        `json:"skipSetup,omitempty"`
+	SslCertificatesSecretName      string                      `json:"sslCertificatesSecretName,omitempty"`
+	SuperuserCredentialsSecretName string                      `json:"superuserCredentialsSecretName,omitempty"`
+	Resources                      corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	ConfigResources                corev1.ResourceRequirements `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
+	NodeSelector                   map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -121,34 +123,40 @@ type QuayEcosystemCondition struct {
 
 // Redis defines the properies of a deployment of Redis
 type Redis struct {
-	Hostname            string `json:"hostname,omitempty"`
-	Image               string `json:"image,omitempty"`
-	ImagePullSecretName string `json:"imagePullSecretName,omitempty"`
-	Port                *int32 `json:"port,omitempty"`
-	Replicas            *int32 `json:"replicas,omitempty"`
+	Hostname            string                      `json:"hostname,omitempty"`
+	Image               string                      `json:"image,omitempty"`
+	ImagePullSecretName string                      `json:"imagePullSecretName,omitempty"`
+	Port                *int32                      `json:"port,omitempty"`
+	Replicas            *int32                      `json:"replicas,omitempty"`
+	Resources           corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	NodeSelector        map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 }
 
 // Database defines a database that will be deployed to support a particular component
 type Database struct {
-	CPU                   string `json:"cpu,omitempty"`
-	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
-	Image                 string `json:"image,omitempty"`
-	ImagePullSecretName   string `json:"imagePullSecretName,omitempty"`
-	Memory                string `json:"memory,omitempty"`
-	Replicas              *int32 `json:"replicas,omitempty"`
-	Server                string `json:"server,omitempty"`
-	VolumeSize            string `json:"volumeSize,omitempty"`
+	CPU                   string                      `json:"cpu,omitempty"`
+	CredentialsSecretName string                      `json:"credentialsSecretName,omitempty"`
+	Image                 string                      `json:"image,omitempty"`
+	ImagePullSecretName   string                      `json:"imagePullSecretName,omitempty"`
+	Memory                string                      `json:"memory,omitempty"`
+	Replicas              *int32                      `json:"replicas,omitempty"`
+	Server                string                      `json:"server,omitempty"`
+	VolumeSize            string                      `json:"volumeSize,omitempty"`
+	Resources             corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	NodeSelector          map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 }
 
 // Clair defines the properties of a deployment of Clair
 type Clair struct {
-	Enabled                   bool      `json:"enabled,omitempty"`
-	Image                     string    `json:"image,omitempty"`
-	ImagePullSecretName       string    `json:"imagePullSecretName,omitempty"`
-	Database                  *Database `json:"database,omitempty"`
-	Replicas                  *int32    `json:"replicas,omitempty"`
-	SslCertificatesSecretName string    `json:"sslCertificatesSecretName,omitempty"`
-	UpdateInterval            string    `json:"updateInterval,omitempty"`
+	Enabled                   bool                        `json:"enabled,omitempty"`
+	Image                     string                      `json:"image,omitempty"`
+	ImagePullSecretName       string                      `json:"imagePullSecretName,omitempty"`
+	Database                  *Database                   `json:"database,omitempty"`
+	Replicas                  *int32                      `json:"replicas,omitempty"`
+	SslCertificatesSecretName string                      `json:"sslCertificatesSecretName,omitempty"`
+	UpdateInterval            string                      `json:"updateInterval,omitempty"`
+	Resources                 corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	NodeSelector              map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry
