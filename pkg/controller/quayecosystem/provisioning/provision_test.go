@@ -20,7 +20,7 @@ func TestAllowedNamespaces(t *testing.T) {
 		{
 			secret: &corev1.Secret{
 				Data: map[string][]byte{
-					constants.QuayAppConfigSSLCertificateSecretKey: []byte(""),
+					constants.QuayAppConfigSSLCertificateSecretKey: []byte("sslcertificate"),
 				},
 			},
 			expected: false,
@@ -28,8 +28,8 @@ func TestAllowedNamespaces(t *testing.T) {
 		{
 			secret: &corev1.Secret{
 				Data: map[string][]byte{
-					constants.QuayAppConfigSSLCertificateSecretKey: []byte(""),
-					constants.QuayAppConfigSSLPrivateKeySecretKey:  []byte(""),
+					constants.QuayAppConfigSSLCertificateSecretKey: []byte("sslcertificate"),
+					constants.QuayAppConfigSSLPrivateKeySecretKey:  []byte("privatekey"),
 				},
 			},
 			expected: true,
