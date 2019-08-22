@@ -5,12 +5,11 @@ import (
 	"testing"
 	"time"
 
-	test "github.com/KohlsTechnology/eunomia/test"
+	test "github.com/redhat-cop/quay-operator/test"
 
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 
 	"github.com/stretchr/testify/assert"
 
@@ -31,7 +30,7 @@ func TestDefaultConfiguration(t *testing.T) {
 	defaultConfigDeploy(t, framework.Global, ctx)
 }
 
-func defaultConfigDeploy(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
+func defaultConfigDeploy(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) error {
 	namespace, err := ctx.GetNamespace()
 	assert.NoError(t, err)
 
@@ -58,5 +57,6 @@ func defaultConfigDeploy(t *testing.T, f *framework.Framework, ctx *framework.Te
 	assert.NoError(t, err)
 
 	// Make sure one of the default values was assigned
-	assert.Equal(t, crd.Spec.Quay.Image, constants.QuayImage)
+	//assert.Equal(t, crd.Spec.Quay.Image, constants.QuayImage)
+	return WaitForPod(t, f, ctx, namespace, "helloworld", retryInterval, timeout)
 }

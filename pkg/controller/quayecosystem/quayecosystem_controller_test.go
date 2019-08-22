@@ -20,7 +20,7 @@ import (
 )
 
 var name = "quay-operator"
-var namespace = "quay"
+var namespace = "quay-enterprise"
 
 func TestDefaultConfiguration(t *testing.T) {
 	// Stub out object placeholders for test

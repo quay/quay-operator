@@ -28,7 +28,7 @@ func AddToFrameworkSchemeForTests(t *testing.T, ctx *framework.TestCtx) {
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: redhatcopv1alpha1.QuayEcosystemSpec{},
+		Spec:   redhatcopv1alpha1.QuayEcosystemSpec{},
 		Status: redhatcopv1alpha1.QuayEcosystemStatus{},
 	}
 
