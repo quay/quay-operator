@@ -16,9 +16,8 @@ spec:
       containers:
         - name: quay-operator
           image: quay.io/redhat-cop/quay-operator:latest
-          ports:
-          - containerPort: 60000
-            name: metrics
+          command:
+          - quay-operator
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
