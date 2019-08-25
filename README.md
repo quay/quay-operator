@@ -426,6 +426,23 @@ spec:
       node-role.kubernetes.io/infra=true
 ```
 
+### Deployment Strategy
+
+Each of the core components consist of Kubernetes `Deployments`. This resource supports the method in which new versions are released. This operator supports making use of the `RollingUpdate` and `Recreate` strategies. Either value can be defined by using the `deploymentStrategy` property on the desired resource as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    deploymentStrategy: RollingUpdate
+```
+
+_Note: The absence of a defined value will make use of the `RollingUpdate` strategy_
+
 ## Troubleshooting
 
 To resolve issues running, configuring and utilzing the operator, the following steps may be utilized:

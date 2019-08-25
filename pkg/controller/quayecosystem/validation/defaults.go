@@ -5,6 +5,7 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -52,6 +53,11 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		quayConfiguration.QuayEcosystem.Spec.Quay.Image = constants.QuayImage
 	}
 
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy) {
+		changed = true
+		quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
+	}
+
 	// Default Quay Config Route
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigRouteHost) {
 		quayConfiguration.QuayConfigHostname = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
@@ -65,6 +71,11 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.Image) {
 			changed = true
 			quayConfiguration.QuayEcosystem.Spec.Redis.Image = constants.RedisImage
+		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.DeploymentStrategy) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Redis.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
 		}
 	}
 
@@ -92,6 +103,11 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 			quayConfiguration.QuayEcosystem.Spec.Quay.Database.Image = constants.PostgresqlImage
 		}
 
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.DeploymentStrategy) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Quay.Database.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
+		}
+
 	} else {
 		quayConfiguration.QuayDatabase.Server = quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server
 
@@ -112,6 +128,11 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 			changed = true
 		}
 
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.DeploymentStrategy) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Clair.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
+		}
+
 		// User would like to have a database automatically provisioned if server not provided
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.Server) {
 
@@ -120,6 +141,11 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.Image) {
 				changed = true
 				quayConfiguration.QuayEcosystem.Spec.Clair.Database.Image = constants.PostgresqlImage
+			}
+
+			if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.DeploymentStrategy) {
+				changed = true
+				quayConfiguration.QuayEcosystem.Spec.Clair.Database.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
 			}
 
 		} else {
