@@ -428,7 +428,7 @@ spec:
 
 ### Deployment Strategy
 
-Each of the cpre components consist of Kubernetes `Deployments`. This resource supports the method in which new versions are released. This operator supports making use of the `RollingUpdate` and `Recreate` strategies. Either value can be defined by using the `deploymentStrategy` property on the desired resource as shown below:
+Each of the core components consist of Kubernetes `Deployments`. This resource supports the method in which new versions are released. This operator supports making use of the `RollingUpdate` and `Recreate` strategies. Either value can be defined by using the `deploymentStrategy` property on the desired resource as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
