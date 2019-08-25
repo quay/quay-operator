@@ -54,6 +54,9 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 				},
 				Spec: redisDeploymentPodSpec,
 			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Redis.DeploymentStrategy,
+			},
 		},
 	}
 
@@ -168,6 +171,9 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 					Labels: meta.Labels,
 				},
 				Spec: quayDeploymentPodSpec,
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy,
 			},
 		},
 	}
@@ -350,6 +356,9 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				},
 				Spec: quayDeploymentPodSpec,
 			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy,
+			},
 		},
 	}
 
@@ -500,6 +509,9 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 				},
 				Spec: clairDeploymentPodSpec,
 			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Clair.DeploymentStrategy,
+			},
 		},
 	}
 
@@ -642,6 +654,9 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 					Labels: meta.Labels,
 				},
 				Spec: databaseDeploymentPodSpec,
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: database.DeploymentStrategy,
 			},
 		},
 	}

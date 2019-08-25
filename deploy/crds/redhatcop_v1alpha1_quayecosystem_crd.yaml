@@ -37,6 +37,8 @@ spec:
                       type: string
                     credentialsSecretName:
                       type: string
+                    deploymentStrategy:
+                      type: string
                     image:
                       type: string
                     imagePullSecretName:
@@ -57,6 +59,8 @@ spec:
                     volumeSize:
                       type: string
                   type: object
+                deploymentStrategy:
+                  type: string
                 enabled:
                   type: boolean
                 image:
@@ -91,6 +95,8 @@ spec:
                       type: string
                     credentialsSecretName:
                       type: string
+                    deploymentStrategy:
+                      type: string
                     image:
                       type: string
                     imagePullSecretName:
@@ -111,6 +117,8 @@ spec:
                     volumeSize:
                       type: string
                   type: object
+                deploymentStrategy:
+                  type: string
                 enableNodePortService:
                   type: boolean
                 image:
@@ -150,6 +158,8 @@ spec:
               type: object
             redis:
               properties:
+                deploymentStrategy:
+                  type: string
                 hostname:
                   type: string
                 image:
@@ -191,8 +201,8 @@ spec:
                   type:
                     type: string
                 required:
-                - type
                 - status
+                - type
                 type: object
               type: array
             hostname:
