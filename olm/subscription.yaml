@@ -7,5 +7,5 @@ spec:
   source: quay
   sourceNamespace: openshift-operator-lifecycle-manager
   name: quay
-  startingCSV: quay.v0.0.4
+  startingCSV: quay.v0.0.5
   channel: alpha
