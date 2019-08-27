@@ -24,15 +24,20 @@ func GetPod(namespace, namePrefix, containsImage string, kubeclient kubernetes.I
 	}
 	for _, pod := range pods.Items {
 		if strings.HasPrefix(pod.Name, namePrefix) {
-			for _, c := range pod.Spec.Containers {
-				fmt.Printf("Found pod %s", c.Image)
-				if strings.Contains(c.Image, containsImage) {
-					return pod
+			for _, pod := range pods.Items {
+				//if strings.HasPrefix(pod.Name, namePrefix) {
+				for _, c := range pod.Spec.Containers {
+					fmt.Printf("Found pod +%v\n", c)
+					if strings.Contains(c.Image, containsImage) {
+						return pod
+					}
+					//}
 				}
 			}
 		}
 	}
 	return v1.Pod{}
+
 }
 
 func WaitForPod(t *testing.T, f *framework.Framework, ctx *framework.TestCtx, namespace, name string, retryInterval time.Duration, timeout time.Duration) error {

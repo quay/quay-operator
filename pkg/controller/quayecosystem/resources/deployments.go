@@ -1,6 +1,8 @@
 package resources
 
 import (
+	"fmt"
+
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
@@ -27,6 +29,8 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 		ServiceAccountName: constants.RedisServiceAccount,
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Redis.NodeSelector,
 	}
+
+	fmt.Printf("+%v\n", redisDeploymentPodSpec)
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.ImagePullSecretName) {
 		redisDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
