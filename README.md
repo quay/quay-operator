@@ -301,7 +301,7 @@ metadata:
 spec:
   quay:
     routeHost: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
-  imagePullSecretName: redhat-pull-secret
+    imagePullSecretName: redhat-pull-secret
 ```
 
 
@@ -319,7 +319,7 @@ metadata:
 spec:
   quay:
     configRouteHost: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
-  imagePullSecretName: redhat-pull-secret
+    imagePullSecretName: redhat-pull-secret
 ```
 
 ### Configuration Deployment After Initial Setup
