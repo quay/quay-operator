@@ -6,6 +6,8 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -58,6 +60,16 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
 	}
 
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ReadinessProbe) {
+		changed = true
+		quayConfiguration.QuayEcosystem.Spec.Quay.ReadinessProbe = getDefaultQuayReadinessProbe()
+	}
+
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe) {
+		changed = true
+		quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe = getDefaultQuayLivenessProbe()
+	}
+
 	// Default Quay Config Route
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigRouteHost) {
 		quayConfiguration.QuayConfigHostname = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
@@ -77,6 +89,17 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 			changed = true
 			quayConfiguration.QuayEcosystem.Spec.Redis.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
 		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.ReadinessProbe) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Redis.ReadinessProbe = getDefaultRedisReadinessProbe()
+		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Redis.LivenessProbe = getDefaultRedisLivenessProbe()
+		}
+
 	}
 
 	// Set Redis Hostname
@@ -108,6 +131,16 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 			quayConfiguration.QuayEcosystem.Spec.Quay.Database.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
 		}
 
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.ReadinessProbe) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Quay.Database.ReadinessProbe = getDefaultDatabaseReadinessProbe()
+		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.LivenessProbe) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Quay.Database.LivenessProbe = getDefaultDatabaseLivenessProbe()
+		}
+
 	} else {
 		quayConfiguration.QuayDatabase.Server = quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server
 
@@ -123,9 +156,35 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 			changed = true
 			quayConfiguration.QuayEcosystem.Spec.Clair.Image = constants.ClairImage
 		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.ReadinessProbe) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Clair.ReadinessProbe = getDefaultClairReadinessProbe()
+		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.LivenessProbe) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Clair.LivenessProbe = getDefaultClairLivenessProbe()
+		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.DeploymentStrategy) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Clair.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType
+		}
+
 		if quayConfiguration.QuayEcosystem.Spec.Clair.Database == nil {
 			quayConfiguration.QuayEcosystem.Spec.Clair.Database = &redhatcopv1alpha1.Database{}
 			changed = true
+		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.ReadinessProbe) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Clair.Database.ReadinessProbe = getDefaultDatabaseReadinessProbe()
+		}
+
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.LivenessProbe) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Clair.Database.LivenessProbe = getDefaultDatabaseLivenessProbe()
 		}
 
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.DeploymentStrategy) {
@@ -192,4 +251,113 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	}
 
 	return changed
+}
+
+func getDefaultClairReadinessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		TimeoutSeconds:      5,
+		FailureThreshold:    3,
+		InitialDelaySeconds: 10,
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path:   constants.ClairHealthEndpoint,
+				Port:   intstr.IntOrString{IntVal: 6061},
+				Scheme: "HTTP",
+			},
+		},
+	}
+}
+
+func getDefaultClairLivenessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		TimeoutSeconds:      5,
+		FailureThreshold:    3,
+		InitialDelaySeconds: 30,
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path:   constants.ClairHealthEndpoint,
+				Port:   intstr.IntOrString{IntVal: 6061},
+				Scheme: "HTTP",
+			},
+		},
+	}
+}
+
+func getDefaultQuayReadinessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		FailureThreshold:    3,
+		InitialDelaySeconds: 5,
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path:   constants.QuayHealthEndpoint,
+				Port:   intstr.IntOrString{IntVal: 8443},
+				Scheme: "HTTPS",
+			},
+		},
+	}
+}
+
+func getDefaultQuayLivenessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		TimeoutSeconds:      5,
+		FailureThreshold:    3,
+		InitialDelaySeconds: 120,
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path:   constants.QuayHealthEndpoint,
+				Port:   intstr.IntOrString{IntVal: 8443},
+				Scheme: "HTTPS",
+			},
+		},
+	}
+}
+
+func getDefaultDatabaseReadinessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			Exec: &corev1.ExecAction{
+				Command: []string{"/usr/libexec/check-container"},
+			},
+		},
+		FailureThreshold:    3,
+		InitialDelaySeconds: 10,
+		TimeoutSeconds:      1,
+	}
+}
+
+func getDefaultDatabaseLivenessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			Exec: &corev1.ExecAction{
+				Command: []string{"/usr/libexec/check-container", "--live"},
+			},
+		},
+		FailureThreshold:    3,
+		InitialDelaySeconds: 120,
+		TimeoutSeconds:      10,
+	}
+}
+
+func getDefaultRedisReadinessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		FailureThreshold:    3,
+		InitialDelaySeconds: 30,
+		Handler: corev1.Handler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{IntVal: 6379},
+			},
+		},
+	}
+}
+
+func getDefaultRedisLivenessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		FailureThreshold:    3,
+		InitialDelaySeconds: 30,
+		Handler: corev1.Handler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{IntVal: 6379},
+			},
+		},
+	}
 }
