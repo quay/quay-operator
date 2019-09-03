@@ -12,8 +12,6 @@ require (
 	k8s.io/api v0.0.0-20190612125737-db0771252981
 	k8s.io/apimachinery v0.0.0-20190612125636-6a5db36e93ad
 	k8s.io/client-go v11.0.0+incompatible
-	k8s.io/code-generator v0.0.0-20181203235156-f8cba74510f3
-	k8s.io/gengo v0.0.0-20190327210449-e17681d19d3a
 	k8s.io/kube-openapi v0.0.0-20190603182131-db7b694dc208
 	sigs.k8s.io/controller-runtime v0.1.12
 	sigs.k8s.io/controller-tools v0.1.10
@@ -39,3 +37,5 @@ replace (
 )
 
 replace github.com/operator-framework/operator-sdk => github.com/operator-framework/operator-sdk v0.10.0
+
+replace git.apache.org/thrift.git => github.com/apache/thrift v0.12.0

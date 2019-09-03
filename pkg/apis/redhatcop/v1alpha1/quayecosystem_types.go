@@ -102,8 +102,10 @@ type Quay struct {
 	EnableNodePortService          bool                          `json:"enableNodePortService,omitempty"`
 	Image                          string                        `json:"image,omitempty"`
 	ImagePullSecretName            string                        `json:"imagePullSecretName,omitempty"`
+	LivenessProbe                  *corev1.Probe                 `json:"livenessProbe,omitempty"`
 	KeepConfigDeployment           bool                          `json:"keepConfigDeployment,omitempty"`
 	NodeSelector                   map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe                 *corev1.Probe                 `json:"readinessProbe,omitempty"`
 	RegistryBackends               []RegistryBackend             `json:"registryBackends,omitempty"`
 	RegistryStorage                *RegistryStorage              `json:"registryStorage,omitempty"`
 	Replicas                       *int32                        `json:"replicas,omitempty"`
@@ -130,8 +132,10 @@ type Redis struct {
 	Hostname            string                        `json:"hostname,omitempty"`
 	Image               string                        `json:"image,omitempty"`
 	ImagePullSecretName string                        `json:"imagePullSecretName,omitempty"`
+	LivenessProbe       *corev1.Probe                 `json:"livenessProbe,omitempty"`
 	NodeSelector        map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 	Port                *int32                        `json:"port,omitempty"`
+	ReadinessProbe      *corev1.Probe                 `json:"readinessProbe,omitempty"`
 	Replicas            *int32                        `json:"replicas,omitempty"`
 	Resources           corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 }
@@ -143,8 +147,10 @@ type Database struct {
 	DeploymentStrategy    appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
 	Image                 string                        `json:"image,omitempty"`
 	ImagePullSecretName   string                        `json:"imagePullSecretName,omitempty"`
+	LivenessProbe         *corev1.Probe                 `json:"livenessProbe,omitempty"`
 	Memory                string                        `json:"memory,omitempty"`
 	NodeSelector          map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe        *corev1.Probe                 `json:"readinessProbe,omitempty"`
 	Replicas              *int32                        `json:"replicas,omitempty"`
 	Resources             corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	Server                string                        `json:"server,omitempty"`
@@ -158,7 +164,9 @@ type Clair struct {
 	Enabled                   bool                          `json:"enabled,omitempty"`
 	Image                     string                        `json:"image,omitempty"`
 	ImagePullSecretName       string                        `json:"imagePullSecretName,omitempty"`
+	LivenessProbe             *corev1.Probe                 `json:"livenessProbe,omitempty"`
 	NodeSelector              map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe            *corev1.Probe                 `json:"readinessProbe,omitempty"`
 	Replicas                  *int32                        `json:"replicas,omitempty"`
 	Resources                 corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	SslCertificatesSecretName string                        `json:"sslCertificatesSecretName,omitempty"`

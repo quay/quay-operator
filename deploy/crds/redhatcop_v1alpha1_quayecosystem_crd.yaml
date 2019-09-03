@@ -43,11 +43,15 @@ spec:
                       type: string
                     imagePullSecretName:
                       type: string
+                    livenessProbe:
+                      type: object
                     memory:
                       type: string
                     nodeSelector:
                       additionalProperties:
                         type: string
+                      type: object
+                    readinessProbe:
                       type: object
                     replicas:
                       format: int32
@@ -67,9 +71,13 @@ spec:
                   type: string
                 imagePullSecretName:
                   type: string
+                livenessProbe:
+                  type: object
                 nodeSelector:
                   additionalProperties:
                     type: string
+                  type: object
+                readinessProbe:
                   type: object
                 replicas:
                   format: int32
@@ -101,11 +109,15 @@ spec:
                       type: string
                     imagePullSecretName:
                       type: string
+                    livenessProbe:
+                      type: object
                     memory:
                       type: string
                     nodeSelector:
                       additionalProperties:
                         type: string
+                      type: object
+                    readinessProbe:
                       type: object
                     replicas:
                       format: int32
@@ -127,9 +139,13 @@ spec:
                   type: string
                 keepConfigDeployment:
                   type: boolean
+                livenessProbe:
+                  type: object
                 nodeSelector:
                   additionalProperties:
                     type: string
+                  type: object
+                readinessProbe:
                   type: object
                 registryBackends:
                   items:
@@ -166,6 +182,8 @@ spec:
                   type: string
                 imagePullSecretName:
                   type: string
+                livenessProbe:
+                  type: object
                 nodeSelector:
                   additionalProperties:
                     type: string
@@ -173,6 +191,8 @@ spec:
                 port:
                   format: int32
                   type: integer
+                readinessProbe:
+                  type: object
                 replicas:
                   format: int32
                   type: integer
