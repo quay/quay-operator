@@ -173,6 +173,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		time.Sleep(time.Duration(5) * time.Second)
 
 		quaySetupInstance, err := r.quaySetupManager.NewQuaySetupInstance(&quayConfiguration)
+
 		if err != nil {
 			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to obtain QuaySetupInstance", err.Error())
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupFailure, err)
@@ -209,6 +210,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	// Manage Clair Resources
 	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
+
 		// Setup Security Scanner
 		configureSecurityScannerResult, err := configuration.ConfigureSecurityScanner(metaObject)
 		if err != nil {
@@ -222,6 +224,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		}
 
 		_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationSuccess, "", "Clair Configuration Updated Successfully")
+
 		if err != nil {
 			logging.Log.Error(err, "Failed to update QuayEcosystem after security scanner completion")
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemSecurityScannerConfigurationFailure, err)
@@ -240,6 +243,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		}
 
 		_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationSuccess, "", "Clair Configuration Updated Successfully")
+
 		if err != nil {
 			logging.Log.Error(err, "Failed to update QuayEcosystem after Clair configuration success")
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationFailure, err)
