@@ -72,11 +72,11 @@ func defaultConfigDeploy(t *testing.T, f *framework.Framework, ctx *framework.Te
 	assert.NoError(t, err)
 	assert.Equal(t, crd.Spec.Quay.Image, constants.QuayImage)
 
-	// Wait for the postgresql deployment
-	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay-postgresql", "registry.access.redhat.com/rhscl/postgresql-96-rhel7:1", retryInterval, timeout)
-	assert.NoError(t, success)
-
 	// Wait for the quay deployment
 	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay-config", "quay.io/redhat/quay:v3.0.4", retryInterval, timeout)
+	assert.NoError(t, success)
+
+	// Wait for the postgresql deployment
+	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay-postgresql", "registry.access.redhat.com/rhscl/postgresql-96-rhel7:1", retryInterval, timeout)
 	assert.NoError(t, success)
 }

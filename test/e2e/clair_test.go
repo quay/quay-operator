@@ -2,7 +2,6 @@ package e2e
 
 import (
 	goctx "context"
-	"fmt"
 	"testing"
 
 	test "github.com/redhat-cop/quay-operator/test"
@@ -13,7 +12,6 @@ import (
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
-
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +39,7 @@ func defaultClairDeploy(t *testing.T, f *framework.Framework, ctx *framework.Tes
 
 	// Add clair enabled, image pull secret, and the name
 	quayEcosystem.Spec.Quay.ImagePullSecretName = "redhat-pull-secret"
+	quayEcosystem.Spec.Quay.ConfigRouteHost = "quay-operator-quay-config-quay-enterprise.192.168.99.101.nip.io"
 	quayEcosystem.Spec.Clair = &redhatcopv1alpha1.Clair{
 		Enabled:             true,
 		ImagePullSecretName: "redhat-pull-secret",
@@ -48,7 +47,6 @@ func defaultClairDeploy(t *testing.T, f *framework.Framework, ctx *framework.Tes
 	}
 	quayEcosystem.ObjectMeta.Name = name
 	quayEcosystem.ObjectMeta.Namespace = namespace
-	fmt.Printf("%+v\n", quayEcosystem.Spec.Clair)
 
 	err = f.Client.Create(goctx.TODO(), quayEcosystem, &framework.CleanupOptions{TestContext: ctx, Timeout: timeout, RetryInterval: retryInterval})
 	assert.NoError(t, err)
@@ -69,15 +67,15 @@ func defaultClairDeploy(t *testing.T, f *framework.Framework, ctx *framework.Tes
 	assert.NoError(t, err)
 	assert.Equal(t, crd.Spec.Quay.Image, constants.QuayImage)
 
-	// Wait for the postgresql deployment
-	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay-postgresql", "registry.access.redhat.com/rhscl/postgresql-96-rhel7:1", retryInterval, timeout)
-	assert.NoError(t, success)
-
 	// Wait for the quay deployment
 	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay-config", "quay.io/redhat/quay:v3.0.4", retryInterval, timeout)
 	assert.NoError(t, success)
 
-	// Wait for the clair deployment
-	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay-clair", "quay.io/redhat/clair-jwt:v3.0.4", retryInterval, timeout)
+	// Wait for the postgresql deployment
+	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay-postgresql", "registry.access.redhat.com/rhscl/postgresql-96-rhel7:1", retryInterval, timeout)
+	assert.NoError(t, success)
+
+	// Wait for the clair postgres deployment
+	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-clair-postgresql", "registry.access.redhat.com/rhscl/postgresql-96-rhel7:1", retryInterval, timeout)
 	assert.NoError(t, success)
 }
