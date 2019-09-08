@@ -2,6 +2,7 @@ package e2e
 
 import (
 	goctx "context"
+	"strings"
 	"testing"
 
 	test "github.com/redhat-cop/quay-operator/test"
@@ -39,7 +40,8 @@ func defaultClairDeploy(t *testing.T, f *framework.Framework, ctx *framework.Tes
 
 	// Add clair enabled, image pull secret, and the name
 	quayEcosystem.Spec.Quay.ImagePullSecretName = "redhat-pull-secret"
-	quayEcosystem.Spec.Quay.ConfigRouteHost = "quay-operator-quay-config-quay-enterprise.192.168.99.101.nip.io"
+	ip := strings.Trim(strings.Split(f.KubeConfig.Host, ":")[1], "//")
+	quayEcosystem.Spec.Quay.ConfigRouteHost = "quay-operator-quay-config-quay-enterprise." + ip + ".nip.io"
 	quayEcosystem.Spec.Clair = &redhatcopv1alpha1.Clair{
 		Enabled:             true,
 		ImagePullSecretName: "redhat-pull-secret",
