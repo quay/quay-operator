@@ -161,7 +161,6 @@ spec:
           - watch
           - delete
           - patch
-          - put
         - apiGroups:
           - ""
           resources:
@@ -170,7 +169,6 @@ spec:
           verbs:
           - create
           - update
-          - put
           - patch
           - get
           - list
@@ -192,7 +190,6 @@ spec:
           - list
           - watch
           - patch
-          - put
           - delete
         - apiGroups:
           - extensions
@@ -205,7 +202,6 @@ spec:
           - list
           - watch
           - patch
-          - put
           - delete
         - apiGroups:
           - apps
@@ -250,7 +246,6 @@ spec:
           - list
           - watch
           - patch
-          - put
           - delete
         - apiGroups:
           - rbac.authorization.k8s.io
@@ -262,7 +257,6 @@ spec:
           - update
           - get
           - patch
-          - put
           - list
           - watch
         - apiGroups:
@@ -280,7 +274,7 @@ spec:
     type: SingleNamespace
   - supported: false
     type: MultiNamespace
-  - supported: true
+  - supported: false
     type: AllNamespaces
   keywords:
   - kubernetes
