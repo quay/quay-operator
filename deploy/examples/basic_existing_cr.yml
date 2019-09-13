@@ -1,5 +1,3 @@
-# This will deploy Quay with Clair to restore a backedup configuration on the url quay.app.example.com while keeping the configuration to update it
-
 apiVersion: redhatcop.redhat.io/v1alpha1
 kind: QuayEcosystem
 metadata:
