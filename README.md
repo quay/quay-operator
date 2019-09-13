@@ -301,7 +301,7 @@ metadata:
 spec:
   quay:
     routeHost: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
-  imagePullSecretName: redhat-pull-secret
+    imagePullSecretName: redhat-pull-secret
 ```
 
 
@@ -319,7 +319,7 @@ metadata:
 spec:
   quay:
     configRouteHost: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
-  imagePullSecretName: redhat-pull-secret
+    imagePullSecretName: redhat-pull-secret
 ```
 
 ### Configuration Deployment After Initial Setup
@@ -410,6 +410,36 @@ spec:
         memory: 512Mi
 ```
 
+### Probes
+
+[Readiness and Liveness Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/) can be specified in the same form as any other value in a `PodTemplate`. 
+
+The following is how a _readinessProbe_ and _livenessProbe_ can be specified:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    livenessProbe:
+      initialDelaySeconds: 120
+      httpGet:
+        path: /health/instance
+        port: 8443
+        scheme: HTTPS
+    readinessProbe:
+      initialDelaySeconds: 10
+      httpGet:
+        path: /health/instance
+        port: 8443
+        scheme: HTTPS
+```
+
+_Note_: If a value for either property is not specified, an opinionated default value is applied.
+
 ### Node Selector
 
 It may be desired that components of the `QuayEcosystem` may need to be deployed to only a subset of available nodes in a Kubernetes cluster. This functionality can be set on each of the resources using the `nodeSelector` property as show below:
@@ -425,6 +455,23 @@ spec:
     nodeSelector:
       node-role.kubernetes.io/infra=true
 ```
+
+### Deployment Strategy
+
+Each of the core components consist of Kubernetes `Deployments`. This resource supports the method in which new versions are released. This operator supports making use of the `RollingUpdate` and `Recreate` strategies. Either value can be defined by using the `deploymentStrategy` property on the desired resource as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    deploymentStrategy: RollingUpdate
+```
+
+_Note: The absence of a defined value will make use of the `RollingUpdate` strategy_
 
 ## Troubleshooting
 

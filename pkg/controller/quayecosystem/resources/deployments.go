@@ -22,7 +22,9 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 6379,
 			}},
-			Resources: quayConfiguration.QuayEcosystem.Spec.Redis.Resources,
+			ReadinessProbe: quayConfiguration.QuayEcosystem.Spec.Redis.ReadinessProbe,
+			LivenessProbe:  quayConfiguration.QuayEcosystem.Spec.Redis.LivenessProbe,
+			Resources:      quayConfiguration.QuayEcosystem.Spec.Redis.Resources,
 		}},
 		ServiceAccountName: constants.RedisServiceAccount,
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Redis.NodeSelector,
@@ -53,6 +55,9 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 					Labels: meta.Labels,
 				},
 				Spec: redisDeploymentPodSpec,
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Redis.DeploymentStrategy,
 			},
 		},
 	}
@@ -169,6 +174,9 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				},
 				Spec: quayDeploymentPodSpec,
 			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy,
+			},
 		},
 	}
 
@@ -261,29 +269,9 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				MountPath: constants.QuayConfigVolumePath,
 				ReadOnly:  false,
 			}},
-			ReadinessProbe: &corev1.Probe{
-				FailureThreshold:    3,
-				InitialDelaySeconds: 10,
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path:   constants.QuayHealthEndpoint,
-						Port:   intstr.IntOrString{IntVal: 8443},
-						Scheme: "HTTPS",
-					},
-				},
-			},
-			Resources: quayConfiguration.QuayEcosystem.Spec.Quay.Resources,
-			LivenessProbe: &corev1.Probe{
-				FailureThreshold:    3,
-				InitialDelaySeconds: 30,
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path:   constants.QuayHealthEndpoint,
-						Port:   intstr.IntOrString{IntVal: 8443},
-						Scheme: "HTTPS",
-					},
-				},
-			},
+			ReadinessProbe: quayConfiguration.QuayEcosystem.Spec.Quay.ReadinessProbe,
+			Resources:      quayConfiguration.QuayEcosystem.Spec.Quay.Resources,
+			LivenessProbe:  quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe,
 		}},
 		ServiceAccountName: constants.QuayServiceAccount,
 		Volumes:            []corev1.Volume{configVolume},
@@ -350,6 +338,9 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				},
 				Spec: quayDeploymentPodSpec,
 			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy,
+			},
 		},
 	}
 
@@ -382,28 +373,8 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 					MountPath: constants.ClairTrustCaPath,
 					SubPath:   "ca.crt",
 				}},
-			ReadinessProbe: &corev1.Probe{
-				FailureThreshold:    3,
-				InitialDelaySeconds: 10,
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path:   constants.ClairHealthEndpoint,
-						Port:   intstr.IntOrString{IntVal: 6061},
-						Scheme: "HTTP",
-					},
-				},
-			},
-			LivenessProbe: &corev1.Probe{
-				FailureThreshold:    3,
-				InitialDelaySeconds: 30,
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path:   constants.ClairHealthEndpoint,
-						Port:   intstr.IntOrString{IntVal: 6061},
-						Scheme: "HTTP",
-					},
-				},
-			},
+			ReadinessProbe: quayConfiguration.QuayEcosystem.Spec.Clair.ReadinessProbe,
+			LivenessProbe:  quayConfiguration.QuayEcosystem.Spec.Clair.LivenessProbe,
 		}},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Clair.NodeSelector,
 		ServiceAccountName: constants.ClairServiceAccount,
@@ -500,6 +471,9 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 				},
 				Spec: clairDeploymentPodSpec,
 			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Clair.DeploymentStrategy,
+			},
 		},
 	}
 
@@ -552,24 +526,8 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 				Name:      constants.PostgresDataVolumeName,
 				MountPath: constants.PostgresDataVolumePath,
 			}},
-			LivenessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.FromInt(constants.PostgreSQLPort),
-					},
-				},
-				InitialDelaySeconds: 5,
-				TimeoutSeconds:      1,
-			},
-			ReadinessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					Exec: &corev1.ExecAction{
-						Command: []string{"/usr/libexec/check-container", "--live"},
-					},
-				},
-				InitialDelaySeconds: 5,
-				TimeoutSeconds:      1,
-			},
+			LivenessProbe:  database.LivenessProbe,
+			ReadinessProbe: database.ReadinessProbe,
 
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: constants.PostgreSQLPort,
@@ -642,6 +600,9 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 					Labels: meta.Labels,
 				},
 				Spec: databaseDeploymentPodSpec,
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: database.DeploymentStrategy,
 			},
 		},
 	}

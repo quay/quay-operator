@@ -37,15 +37,21 @@ spec:
                       type: string
                     credentialsSecretName:
                       type: string
+                    deploymentStrategy:
+                      type: string
                     image:
                       type: string
                     imagePullSecretName:
                       type: string
+                    livenessProbe:
+                      type: object
                     memory:
                       type: string
                     nodeSelector:
                       additionalProperties:
                         type: string
+                      type: object
+                    readinessProbe:
                       type: object
                     replicas:
                       format: int32
@@ -57,15 +63,21 @@ spec:
                     volumeSize:
                       type: string
                   type: object
+                deploymentStrategy:
+                  type: string
                 enabled:
                   type: boolean
                 image:
                   type: string
                 imagePullSecretName:
                   type: string
+                livenessProbe:
+                  type: object
                 nodeSelector:
                   additionalProperties:
                     type: string
+                  type: object
+                readinessProbe:
                   type: object
                 replicas:
                   format: int32
@@ -91,15 +103,21 @@ spec:
                       type: string
                     credentialsSecretName:
                       type: string
+                    deploymentStrategy:
+                      type: string
                     image:
                       type: string
                     imagePullSecretName:
                       type: string
+                    livenessProbe:
+                      type: object
                     memory:
                       type: string
                     nodeSelector:
                       additionalProperties:
                         type: string
+                      type: object
+                    readinessProbe:
                       type: object
                     replicas:
                       format: int32
@@ -111,6 +129,8 @@ spec:
                     volumeSize:
                       type: string
                   type: object
+                deploymentStrategy:
+                  type: string
                 enableNodePortService:
                   type: boolean
                 image:
@@ -119,9 +139,13 @@ spec:
                   type: string
                 keepConfigDeployment:
                   type: boolean
+                livenessProbe:
+                  type: object
                 nodeSelector:
                   additionalProperties:
                     type: string
+                  type: object
+                readinessProbe:
                   type: object
                 registryBackends:
                   items:
@@ -150,12 +174,16 @@ spec:
               type: object
             redis:
               properties:
+                deploymentStrategy:
+                  type: string
                 hostname:
                   type: string
                 image:
                   type: string
                 imagePullSecretName:
                   type: string
+                livenessProbe:
+                  type: object
                 nodeSelector:
                   additionalProperties:
                     type: string
@@ -163,6 +191,8 @@ spec:
                 port:
                   format: int32
                   type: integer
+                readinessProbe:
+                  type: object
                 replicas:
                   format: int32
                   type: integer
@@ -191,8 +221,8 @@ spec:
                   type:
                     type: string
                 required:
-                - type
                 - status
+                - type
                 type: object
               type: array
             hostname:
