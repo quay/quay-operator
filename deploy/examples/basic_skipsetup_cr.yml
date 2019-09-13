@@ -6,7 +6,6 @@ spec:
   quay:
     imagePullSecretName: redhat-pull-secret
     deploymentStrategy: Recreate
-    #sslCertificatesSecretName: custom-quay-ssl
     skipSetup: true
     keepConfigDeployment: true
     routeHost: {{ quay_url }}
