@@ -1,3 +1,5 @@
+# This will deploy Quay with Clair automatically on the url quay.app.example.com while keeping the configuration to update it
+
 apiVersion: redhatcop.redhat.io/v1alpha1
 kind: QuayEcosystem
 metadata:
