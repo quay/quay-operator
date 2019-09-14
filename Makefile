@@ -104,7 +104,7 @@ run-e2e-tests: operator-sdk test local ./test/e2e --namespace "quay-enterprise" 
 #Install SDK
 install-sdk:
 	@echo Installing SDK ${SDK_VERSION}
-	@SDK_VERSION=$(SDK_VERSION) GOPATH=$(GOPATH) ./.travis/install-sdk.sh
+	@SDK_VERSION=$(SDK_VERSION) GOPATH=$(GOPATH) ./.travis/setup-sdk.sh
 
 #Install Minishift
 install-minishift:
