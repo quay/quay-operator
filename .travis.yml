@@ -15,6 +15,10 @@ before_install:
     - sudo cat /etc/default/docker
     - sudo service docker restart
 
+
+script:
+- make travis-e2e-tests
+
 deploy:
   - provider: script
     skip_cleanup: true
