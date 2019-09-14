@@ -3,9 +3,17 @@ language: go
 go_import_path: github.com/redhat-cop/quay-operator
 go:
 - "1.12"
-
 env:
   - GO111MODULE=on
+  
+services:
+- docker
+
+before_install:
+    # add 172.16.0.0/12 as insecure registry (OpenShift internal registry)
+    - sudo sed -i "s/\DOCKER_OPTS=\"/DOCKER_OPTS=\"--insecure-registry=172.16.0.0\/12 /g" /etc/default/docker
+    - sudo cat /etc/default/docker
+    - sudo service docker restart
 
 deploy:
   - provider: script
@@ -24,7 +32,7 @@ deploy:
       tags: true
   - provider: script
     skip_cleanup: true
-    script: make travis-dev-deploy DEV_TAG=$TRAVIS_COMMIT
+    script: make travis-e2e-tests travis-dev-deploy DEV_TAG=$TRAVIS_COMMIT
     on:
       condition: $PUSH_LATEST_COMMIT = yes
       all_branches: true

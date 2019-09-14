@@ -8,6 +8,11 @@ IMG := $(REPOSITORY):latest
 
 VERSION := v0.0.5
 
+OPENSHIFT_VERSION=3.11.146
+QUAY_NAMESPACE=quay-enterprise
+SDK_VERSION=v0.10.0
+GOPATH ?= "$(HOME)/go"
+
 BUILD_COMMIT := $(shell ./scripts/build/get-build-commit.sh)
 BUILD_TIMESTAMP := $(shell ./scripts/build/get-build-timestamp.sh)
 BUILD_HOSTNAME := $(shell ./scripts/build/get-build-hostname.sh)
@@ -89,3 +94,19 @@ travis-dev-deploy: docker-login docker-build docker-push-dev
 
 # Travis Release
 travis-release-deploy: docker-login docker-build docker-push-release
+
+#Travis E2E
+travis-e2e-tests: install-minishift install-sdk run-e2e-tests
+
+#Run E2E
+run-e2e-tests: operator-sdk test local ./test/e2e --namespace "quay-enterprise" --up-local --no-setup --verbose
+
+#Install SDK
+install-sdk:
+	@echo Installing SDK ${SDK_VERSION}
+	@SDK_VERSION=$(SDK_VERSION) GOPATH=$(GOPATH) ./.travis/install-sdk.sh
+
+#Install Minishift
+install-minishift:
+	@echo Installing Minishift
+	@OPENSHIFT_VERSION=$(OPENSHIFT_VERSION) QUAY_NAMESPACE=$(QUAY_NAMESPACE) ./.travis/setup-minishift.sh
