@@ -17,7 +17,7 @@ else
     echo "Logging into redhat registry"
     docker login registry.redhat.io -u $RH_USERNAME -p $RH_PASSWORD
     echo "Bring up openshift cluster"
-    ./oc cluster up
+    ./oc cluster up --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11 --create-machine
     ./oc login -u system:admin
     echo "Creating new project $QUAY_NAMESPACE"
     ./oc new-project $QUAY_NAMESPACE
