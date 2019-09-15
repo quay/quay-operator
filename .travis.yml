@@ -9,11 +9,11 @@ env:
 services:
 - docker
 
-before_install:
+#before_install:
     # add 172.16.0.0/12 as insecure registry (OpenShift internal registry)
-    - sudo sed -i "s/\DOCKER_OPTS=\"/DOCKER_OPTS=\"--insecure-registry=172.16.0.0\/12 /g" /etc/default/docker
-    - sudo cat /etc/default/docker
-    - sudo service docker restart
+    # - sudo sed -i "s/\DOCKER_OPTS=\"/DOCKER_OPTS=\"--insecure-registry=172.16.0.0\/12 /g" /etc/default/docker
+    # - sudo cat /etc/default/docker
+    # - sudo service docker restart
 
 
 script:
