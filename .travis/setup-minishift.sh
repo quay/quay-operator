@@ -19,7 +19,7 @@ else
     rm -rf /etc/origin;mkdir -p /etc/origin ~/.kube
 
     echo "Bring up openshift cluster"
-    ./oc cluster up --image=registry.access.redhat.com/openshift3/ose:v3.11
+    ./oc cluster up
     ./oc login -u system:admin
     echo "Creating new project $QUAY_NAMESPACE"
     ./oc new-project $QUAY_NAMESPACE
