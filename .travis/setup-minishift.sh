@@ -22,7 +22,7 @@ else
     echo "Bring up openshift cluster"
     mkdir -p "$HOME/.occluster"
     rm -r ~/.kube
-    ./oc cluster up  --base-dir="$HOME/.occluster" --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11
+    ./oc cluster up  --base-dir="$HOME/.occluster" --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11.51
     ./oc login -u system:admin
     echo "Creating new project $QUAY_NAMESPACE"
     ./oc new-project $QUAY_NAMESPACE
