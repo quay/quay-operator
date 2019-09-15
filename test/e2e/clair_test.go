@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	retryInterval        = time.Second * 60
-	timeout              = time.Second * 260
+	retryInterval        = time.Second * 120
+	timeout              = time.Second * 460
 	cleanupRetryInterval = time.Second * 1
 	cleanupTimeout       = time.Second * 5
 	name                 = "quay-operator"
