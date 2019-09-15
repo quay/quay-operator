@@ -22,9 +22,9 @@ else
     echo "Bring up openshift cluster"
     mkdir -p "$HOME/.occluster"
     rm -r ~/.kube
-    oc cluster up  --base-dir="$HOME/.occluster" --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11
-    oc login -u system:admin
+    ./oc cluster up  --base-dir="$HOME/.occluster" --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11
+    ./oc login -u system:admin
     echo "Creating new project $QUAY_NAMESPACE"
-    oc new-project $QUAY_NAMESPACE
-    oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=config.json" --type='kubernetes.io/dockerconfigjson'
+    ./oc new-project $QUAY_NAMESPACE
+    ./oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=config.json" --type='kubernetes.io/dockerconfigjson'
 fi
