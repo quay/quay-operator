@@ -14,6 +14,10 @@ else
     wget https://mirror.openshift.com/pub/openshift-v3/clients/${OPENSHIFT_VERSION}/linux/oc.tar.gz
     tar xvzf oc.tar.gz
 
+    echo "Clean up"
+    ./oc cluster down
+    rm -rf /etc/origin;mkdir -p /etc/origin ~/.kube
+
     echo "Bring up openshift cluster"
     ./oc cluster up --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11
     ./oc login -u system:admin
