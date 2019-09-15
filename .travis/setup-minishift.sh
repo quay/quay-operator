@@ -15,8 +15,7 @@ else
     tar xvzf oc.tar.gz
 
     echo "Bring up openshift cluster"
-    rm -rf /tmp/base_occlusterup/ ; mkdir /tmp/base_occlusterup/
-    ./oc cluster up --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11 --base-dir=/tmp/base_occlusterup
+    ./oc cluster up --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11
     ./oc login -u system:admin
     echo "Creating new project $QUAY_NAMESPACE"
     ./oc new-project $QUAY_NAMESPACE
