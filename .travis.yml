@@ -1,4 +1,4 @@
-sudo: false
+sudo: required
 language: go
 go_import_path: github.com/redhat-cop/quay-operator
 go:
