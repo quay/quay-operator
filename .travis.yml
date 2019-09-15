@@ -14,7 +14,9 @@ before_install:
      - sudo sed -i "s/\DOCKER_OPTS=\"/DOCKER_OPTS=\"--insecure-registry=172.16.0.0\/12 /g" /etc/default/docker
      - sudo cat /etc/default/docker
      - sudo service docker restart
-
+     - sudo apt-get install libssl1.0.0 libssl-dev
+     - sudo ln -s /lib/x86_64-linux-gnu/libssl.so.1.0.0 /usr/lib/libssl.so.10
+     - sudo ln -s /lib/x86_64-linux-gnu/libcrypto.so.1.0.0 /usr/lib/libcrypto.so.10
 
 script:
 - make travis-e2e-tests
