@@ -99,7 +99,8 @@ travis-release-deploy: docker-login docker-build docker-push-release
 travis-e2e-tests: install-minishift install-sdk run-e2e-tests
 
 #Run E2E
-run-e2e-tests: operator-sdk test local ./test/e2e --namespace "quay-enterprise" --up-local --no-setup --verbose
+run-e2e-tests: 
+	operator-sdk test local ./test/e2e --namespace "quay-enterprise" --up-local --no-setup --verbose
 
 #Install SDK
 install-sdk:
