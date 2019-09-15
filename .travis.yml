@@ -14,6 +14,7 @@ before_install:
     - sudo sed -i "s/\DOCKER_OPTS=\"/DOCKER_OPTS=\"--insecure-registry=172.16.0.0\/12 /g" /etc/default/docker
     - sudo cat /etc/default/docker
     - sudo service docker restart
+    - docker rmi $(docker images -q)
 
 
 script:
