@@ -1,8 +1,6 @@
 #REMOVE BEFORE MERGING
 export QUAY_PASSWORD="O81WSHRSJR14UAZBK54GQHJS0P1V4CLWAJV1X2C4SD7KO59CQ9N3RE12612XU1HR"
 export QUAY_USERNAME="redhat+quay"
-export RH_PASSWORD="maythe(ma)bwithu22!"
-export RH_USERNAME="RHN-GPS-cnuland"
 
 if [[ -z "${QUAY_PASSWORD}" ]]; then
     echo "QUAY_PASSWORD environment variable not set"
