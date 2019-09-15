@@ -11,7 +11,7 @@ elif [[ -z "${RH_PASSWORD}" ]]; then
 elif [[ -z "${RH_USERNAME}" ]]; then
     echo "RH_USERNAME environment variable not set"
 else
-    wget https://mirror.openshift.com/pub/openshift-v3/clients/${OPENSHIFT_VERSION}/linux/oc.tar.gz
+    wget https://mirror.openshift.com/pub/openshift-v3/clients/3.11.0-0.9.0/linux-aarch64/oc.tar.gz
     tar xvzf oc.tar.gz
     echo "Logging into quay.io"
     docker login quay.io -u $QUAY_USERNAME -p $QUAY_PASSWORD
