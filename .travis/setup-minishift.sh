@@ -12,7 +12,6 @@ elif [[ -z "${RH_USERNAME}" ]]; then
     echo "RH_USERNAME environment variable not set"
 else
     sudo wget -qO- https://mirror.openshift.com/pub/openshift-v3/clients/${OPENSHIFT_VERSION}/linux/oc.tar.gz | sudo tar -xvz -C /bin
-    tar xvzf oc.tar.gz
     echo "Logging into quay.io"
     docker login quay.io -u $QUAY_USERNAME -p $QUAY_PASSWORD
     cp ~/.docker/config.json ./
