@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	retryInterval        = time.Second * 120
-	timeout              = time.Second * 460
+	retryInterval        = time.Second * 180
+	timeout              = time.Second * 500
 	cleanupRetryInterval = time.Second * 1
 	cleanupTimeout       = time.Second * 5
 	name                 = "quay-operator"
@@ -84,8 +84,8 @@ func defaultClairDeploy(t *testing.T, f *framework.Framework, ctx *framework.Tes
 	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay", constants.QuayImage, retryInterval, timeout)
 	assert.NoError(t, success)
 	// Wait for the clair postgres deployment
-	//success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-clair-postgresql", constants.PostgresqlImage, retryInterval, timeout)
-	//assert.NoError(t, success)
+	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-clair-postgresql", constants.PostgresqlImage, retryInterval, timeout)
+	assert.NoError(t, success)
 	// NOTE: Because of limitations with mounting subPath in minishift we must check for the deployment of clair instead of the pod
 	//Check for the clair deployment
 	deployment := &appsv1.Deployment{}
