@@ -1,4 +1,3 @@
-#!/bin/bash
 export DEST="${GOPATH}/bin/operator-sdk"
 export SDK_VERSION=v0.10.0
 
@@ -9,3 +8,4 @@ chmod +x ${DEST}
 ls -al
 echo $PATH
 operator-sdk -help
+exit 0
