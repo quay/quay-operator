@@ -107,7 +107,7 @@ run-unit-tests:
 	go test -v ./pkg/...
 
 #Run E2E
-run-e2e-tests: s
+run-e2e-tests:
 	operator-sdk test local ./test/e2e --namespace "quay-enterprise" --up-local --no-setup --verbose
 
 #Install SDK
