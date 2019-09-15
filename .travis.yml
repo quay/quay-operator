@@ -11,8 +11,7 @@ services:
 
 before_install:
     # add 172.16.0.0/12 as insecure registry (OpenShift internal registry)
-    - sudo sed -i "s/\DOCKER_OPTS=\"/DOCKER_OPTS=\"--insecure-registry=172.16.0.0\/12 /g" /etc/default/docker
-    - sudo sed -i "s/\DOCKER_OPTS=\"/DOCKER_OPTS=\"--registry-mirror=registry.access.redhat.com /g" /etc/default/docker
+    - echo '{"registry-mirrors": ["registry.access.redhat.com"], "mtu": 1460, "insecure-registries": ["172.30.0.0/16"] }' | sudo tee /etc/docker/daemon.json    
     - sudo cat /etc/default/docker
     - sudo service docker restart
 
