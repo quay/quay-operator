@@ -11,13 +11,11 @@ elif [[ -z "${RH_PASSWORD}" ]]; then
 elif [[ -z "${RH_USERNAME}" ]]; then
     echo "RH_USERNAME environment variable not set"
 else
-    sudo wget -qO- https://mirror.openshift.com/pub/openshift-v3/clients/${OPENSHIFT_VERSION}/linux/oc.tar.gz | sudo tar -xvz -C /bin
+    sudo wget -qO https://mirror.openshift.com/pub/openshift-v3/clients/${OPENSHIFT_VERSION}/linux/oc.tar.gz | sudo tar -xvz -C /bin
     tar xvzf oc.tar.gz
     echo "Logging into quay.io"
     docker login quay.io -u $QUAY_USERNAME -p $QUAY_PASSWORD
     cp ~/.docker/config.json ./
-    #docker pull quay.io/openshift/origin-node:v3.11
-    #sudo docker cp $(docker create docker.io/openshift/origin:v3.11):/bin/oc /usr/local/bin/oc
 
     echo "Bring up openshift cluster"
     IP_ADDR=$(ip addr show $DEV | awk '/inet /{ gsub("/.*", ""); print $2}')
