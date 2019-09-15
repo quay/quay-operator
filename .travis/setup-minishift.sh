@@ -16,15 +16,15 @@ else
 
     echo "Clean up"
     ./oc cluster down
-    rm -rf /etc/origin;mkdir -p /etc/origin ~/.kube
+    sudo rm -rf /etc/origin;mkdir -p /etc/origin ~/.kube
 
     echo "Bring up openshift cluster"
-    ./oc cluster up
-    ./oc login -u system:admin
+    sudo ./oc cluster up --image=registry.access.redhat.com/openshift3/ose:v3.11
+    sudo ./oc login -u system:admin
     echo "Creating new project $QUAY_NAMESPACE"
-    ./oc new-project $QUAY_NAMESPACE
+    sudo ./oc new-project $QUAY_NAMESPACE
     echo "Logging into quay.io"
     docker login quay.io -u $QUAY_USERNAME -p $QUAY_PASSWORD
     cp ~/.docker/config.json ./
-    ./oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=config.json" --type='kubernetes.io/dockerconfigjson'
+    sudo ./oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=config.json" --type='kubernetes.io/dockerconfigjson'
 fi
