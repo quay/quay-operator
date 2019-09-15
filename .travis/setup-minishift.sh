@@ -16,7 +16,7 @@ else
 
     echo "Clean up"
     ./oc cluster down
-    rm -rf /etc/origin;mkdir -p /etc/origin ~/.kube
+    sudo rm -rf /etc/origin;mkdir -p /etc/origin ~/.kube
 
     echo "Bring up openshift cluster"
     ./oc cluster up --skip-registry-check=true --image=registry.access.redhat.com/openshift3/ose-control-plane:v3.11
