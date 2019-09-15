@@ -96,10 +96,18 @@ travis-dev-deploy: docker-login docker-build docker-push-dev
 travis-release-deploy: docker-login docker-build docker-push-release
 
 #Travis E2E
-travis-e2e-tests: install-minishift install-sdk run-e2e-tests
+travis-e2e-tests: install-minishift install-sdk run-go-mod run-unit-tests run-e2e-tests
+
+#Install dependencies
+run-go-mod:
+	go mod vendor
+
+#Run Unit Tests
+run-unit-tests:
+	go test -v ./pkg/...
 
 #Run E2E
-run-e2e-tests: 
+run-e2e-tests: s
 	operator-sdk test local ./test/e2e --namespace "quay-enterprise" --up-local --no-setup --verbose
 
 #Install SDK
