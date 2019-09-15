@@ -15,6 +15,7 @@ before_install:
      - echo '{"insecure-registries":["172.30.0.0/16"]}' | sudo tee /etc/docker/daemon.json
      - sudo cat /etc/default/docker
      - sudo service docker restart
+     - sudo apt-get install mercurial
 
 script:
 - make travis-e2e-tests
