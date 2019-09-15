@@ -23,4 +23,5 @@ else
     echo "Creating new project $QUAY_NAMESPACE"
     oc new-project $QUAY_NAMESPACE
     oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=config.json" --type='kubernetes.io/dockerconfigjson'
+    oc apply -f ./deploy/crds/redhatcop_v1alpha1_quayecosystem_crd.yaml
 fi
