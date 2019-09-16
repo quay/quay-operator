@@ -25,13 +25,13 @@ func GetPod(namespace, namePrefix, containsImage string, kubeclient kubernetes.I
 	for _, pod := range pods.Items {
 		if strings.HasPrefix(pod.Name, namePrefix) {
 			for _, pod := range pods.Items {
-				//if strings.HasPrefix(pod.Name, namePrefix) {
-				for _, c := range pod.Spec.Containers {
-					fmt.Printf("Found pod +%v\n", c)
-					if strings.Contains(c.Image, containsImage) {
-						return pod
+				if strings.HasPrefix(pod.Name, namePrefix) {
+					for _, c := range pod.Spec.Containers {
+						fmt.Printf("Found pod +%v\n", c)
+						if strings.Contains(c.Image, containsImage) {
+							return pod
+						}
 					}
-					//}
 				}
 			}
 		}
@@ -67,6 +67,7 @@ func WaitForPod(t *testing.T, f *framework.Framework, ctx *framework.TestCtx, na
 
 func WaitForPodWithImage(t *testing.T, f *framework.Framework, ctx *framework.TestCtx, namespace, name string, image string, retryInterval time.Duration, timeout time.Duration) error {
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
+		fmt.Printf("Looking for pod +%v\n", name)
 		// Check if the CRD has been created
 		pod := GetPod(namespace, name, image, f.KubeClient)
 		if err != nil {

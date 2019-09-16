@@ -14,12 +14,13 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/validation"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
-	retryInterval        = time.Second * 200
-	timeout              = time.Second * 600
+	retryInterval        = time.Second * 30
+	timeout              = time.Second * 1800
 	cleanupRetryInterval = time.Second * 1
 	cleanupTimeout       = time.Second * 5
 	name                 = "quay-operator"
@@ -83,12 +84,12 @@ func defaultClairDeploy(t *testing.T, f *framework.Framework, ctx *framework.Tes
 	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-quay", constants.QuayImage, retryInterval, timeout)
 	assert.NoError(t, success)
 	// Wait for the clair postgres deployment
-	//success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-clair-postgresql", constants.PostgresqlImage, retryInterval, timeout)
-	//assert.NoError(t, success)
+	success = WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-clair-postgresql", constants.PostgresqlImage, retryInterval, timeout)
+	assert.NoError(t, success)
 	// NOTE: Because of limitations with mounting subPath in minishift we must check for the deployment of clair instead of the pod
 	//Check for the clair deployment
-	//deployment := &appsv1.Deployment{}
-	//err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "quay-operator-clair", Namespace: namespace}, deployment)
-	//assert.NoError(t, err)
+	deployment := &appsv1.Deployment{}
+	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: "quay-operator-clair", Namespace: namespace}, deployment)
+	assert.NoError(t, err)
 
 }
