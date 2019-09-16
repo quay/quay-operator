@@ -108,7 +108,7 @@ run-unit-tests:
 
 #Run E2E
 run-e2e-tests:
-	operator-sdk test local ./test/e2e --namespace "quay-enterprise" --up-local --no-setup --verbose --go-test-flags "-timeout 20m"
+	operator-sdk test local ./test/e2e --namespace "quay-enterprise" --up-local --no-setup --verbose --go-test-flags "-timeout 40m"
 
 #Install SDK
 install-sdk:
