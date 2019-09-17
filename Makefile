@@ -96,7 +96,7 @@ travis-dev-deploy: docker-login docker-build docker-push-dev
 travis-release-deploy: docker-login docker-build docker-push-release
 
 #Travis E2E
-travis-e2e-tests: install-minishift install-sdk run-go-mod run-unit-tests run-e2e-tests
+travis-e2e-tests: install-minishift run-go-mod run-unit-tests run-e2e-tests
 
 #Install dependencies
 run-go-mod:

@@ -69,8 +69,6 @@ func WaitForPodWithImage(t *testing.T, f *framework.Framework, ctx *framework.Te
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 		fmt.Printf("Looking for pod +%v\n", name)
 		// Check if the CRD has been created
-		pods, err := f.KubeClient.CoreV1().Events(namespace).List(metav1.ListOptions{})
-		fmt.Printf("Events +%v\n", pods)
 		pod := GetPod(namespace, name, image, f.KubeClient)
 		if err != nil {
 			if apierrors.IsNotFound(err) {

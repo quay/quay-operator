@@ -48,6 +48,8 @@ spec:
                     memory:
                       type: string
                     nodeSelector:
+                      additionalProperties:
+                        type: string
                       type: object
                     readinessProbe:
                       type: object
@@ -72,6 +74,8 @@ spec:
                 livenessProbe:
                   type: object
                 nodeSelector:
+                  additionalProperties:
+                    type: string
                   type: object
                 readinessProbe:
                   type: object
@@ -110,6 +114,8 @@ spec:
                     memory:
                       type: string
                     nodeSelector:
+                      additionalProperties:
+                        type: string
                       type: object
                     readinessProbe:
                       type: object
@@ -136,6 +142,8 @@ spec:
                 livenessProbe:
                   type: object
                 nodeSelector:
+                  additionalProperties:
+                    type: string
                   type: object
                 readinessProbe:
                   type: object
@@ -177,6 +185,8 @@ spec:
                 livenessProbe:
                   type: object
                 nodeSelector:
+                  additionalProperties:
+                    type: string
                   type: object
                 port:
                   format: int32
