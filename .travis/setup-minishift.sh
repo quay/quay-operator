@@ -15,13 +15,13 @@ else
     cp ~/.docker/config.json ./
     echo "Bring up okd cluster"
     IP_ADDR=$(ip addr show $DEV | awk '/inet /{ gsub("/.*", ""); print $2}')
-    ./oc cluster up --public-hostname=${IP_ADDR} --routing-suffix=${IP_ADDR}.nip.io --skip-registry-check=true
+    oc cluster up --public-hostname=${IP_ADDR} --routing-suffix=${IP_ADDR}.nip.io --skip-registry-check=true
     echo "Login"
-    ./oc login -u system:admin
+    oc login -u system:admin
     echo "Creating new project $QUAY_NAMESPACE"
-    ./oc new-project $QUAY_NAMESPACE
-    ./oc adm policy add-scc-to-user anyuid -z default
-    ./oc adm policy add-cluster-role-to-user cluster-admin admin
-    ./oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=config.json" --type='kubernetes.io/dockerconfigjson'
-    ./oc apply -f ./deploy/crds/redhatcop_v1alpha1_quayecosystem_crd.yaml
+    oc new-project $QUAY_NAMESPACE
+    oc adm policy add-scc-to-user anyuid -z default
+    oc adm policy add-cluster-role-to-user cluster-admin admin
+    oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=config.json" --type='kubernetes.io/dockerconfigjson'
+    oc apply -f ./deploy/crds/redhatcop_v1alpha1_quayecosystem_crd.yaml
 fi
