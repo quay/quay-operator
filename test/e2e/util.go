@@ -8,6 +8,7 @@ import (
 	"time"
 
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,6 +63,27 @@ func WaitForPod(t *testing.T, f *framework.Framework, ctx *framework.TestCtx, na
 		return err
 	}
 	t.Logf("pod available\n")
+	return nil
+}
+
+func WaitForDeployment(t *testing.T, f *framework.Framework, ctx *framework.TestCtx, namespace, name string, retryInterval time.Duration, timeout time.Duration) error {
+	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
+		// Check if the CRD has been created
+		deployment := &appsv1.Deployment{}
+		err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, deployment)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				t.Logf("Waiting for availability of %s deployment\n", name)
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
+		return err
+	}
+	t.Logf("deployment available\n")
 	return nil
 }
 
