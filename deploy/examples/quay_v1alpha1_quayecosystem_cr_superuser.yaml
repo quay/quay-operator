@@ -1,0 +1,8 @@
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    superuserCredentialsSecretName: <secret_name>
+    imagePullSecretName: redhat-pull-secret

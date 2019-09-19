@@ -1,0 +1,7 @@
+---
+operator-path: deploy/operator.yaml
+role-path: deploy/role.yaml
+operator-name: quay
+crd-cr-paths:
+  - deploy/crds/redhatcop_v1alpha1_quayecosystem_crd.yaml
+  - deploy/examples
