@@ -113,9 +113,9 @@ run-e2e-tests:
 #Install SDK
 install-sdk:
 	@echo Installing SDK ${SDK_VERSION}
-	@SDK_VERSION=$(SDK_VERSION) GOPATH=$(GOPATH) ./.travis/setup-sdk.sh
+	@SDK_VERSION=$(SDK_VERSION) GOPATH=$(GOPATH) bash /.travis/setup-sdk.sh
 
 #Install Minishift
 install-minishift:
 	@echo Installing Minishift
-	@OPENSHIFT_VERSION=$(OPENSHIFT_VERSION) QUAY_NAMESPACE=$(QUAY_NAMESPACE) ./.travis/setup-minishift.sh
+	@OPENSHIFT_VERSION=$(OPENSHIFT_VERSION) QUAY_NAMESPACE=$(QUAY_NAMESPACE) bash /.travis/setup-minishift.sh
