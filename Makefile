@@ -96,7 +96,7 @@ travis-dev-deploy: docker-login docker-build docker-push-dev
 travis-release-deploy: docker-login docker-build docker-push-release
 
 #Travis E2E - run-e2e-tests not available on travis yet because of an issue with sensitive data before exposed
-travis-e2e-tests: install-minishift install-sdk run-go-mod run-unit-tests # run-e2e-tests
+travis-e2e-tests: install-sdk run-go-mod run-unit-tests # install-minishift run-e2e-tests
 
 #Install dependencies
 run-go-mod:
