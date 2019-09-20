@@ -1,4 +1,4 @@
-#REMOVE BEFORE MERGING
+#!/bin/bash
 if [[ -z "${QUAY_PASSWORD}" ]]; then
     echo "QUAY_PASSWORD environment variable not set"
 elif [[ -z "${QUAY_USERNAME}" ]]; then

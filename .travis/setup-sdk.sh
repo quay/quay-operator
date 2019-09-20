@@ -1,3 +1,4 @@
+#!/bin/bash
 export DEST="${GOPATH}/bin/operator-sdk"
 export SDK_VERSION=v0.10.0
 
