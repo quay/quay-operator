@@ -9,8 +9,6 @@ spec:
     skipSetup: true
     keepConfigDeployment: true
     routeHost: quay.app.example.com
-  redis:
-    imagePullSecretName: redhat-pull-secret
   clair:
     enabled: true
     imagePullSecretName: redhat-pull-secret
