@@ -337,6 +337,28 @@ spec:
     keepConfigDeployment: true
 ```
 
+### Redis Password
+
+By default, the operator managed Redis instance is deployed without a password. A password can be specified by creating a secret containing the password in the key _password_. The following command can be used to create the secret:
+
+```
+oc create secret generic <secret_name> --from-literal=password=<password>
+```
+
+The secret can then be specified within the _redis_ section using the `` as shown below:
+
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  redis:
+    credentialsSecretName: <secret_name>
+    imagePullSecretName: redhat-pull-secret
+```
+
 ### Clair
 
 [Clair](https://github.com/coreos/clair) is a vulnerability assessment tool for application container. Support is available to automatically provision and configure both Clair and the integration wtih Quay. A property called `clair` can be specified in the `QuayEcosystem` object along with `enabled: true` within this field in order to deploy Clair. An example is shown below:
@@ -472,6 +494,27 @@ spec:
 ```
 
 _Note: The absence of a defined value will make use of the `RollingUpdate` strategy_
+
+### Environment Variables
+
+In addition to environment variables that are automatically configured by the operator, users can define their own set of environment variables in order to customize the managed resources. Each core component includes a property called `envVars` where environment variables can be defined. An example is shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    envVars:
+      - name: FOO
+        value: bar
+```
+
+_Note_: Environment variables for the Quay configuration pod can be managed by specifying the `configEnvVars` property on the `quay` resource
+
+_Caution:_ User defined environment variables are given precedence over those managed by the operator. Undesirable results may occur if conflicting keys are used.
 
 ## Troubleshooting
 

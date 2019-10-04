@@ -15,9 +15,28 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 
 	meta.Name = GetRedisResourcesName(quayConfiguration.QuayEcosystem)
 
+	envVars := []corev1.EnvVar{}
+
+	if quayConfiguration.ValidProvidedRedisPasswordSecret {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: constants.RedisPasswordEnvVar,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: quayConfiguration.QuayEcosystem.Spec.Redis.CredentialsSecretName,
+					},
+					Key: constants.RedisPasswordKey,
+				},
+			},
+		})
+	}
+
+	envVars = utils.MergeEnvVars(envVars, quayConfiguration.QuayEcosystem.Spec.Redis.EnvVars)
+
 	redisDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: quayConfiguration.QuayEcosystem.Spec.Redis.Image,
+			Env:   envVars,
 			Name:  meta.Name,
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 6379,
@@ -71,36 +90,40 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 	meta.Name = GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
 	BuildQuayConfigResourceLabels(meta.Labels)
 
+	envVars := []corev1.EnvVar{
+		{
+			Name:  constants.QuayEntryName,
+			Value: constants.QuayEntryConfigValue,
+		},
+		{
+			Name: constants.QuayConfigPasswordName,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: quayConfiguration.QuayConfigPasswordSecret,
+					},
+					Key: constants.QuayConfigPasswordKey,
+				},
+			},
+		},
+		{
+			Name: constants.QuayNamespaceEnvironmentVariable,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+	}
+
+	envVars = utils.MergeEnvVars(envVars, quayConfiguration.QuayEcosystem.Spec.Quay.EnvVars)
+
 	quayDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: quayConfiguration.QuayEcosystem.Spec.Quay.Image,
 			Name:  constants.QuayContainerConfigName,
-			Env: []corev1.EnvVar{
-				{
-					Name:  constants.QuayEntryName,
-					Value: constants.QuayEntryConfigValue,
-				},
-				{
-					Name: constants.QuayConfigPasswordName,
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: quayConfiguration.QuayConfigPasswordSecret,
-							},
-							Key: constants.QuayConfigPasswordKey,
-						},
-					},
-				},
-				{
-					Name: constants.QuayNamespaceEnvironmentVariable,
-					ValueFrom: &corev1.EnvVarSource{
-						FieldRef: &corev1.ObjectFieldSelector{
-							APIVersion: "v1",
-							FieldPath:  "metadata.namespace",
-						},
-					},
-				},
-			},
+			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 8080,
 				Name:          "http",
@@ -188,6 +211,24 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 	meta.Name = GetQuayResourcesName(quayConfiguration.QuayEcosystem)
 	BuildQuayResourceLabels(meta.Labels)
 
+	configEnvVars := []corev1.EnvVar{
+		{
+			Name: constants.QuayNamespaceEnvironmentVariable,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name:  constants.QuayExtraCertsDirEnvironmentVariable,
+			Value: "/conf/stack/extra_ca_certs",
+		},
+	}
+
+	configEnvVars = utils.MergeEnvVars(configEnvVars, quayConfiguration.QuayEcosystem.Spec.Quay.EnvVars)
+
 	configVolumeSources := []corev1.VolumeProjection{
 		{
 			Secret: &corev1.SecretProjection{
@@ -242,21 +283,7 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 		Containers: []corev1.Container{{
 			Image: quayConfiguration.QuayEcosystem.Spec.Quay.Image,
 			Name:  constants.QuayContainerAppName,
-			Env: []corev1.EnvVar{
-				{
-					Name: constants.QuayNamespaceEnvironmentVariable,
-					ValueFrom: &corev1.EnvVarSource{
-						FieldRef: &corev1.ObjectFieldSelector{
-							APIVersion: "v1",
-							FieldPath:  "metadata.namespace",
-						},
-					},
-				},
-				{
-					Name:  constants.QuayExtraCertsDirEnvironmentVariable,
-					Value: "/conf/stack/extra_ca_certs",
-				},
-			},
+			Env:   configEnvVars,
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 8080,
 				Name:          "http",
@@ -352,10 +379,15 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 	meta.Name = GetClairResourcesName(quayConfiguration.QuayEcosystem)
 	BuildClairResourceLabels(meta.Labels)
 
+	envVars := []corev1.EnvVar{}
+
+	envVars = utils.MergeEnvVars(envVars, quayConfiguration.QuayEcosystem.Spec.Clair.EnvVars)
+
 	clairDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
 			Image: quayConfiguration.QuayEcosystem.Spec.Clair.Image,
 			Name:  constants.ClairContainerName,
+			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 6060,
 				Name:          "clair-api",
@@ -482,45 +514,49 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 
 func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *QuayConfiguration, database *redhatcopv1alpha1.Database, databaseComponent constants.DatabaseComponent) *appsv1.Deployment {
 
-	databaseDeploymentPodSpec := corev1.PodSpec{
-		Containers: []corev1.Container{{
-			Image: database.Image,
-			Name:  meta.Name,
-			Env: []corev1.EnvVar{
-				{
-					Name: "POSTGRESQL_USER",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
-							},
-							Key: constants.DatabaseCredentialsUsernameKey,
-						},
+	envVars := []corev1.EnvVar{
+		{
+			Name: "POSTGRESQL_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
 					},
-				},
-				{
-					Name: "POSTGRESQL_PASSWORD",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
-							},
-							Key: constants.DatabaseCredentialsPasswordKey,
-						},
-					},
-				},
-				{
-					Name: "POSTGRESQL_DATABASE",
-					ValueFrom: &corev1.EnvVarSource{
-						SecretKeyRef: &corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
-							},
-							Key: constants.DatabaseCredentialsDatabaseKey,
-						},
-					},
+					Key: constants.DatabaseCredentialsUsernameKey,
 				},
 			},
+		},
+		{
+			Name: "POSTGRESQL_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
+					},
+					Key: constants.DatabaseCredentialsPasswordKey,
+				},
+			},
+		},
+		{
+			Name: "POSTGRESQL_DATABASE",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: utils.CheckValue(database.CredentialsSecretName, meta.Name).(string),
+					},
+					Key: constants.DatabaseCredentialsDatabaseKey,
+				},
+			},
+		},
+	}
+
+	envVars = utils.MergeEnvVars(envVars, database.EnvVars)
+
+	databaseDeploymentPodSpec := corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Image:     database.Image,
+			Name:      meta.Name,
+			Env:       envVars,
 			Resources: database.Resources,
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
 				Name:      constants.PostgresDataVolumeName,

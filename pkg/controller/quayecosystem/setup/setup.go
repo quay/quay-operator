@@ -89,6 +89,10 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		redisConfiguration["port"] = quaySetupInstance.quayConfiguration.RedisPort
 	}
 
+	if !utils.IsZeroOfUnderlyingType(quaySetupInstance.quayConfiguration.RedisPassword) {
+		redisConfiguration["password"] = quaySetupInstance.quayConfiguration.RedisPassword
+	}
+
 	quayConfig.Config["BUILDLOGS_REDIS"] = redisConfiguration
 	quayConfig.Config["USER_EVENTS_REDIS"] = redisConfiguration
 	quayConfig.Config["SERVER_HOSTNAME"] = quaySetupInstance.quayConfiguration.QuayHostname

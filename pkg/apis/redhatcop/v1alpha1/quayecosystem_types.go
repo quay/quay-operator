@@ -94,12 +94,14 @@ type QuayEcosystemList struct {
 
 // Quay defines the properies of a deployment of Quay
 type Quay struct {
+	ConfigEnvVars                  []corev1.EnvVar               `json:"configEnvVars,omitempty"`
 	ConfigResources                corev1.ResourceRequirements   `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
 	ConfigRouteHost                string                        `json:"configRouteHost,omitempty"`
 	ConfigSecretName               string                        `json:"configSecretName,omitempty"`
 	Database                       *Database                     `json:"database,omitempty"`
 	DeploymentStrategy             appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
 	EnableNodePortService          bool                          `json:"enableNodePortService,omitempty"`
+	EnvVars                        []corev1.EnvVar               `json:"envVars,omitempty"`
 	Image                          string                        `json:"image,omitempty"`
 	ImagePullSecretName            string                        `json:"imagePullSecretName,omitempty"`
 	LivenessProbe                  *corev1.Probe                 `json:"livenessProbe,omitempty"`
@@ -128,16 +130,18 @@ type QuayEcosystemCondition struct {
 
 // Redis defines the properies of a deployment of Redis
 type Redis struct {
-	DeploymentStrategy  appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
-	Hostname            string                        `json:"hostname,omitempty"`
-	Image               string                        `json:"image,omitempty"`
-	ImagePullSecretName string                        `json:"imagePullSecretName,omitempty"`
-	LivenessProbe       *corev1.Probe                 `json:"livenessProbe,omitempty"`
-	NodeSelector        map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	Port                *int32                        `json:"port,omitempty"`
-	ReadinessProbe      *corev1.Probe                 `json:"readinessProbe,omitempty"`
-	Replicas            *int32                        `json:"replicas,omitempty"`
-	Resources           corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	CredentialsSecretName string                        `json:"credentialsSecretName,omitempty"`
+	DeploymentStrategy    appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+	EnvVars               []corev1.EnvVar               `json:"envVars,omitempty"`
+	Hostname              string                        `json:"hostname,omitempty"`
+	Image                 string                        `json:"image,omitempty"`
+	ImagePullSecretName   string                        `json:"imagePullSecretName,omitempty"`
+	LivenessProbe         *corev1.Probe                 `json:"livenessProbe,omitempty"`
+	NodeSelector          map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	Port                  *int32                        `json:"port,omitempty"`
+	ReadinessProbe        *corev1.Probe                 `json:"readinessProbe,omitempty"`
+	Replicas              *int32                        `json:"replicas,omitempty"`
+	Resources             corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 }
 
 // Database defines a database that will be deployed to support a particular component
@@ -145,6 +149,7 @@ type Database struct {
 	CPU                   string                        `json:"cpu,omitempty"`
 	CredentialsSecretName string                        `json:"credentialsSecretName,omitempty"`
 	DeploymentStrategy    appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+	EnvVars               []corev1.EnvVar               `json:"envVars,omitempty"`
 	Image                 string                        `json:"image,omitempty"`
 	ImagePullSecretName   string                        `json:"imagePullSecretName,omitempty"`
 	LivenessProbe         *corev1.Probe                 `json:"livenessProbe,omitempty"`
@@ -162,6 +167,7 @@ type Clair struct {
 	Database                  *Database                     `json:"database,omitempty"`
 	DeploymentStrategy        appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
 	Enabled                   bool                          `json:"enabled,omitempty"`
+	EnvVars                   []corev1.EnvVar               `json:"envVars,omitempty"`
 	Image                     string                        `json:"image,omitempty"`
 	ImagePullSecretName       string                        `json:"imagePullSecretName,omitempty"`
 	LivenessProbe             *corev1.Probe                 `json:"livenessProbe,omitempty"`
