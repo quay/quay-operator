@@ -39,6 +39,10 @@ spec:
                       type: string
                     deploymentStrategy:
                       type: string
+                    envVars:
+                      items:
+                        type: object
+                      type: array
                     image:
                       type: string
                     imagePullSecretName:
@@ -67,6 +71,10 @@ spec:
                   type: string
                 enabled:
                   type: boolean
+                envVars:
+                  items:
+                    type: object
+                  type: array
                 image:
                   type: string
                 imagePullSecretName:
@@ -91,6 +99,10 @@ spec:
               type: object
             quay:
               properties:
+                configEnvVars:
+                  items:
+                    type: object
+                  type: array
                 configResources:
                   type: object
                 configRouteHost:
@@ -105,6 +117,10 @@ spec:
                       type: string
                     deploymentStrategy:
                       type: string
+                    envVars:
+                      items:
+                        type: object
+                      type: array
                     image:
                       type: string
                     imagePullSecretName:
@@ -133,6 +149,10 @@ spec:
                   type: string
                 enableNodePortService:
                   type: boolean
+                envVars:
+                  items:
+                    type: object
+                  type: array
                 image:
                   type: string
                 imagePullSecretName:
@@ -174,8 +194,14 @@ spec:
               type: object
             redis:
               properties:
+                credentialsSecretName:
+                  type: string
                 deploymentStrategy:
                   type: string
+                envVars:
+                  items:
+                    type: object
+                  type: array
                 hostname:
                   type: string
                 image:

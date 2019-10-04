@@ -27,9 +27,10 @@ type QuayConfiguration struct {
 	ProvisionClairDatabase           bool
 
 	// Redis
-	RedisHostname string
-	RedisPort     *int32
-	RedisPassword string
+	RedisHostname                    string
+	RedisPort                        *int32
+	RedisPassword                    string
+	ValidProvidedRedisPasswordSecret bool
 
 	// Quay
 	QuayHostname                          string

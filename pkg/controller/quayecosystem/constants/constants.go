@@ -194,6 +194,10 @@ const (
 	DatabaseComponentQuay DatabaseComponent = "quay"
 	// DatabaseComponentClair is the name of the Quay database
 	DatabaseComponentClair DatabaseComponent = "clair"
+	// RedisPasswordKey represents the key for the redis password
+	RedisPasswordKey = "password"
+	// RedisPasswordEnvVar represents the name of the environment variable that contains the Redis password
+	RedisPasswordEnvVar = "REDIS_PASSWORD"
 )
 
 var (

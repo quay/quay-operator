@@ -91,6 +91,23 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 		}
 	}
 
+	// Validate Redis CredentialsSecret
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.CredentialsSecretName) {
+
+		validRedisCredentialSecret, redisSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Redis.CredentialsSecretName, []string{constants.RedisPasswordKey})
+
+		if err != nil {
+			return false, err
+		}
+
+		if !validRedisCredentialSecret {
+			return false, fmt.Errorf("Failed to validate provided Redis Credentials Secret")
+		}
+
+		quayConfiguration.RedisPassword = string(redisSecret.Data[constants.RedisPasswordKey])
+		quayConfiguration.ValidProvidedRedisPasswordSecret = true
+	}
+
 	// Validate Quay Database ImagePullSecret
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Database.ImagePullSecretName) {
 
