@@ -250,6 +250,11 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		changed = true
 	}
 
+	if updatedRegistryBakends, registryBakendsChanged := setDefaultBackendSourceValues(quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends); registryBakendsChanged {
+		quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends = updatedRegistryBakends
+		changed = true
+	}
+
 	return changed
 }
 
@@ -360,4 +365,31 @@ func getDefaultRedisLivenessProbe() *corev1.Probe {
 			},
 		},
 	}
+}
+
+func setDefaultBackendSourceValues(registryBackends []redhatcopv1alpha1.RegistryBackend) ([]redhatcopv1alpha1.RegistryBackend, bool) {
+
+	changed := false
+
+	for _, registryBackend := range registryBackends {
+
+		if !utils.IsZeroOfUnderlyingType(registryBackend.Local) {
+			if utils.IsZeroOfUnderlyingType(registryBackend.Local.StoragePath) {
+				changed = true
+				registryBackend.Local.StoragePath = constants.QuayRegistryStoragePath
+			}
+			continue
+		}
+
+		if !utils.IsZeroOfUnderlyingType(registryBackend.S3) {
+			if utils.IsZeroOfUnderlyingType(registryBackend.S3.StoragePath) {
+				changed = true
+				registryBackend.S3.StoragePath = constants.QuayRegistryStoragePath
+			}
+			continue
+		}
+	}
+
+	return registryBackends, changed
+
 }

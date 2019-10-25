@@ -45,6 +45,7 @@ type QuayConfiguration struct {
 	QuaySslCertificate                    []byte
 	QuaySslPrivateKey                     []byte
 	SecurityScannerKeyID                  string
+	RegistryBackends                      []redhatcopv1alpha1.RegistryBackend
 
 	// Clair
 	ClairSslCertificate []byte

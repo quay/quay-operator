@@ -201,9 +201,12 @@ spec:
 
 ### Registry Backends
 
-Quay supports multiple storage backends. The quay operator supports aiding in the facilitation of certain storage backends. The following backends are currently supported:
+Quay supports multiple storage backends (configured as an array). The quay operator supports aiding in the facilitation of certain storage backends. The following backends are currently supported:
 
 * Local
+* S3
+
+#### Local Storage
 
 The following is an example of how to define a local backend with a customized location for which images will be stored:
 
@@ -222,7 +225,7 @@ spec:
 ```
 
 
-#### Configuring Persistent Local Storage
+##### Configuring Persistent Local Storage
 
 By default, Quay uses an ephemeral volume for local storage. In order to avoid data loss, persistent storage is required. To enable the use of a _PersistentVolume_ to store images, specify the `registryStorage` parameter underneath the `quay` property. The following example will cause a _PersistentVolumeClaim_ to be created within the project requesting storage of 10Gi and an _access mode_ of `ReadWriteOnce` (Default value is `ReadWriteMany`)
 
@@ -241,6 +244,85 @@ spec:
 ```
 
 A Storage Class can also be provided using the `persistentVolumeStorageClassName` property
+
+### S3 Storage
+
+S3 Storage, for example from AWS, is supported using the `s3` registry backend type. The following is an example of how an S3 bucket in AWS can be used as the registry storage:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    registryStorage:
+      - name: s3
+        s3:
+          s3_bucket: quay
+          s3_access_key: <s3_access_key>
+          s3_secret_key: <s3_secret_key>
+          host: s3.us-east-2.amazonaws.com
+```
+
+#### S3 Credentials Secret
+
+To prevent displaying sensitive values as plaintext, the secret key and access key can be added to a secret which in turn can be reference within the `QuayEcosystem` resource. 
+
+```
+oc create secret generic s3-credentials --from-literal=s3_access_key=<s3_access_key> --from-literal=s3_secret_key=<s3_secret_key>
+```
+
+Remove the `s3_access_key` and `s3_secret_key` properties if specified and reference the secret using the 
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    registryStorage:
+      - name: s3
+        s3:
+          s3_bucket: quay
+          credentialsSecretName: s3-credentials
+          host: s3.us-east-2.amazonaws.com
+```
+
+### Storage Replication
+
+Data can be replicated between multiple registry backends and can be enabled by setting the `enableStorageReplication` to `true` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    enableStorageReplication: true
+    registryStorage:
+      - name: s3
+        s3:
+          s3_bucket: quay
+          credentialsSecretName: s3-credentials
+          host: s3.us-east-2.amazonaws.com
+          replicateByDefault: true
+      - name: s3-backup
+        s3:
+          s3_bucket: quay-backup
+          credentialsSecretName: s3-credentials
+          host: s3.us-east-2.amazonaws.com
+          replicateByDefault: true
+```
+
+Each backend that supports replication contains a `replicateByDefault` field that when set to `true` will be distributed to other storage engines.
+
+_Note:_ Support for replicated storage is not available for the `local` registry backend and will result in an error during the verification phase.
 
 ### Skipping Automated Setup
 

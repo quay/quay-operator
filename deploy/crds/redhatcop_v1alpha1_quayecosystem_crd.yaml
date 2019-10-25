@@ -149,6 +149,8 @@ spec:
                   type: string
                 enableNodePortService:
                   type: boolean
+                enableStorageReplication:
+                  type: boolean
                 envVars:
                   items:
                     type: object

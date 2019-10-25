@@ -132,19 +132,43 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 	// Setup Storage
 	distributedStorageConfig := map[string][]interface{}{}
+	distributedStoragePreference := []string{}
+	distributedStorageReplicateByDefault := []string{}
+	storageReplication := false
 
-	for _, registryBackend := range quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
+	for _, registryBackend := range quaySetupInstance.quayConfiguration.RegistryBackends {
 
 		var quayRegistry []interface{}
 
 		if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Local) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeLocalStorageName)
 			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.Local)
+		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.S3) {
+			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeS3StorageName)
+			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.S3)
+
+			if quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.EnableStorageReplication {
+				distributedStoragePreference = append(distributedStoragePreference, registryBackend.Name)
+				storageReplication = true
+			}
+
+			if quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.EnableStorageReplication {
+				distributedStorageReplicateByDefault = append(distributedStorageReplicateByDefault, registryBackend.Name)
+				storageReplication = true
+			}
+
+			registryBackend.RegistryBackendSource.S3.ReplicateByDefault = nil
+
 		}
 
 		distributedStorageConfig[registryBackend.Name] = quayRegistry
 
 	}
+
+	quayConfig.Config["DISTRIBUTED_STORAGE_CONFIG"] = distributedStorageConfig
+	quayConfig.Config["FEATURE_STORAGE_REPLICATION"] = storageReplication
+	quayConfig.Config["DISTRIBUTED_STORAGE_PREFERENCE"] = distributedStoragePreference
+	quayConfig.Config["DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS"] = distributedStorageReplicateByDefault
 
 	// Setup Security Scanner
 	if quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Clair != nil && quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
