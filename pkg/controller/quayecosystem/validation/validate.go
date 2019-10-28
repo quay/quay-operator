@@ -173,6 +173,44 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	}
 
+	// Registry Backends
+	for _, registryBackend := range quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
+
+		// Validate replication is not enabled when using a Local backend
+		if quayConfiguration.QuayEcosystem.Spec.Quay.EnableStorageReplication {
+			if registryBackend.Local != nil {
+				return false, fmt.Errorf("Cannot have make use of local storage when replication enabled. Local storage: %s", registryBackend.Name)
+			}
+		}
+
+		managedRegistryBackend := registryBackend.DeepCopy()
+
+		// Validate various backends
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.S3) {
+
+			// TODO: Do basic field validation
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.S3.CredentialsSecretName) {
+				validS3Secret, s3Secret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.S3.CredentialsSecretName, constants.RequiredS3CredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validS3Secret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.S3.AccessKey = string(s3Secret.Data[constants.S3AccessKey])
+				managedRegistryBackend.S3.SecretKey = string(s3Secret.Data[constants.S3SecretKey])
+				managedRegistryBackend.S3.CredentialsSecretName = ""
+
+			}
+
+		}
+
+		quayConfiguration.RegistryBackends = append(quayConfiguration.RegistryBackends, *managedRegistryBackend)
+
+	}
+
 	// Validate Quay SSL Certificates
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName) {
 		validQuaySslCertificateSecret, quaySslCertificateSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName, constants.RequiredSslCertificateKeys)

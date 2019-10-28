@@ -148,6 +148,15 @@ const (
 	// RegistryStorageTypeLocalStorageName is the value of the Local Quay Storage type
 	RegistryStorageTypeLocalStorageName = "LocalStorage"
 
+	// RegistryStorageTypeS3StorageName is the value of the Amazon S3 storage type
+	RegistryStorageTypeS3StorageName = "S3Storage"
+
+	// S3AccessKey is the name of the S3 Access Key
+	S3AccessKey = "s3_access_key"
+
+	// S3SecretKey is the name of the S3 Access Key
+	S3SecretKey = "s3_secret_key"
+
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
 	// QuayConfigVolumeName is the name of the volume containing Quay configurations
@@ -229,6 +238,9 @@ var (
 
 	// RequiredSslCertificateKeys represents the keys that are required for a provided SSL certificate
 	RequiredSslCertificateKeys = []string{QuayAppConfigSSLCertificateSecretKey, QuayAppConfigSSLPrivateKeySecretKey}
+
+	// RequiredS3CredentialKeys rerpresents the keys that are required for the S3 registry backend
+	RequiredS3CredentialKeys = []string{S3AccessKey, S3SecretKey}
 
 	// RequiredAnyUIDSccServiceAccounts is a list of service accounts who require access to the anyuid SCC
 	RequiredAnyUIDSccServiceAccounts = []string{QuayServiceAccount}

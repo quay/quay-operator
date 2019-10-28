@@ -116,6 +116,7 @@ type Quay struct {
 	SkipSetup                      bool                          `json:"skipSetup,omitempty"`
 	SslCertificatesSecretName      string                        `json:"sslCertificatesSecretName,omitempty"`
 	SuperuserCredentialsSecretName string                        `json:"superuserCredentialsSecretName,omitempty"`
+	EnableStorageReplication       bool                          `json:"enableStorageReplication,omitempty"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -188,6 +189,7 @@ type RegistryBackend struct {
 // RegistryBackendSource defines the specific configurations to support the Quay registry
 type RegistryBackendSource struct {
 	Local *LocalRegistryBackendSource `json:"local,omitempty,name=local"`
+	S3    *S3RegistryBackendSource    `json:"s3,omitempty,name=s3"`
 }
 
 // RegistryStorage defines the configurations to support persistent storage
@@ -200,6 +202,18 @@ type RegistryStorage struct {
 // LocalRegistryBackendSource defines local registry storage
 type LocalRegistryBackendSource struct {
 	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+}
+
+// S3RegistryBackendSource defines S3 registry storage
+type S3RegistryBackendSource struct {
+	StoragePath           string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName            string `json:"s3_bucket,omitempty,name=s3_bucket"`
+	AccessKey             string `json:"s3_access_key,omitempty,name=s3_access_key"`
+	SecretKey             string `json:"s3_secret_key,omitempty,name=s3_secret_key"`
+	Host                  string `json:"host,omitempty,name=host"`
+	Port                  int    `json:"port,omitempty,name=port"`
+	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+	ReplicateByDefault    *bool  `json:"replicateByDefault,omitempty"`
 }
 
 func init() {

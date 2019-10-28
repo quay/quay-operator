@@ -312,7 +312,7 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 		}
 	}
 
-	for _, registryBackend := range quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
+	for _, registryBackend := range quayConfiguration.RegistryBackends {
 
 		if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Local) {
 
