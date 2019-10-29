@@ -20,17 +20,17 @@ func GenerateDefaultClairConfigFile() client.ClairFile {
 					"cachesize": 16384,
 				},
 			},
-			Updater: &client.ClairUpdater{
-				Interval: constants.ClairDefaultUpdateInterval,
-				Notifier: &client.ClairNotifier{
-					Attempts:         1,
-					RenotifyInterval: time.Hour * 1,
-					Params: map[string]interface{}{
-						"http": &client.ClairHttpNotifier{
-							Proxy: "http://localhost:6063",
-						},
+			Notifier: &client.ClairNotifier{
+				Attempts:         1,
+				RenotifyInterval: time.Hour * 1,
+				Params: map[string]interface{}{
+					"http": &client.ClairHttpNotifier{
+						Proxy: "http://localhost:6063",
 					},
 				},
+			},
+			Updater: &client.ClairUpdater{
+				Interval: constants.ClairDefaultUpdateInterval,
 			},
 			API: &client.ClairAPI{
 				Port:          6062,
