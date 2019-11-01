@@ -100,6 +100,7 @@ type ClairFile struct {
 type ClairConfig struct {
 	Database *ClairDatabase `yaml:"database"`
 	Updater  *ClairUpdater  `yaml:"updater"`
+	Notifier *ClairNotifier `yaml:"notifier"`
 	API      *ClairAPI      `yaml:"api"`
 }
 
@@ -109,8 +110,7 @@ type ClairDatabase struct {
 }
 
 type ClairUpdater struct {
-	Notifier *ClairNotifier `yaml:"notifier"`
-	Interval time.Duration  `yaml:"interval"`
+	Interval time.Duration `yaml:"interval"`
 }
 
 type ClairNotifier struct {

@@ -737,7 +737,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 
 	clairConfigFile.Clair.Updater.Interval = r.quayConfiguration.ClairUpdateInterval
 
-	clairConfigFile.Clair.Updater.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
+	clairConfigFile.Clair.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
 		Endpoint: fmt.Sprintf("https://%s/secscan/notify", r.quayConfiguration.QuayEcosystem.Status.Hostname),
 		Proxy:    "http://localhost:6063",
 	}
