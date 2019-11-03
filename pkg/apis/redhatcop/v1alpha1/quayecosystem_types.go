@@ -184,12 +184,23 @@ type Clair struct {
 type RegistryBackend struct {
 	Name                  string `json:"name"`
 	RegistryBackendSource `json:",inline" protobuf:"bytes,2,opt,name=registryBackendSource"`
+	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+	ReplicateByDefault    *bool  `json:"replicateByDefault,omitempty"`
+}
+
+// RegistryBackendStorageType defines the type of registry backend storage
+type RegistryBackendStorageType interface {
+	Validate() error
 }
 
 // RegistryBackendSource defines the specific configurations to support the Quay registry
 type RegistryBackendSource struct {
-	Local *LocalRegistryBackendSource `json:"local,omitempty,name=local"`
-	S3    *S3RegistryBackendSource    `json:"s3,omitempty,name=s3"`
+	Local       *LocalRegistryBackendSource       `json:"local,omitempty,name=local"`
+	S3          *S3RegistryBackendSource          `json:"s3,omitempty,name=s3"`
+	GoogleCloud *GoogleCloudRegistryBackendSource `json:"googlecloud,omitempty,name=googlecloud"`
+	Azure       *AzureRegistryBackendSource       `json:"azure,omitempty,name=azure"`
+	RADOS       *RADOSRegistryBackendSource       `json:"rados,omitempty,name=rados"`
+	RHOCS       *RHOCSRegistryBackendSource       `json:"rhocs,omitempty,name=rhocs"`
 }
 
 // RegistryStorage defines the configurations to support persistent storage
@@ -206,14 +217,79 @@ type LocalRegistryBackendSource struct {
 
 // S3RegistryBackendSource defines S3 registry storage
 type S3RegistryBackendSource struct {
-	StoragePath           string `json:"storage_path,omitempty,name=storage_path"`
-	BucketName            string `json:"s3_bucket,omitempty,name=s3_bucket"`
-	AccessKey             string `json:"s3_access_key,omitempty,name=s3_access_key"`
-	SecretKey             string `json:"s3_secret_key,omitempty,name=s3_secret_key"`
-	Host                  string `json:"host,omitempty,name=host"`
-	Port                  int    `json:"port,omitempty,name=port"`
-	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
-	ReplicateByDefault    *bool  `json:"replicateByDefault,omitempty"`
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName  string `json:"s3_bucket,omitempty,name=s3_bucket"`
+	AccessKey   string `json:"s3_access_key,omitempty,name=s3_access_key"`
+	SecretKey   string `json:"s3_secret_key,omitempty,name=s3_secret_key"`
+	Host        string `json:"host,omitempty,name=host"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// GoogleCloudRegistryBackendSource defines Google Cloud registry storage
+type GoogleCloudRegistryBackendSource struct {
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName  string `json:"bucket_name,omitempty,name=bucket_name"`
+	AccessKey   string `json:"access_key,omitempty,name=access_key"`
+	SecretKey   string `json:"secret_key,omitempty,name=secret_key"`
+}
+
+// AzureRegistryBackendSource defines Azure blob registry storage
+type AzureRegistryBackendSource struct {
+	StoragePath   string `json:"storage_path,omitempty,name=storage_path"`
+	ContainerName string `json:"azure_container,omitempty,name=azure_container"`
+	AccountName   string `json:"azure_account_name,omitempty,name=azure_account_name"`
+	AccountKey    string `json:"azure_account_key,omitempty,name=azure_account_key"`
+	SasToken      string `json:"sas_token,omitempty,name=sas_token"`
+}
+
+// RADOSRegistryBackendSource defines Ceph RADOS registry storage
+type RADOSRegistryBackendSource struct {
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName  string `json:"s3_bucket,omitempty,name=s3_bucket"`
+	AccessKey   string `json:"access_key,omitempty,name=s3_access_key"`
+	SecretKey   string `json:"secret_key,omitempty,name=s3_secret_key"`
+	Hostname    string `json:"hostname,omitempty,name=hostname"`
+	Secure      bool   `json:"is_secure,omitempty,name=is_secure"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// RHOCSRegistryBackendSource defines RHOCS registry storage
+type RHOCSRegistryBackendSource struct {
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName  string `json:"s3_bucket,omitempty,name=s3_bucket"`
+	AccessKey   string `json:"access_key,omitempty,name=s3_access_key"`
+	SecretKey   string `json:"secret_key,omitempty,name=s3_secret_key"`
+	Hostname    string `json:"hostname,omitempty,name=hostname"`
+	Secure      bool   `json:"is_secure,omitempty,name=is_secure"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// Not yet implemented
+
+// SwiftRegistryBackendSource defines Swift registry storage
+type SwiftRegistryBackendSource struct {
+	AuthVersion int               `json:"auth_version,omitempty,name=auth_version"`
+	AuthURL     string            `json:"auth_url,omitempty,name=auth_url"`
+	Container   string            `json:"swift_container,omitempty,name=swift_container"`
+	StoragePath string            `json:"storage_path,omitempty,name=storage_path"`
+	Username    string            `json:"swift_user,omitempty,name=swift_user"`
+	Password    string            `json:"swift_password,omitempty,name=swift_password"`
+	CACertPath  string            `json:"ca_cert_path,omitempty,name=ca_cert_path"`
+	TempURLKey  string            `json:"temp_url_key,omitempty,name=temp_url_key"`
+	OSOptions   map[string]string `json:"os_options,omitempty" protobuf:"bytes,7,rep,name=os_options"`
+}
+
+// CloudfrontS3RegistryBackendSource defines CouldfrontS3 registry storage
+type CloudfrontS3RegistryBackendSource struct {
+	StoragePath        string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName         string `json:"s3_bucket,omitempty,name=s3_bucket"`
+	AccessKey          string `json:"s3_access_key,omitempty,name=s3_access_key"`
+	SecretKey          string `json:"s3_secret_key,omitempty,name=s3_secret_key"`
+	Host               string `json:"host,omitempty,name=host"`
+	Port               int    `json:"port,omitempty,name=port"`
+	KeyID              string `json:"cloudfront_distribution_domain,omitempty,name=cloudfront_distribution_domain"`
+	DistributionDomain string `json:"cloudfront_key_id,omitempty,name=cloudfront_key_id"`
+	PrivateKeyFilename string `json:"cloudfront_privatekey_filename,omitempty,name=cloudfront_privatekey_filename"`
 }
 
 func init() {

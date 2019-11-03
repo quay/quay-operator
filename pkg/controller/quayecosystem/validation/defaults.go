@@ -388,6 +388,37 @@ func setDefaultBackendSourceValues(registryBackends []redhatcopv1alpha1.Registry
 			}
 			continue
 		}
+
+		if !utils.IsZeroOfUnderlyingType(registryBackend.Azure) {
+			if utils.IsZeroOfUnderlyingType(registryBackend.Azure.StoragePath) {
+				changed = true
+				registryBackend.Azure.StoragePath = constants.QuayRegistryStoragePath
+			}
+			continue
+		}
+
+		if !utils.IsZeroOfUnderlyingType(registryBackend.GoogleCloud) {
+			if utils.IsZeroOfUnderlyingType(registryBackend.GoogleCloud.StoragePath) {
+				changed = true
+				registryBackend.GoogleCloud.StoragePath = constants.QuayRegistryStoragePath
+			}
+			continue
+		}
+
+		if !utils.IsZeroOfUnderlyingType(registryBackend.RADOS) {
+			if utils.IsZeroOfUnderlyingType(registryBackend.RADOS.StoragePath) {
+				changed = true
+				registryBackend.RADOS.StoragePath = constants.QuayRegistryStoragePath
+			}
+			continue
+		}
+		if !utils.IsZeroOfUnderlyingType(registryBackend.RHOCS) {
+			if utils.IsZeroOfUnderlyingType(registryBackend.RHOCS.StoragePath) {
+				changed = true
+				registryBackend.RHOCS.StoragePath = constants.QuayRegistryStoragePath
+			}
+			continue
+		}
 	}
 
 	return registryBackends, changed

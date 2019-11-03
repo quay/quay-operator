@@ -135,10 +135,21 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 	distributedStoragePreference := []string{}
 	distributedStorageReplicateByDefault := []string{}
 	storageReplication := false
+	truthy := true
 
 	for _, registryBackend := range quaySetupInstance.quayConfiguration.RegistryBackends {
 
 		var quayRegistry []interface{}
+
+		if registryBackend.ReplicateByDefault == &truthy {
+			distributedStorageReplicateByDefault = append(distributedStorageReplicateByDefault, registryBackend.Name)
+			storageReplication = true
+		}
+
+		if quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.EnableStorageReplication {
+			distributedStoragePreference = append(distributedStoragePreference, registryBackend.Name)
+			storageReplication = true
+		}
 
 		if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Local) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeLocalStorageName)
@@ -146,20 +157,15 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.S3) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeS3StorageName)
 			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.S3)
-
-			if quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.EnableStorageReplication {
-				distributedStoragePreference = append(distributedStoragePreference, registryBackend.Name)
-				storageReplication = true
-			}
-
-			if quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.EnableStorageReplication {
-				distributedStorageReplicateByDefault = append(distributedStorageReplicateByDefault, registryBackend.Name)
-				storageReplication = true
-			}
-
-			registryBackend.RegistryBackendSource.S3.ReplicateByDefault = nil
-
+		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.GoogleCloud) {
+			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeGoogleCloudStorageName)
+			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.GoogleCloud)
+		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Azure) {
+			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeAzureStorageName)
+			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.Azure)
 		}
+
+		registryBackend.ReplicateByDefault = nil
 
 		distributedStorageConfig[registryBackend.Name] = quayRegistry
 

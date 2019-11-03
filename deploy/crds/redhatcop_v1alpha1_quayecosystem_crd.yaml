@@ -172,8 +172,12 @@ spec:
                 registryBackends:
                   items:
                     properties:
+                      credentialsSecretName:
+                        type: string
                       name:
                         type: string
+                      replicateByDefault:
+                        type: boolean
                     required:
                     - name
                     type: object

@@ -185,24 +185,85 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 		managedRegistryBackend := registryBackend.DeepCopy()
 
-		// Validate various backends
+		// Validate S3 backend
 		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.S3) {
 
-			// TODO: Do basic field validation
-			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.S3.CredentialsSecretName) {
-				validS3Secret, s3Secret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.S3.CredentialsSecretName, constants.RequiredS3CredentialKeys)
+			if managedRegistryBackend.S3.StoragePath == "" || managedRegistryBackend.S3.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate required credentials secret name for the provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+				validS3Secret, s3Secret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredS3CredentialKeys)
 
 				if err != nil {
 					return false, err
 				}
 				if !validS3Secret {
-					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+					return false, fmt.Errorf("Failed to validate required credentials secret name for the provided registry backend. Name: %s", managedRegistryBackend.Name)
 				}
 
 				managedRegistryBackend.S3.AccessKey = string(s3Secret.Data[constants.S3AccessKey])
 				managedRegistryBackend.S3.SecretKey = string(s3Secret.Data[constants.S3SecretKey])
-				managedRegistryBackend.S3.CredentialsSecretName = ""
+				managedRegistryBackend.CredentialsSecretName = ""
 
+			}
+
+		}
+
+		// Validate Azure backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.Azure) {
+
+			if managedRegistryBackend.Azure.StoragePath == "" || managedRegistryBackend.Azure.ContainerName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+				validAzureSecret, azureSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredAzureCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validAzureSecret {
+					return false, fmt.Errorf("Failed to validate required credentials secret name for the provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.Azure.AccountName = string(azureSecret.Data[constants.AzureAccountName])
+				managedRegistryBackend.Azure.AccountKey = string(azureSecret.Data[constants.AzureAccountKey])
+
+				if _, found := azureSecret.Data[constants.AzureSasToken]; found {
+					managedRegistryBackend.Azure.SasToken = string(azureSecret.Data[constants.AzureSasToken])
+				}
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+		}
+
+		// Validate Google Cloud backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.GoogleCloud) {
+
+			// TODO: Do basic field validation
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+
+				validAzureSecret, azureSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredGoogleCloudCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validAzureSecret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.GoogleCloud.AccessKey = string(azureSecret.Data[constants.GoogleCloudAccessKey])
+				managedRegistryBackend.GoogleCloud.SecretKey = string(azureSecret.Data[constants.GoogleCloudAccessKey])
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+			if managedRegistryBackend.GoogleCloud.StoragePath == "" || managedRegistryBackend.GoogleCloud.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
 			}
 
 		}

@@ -151,11 +151,32 @@ const (
 	// RegistryStorageTypeS3StorageName is the value of the Amazon S3 storage type
 	RegistryStorageTypeS3StorageName = "S3Storage"
 
+	// RegistryStorageTypeGoogleCloudStorageName is the value of the Google Cloud storage type
+	RegistryStorageTypeGoogleCloudStorageName = "GoogleCloudStorage"
+
+	// RegistryStorageTypeAzureStorageName is the value of the Azure storage type
+	RegistryStorageTypeAzureStorageName = "AzureStorage"
+
 	// S3AccessKey is the name of the S3 Access Key
 	S3AccessKey = "s3_access_key"
 
-	// S3SecretKey is the name of the S3 Access Key
+	// S3SecretKey is the name of the S3 Secret Key
 	S3SecretKey = "s3_secret_key"
+
+	// AzureAccountName is the name of the Azure Account Name
+	AzureAccountName = "azure_account_name"
+
+	// AzureAccountKey is the name of the Azure Secret Key
+	AzureAccountKey = "azure_account_key"
+
+	// AzureSasToken is the name of the Azure SAS Token
+	AzureSasToken = "sas_token"
+
+	// GoogleCloudAccessKey is the name of the Google Cloud access key
+	GoogleCloudAccessKey = "access_key"
+
+	// GoogleCloudSecretKey is the name of the Google Cloud secret Key
+	GoogleCloudSecretKey = "secret_key"
 
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
@@ -239,8 +260,14 @@ var (
 	// RequiredSslCertificateKeys represents the keys that are required for a provided SSL certificate
 	RequiredSslCertificateKeys = []string{QuayAppConfigSSLCertificateSecretKey, QuayAppConfigSSLPrivateKeySecretKey}
 
-	// RequiredS3CredentialKeys rerpresents the keys that are required for the S3 registry backend
+	// RequiredS3CredentialKeys represents the keys that are required for the S3 registry backend
 	RequiredS3CredentialKeys = []string{S3AccessKey, S3SecretKey}
+
+	// RequiredAzureCredentialKeys represents the keys that are required for the Azure registry backend
+	RequiredAzureCredentialKeys = []string{AzureAccountName, AzureAccountKey}
+
+	// RequiredGoogleCloudCredentialKeys represents the keys that are required for the Google Cloud registry backend
+	RequiredGoogleCloudCredentialKeys = []string{GoogleCloudAccessKey, GoogleCloudSecretKey}
 
 	// RequiredAnyUIDSccServiceAccounts is a list of service accounts who require access to the anyuid SCC
 	RequiredAnyUIDSccServiceAccounts = []string{QuayServiceAccount}
