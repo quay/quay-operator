@@ -243,20 +243,46 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 		// Validate Google Cloud backend
 		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.GoogleCloud) {
 
-			// TODO: Do basic field validation
 			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
 
-				validAzureSecret, azureSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredGoogleCloudCredentialKeys)
+				validGoogleCloudSecret, googleCloudSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredGoogleCloudCredentialKeys)
 
 				if err != nil {
 					return false, err
 				}
-				if !validAzureSecret {
+				if !validGoogleCloudSecret {
 					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
 				}
 
-				managedRegistryBackend.GoogleCloud.AccessKey = string(azureSecret.Data[constants.GoogleCloudAccessKey])
-				managedRegistryBackend.GoogleCloud.SecretKey = string(azureSecret.Data[constants.GoogleCloudAccessKey])
+				managedRegistryBackend.GoogleCloud.AccessKey = string(googleCloudSecret.Data[constants.GoogleCloudAccessKey])
+				managedRegistryBackend.GoogleCloud.SecretKey = string(googleCloudSecret.Data[constants.GoogleCloudAccessKey])
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+			if managedRegistryBackend.GoogleCloud.StoragePath == "" || managedRegistryBackend.GoogleCloud.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+		}
+
+		// Validate RHOCS backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.RHOCS) {
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+
+				validRHOCSSecret, RHOCSSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredRHOCSCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validRHOCSSecret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.RHOCS.AccessKey = string(RHOCSSecret.Data[constants.RHOCSAccessKey])
+				managedRegistryBackend.RHOCS.SecretKey = string(RHOCSSecret.Data[constants.RHOCSSecretKey])
 
 				managedRegistryBackend.CredentialsSecretName = ""
 

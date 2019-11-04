@@ -256,9 +256,9 @@ type RADOSRegistryBackendSource struct {
 // RHOCSRegistryBackendSource defines RHOCS registry storage
 type RHOCSRegistryBackendSource struct {
 	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
-	BucketName  string `json:"s3_bucket,omitempty,name=s3_bucket"`
-	AccessKey   string `json:"access_key,omitempty,name=s3_access_key"`
-	SecretKey   string `json:"secret_key,omitempty,name=s3_secret_key"`
+	BucketName  string `json:"bucket_name,omitempty,name=bucket_name"`
+	AccessKey   string `json:"access_key,omitempty,name=access_key"`
+	SecretKey   string `json:"secret_key,omitempty,name=access_key"`
 	Hostname    string `json:"hostname,omitempty,name=hostname"`
 	Secure      bool   `json:"is_secure,omitempty,name=is_secure"`
 	Port        int    `json:"port,omitempty,name=port"`

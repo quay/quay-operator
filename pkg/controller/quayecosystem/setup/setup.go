@@ -163,6 +163,9 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Azure) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeAzureStorageName)
 			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.Azure)
+		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.RHOCS) {
+			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeRHOCSStorageName)
+			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.RHOCS)
 		}
 
 		registryBackend.ReplicateByDefault = nil

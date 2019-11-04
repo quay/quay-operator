@@ -157,6 +157,9 @@ const (
 	// RegistryStorageTypeAzureStorageName is the value of the Azure storage type
 	RegistryStorageTypeAzureStorageName = "AzureStorage"
 
+	// RegistryStorageTypeRHOCSStorageName is the value of the RHOCS storage type
+	RegistryStorageTypeRHOCSStorageName = "RHOCSStorage"
+
 	// S3AccessKey is the name of the S3 Access Key
 	S3AccessKey = "s3_access_key"
 
@@ -177,6 +180,12 @@ const (
 
 	// GoogleCloudSecretKey is the name of the Google Cloud secret Key
 	GoogleCloudSecretKey = "secret_key"
+
+	// RHOCSAccessKey is the name of the RHOCS access key
+	RHOCSAccessKey = "access_key"
+
+	// RHOCSSecretKey is the name of the RHOCS secret Key
+	RHOCSSecretKey = "secret_key"
 
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
@@ -268,6 +277,9 @@ var (
 
 	// RequiredGoogleCloudCredentialKeys represents the keys that are required for the Google Cloud registry backend
 	RequiredGoogleCloudCredentialKeys = []string{GoogleCloudAccessKey, GoogleCloudSecretKey}
+
+	// RequiredRHOCSCredentialKeys represents the keys that are required for the RHOCS registry backend
+	RequiredRHOCSCredentialKeys = []string{RHOCSAccessKey, RHOCSSecretKey}
 
 	// RequiredAnyUIDSccServiceAccounts is a list of service accounts who require access to the anyuid SCC
 	RequiredAnyUIDSccServiceAccounts = []string{QuayServiceAccount}
