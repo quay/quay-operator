@@ -629,7 +629,7 @@ $ operator-sdk up local --namespace=quay-enterprise
 
 ## Upgrading Quay & Clair
 
-Execute the following steps to upgrade an existing deployment to a new version without upgrading the operator. 
+Execute the following steps to upgrade an existing deployment to a new version without upgrading the operator:
 
 ```
 oc edit quayecosystem/quayecosystem
