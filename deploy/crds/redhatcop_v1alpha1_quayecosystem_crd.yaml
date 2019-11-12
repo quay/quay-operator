@@ -155,6 +155,15 @@ spec:
                   items:
                     type: object
                   type: array
+                extraCaCerts:
+                  items:
+                    properties:
+                      secretName:
+                        type: string
+                    required:
+                    - secretName
+                    type: object
+                  type: array
                 image:
                   type: string
                 imagePullSecretName:

@@ -173,6 +173,39 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	}
 
+	// Validate Extra CA Certs
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExtraCaCerts) {
+
+		for _, extraCaCert := range quayConfiguration.QuayEcosystem.Spec.Quay.ExtraCaCerts {
+
+			managedExtraCaCert := extraCaCert.DeepCopy()
+
+			if managedExtraCaCert.SecretName == "" {
+				return false, fmt.Errorf("Failed to validate provided extra certificate. `secretName` must not be empty")
+			}
+
+			validExtraCaSecret, extraCaSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, managedExtraCaCert.SecretName, managedExtraCaCert.Keys)
+
+			if err != nil {
+				return false, err
+			}
+			if !validExtraCaSecret {
+				return false, fmt.Errorf("Failed to validate required extra certificate. Invalid Secret Name: %s", managedExtraCaCert.SecretName)
+			}
+
+			// If the user did not provide a list of keys, grab all of the keys
+			if utils.IsZeroOfUnderlyingType(managedExtraCaCert.Keys) || len(managedExtraCaCert.Keys) == 0 {
+				for secretDataKey := range extraCaSecret.Data {
+					managedExtraCaCert.Keys = append(managedExtraCaCert.Keys, secretDataKey)
+				}
+			}
+
+			quayConfiguration.ExtraCaCerts = append(quayConfiguration.ExtraCaCerts, *managedExtraCaCert)
+
+		}
+
+	}
+
 	// Registry Backends
 	for _, registryBackend := range quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
 
@@ -256,6 +289,33 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 				managedRegistryBackend.GoogleCloud.AccessKey = string(googleCloudSecret.Data[constants.GoogleCloudAccessKey])
 				managedRegistryBackend.GoogleCloud.SecretKey = string(googleCloudSecret.Data[constants.GoogleCloudAccessKey])
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+			if managedRegistryBackend.GoogleCloud.StoragePath == "" || managedRegistryBackend.GoogleCloud.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+		}
+
+		// Validate RHOCS backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.RHOCS) {
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+
+				validRHOCSSecret, RHOCSSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredRHOCSCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validRHOCSSecret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.RHOCS.AccessKey = string(RHOCSSecret.Data[constants.RHOCSAccessKey])
+				managedRegistryBackend.RHOCS.SecretKey = string(RHOCSSecret.Data[constants.RHOCSSecretKey])
 
 				managedRegistryBackend.CredentialsSecretName = ""
 

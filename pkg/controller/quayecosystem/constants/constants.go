@@ -201,6 +201,8 @@ const (
 	QuayNamespaceEnvironmentVariable = "QE_K8S_NAMESPACE"
 	//QuayExtraCertsDirEnvironmentVariable is the name of the environment variable to specify the location of extra certificates
 	QuayExtraCertsDirEnvironmentVariable = "KUBE_EXTRA_CA_CERTDIR"
+	// QuayExtraCertsDir is the location of extra certificates
+	QuayExtraCertsDir = "/conf/stack/extra_ca_certs"
 	// SecurityScannerService is the name of the security scanner service
 	SecurityScannerService = "security_scanner"
 	// SecurityScannerServiceSecretKey is the name of the key containing the security service private key

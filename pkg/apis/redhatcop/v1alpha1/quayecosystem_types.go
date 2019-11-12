@@ -117,6 +117,7 @@ type Quay struct {
 	SslCertificatesSecretName      string                        `json:"sslCertificatesSecretName,omitempty"`
 	SuperuserCredentialsSecretName string                        `json:"superuserCredentialsSecretName,omitempty"`
 	EnableStorageReplication       bool                          `json:"enableStorageReplication,omitempty"`
+	ExtraCaCerts                   []ExtraCaCert                 `json:"extraCaCerts,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=extraCaCerts"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -290,6 +291,12 @@ type CloudfrontS3RegistryBackendSource struct {
 	KeyID              string `json:"cloudfront_distribution_domain,omitempty,name=cloudfront_distribution_domain"`
 	DistributionDomain string `json:"cloudfront_key_id,omitempty,name=cloudfront_key_id"`
 	PrivateKeyFilename string `json:"cloudfront_privatekey_filename,omitempty,name=cloudfront_privatekey_filename"`
+}
+
+// ExtraCaCert defines extra certificates that should be mounted
+type ExtraCaCert struct {
+	SecretName string   `json:"secretName"`
+	Keys       []string `json:"keys,omitempty,name=keys"`
 }
 
 func init() {
