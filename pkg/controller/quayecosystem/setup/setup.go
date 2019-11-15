@@ -166,6 +166,15 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.RHOCS) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeRHOCSStorageName)
 			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.RHOCS)
+		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.RADOS) {
+			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeRADOSStorageName)
+			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.RADOS)
+		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Swift) {
+			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeSwiftStorageName)
+			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.Swift)
+		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.CloudfrontS3) {
+			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeCloudfrontS3StorageName)
+			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.CloudfrontS3)
 		}
 
 		registryBackend.ReplicateByDefault = nil

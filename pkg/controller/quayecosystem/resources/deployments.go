@@ -645,19 +645,36 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 
 	}
 
-	// Add User Defined Extra Certificates
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.ExtraCaCerts) {
+	// Add User Defined Config Files
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.ConfigFiles) {
 
-		for _, extraCaCert := range quayConfiguration.ExtraCaCerts {
+		for _, configFiles := range quayConfiguration.ConfigFiles {
 
-			extraCaCertKeyToPaths := []corev1.KeyToPath{}
+			configFilesKeyToPaths := []corev1.KeyToPath{}
 
-			if !utils.IsZeroOfUnderlyingType(extraCaCert.Keys) {
+			if !utils.IsZeroOfUnderlyingType(configFiles.Files) {
 
-				for _, keyValue := range extraCaCert.Keys {
-					extraCaCertKeyToPaths = append(extraCaCertKeyToPaths, corev1.KeyToPath{
-						Key:  keyValue,
-						Path: fmt.Sprintf("extra_ca_certs/%s", keyValue),
+				for _, configFile := range configFiles.Files {
+
+					baseDir := ""
+					filename := ""
+
+					if !utils.IsZeroOfUnderlyingType(configFile.Type) && redhatcopv1alpha1.ExtraCaCertQuayConfigFileType == configFile.Type {
+						baseDir = "extra_ca_certs/"
+
+					} else if !utils.IsZeroOfUnderlyingType(configFiles.Type) && redhatcopv1alpha1.ExtraCaCertQuayConfigFileType == configFiles.Type {
+						baseDir = "extra_ca_certs/"
+					}
+
+					if utils.IsZeroOfUnderlyingType(configFile.Filename) {
+						filename = configFile.Key
+					} else {
+						filename = configFile.Filename
+					}
+
+					configFilesKeyToPaths = append(configFilesKeyToPaths, corev1.KeyToPath{
+						Key:  configFile.Key,
+						Path: fmt.Sprintf("%s%s", baseDir, filename),
 					})
 				}
 			}
@@ -665,9 +682,9 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 			configVolumeSources = append(configVolumeSources, corev1.VolumeProjection{
 				Secret: &corev1.SecretProjection{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: extraCaCert.SecretName,
+						Name: configFiles.SecretName,
 					},
-					Items: extraCaCertKeyToPaths,
+					Items: configFilesKeyToPaths,
 				},
 			})
 

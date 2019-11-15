@@ -160,6 +160,15 @@ const (
 	// RegistryStorageTypeRHOCSStorageName is the value of the RHOCS storage type
 	RegistryStorageTypeRHOCSStorageName = "RHOCSStorage"
 
+	// RegistryStorageTypeRADOSStorageName is the value of the RHOCS storage type
+	RegistryStorageTypeRADOSStorageName = "RadosGWStorage"
+
+	// RegistryStorageTypeSwiftStorageName is the value of the Swift storage type
+	RegistryStorageTypeSwiftStorageName = "SwiftStorage"
+
+	// RegistryStorageTypeCloudfrontS3StorageName is the value of the Cloudfront S3 storage type
+	RegistryStorageTypeCloudfrontS3StorageName = "CloudFrontedS3Storage"
+
 	// S3AccessKey is the name of the S3 Access Key
 	S3AccessKey = "s3_access_key"
 
@@ -186,6 +195,24 @@ const (
 
 	// RHOCSSecretKey is the name of the RHOCS secret Key
 	RHOCSSecretKey = "secret_key"
+
+	// RADOSAccessKey is the name of the RADOS access key
+	RADOSAccessKey = "access_key"
+
+	// RADOSSecretKey is the name of the RADOS secret Key
+	RADOSSecretKey = "secret_key"
+
+	// SwiftUser is the name of the Swift user Key
+	SwiftUser = "swift_user"
+
+	// SwiftPassword is the name of the Swift password Key
+	SwiftPassword = "swift_password"
+
+	// CloudfrontS3AccessKey is the name of the S3 Access Key
+	CloudfrontS3AccessKey = "s3_access_key"
+
+	// CloudfrontS3SecretKey is the name of the S3 Secret Key
+	CloudfrontS3SecretKey = "s3_secret_key"
 
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
@@ -282,6 +309,15 @@ var (
 
 	// RequiredRHOCSCredentialKeys represents the keys that are required for the RHOCS registry backend
 	RequiredRHOCSCredentialKeys = []string{RHOCSAccessKey, RHOCSSecretKey}
+
+	// RequiredRADOSCredentialKeys represents the keys that are required for the RADOS registry backend
+	RequiredRADOSCredentialKeys = []string{RADOSAccessKey, RADOSSecretKey}
+
+	// RequiredSwiftCredentialKeys represents the keys that are required for the Swift registry backend
+	RequiredSwiftCredentialKeys = []string{SwiftUser, SwiftPassword}
+
+	// RequiredCloudfrontS3CredentialKeys represents the keys that are required for the Cloudfront S3 registry backend
+	RequiredCloudfrontS3CredentialKeys = []string{CloudfrontS3AccessKey, CloudfrontS3SecretKey}
 
 	// RequiredAnyUIDSccServiceAccounts is a list of service accounts who require access to the anyuid SCC
 	RequiredAnyUIDSccServiceAccounts = []string{QuayServiceAccount}

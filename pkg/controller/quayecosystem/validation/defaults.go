@@ -419,6 +419,20 @@ func setDefaultBackendSourceValues(registryBackends []redhatcopv1alpha1.Registry
 			}
 			continue
 		}
+		if !utils.IsZeroOfUnderlyingType(registryBackend.Swift) {
+			if utils.IsZeroOfUnderlyingType(registryBackend.Swift.StoragePath) {
+				changed = true
+				registryBackend.Swift.StoragePath = constants.QuayRegistryStoragePath
+			}
+			continue
+		}
+		if !utils.IsZeroOfUnderlyingType(registryBackend.CloudfrontS3) {
+			if utils.IsZeroOfUnderlyingType(registryBackend.CloudfrontS3.StoragePath) {
+				changed = true
+				registryBackend.CloudfrontS3.StoragePath = constants.QuayRegistryStoragePath
+			}
+			continue
+		}
 	}
 
 	return registryBackends, changed
