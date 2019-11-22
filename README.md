@@ -203,12 +203,25 @@ spec:
 
 Quay supports multiple storage backends (configured as an array). The quay operator supports aiding in the facilitation of certain storage backends. The following backends are currently supported:
 
-* Local
-* S3
+Please refer to the [Registry Storage Documentation](docs/storage.md) for the options available.
 
-#### Local Storage
 
-The following is an example of how to define a local backend with a customized location for which images will be stored:
+### Configuration Files
+
+Files related to the configuration of Quay are located in the `/conf/stack` directory. There are situations for which additional user defined configuration files need to be added to this directory (such as certificates and private keys). The Quay Operator supports the injection of these assets within the `configFiles` property in the `quay` property of the `QuayEcosystem` object where one or more assets can be specified.
+
+Two types of configuration files can be specified by the `type` property:
+
+1. `config` - Configuration files that will be added to the `/conf/stack` directory
+2. `extraCaCerts` - Certificates to be trusted container
+
+Configuration files are stored as values within _Secrets_. The first step is to create a secret containing these files. The following command illustrates how a private key can be added: 
+
+```
+oc create secret generic quayconfigfile --from-file=<path_to_file>
+```
+
+With the secret created, the secret containing the configuration file can be referenced in the `QuayEcosystem` object as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -217,17 +230,11 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
-    registryBackends:
-      - name: local
-        local:
-          storage_path: /opt/quayregistry
-```
+    configFiles:
+      - secretName: quayconfigfile
+  ```
 
-
-##### Configuring Persistent Local Storage
-
-By default, Quay uses an ephemeral volume for local storage. In order to avoid data loss, persistent storage is required. To enable the use of a _PersistentVolume_ to store images, specify the `registryStorage` parameter underneath the `quay` property. The following example will cause a _PersistentVolumeClaim_ to be created within the project requesting storage of 10Gi and an _access mode_ of `ReadWriteOnce` (Default value is `ReadWriteMany`)
+By default, the `config` type is assumed. If the contents of the secret contains certificates that should be added to the `extra_ca_certs` directory, specify the type as `extraCaCert` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -236,18 +243,12 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
-    registryStorage:
-      persistentVolumeAccessMode:
-        - ReadWriteOnce
-      persistentVolumeSize: 10Gi
+    configFiles:
+      - secretName: quayconfigfile
+        type: extraCaCert
 ```
 
-A Storage Class can also be provided using the `persistentVolumeStorageClassName` property
-
-### S3 Storage
-
-S3 Storage, for example from AWS, is supported using the `s3` registry backend type. The following is an example of how an S3 bucket in AWS can be used as the registry storage:
+Individual keys within a secret can be referenced to fine tune the resources that are added to the configuration using the `files` property as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -256,73 +257,18 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
-    registryStorage:
-      - name: s3
-        s3:
-          s3_bucket: quay
-          s3_access_key: <s3_access_key>
-          s3_secret_key: <s3_secret_key>
-          host: s3.us-east-2.amazonaws.com
+    configFiles:
+      - secretName: quayconfigfile
+        files:
+          - key: myprivatekey.pem
+            filename: cloudfront.pem
+          - key: myExtraCaCert.crt
+            type: extraCaCert
 ```
 
-#### S3 Credentials Secret
+The example above assumes that two files have been added to a secret called _quayconfigfile_. The file _myprivatekey.pem_ that was added to the secret will be mounted in the quay pod at the path `/conf/stack/cloudfront.pem` since it is a `config` file type and specifies a custom _filename_ that should be projected into the pod. The _myExtraCaCert.crt_ file will be added to the Quay pod within at the path `/conf/stack/extra_certs/myExtraCert.crt`
 
-To prevent displaying sensitive values as plaintext, the secret key and access key can be added to a secret which in turn can be reference within the `QuayEcosystem` resource. 
-
-```
-oc create secret generic s3-credentials --from-literal=s3_access_key=<s3_access_key> --from-literal=s3_secret_key=<s3_secret_key>
-```
-
-Remove the `s3_access_key` and `s3_secret_key` properties if specified and reference the secret using the 
-
-```
-apiVersion: redhatcop.redhat.io/v1alpha1
-kind: QuayEcosystem
-metadata:
-  name: example-quayecosystem
-spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
-    registryStorage:
-      - name: s3
-        s3:
-          s3_bucket: quay
-          credentialsSecretName: s3-credentials
-          host: s3.us-east-2.amazonaws.com
-```
-
-### Storage Replication
-
-Data can be replicated between multiple registry backends and can be enabled by setting the `enableStorageReplication` to `true` as shown below:
-
-```
-apiVersion: redhatcop.redhat.io/v1alpha1
-kind: QuayEcosystem
-metadata:
-  name: example-quayecosystem
-spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
-    enableStorageReplication: true
-    registryStorage:
-      - name: s3
-        s3:
-          s3_bucket: quay
-          credentialsSecretName: s3-credentials
-          host: s3.us-east-2.amazonaws.com
-          replicateByDefault: true
-      - name: s3-backup
-        s3:
-          s3_bucket: quay-backup
-          credentialsSecretName: s3-credentials
-          host: s3.us-east-2.amazonaws.com
-          replicateByDefault: true
-```
-
-Each backend that supports replication contains a `replicateByDefault` field that when set to `true` will be distributed to other storage engines.
-
-_Note:_ Support for replicated storage is not available for the `local` registry backend and will result in an error during the verification phase.
+_Note:_ The `type` property within `files` property overrides the value in the `configFiles` property.
 
 ### Skipping Automated Setup
 

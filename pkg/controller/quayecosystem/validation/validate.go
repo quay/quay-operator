@@ -7,6 +7,8 @@ import (
 
 	"time"
 
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
+
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
@@ -173,6 +175,44 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	}
 
+	// Validate Config Files
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFiles) {
+
+		for _, configFiles := range quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFiles {
+
+			managedConfigFiles := configFiles.DeepCopy()
+
+			if managedConfigFiles.SecretName == "" {
+				return false, fmt.Errorf("Failed to validate provided config files. `secretName` must not be empty")
+			}
+
+			validConfigFilesSecret, configFilesSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, managedConfigFiles.SecretName, managedConfigFiles.GetKeys())
+
+			if err != nil {
+				return false, err
+			}
+			if !validConfigFilesSecret {
+				return false, fmt.Errorf("Failed to validate required provided config file parameters. Invalid Secret Name: %s", managedConfigFiles.SecretName)
+			}
+
+			// If the user did not provide a list of keys, grab all of the files
+			if utils.IsZeroOfUnderlyingType(managedConfigFiles.Files) || len(managedConfigFiles.Files) == 0 {
+				for secretDataFiles := range configFilesSecret.Data {
+
+					managedConfigFiles.Files = append(managedConfigFiles.Files, redhatcopv1alpha1.QuayConfigFile{
+						Type:     redhatcopv1alpha1.ConfigQuayConfigFileType,
+						Key:      secretDataFiles,
+						Filename: secretDataFiles,
+					})
+				}
+			}
+
+			quayConfiguration.ConfigFiles = append(quayConfiguration.ConfigFiles, *managedConfigFiles)
+
+		}
+
+	}
+
 	// Registry Backends
 	for _, registryBackend := range quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
 
@@ -185,24 +225,192 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 		managedRegistryBackend := registryBackend.DeepCopy()
 
-		// Validate various backends
+		// Validate S3 backend
 		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.S3) {
 
-			// TODO: Do basic field validation
-			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.S3.CredentialsSecretName) {
-				validS3Secret, s3Secret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.S3.CredentialsSecretName, constants.RequiredS3CredentialKeys)
+			if managedRegistryBackend.S3.StoragePath == "" || managedRegistryBackend.S3.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate required credentials secret name for the provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+				validS3Secret, s3Secret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredS3CredentialKeys)
 
 				if err != nil {
 					return false, err
 				}
 				if !validS3Secret {
-					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+					return false, fmt.Errorf("Failed to validate required credentials secret name for the provided registry backend. Name: %s", managedRegistryBackend.Name)
 				}
 
 				managedRegistryBackend.S3.AccessKey = string(s3Secret.Data[constants.S3AccessKey])
 				managedRegistryBackend.S3.SecretKey = string(s3Secret.Data[constants.S3SecretKey])
-				managedRegistryBackend.S3.CredentialsSecretName = ""
+				managedRegistryBackend.CredentialsSecretName = ""
 
+			}
+
+		}
+
+		// Validate Azure backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.Azure) {
+
+			if managedRegistryBackend.Azure.StoragePath == "" || managedRegistryBackend.Azure.ContainerName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+				validAzureSecret, azureSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredAzureCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validAzureSecret {
+					return false, fmt.Errorf("Failed to validate required credentials secret name for the provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.Azure.AccountName = string(azureSecret.Data[constants.AzureAccountName])
+				managedRegistryBackend.Azure.AccountKey = string(azureSecret.Data[constants.AzureAccountKey])
+
+				if _, found := azureSecret.Data[constants.AzureSasToken]; found {
+					managedRegistryBackend.Azure.SasToken = string(azureSecret.Data[constants.AzureSasToken])
+				}
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+		}
+
+		// Validate Google Cloud backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.GoogleCloud) {
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+
+				validGoogleCloudSecret, googleCloudSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredGoogleCloudCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validGoogleCloudSecret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.GoogleCloud.AccessKey = string(googleCloudSecret.Data[constants.GoogleCloudAccessKey])
+				managedRegistryBackend.GoogleCloud.SecretKey = string(googleCloudSecret.Data[constants.GoogleCloudAccessKey])
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+			if managedRegistryBackend.GoogleCloud.StoragePath == "" || managedRegistryBackend.GoogleCloud.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+		}
+
+		// Validate RHOCS backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.RHOCS) {
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+
+				validRHOCSSecret, RHOCSSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredRHOCSCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validRHOCSSecret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.RHOCS.AccessKey = string(RHOCSSecret.Data[constants.RHOCSAccessKey])
+				managedRegistryBackend.RHOCS.SecretKey = string(RHOCSSecret.Data[constants.RHOCSSecretKey])
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+			if managedRegistryBackend.RHOCS.StoragePath == "" || managedRegistryBackend.RHOCS.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+		}
+
+		// Validate RADOS backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.RADOS) {
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+
+				validRADOSSecret, RADOSSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredRADOSCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validRADOSSecret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.RHOCS.AccessKey = string(RADOSSecret.Data[constants.RADOSAccessKey])
+				managedRegistryBackend.RHOCS.SecretKey = string(RADOSSecret.Data[constants.RADOSSecretKey])
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+			if managedRegistryBackend.RHOCS.StoragePath == "" || managedRegistryBackend.RHOCS.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+		}
+
+		// Validate Swift backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.Swift) {
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+
+				validSwiftSecret, SwiftSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredSwiftCredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validSwiftSecret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.Swift.User = string(SwiftSecret.Data[constants.SwiftUser])
+				managedRegistryBackend.Swift.Password = string(SwiftSecret.Data[constants.SwiftPassword])
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+			if managedRegistryBackend.Swift.StoragePath == "" || managedRegistryBackend.Swift.Container == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+			}
+
+		}
+
+		// Validate Cloudfront S3 backend
+		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CloudfrontS3) {
+
+			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {
+
+				validCloudfrontS3Secret, cloudfrontS3Secret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, registryBackend.CredentialsSecretName, constants.RequiredCloudfrontS3CredentialKeys)
+
+				if err != nil {
+					return false, err
+				}
+				if !validCloudfrontS3Secret {
+					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
+				}
+
+				managedRegistryBackend.CloudfrontS3.AccessKey = string(cloudfrontS3Secret.Data[constants.CloudfrontS3AccessKey])
+				managedRegistryBackend.CloudfrontS3.SecretKey = string(cloudfrontS3Secret.Data[constants.CloudfrontS3SecretKey])
+
+				managedRegistryBackend.CredentialsSecretName = ""
+
+			}
+
+			if managedRegistryBackend.CloudfrontS3.StoragePath == "" || managedRegistryBackend.CloudfrontS3.BucketName == "" {
+				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
 			}
 
 		}
