@@ -11,9 +11,700 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystem":       schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref),
-		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec":   schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref),
-		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemStatus": schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_AzureRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair":                             schema_pkg_apis_redhatcop_v1alpha1_Clair(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource": schema_pkg_apis_redhatcop_v1alpha1_CloudfrontS3RegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database":                          schema_pkg_apis_redhatcop_v1alpha1_Database(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource":  schema_pkg_apis_redhatcop_v1alpha1_GoogleCloudRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_LocalRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay":                              schema_pkg_apis_redhatcop_v1alpha1_Quay(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFile":                    schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFile(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles":                   schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFiles(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystem":                     schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition":            schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemCondition(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec":                 schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemStatus":               schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_RADOSRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_RHOCSRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis":                             schema_pkg_apis_redhatcop_v1alpha1_Redis(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend":                   schema_pkg_apis_redhatcop_v1alpha1_RegistryBackend(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackendSource":             schema_pkg_apis_redhatcop_v1alpha1_RegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage":                   schema_pkg_apis_redhatcop_v1alpha1_RegistryStorage(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource":           schema_pkg_apis_redhatcop_v1alpha1_S3RegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_SwiftRegistryBackendSource(ref),
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_AzureRegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AzureRegistryBackendSource defines Azure blob registry storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storagePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"containerName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"accountName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"accountKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"sasToken": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Clair defines the properties of a deployment of Clair",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"database": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database"),
+						},
+					},
+					"deploymentStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"enabled": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"envVars": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.EnvVar"),
+									},
+								},
+							},
+						},
+					},
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"imagePullSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"livenessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"readinessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
+						},
+					},
+					"sslCertificatesSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"updateInterval": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_CloudfrontS3RegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CloudfrontS3RegistryBackendSource defines CouldfrontS3 registry storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storagePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"bucketName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"accessKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"secretKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"host": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"port": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"distributionDomain": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"keyID": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"privateKeyFilename": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_Database(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Database defines a database that will be deployed to support a particular component",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"cpu": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"credentialsSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"deploymentStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"envVars": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.EnvVar"),
+									},
+								},
+							},
+						},
+					},
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"imagePullSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"livenessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"memory": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"readinessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
+						},
+					},
+					"server": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"volumeSize": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_GoogleCloudRegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GoogleCloudRegistryBackendSource defines Google Cloud registry storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storagePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"bucketName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"accessKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"secretKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_LocalRegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LocalRegistryBackendSource defines local registry storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storagePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Quay defines the properies of a deployment of Quay",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"configEnvVars": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.EnvVar"),
+									},
+								},
+							},
+						},
+					},
+					"configResources": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
+						},
+					},
+					"configRouteHost": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"configSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"database": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database"),
+						},
+					},
+					"deploymentStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"enableNodePortService": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"envVars": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.EnvVar"),
+									},
+								},
+							},
+						},
+					},
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"imagePullSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"livenessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"keepConfigDeployment": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"readinessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"registryBackends": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend"),
+									},
+								},
+							},
+						},
+					},
+					"registryStorage": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage"),
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
+						},
+					},
+					"routeHost": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"skipSetup": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"sslCertificatesSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"superuserCredentialsSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"enableStorageReplication": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"configFiles": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type":       "atomic",
+								"x-kubernetes-patch-merge-key": "secretName",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFile(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "QuayConfigFile defines configuration files that are injected into the Quay resources",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"filename": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFiles(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "QuayConfigFiles defines configuration files that are injected into the Quay resources",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"secretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"files": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFile"),
+									},
+								},
+							},
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"secretName"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFile"},
 	}
 }
 
@@ -21,7 +712,8 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "QuayEcosystem is the Schema for the quayecosystems API",
+				Description: "QuayEcosystem is the Schema for the quayecosystems API kubebuilder:subresource:status (NOTE: Currently broken <OCP 4)",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
@@ -60,11 +752,62 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref common.ReferenceCallba
 	}
 }
 
+func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "QuayEcosystemCondition defines a list of conditions that the object will transiton through",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"lastUpdateTime": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"status", "type"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
 func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "QuayEcosystemSpec defines the desired state of QuayEcosystem",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"quay": {
 						SchemaProps: spec.SchemaProps{
@@ -94,6 +837,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref common.Reference
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "QuayEcosystemStatus defines the observed state of QuayEcosystem",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"message": {
 						SchemaProps: spec.SchemaProps{
@@ -116,6 +860,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref common.Reference
 					"conditions": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
+								"x-kubernetes-list-type":       "atomic",
 								"x-kubernetes-patch-merge-key": "type",
 								"x-kubernetes-patch-strategy":  "merge",
 							},
@@ -142,5 +887,514 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref common.Reference
 		},
 		Dependencies: []string{
 			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition"},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_RADOSRegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RADOSRegistryBackendSource defines Ceph RADOS registry storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storagePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"bucketName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"accessKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"secretKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"secure": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"port": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_RHOCSRegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RHOCSRegistryBackendSource defines RHOCS registry storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storagePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"bucketName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"accessKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"secretKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"secure": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+					"port": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_Redis(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Redis defines the properies of a deployment of Redis",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"credentialsSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"deploymentStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"envVars": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.EnvVar"),
+									},
+								},
+							},
+						},
+					},
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"imagePullSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"livenessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"port": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"readinessProbe": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.Probe"),
+						},
+					},
+					"replicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_RegistryBackend(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RegistryBackend defines a particular backend supporting the Quay registry",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"local": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource"),
+						},
+					},
+					"s3": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource"),
+						},
+					},
+					"googleCloud": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource"),
+						},
+					},
+					"azure": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource"),
+						},
+					},
+					"rados": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource"),
+						},
+					},
+					"rhocs": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource"),
+						},
+					},
+					"swift": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"),
+						},
+					},
+					"cloudfrontS3": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource"),
+						},
+					},
+					"credentialsSecretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"replicateByDefault": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_RegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RegistryBackendSource defines the specific configurations to support the Quay registry",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"local": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource"),
+						},
+					},
+					"s3": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource"),
+						},
+					},
+					"googleCloud": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource"),
+						},
+					},
+					"azure": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource"),
+						},
+					},
+					"rados": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource"),
+						},
+					},
+					"rhocs": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource"),
+						},
+					},
+					"swift": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"),
+						},
+					},
+					"cloudfrontS3": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_RegistryStorage(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "RegistryStorage defines the configurations to support persistent storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"persistentVolumeAccessModes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"persistentVolumeSize": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"persistentVolumeStorageClassName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_S3RegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "S3RegistryBackendSource defines S3 registry storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storagePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"bucketName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"accessKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"secretKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"host": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"port": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_SwiftRegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SwiftRegistryBackendSource defines Swift registry storage",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"storagePath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"authVersion": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"authURL": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"container": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"user": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"password": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"caCertPath": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"tempURLKey": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"osOptions": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
