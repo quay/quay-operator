@@ -85,7 +85,7 @@ type QuayEcosystemStatus struct {
 
 // QuayEcosystem is the Schema for the quayecosystems API
 // +k8s:openapi-gen=true
-// kubebuilder:subresource:status (NOTE: Currently broken <OCP 4)
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:path=quayecosystems,scope=Namespaced
 type QuayEcosystem struct {
 	metav1.TypeMeta   `json:",inline"`

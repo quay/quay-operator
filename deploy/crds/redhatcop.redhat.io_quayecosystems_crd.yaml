@@ -10,10 +10,11 @@ spec:
     plural: quayecosystems
     singular: quayecosystem
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
-      description: 'QuayEcosystem is the Schema for the quayecosystems API kubebuilder:subresource:status
-        (NOTE: Currently broken <OCP 4)'
+      description: QuayEcosystem is the Schema for the quayecosystems API
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

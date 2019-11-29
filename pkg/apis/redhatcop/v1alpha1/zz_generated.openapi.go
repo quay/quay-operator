@@ -712,7 +712,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "QuayEcosystem is the Schema for the quayecosystems API kubebuilder:subresource:status (NOTE: Currently broken <OCP 4)",
+				Description: "QuayEcosystem is the Schema for the quayecosystems API",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
