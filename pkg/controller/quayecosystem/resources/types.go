@@ -27,9 +27,10 @@ type QuayConfiguration struct {
 	ProvisionClairDatabase           bool
 
 	// Redis
-	RedisHostname string
-	RedisPort     *int32
-	RedisPassword string
+	RedisHostname                    string
+	RedisPort                        *int32
+	RedisPassword                    string
+	ValidProvidedRedisPasswordSecret bool
 
 	// Quay
 	QuayHostname                          string
@@ -44,6 +45,8 @@ type QuayConfiguration struct {
 	QuaySslCertificate                    []byte
 	QuaySslPrivateKey                     []byte
 	SecurityScannerKeyID                  string
+	RegistryBackends                      []redhatcopv1alpha1.RegistryBackend
+	ConfigFiles                           []redhatcopv1alpha1.QuayConfigFiles
 
 	// Clair
 	ClairSslCertificate []byte

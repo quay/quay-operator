@@ -24,7 +24,6 @@ rules:
   - 'watch'
   - 'delete'
   - 'patch'
-  - 'put'
 - apiGroups:
   - ""
   resources:
@@ -33,7 +32,6 @@ rules:
   verbs:
   - 'create'
   - 'update'
-  - 'put'
   - 'patch'
   - 'get'
   - 'list'
@@ -55,7 +53,6 @@ rules:
   - 'list'
   - 'watch'
   - 'patch'
-  - 'put'
   - 'delete'
 - apiGroups:
   - extensions
@@ -68,7 +65,6 @@ rules:
   - 'list'
   - 'watch'
   - 'patch'
-  - 'put'
   - 'delete'
 - apiGroups:
   - apps
@@ -113,7 +109,6 @@ rules:
   - 'list'
   - 'watch'
   - 'patch'
-  - 'put'
   - 'delete'
 - apiGroups:
   - rbac.authorization.k8s.io
@@ -125,7 +120,6 @@ rules:
   - 'update'
   - 'get'
   - 'patch'
-  - 'put'
   - 'list'
   - 'watch'
 - apiGroups:

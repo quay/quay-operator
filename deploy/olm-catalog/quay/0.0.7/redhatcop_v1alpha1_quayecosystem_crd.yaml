@@ -38,14 +38,7 @@ spec:
                     credentialsSecretName:
                       type: string
                     deploymentStrategy:
-                      enum:
-                      - Recreate
-                      - RollingUpdate
                       type: string
-                    envVars:
-                      items:
-                        type: object
-                      type: array
                     image:
                       type: string
                     imagePullSecretName:
@@ -71,16 +64,9 @@ spec:
                       type: string
                   type: object
                 deploymentStrategy:
-                  enum:
-                  - Recreate
-                  - RollingUpdate
                   type: string
                 enabled:
                   type: boolean
-                envVars:
-                  items:
-                    type: object
-                  type: array
                 image:
                   type: string
                 imagePullSecretName:
@@ -105,19 +91,6 @@ spec:
               type: object
             quay:
               properties:
-                configEnvVars:
-                  items:
-                    type: object
-                  type: array
-                configFiles:
-                  items:
-                    properties:
-                      secretName:
-                        type: string
-                    required:
-                    - secretName
-                    type: object
-                  type: array
                 configResources:
                   type: object
                 configRouteHost:
@@ -131,14 +104,7 @@ spec:
                     credentialsSecretName:
                       type: string
                     deploymentStrategy:
-                      enum:
-                      - Recreate
-                      - RollingUpdate
                       type: string
-                    envVars:
-                      items:
-                        type: object
-                      type: array
                     image:
                       type: string
                     imagePullSecretName:
@@ -164,18 +130,9 @@ spec:
                       type: string
                   type: object
                 deploymentStrategy:
-                  enum:
-                  - Recreate
-                  - RollingUpdate
                   type: string
                 enableNodePortService:
                   type: boolean
-                enableStorageReplication:
-                  type: boolean
-                envVars:
-                  items:
-                    type: object
-                  type: array
                 image:
                   type: string
                 imagePullSecretName:
@@ -193,12 +150,8 @@ spec:
                 registryBackends:
                   items:
                     properties:
-                      credentialsSecretName:
-                        type: string
                       name:
                         type: string
-                      replicateByDefault:
-                        type: boolean
                     required:
                     - name
                     type: object
@@ -221,17 +174,8 @@ spec:
               type: object
             redis:
               properties:
-                credentialsSecretName:
-                  type: string
                 deploymentStrategy:
-                  enum:
-                  - Recreate
-                  - RollingUpdate
                   type: string
-                envVars:
-                  items:
-                    type: object
-                  type: array
                 hostname:
                   type: string
                 image:
