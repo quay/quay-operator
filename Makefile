@@ -6,7 +6,7 @@ DEV_TAG ?= dev
 
 IMG := $(REPOSITORY):latest
 
-VERSION := v0.0.5
+VERSION := v0.0.7
 
 OPENSHIFT_VERSION=3.10.172
 QUAY_NAMESPACE=quay-enterprise

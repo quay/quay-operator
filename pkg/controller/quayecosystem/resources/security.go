@@ -22,7 +22,7 @@ func GetRoleDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.
 			{
 				APIGroups: []string{""},
 				Resources: []string{"secrets"},
-				Verbs:     []string{"get", "put", "patch", "update", "create"},
+				Verbs:     []string{"get", "patch", "update", "create"},
 			},
 			{
 				APIGroups: []string{""},

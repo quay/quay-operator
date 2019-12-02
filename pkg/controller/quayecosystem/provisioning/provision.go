@@ -454,12 +454,13 @@ func (r *ReconcileQuayEcosystemConfiguration) createClairDatabase(meta metav1.Ob
 
 func (r *ReconcileQuayEcosystemConfiguration) configurePostgreSQL(meta metav1.ObjectMeta) error {
 
-	postgresqlPods := &corev1.PodList{}
-	opts := &client.ListOptions{}
-	opts.SetLabelSelector(fmt.Sprintf("%s=%s", constants.LabelCompoentKey, constants.LabelComponentQuayDatabaseValue))
-	opts.InNamespace(r.quayConfiguration.QuayEcosystem.Namespace)
+	postgresqlPods := corev1.PodList{}
+	opts := []client.ListOption{
+		client.InNamespace(r.quayConfiguration.QuayEcosystem.Namespace),
+		client.MatchingLabels(map[string]string{constants.LabelCompoentKey: constants.LabelComponentQuayDatabaseValue}),
+	}
 
-	err := r.reconcilerBase.GetClient().List(context.TODO(), opts, postgresqlPods)
+	err := r.reconcilerBase.GetClient().List(context.TODO(), &postgresqlPods, opts...)
 
 	if err != nil {
 		return err
@@ -737,7 +738,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 
 	clairConfigFile.Clair.Updater.Interval = r.quayConfiguration.ClairUpdateInterval
 
-	clairConfigFile.Clair.Updater.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
+	clairConfigFile.Clair.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
 		Endpoint: fmt.Sprintf("https://%s/secscan/notify", r.quayConfiguration.QuayEcosystem.Status.Hostname),
 		Proxy:    "http://localhost:6063",
 	}
@@ -808,7 +809,7 @@ func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountN
 
 func (r *ReconcileQuayEcosystemConfiguration) quayRegistryStorage(meta metav1.ObjectMeta) error {
 
-	for _, registryBackend := range r.quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
+	for _, registryBackend := range r.quayConfiguration.RegistryBackends {
 
 		if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Local) {
 			registryVolumeName := resources.GetRegistryStorageVolumeName(r.quayConfiguration.QuayEcosystem, registryBackend.Name)
@@ -831,6 +832,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayRegistryStorage(meta metav1.Ob
 
 }
 
+// removeQuayRegistryStorage handles removing persistent storage for local storage
 func (r *ReconcileQuayEcosystemConfiguration) removeQuayRegistryStorage(meta metav1.ObjectMeta) error {
 
 	registryPVC := resources.GetQuayRegistryStorageName(r.quayConfiguration.QuayEcosystem)

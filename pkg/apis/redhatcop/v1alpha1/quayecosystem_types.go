@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"time"
 
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	appsv1 "k8s.io/api/apps/v1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +24,9 @@ type QuayEcosystemPhase string
 
 // QuayEcosystemConditionType defines the types of conditions the operator will run through
 type QuayEcosystemConditionType string
+
+// QuayConfigFileType defines the type of configuration file
+type QuayConfigFileType string
 
 const (
 
@@ -55,6 +59,12 @@ const (
 	QuayEcosystemSecurityScannerConfigurationSuccess QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationSuccess"
 	// QuayEcosystemSecurityScannerConfigurationFailure indicates that the security scanner configuration failed
 	QuayEcosystemSecurityScannerConfigurationFailure QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationFailure"
+
+	// ExtraCaCertQuayConfigFileType specifies a Extra Ca Certificate file type
+	ExtraCaCertQuayConfigFileType QuayConfigFileType = "extraCaCert"
+
+	// ConfigQuayConfigFileType specifies a Extra Ca Certificate file type
+	ConfigQuayConfigFileType QuayConfigFileType = "config"
 )
 
 // QuayEcosystemStatus defines the observed state of QuayEcosystem
@@ -66,6 +76,7 @@ type QuayEcosystemStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=atomic
 	Conditions    []QuayEcosystemCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 	SetupComplete bool                     `json:"setupComplete,omitempty"`
 }
@@ -75,6 +86,7 @@ type QuayEcosystemStatus struct {
 // QuayEcosystem is the Schema for the quayecosystems API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:path=quayecosystems,scope=Namespaced
 type QuayEcosystem struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -93,30 +105,44 @@ type QuayEcosystemList struct {
 }
 
 // Quay defines the properies of a deployment of Quay
+// +k8s:openapi-gen=true
 type Quay struct {
-	ConfigResources                corev1.ResourceRequirements   `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
-	ConfigRouteHost                string                        `json:"configRouteHost,omitempty"`
-	ConfigSecretName               string                        `json:"configSecretName,omitempty"`
-	Database                       *Database                     `json:"database,omitempty"`
-	DeploymentStrategy             appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
-	EnableNodePortService          bool                          `json:"enableNodePortService,omitempty"`
-	Image                          string                        `json:"image,omitempty"`
-	ImagePullSecretName            string                        `json:"imagePullSecretName,omitempty"`
-	LivenessProbe                  *corev1.Probe                 `json:"livenessProbe,omitempty"`
-	KeepConfigDeployment           bool                          `json:"keepConfigDeployment,omitempty"`
-	NodeSelector                   map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	ReadinessProbe                 *corev1.Probe                 `json:"readinessProbe,omitempty"`
-	RegistryBackends               []RegistryBackend             `json:"registryBackends,omitempty"`
-	RegistryStorage                *RegistryStorage              `json:"registryStorage,omitempty"`
-	Replicas                       *int32                        `json:"replicas,omitempty"`
-	Resources                      corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-	RouteHost                      string                        `json:"routeHost,omitempty"`
-	SkipSetup                      bool                          `json:"skipSetup,omitempty"`
-	SslCertificatesSecretName      string                        `json:"sslCertificatesSecretName,omitempty"`
-	SuperuserCredentialsSecretName string                        `json:"superuserCredentialsSecretName,omitempty"`
+	// +listType=atomic
+	ConfigEnvVars    []corev1.EnvVar             `json:"configEnvVars,omitempty"`
+	ConfigResources  corev1.ResourceRequirements `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
+	ConfigRouteHost  string                      `json:"configRouteHost,omitempty"`
+	ConfigSecretName string                      `json:"configSecretName,omitempty"`
+	Database         *Database                   `json:"database,omitempty"`
+	// +kubebuilder:validation:Enum=Recreate;RollingUpdate
+	DeploymentStrategy    appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+	EnableNodePortService bool                          `json:"enableNodePortService,omitempty"`
+	// +listType=atomic
+	EnvVars              []corev1.EnvVar   `json:"envVars,omitempty"`
+	Image                string            `json:"image,omitempty"`
+	ImagePullSecretName  string            `json:"imagePullSecretName,omitempty"`
+	LivenessProbe        *corev1.Probe     `json:"livenessProbe,omitempty"`
+	KeepConfigDeployment bool              `json:"keepConfigDeployment,omitempty"`
+	NodeSelector         map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe       *corev1.Probe     `json:"readinessProbe,omitempty"`
+	// +listType=atomic
+	RegistryBackends               []RegistryBackend           `json:"registryBackends,omitempty"`
+	RegistryStorage                *RegistryStorage            `json:"registryStorage,omitempty"`
+	Replicas                       *int32                      `json:"replicas,omitempty"`
+	Resources                      corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	RouteHost                      string                      `json:"routeHost,omitempty"`
+	SkipSetup                      bool                        `json:"skipSetup,omitempty"`
+	SslCertificatesSecretName      string                      `json:"sslCertificatesSecretName,omitempty"`
+	SuperuserCredentialsSecretName string                      `json:"superuserCredentialsSecretName,omitempty"`
+	EnableStorageReplication       bool                        `json:"enableStorageReplication,omitempty"`
+	// +optional
+	// +patchMergeKey=secretName
+	// +patchStrategy=merge
+	// +listType=atomic
+	ConfigFiles []QuayConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
+// +k8s:openapi-gen=true
 type QuayEcosystemCondition struct {
 	LastTransitionTime metav1.Time                `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	LastUpdateTime     metav1.Time                `json:"lastUpdateTime,omitempty" protobuf:"bytes,3,opt,name=lastUpdateTime"`
@@ -127,77 +153,222 @@ type QuayEcosystemCondition struct {
 }
 
 // Redis defines the properies of a deployment of Redis
+// +k8s:openapi-gen=true
 type Redis struct {
-	DeploymentStrategy  appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
-	Hostname            string                        `json:"hostname,omitempty"`
-	Image               string                        `json:"image,omitempty"`
-	ImagePullSecretName string                        `json:"imagePullSecretName,omitempty"`
-	LivenessProbe       *corev1.Probe                 `json:"livenessProbe,omitempty"`
-	NodeSelector        map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	Port                *int32                        `json:"port,omitempty"`
-	ReadinessProbe      *corev1.Probe                 `json:"readinessProbe,omitempty"`
-	Replicas            *int32                        `json:"replicas,omitempty"`
-	Resources           corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+	// +kubebuilder:validation:Enum=Recreate;RollingUpdate
+	DeploymentStrategy appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+	// +listType=atomic
+	EnvVars             []corev1.EnvVar             `json:"envVars,omitempty"`
+	Hostname            string                      `json:"hostname,omitempty"`
+	Image               string                      `json:"image,omitempty"`
+	ImagePullSecretName string                      `json:"imagePullSecretName,omitempty"`
+	LivenessProbe       *corev1.Probe               `json:"livenessProbe,omitempty"`
+	NodeSelector        map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	Port                *int32                      `json:"port,omitempty"`
+	ReadinessProbe      *corev1.Probe               `json:"readinessProbe,omitempty"`
+	Replicas            *int32                      `json:"replicas,omitempty"`
+	Resources           corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 }
 
 // Database defines a database that will be deployed to support a particular component
+// +k8s:openapi-gen=true
 type Database struct {
-	CPU                   string                        `json:"cpu,omitempty"`
-	CredentialsSecretName string                        `json:"credentialsSecretName,omitempty"`
-	DeploymentStrategy    appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
-	Image                 string                        `json:"image,omitempty"`
-	ImagePullSecretName   string                        `json:"imagePullSecretName,omitempty"`
-	LivenessProbe         *corev1.Probe                 `json:"livenessProbe,omitempty"`
-	Memory                string                        `json:"memory,omitempty"`
-	NodeSelector          map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	ReadinessProbe        *corev1.Probe                 `json:"readinessProbe,omitempty"`
-	Replicas              *int32                        `json:"replicas,omitempty"`
-	Resources             corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-	Server                string                        `json:"server,omitempty"`
-	VolumeSize            string                        `json:"volumeSize,omitempty"`
+	CPU                   string `json:"cpu,omitempty"`
+	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+
+	// +kubebuilder:validation:Enum=Recreate;RollingUpdate
+	DeploymentStrategy appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+	// +listType=atomic
+	EnvVars             []corev1.EnvVar             `json:"envVars,omitempty"`
+	Image               string                      `json:"image,omitempty"`
+	ImagePullSecretName string                      `json:"imagePullSecretName,omitempty"`
+	LivenessProbe       *corev1.Probe               `json:"livenessProbe,omitempty"`
+	Memory              string                      `json:"memory,omitempty"`
+	NodeSelector        map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe      *corev1.Probe               `json:"readinessProbe,omitempty"`
+	Replicas            *int32                      `json:"replicas,omitempty"`
+	Resources           corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	Server              string                      `json:"server,omitempty"`
+	VolumeSize          string                      `json:"volumeSize,omitempty"`
 }
 
 // Clair defines the properties of a deployment of Clair
+// +k8s:openapi-gen=true
 type Clair struct {
-	Database                  *Database                     `json:"database,omitempty"`
-	DeploymentStrategy        appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
-	Enabled                   bool                          `json:"enabled,omitempty"`
-	Image                     string                        `json:"image,omitempty"`
-	ImagePullSecretName       string                        `json:"imagePullSecretName,omitempty"`
-	LivenessProbe             *corev1.Probe                 `json:"livenessProbe,omitempty"`
-	NodeSelector              map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	ReadinessProbe            *corev1.Probe                 `json:"readinessProbe,omitempty"`
-	Replicas                  *int32                        `json:"replicas,omitempty"`
-	Resources                 corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-	SslCertificatesSecretName string                        `json:"sslCertificatesSecretName,omitempty"`
-	UpdateInterval            string                        `json:"updateInterval,omitempty"`
+	Database *Database `json:"database,omitempty"`
+
+	// +kubebuilder:validation:Enum=Recreate;RollingUpdate
+	DeploymentStrategy appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+
+	Enabled bool `json:"enabled,omitempty"`
+	// +listType=atomic
+	EnvVars                   []corev1.EnvVar             `json:"envVars,omitempty"`
+	Image                     string                      `json:"image,omitempty"`
+	ImagePullSecretName       string                      `json:"imagePullSecretName,omitempty"`
+	LivenessProbe             *corev1.Probe               `json:"livenessProbe,omitempty"`
+	NodeSelector              map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe            *corev1.Probe               `json:"readinessProbe,omitempty"`
+	Replicas                  *int32                      `json:"replicas,omitempty"`
+	Resources                 corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	SslCertificatesSecretName string                      `json:"sslCertificatesSecretName,omitempty"`
+	UpdateInterval            string                      `json:"updateInterval,omitempty"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry
+// +k8s:openapi-gen=true
 type RegistryBackend struct {
 	Name                  string `json:"name"`
 	RegistryBackendSource `json:",inline" protobuf:"bytes,2,opt,name=registryBackendSource"`
+	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+	ReplicateByDefault    *bool  `json:"replicateByDefault,omitempty"`
 }
 
 // RegistryBackendSource defines the specific configurations to support the Quay registry
+// +k8s:openapi-gen=true
 type RegistryBackendSource struct {
-	Local *LocalRegistryBackendSource `json:"local,omitempty,name=local"`
+	Local        *LocalRegistryBackendSource        `json:"local,omitempty,name=local"`
+	S3           *S3RegistryBackendSource           `json:"s3,omitempty,name=s3"`
+	GoogleCloud  *GoogleCloudRegistryBackendSource  `json:"googleCloud,omitempty,name=googleCloud"`
+	Azure        *AzureRegistryBackendSource        `json:"azure,omitempty,name=azure"`
+	RADOS        *RADOSRegistryBackendSource        `json:"rados,omitempty,name=rados"`
+	RHOCS        *RHOCSRegistryBackendSource        `json:"rhocs,omitempty,name=rhocs"`
+	Swift        *SwiftRegistryBackendSource        `json:"swift,omitempty,name=swift"`
+	CloudfrontS3 *CloudfrontS3RegistryBackendSource `json:"cloudfrontS3,omitempty,name=cloudfrontS3"`
 }
 
 // RegistryStorage defines the configurations to support persistent storage
+// +k8s:openapi-gen=true
 type RegistryStorage struct {
-	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessMode,omitempty,name=persistentVolumeAccessMode"`
+	// +listType=atomic
+	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessModes,omitempty,name=persistentVolumeAccessModes"`
 	PersistentVolumeSize             string                              `json:"persistentVolumeSize,omitempty,name=volumeSize"`
 	PersistentVolumeStorageClassName string                              `json:"persistentVolumeStorageClassName,omitempty,name=storageClassName"`
 }
 
 // LocalRegistryBackendSource defines local registry storage
+// +k8s:openapi-gen=true
 type LocalRegistryBackendSource struct {
-	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
+}
+
+// S3RegistryBackendSource defines S3 registry storage
+// +k8s:openapi-gen=true
+type S3RegistryBackendSource struct {
+	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
+	BucketName  string `json:"bucketName,omitempty,name=bucketName"`
+	AccessKey   string `json:"accessKey,omitempty,name=accessKey"`
+	SecretKey   string `json:"secretKey,omitempty,name=secretKey"`
+	Host        string `json:"host,omitempty,name=host"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// GoogleCloudRegistryBackendSource defines Google Cloud registry storage
+// +k8s:openapi-gen=true
+type GoogleCloudRegistryBackendSource struct {
+	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
+	BucketName  string `json:"bucketName,omitempty,name=bucketName"`
+	AccessKey   string `json:"accessKey,omitempty,name=accessKey"`
+	SecretKey   string `json:"secretKey,omitempty,name=secretKey"`
+}
+
+// AzureRegistryBackendSource defines Azure blob registry storage
+// +k8s:openapi-gen=true
+type AzureRegistryBackendSource struct {
+	StoragePath   string `json:"storagePath,omitempty,name=storagePath"`
+	ContainerName string `json:"containerName,omitempty,name=containerName"`
+	AccountName   string `json:"accountName,omitempty,name=accountName"`
+	AccountKey    string `json:"accountKey,omitempty,name=accountKey"`
+	SasToken      string `json:"sasToken,omitempty,name=sasToken"`
+}
+
+// RADOSRegistryBackendSource defines Ceph RADOS registry storage
+// +k8s:openapi-gen=true
+type RADOSRegistryBackendSource struct {
+	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
+	BucketName  string `json:"bucketName,omitempty,name=bucketName"`
+	AccessKey   string `json:"accessKey,omitempty,name=accessKey"`
+	SecretKey   string `json:"secretKey,omitempty,name=secretKey"`
+	Hostname    string `json:"hostname,omitempty,name=hostname"`
+	Secure      bool   `json:"secure,omitempty,name=secure"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// RHOCSRegistryBackendSource defines RHOCS registry storage
+// +k8s:openapi-gen=true
+type RHOCSRegistryBackendSource struct {
+	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
+	BucketName  string `json:"bucketName,omitempty,name=bucketName"`
+	AccessKey   string `json:"accessKey,omitempty,name=accessKey"`
+	SecretKey   string `json:"secretKey,omitempty,name=secretKey"`
+	Hostname    string `json:"hostname,omitempty,name=hostname"`
+	Secure      bool   `json:"secure,omitempty,name=secure"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// SwiftRegistryBackendSource defines Swift registry storage
+// +k8s:openapi-gen=true
+type SwiftRegistryBackendSource struct {
+	StoragePath string            `json:"storagePath,omitempty,name=storagePath"`
+	AuthVersion string            `json:"authVersion,omitempty,name=authVersion"`
+	AuthURL     string            `json:"authURL,omitempty,name=authURL"`
+	Container   string            `json:"container,omitempty,name=container"`
+	User        string            `json:"user,omitempty,name=user"`
+	Password    string            `json:"password,omitempty,name=password"`
+	CACertPath  string            `json:"caCertPath,omitempty,name=caCertPath"`
+	TempURLKey  string            `json:"tempURLKey,omitempty,name=tempURLKey"`
+	OSOptions   map[string]string `json:"osOptions,omitempty" protobuf:"bytes,7,rep,name=osOptions"`
+}
+
+// CloudfrontS3RegistryBackendSource defines CouldfrontS3 registry storage
+// +k8s:openapi-gen=true
+type CloudfrontS3RegistryBackendSource struct {
+	StoragePath        string `json:"storagePath,omitempty,name=storagePath"`
+	BucketName         string `json:"bucketName,omitempty,name=bucketName"`
+	AccessKey          string `json:"accessKey,omitempty,name=accessKey"`
+	SecretKey          string `json:"secretKey,omitempty,name=secretKey"`
+	Host               string `json:"host,omitempty,name=host"`
+	Port               int    `json:"port,omitempty,name=port"`
+	DistributionDomain string `json:"distributionDomain,omitempty,name=distributionDomain"`
+	KeyID              string `json:"keyID,omitempty,name=keyID"`
+	PrivateKeyFilename string `json:"privateKeyFilename,omitempty,name=privateKeyFilename"`
+}
+
+// QuayConfigFiles defines configuration files that are injected into the Quay resources
+// +k8s:openapi-gen=true
+type QuayConfigFiles struct {
+	SecretName string `json:"secretName"`
+	// +listType=atomic
+	Files []QuayConfigFile   `json:"files,omitempty,name=files"`
+	Type  QuayConfigFileType `json:"type,omitempty,name=type"`
+}
+
+// QuayConfigFile defines configuration files that are injected into the Quay resources
+// +k8s:openapi-gen=true
+type QuayConfigFile struct {
+	// +kubebuilder:validation:Enum=config;extraCaCert
+	Type     QuayConfigFileType `json:"type,omitempty,name=type"`
+	Key      string             `json:"key,name=key"`
+	Filename string             `json:"filename,omitempty,name=filename"`
 }
 
 func init() {
 	SchemeBuilder.Register(&QuayEcosystem{}, &QuayEcosystemList{})
+}
+
+// GetKeys returns the keys found in Configuration Files
+func (quayConfigFiles *QuayConfigFiles) GetKeys() []string {
+	keys := []string{}
+
+	if !utils.IsZeroOfUnderlyingType(quayConfigFiles.Files) {
+		for _, file := range quayConfigFiles.Files {
+			if !utils.IsZeroOfUnderlyingType(file) {
+				keys = append(keys, file.Key)
+			}
+		}
+	}
+	return keys
+
 }
 
 // SetCondition applies the condition

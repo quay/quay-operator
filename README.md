@@ -29,7 +29,7 @@ $ oc new-project quay-enterprise
 Deploy the cluster resources. Given that a number of elevated permissions are required to resources at a cluster scope the account you are currently logged in must have elevated rights
 
 ```
-$ oc create -f deploy/crds/redhatcop_v1alpha1_quayecosystem_crd.yaml
+$ oc create -f deploy/crds/redhatcop.redhat.io_quayecosystems_crd.yaml
 $ oc create -f deploy/service_account.yaml
 $ oc create -f deploy/cluster_role.yaml
 $ oc create -f deploy/cluster_role_binding.yaml
@@ -201,11 +201,27 @@ spec:
 
 ### Registry Backends
 
-Quay supports multiple storage backends. The quay operator supports aiding in the facilitation of certain storage backends. The following backends are currently supported:
+Quay supports multiple storage backends (configured as an array). The quay operator supports aiding in the facilitation of certain storage backends. The following backends are currently supported:
 
-* Local
+Please refer to the [Registry Storage Documentation](docs/storage.md) for the options available.
 
-The following is an example of how to define a local backend with a customized location for which images will be stored:
+
+### Configuration Files
+
+Files related to the configuration of Quay are located in the `/conf/stack` directory. There are situations for which additional user defined configuration files need to be added to this directory (such as certificates and private keys). The Quay Operator supports the injection of these assets within the `configFiles` property in the `quay` property of the `QuayEcosystem` object where one or more assets can be specified.
+
+Two types of configuration files can be specified by the `type` property:
+
+1. `config` - Configuration files that will be added to the `/conf/stack` directory
+2. `extraCaCerts` - Certificates to be trusted container
+
+Configuration files are stored as values within _Secrets_. The first step is to create a secret containing these files. The following command illustrates how a private key can be added: 
+
+```
+oc create secret generic quayconfigfile --from-file=<path_to_file>
+```
+
+With the secret created, the secret containing the configuration file can be referenced in the `QuayEcosystem` object as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -214,17 +230,11 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
-    registryBackends:
-      - name: local
-        local:
-          storage_path: /opt/quayregistry
-```
+    configFiles:
+      - secretName: quayconfigfile
+  ```
 
-
-#### Configuring Persistent Local Storage
-
-By default, Quay uses an ephemeral volume for local storage. In order to avoid data loss, persistent storage is required. To enable the use of a _PersistentVolume_ to store images, specify the `registryStorage` parameter underneath the `quay` property. The following example will cause a _PersistentVolumeClaim_ to be created within the project requesting storage of 10Gi and an _access mode_ of `ReadWriteOnce` (Default value is `ReadWriteMany`)
+By default, the `config` type is assumed. If the contents of the secret contains certificates that should be added to the `extra_ca_certs` directory, specify the type as `extraCaCert` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -233,14 +243,32 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
-    registryStorage:
-      persistentVolumeAccessMode:
-        - ReadWriteOnce
-      persistentVolumeSize: 10Gi
+    configFiles:
+      - secretName: quayconfigfile
+        type: extraCaCert
 ```
 
-A Storage Class can also be provided using the `persistentVolumeStorageClassName` property
+Individual keys within a secret can be referenced to fine tune the resources that are added to the configuration using the `files` property as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    configFiles:
+      - secretName: quayconfigfile
+        files:
+          - key: myprivatekey.pem
+            filename: cloudfront.pem
+          - key: myExtraCaCert.crt
+            type: extraCaCert
+```
+
+The example above assumes that two files have been added to a secret called _quayconfigfile_. The file _myprivatekey.pem_ that was added to the secret will be mounted in the quay pod at the path `/conf/stack/cloudfront.pem` since it is a `config` file type and specifies a custom _filename_ that should be projected into the pod. The _myExtraCaCert.crt_ file will be added to the Quay pod within at the path `/conf/stack/extra_certs/myExtraCert.crt`
+
+_Note:_ The `type` property within `files` property overrides the value in the `configFiles` property.
 
 ### Skipping Automated Setup
 
@@ -335,6 +363,28 @@ spec:
   quay:
     imagePullSecretName: redhat-pull-secret
     keepConfigDeployment: true
+```
+
+### Redis Password
+
+By default, the operator managed Redis instance is deployed without a password. A password can be specified by creating a secret containing the password in the key _password_. The following command can be used to create the secret:
+
+```
+oc create secret generic <secret_name> --from-literal=password=<password>
+```
+
+The secret can then be specified within the _redis_ section using the `` as shown below:
+
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  redis:
+    credentialsSecretName: <secret_name>
+    imagePullSecretName: redhat-pull-secret
 ```
 
 ### Clair
@@ -472,6 +522,27 @@ spec:
 ```
 
 _Note: The absence of a defined value will make use of the `RollingUpdate` strategy_
+
+### Environment Variables
+
+In addition to environment variables that are automatically configured by the operator, users can define their own set of environment variables in order to customize the managed resources. Each core component includes a property called `envVars` where environment variables can be defined. An example is shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    envVars:
+      - name: FOO
+        value: bar
+```
+
+_Note_: Environment variables for the Quay configuration pod can be managed by specifying the `configEnvVars` property on the `quay` resource
+
+_Caution:_ User defined environment variables are given precedence over those managed by the operator. Undesirable results may occur if conflicting keys are used.
 
 ## Troubleshooting
 

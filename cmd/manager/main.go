@@ -14,7 +14,7 @@ import (
 	ossecurityv1 "github.com/openshift/api/security/v1"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
+	"github.com/redhat-cop/quay-operator/version"
 	"github.com/redhat-cop/quay-operator/pkg/apis"
 	"github.com/redhat-cop/quay-operator/pkg/controller"
 
@@ -43,6 +43,7 @@ var (
 var log = logf.Log.WithName("cmd")
 
 func printVersion() {
+	log.Info(fmt.Sprintf("Operator Version: %s", version.Version))
 	log.Info(fmt.Sprintf("Go Version: %s", runtime.Version()))
 	log.Info(fmt.Sprintf("Go OS/Arch: %s/%s", runtime.GOOS, runtime.GOARCH))
 	log.Info(fmt.Sprintf("Version of operator-sdk: %v", sdkVersion.Version))
