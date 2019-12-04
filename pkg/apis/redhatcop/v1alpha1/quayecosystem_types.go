@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"time"
 
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	appsv1 "k8s.io/api/apps/v1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +24,9 @@ type QuayEcosystemPhase string
 
 // QuayEcosystemConditionType defines the types of conditions the operator will run through
 type QuayEcosystemConditionType string
+
+// QuayConfigFileType defines the type of configuration file
+type QuayConfigFileType string
 
 const (
 
@@ -55,6 +59,12 @@ const (
 	QuayEcosystemSecurityScannerConfigurationSuccess QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationSuccess"
 	// QuayEcosystemSecurityScannerConfigurationFailure indicates that the security scanner configuration failed
 	QuayEcosystemSecurityScannerConfigurationFailure QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationFailure"
+
+	// ExtraCaCertQuayConfigFileType specifies a Extra Ca Certificate file type
+	ExtraCaCertQuayConfigFileType QuayConfigFileType = "extraCaCert"
+
+	// ConfigQuayConfigFileType specifies a Extra Ca Certificate file type
+	ConfigQuayConfigFileType QuayConfigFileType = "config"
 )
 
 // QuayEcosystemStatus defines the observed state of QuayEcosystem
@@ -94,11 +104,12 @@ type QuayEcosystemList struct {
 
 // Quay defines the properies of a deployment of Quay
 type Quay struct {
-	ConfigEnvVars                  []corev1.EnvVar               `json:"configEnvVars,omitempty"`
-	ConfigResources                corev1.ResourceRequirements   `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
-	ConfigRouteHost                string                        `json:"configRouteHost,omitempty"`
-	ConfigSecretName               string                        `json:"configSecretName,omitempty"`
-	Database                       *Database                     `json:"database,omitempty"`
+	ConfigEnvVars    []corev1.EnvVar             `json:"configEnvVars,omitempty"`
+	ConfigResources  corev1.ResourceRequirements `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
+	ConfigRouteHost  string                      `json:"configRouteHost,omitempty"`
+	ConfigSecretName string                      `json:"configSecretName,omitempty"`
+	Database         *Database                   `json:"database,omitempty"`
+	// +kubebuilder:validation:Enum=Recreate,RollingUpdate
 	DeploymentStrategy             appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
 	EnableNodePortService          bool                          `json:"enableNodePortService,omitempty"`
 	EnvVars                        []corev1.EnvVar               `json:"envVars,omitempty"`
@@ -117,6 +128,7 @@ type Quay struct {
 	SslCertificatesSecretName      string                        `json:"sslCertificatesSecretName,omitempty"`
 	SuperuserCredentialsSecretName string                        `json:"superuserCredentialsSecretName,omitempty"`
 	EnableStorageReplication       bool                          `json:"enableStorageReplication,omitempty"`
+	ConfigFiles                    []QuayConfigFiles             `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=extraCaCerts"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -131,65 +143,84 @@ type QuayEcosystemCondition struct {
 
 // Redis defines the properies of a deployment of Redis
 type Redis struct {
-	CredentialsSecretName string                        `json:"credentialsSecretName,omitempty"`
-	DeploymentStrategy    appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
-	EnvVars               []corev1.EnvVar               `json:"envVars,omitempty"`
-	Hostname              string                        `json:"hostname,omitempty"`
-	Image                 string                        `json:"image,omitempty"`
-	ImagePullSecretName   string                        `json:"imagePullSecretName,omitempty"`
-	LivenessProbe         *corev1.Probe                 `json:"livenessProbe,omitempty"`
-	NodeSelector          map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	Port                  *int32                        `json:"port,omitempty"`
-	ReadinessProbe        *corev1.Probe                 `json:"readinessProbe,omitempty"`
-	Replicas              *int32                        `json:"replicas,omitempty"`
-	Resources             corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+	// +kubebuilder:validation:Enum=Recreate,RollingUpdate
+	DeploymentStrategy  appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+	EnvVars             []corev1.EnvVar               `json:"envVars,omitempty"`
+	Hostname            string                        `json:"hostname,omitempty"`
+	Image               string                        `json:"image,omitempty"`
+	ImagePullSecretName string                        `json:"imagePullSecretName,omitempty"`
+	LivenessProbe       *corev1.Probe                 `json:"livenessProbe,omitempty"`
+	NodeSelector        map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	Port                *int32                        `json:"port,omitempty"`
+	ReadinessProbe      *corev1.Probe                 `json:"readinessProbe,omitempty"`
+	Replicas            *int32                        `json:"replicas,omitempty"`
+	Resources           corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 }
 
 // Database defines a database that will be deployed to support a particular component
 type Database struct {
-	CPU                   string                        `json:"cpu,omitempty"`
-	CredentialsSecretName string                        `json:"credentialsSecretName,omitempty"`
-	DeploymentStrategy    appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
-	EnvVars               []corev1.EnvVar               `json:"envVars,omitempty"`
-	Image                 string                        `json:"image,omitempty"`
-	ImagePullSecretName   string                        `json:"imagePullSecretName,omitempty"`
-	LivenessProbe         *corev1.Probe                 `json:"livenessProbe,omitempty"`
-	Memory                string                        `json:"memory,omitempty"`
-	NodeSelector          map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	ReadinessProbe        *corev1.Probe                 `json:"readinessProbe,omitempty"`
-	Replicas              *int32                        `json:"replicas,omitempty"`
-	Resources             corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-	Server                string                        `json:"server,omitempty"`
-	VolumeSize            string                        `json:"volumeSize,omitempty"`
+	CPU                   string `json:"cpu,omitempty"`
+	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+
+	// +kubebuilder:validation:Enum=Recreate,RollingUpdate
+	DeploymentStrategy  appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+	EnvVars             []corev1.EnvVar               `json:"envVars,omitempty"`
+	Image               string                        `json:"image,omitempty"`
+	ImagePullSecretName string                        `json:"imagePullSecretName,omitempty"`
+	LivenessProbe       *corev1.Probe                 `json:"livenessProbe,omitempty"`
+	Memory              string                        `json:"memory,omitempty"`
+	NodeSelector        map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe      *corev1.Probe                 `json:"readinessProbe,omitempty"`
+	Replicas            *int32                        `json:"replicas,omitempty"`
+	Resources           corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	Server              string                        `json:"server,omitempty"`
+	VolumeSize          string                        `json:"volumeSize,omitempty"`
 }
 
 // Clair defines the properties of a deployment of Clair
 type Clair struct {
-	Database                  *Database                     `json:"database,omitempty"`
-	DeploymentStrategy        appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
-	Enabled                   bool                          `json:"enabled,omitempty"`
-	EnvVars                   []corev1.EnvVar               `json:"envVars,omitempty"`
-	Image                     string                        `json:"image,omitempty"`
-	ImagePullSecretName       string                        `json:"imagePullSecretName,omitempty"`
-	LivenessProbe             *corev1.Probe                 `json:"livenessProbe,omitempty"`
-	NodeSelector              map[string]string             `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	ReadinessProbe            *corev1.Probe                 `json:"readinessProbe,omitempty"`
-	Replicas                  *int32                        `json:"replicas,omitempty"`
-	Resources                 corev1.ResourceRequirements   `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-	SslCertificatesSecretName string                        `json:"sslCertificatesSecretName,omitempty"`
-	UpdateInterval            string                        `json:"updateInterval,omitempty"`
+	Database *Database `json:"database,omitempty"`
+
+	// +kubebuilder:validation:Enum=Recreate,RollingUpdate
+	DeploymentStrategy appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
+
+	Enabled                   bool                        `json:"enabled,omitempty"`
+	EnvVars                   []corev1.EnvVar             `json:"envVars,omitempty"`
+	Image                     string                      `json:"image,omitempty"`
+	ImagePullSecretName       string                      `json:"imagePullSecretName,omitempty"`
+	LivenessProbe             *corev1.Probe               `json:"livenessProbe,omitempty"`
+	NodeSelector              map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe            *corev1.Probe               `json:"readinessProbe,omitempty"`
+	Replicas                  *int32                      `json:"replicas,omitempty"`
+	Resources                 corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	SslCertificatesSecretName string                      `json:"sslCertificatesSecretName,omitempty"`
+	UpdateInterval            string                      `json:"updateInterval,omitempty"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry
 type RegistryBackend struct {
 	Name                  string `json:"name"`
 	RegistryBackendSource `json:",inline" protobuf:"bytes,2,opt,name=registryBackendSource"`
+	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
+	ReplicateByDefault    *bool  `json:"replicateByDefault,omitempty"`
+}
+
+// RegistryBackendStorageType defines the type of registry backend storage
+type RegistryBackendStorageType interface {
+	Validate() error
 }
 
 // RegistryBackendSource defines the specific configurations to support the Quay registry
 type RegistryBackendSource struct {
-	Local *LocalRegistryBackendSource `json:"local,omitempty,name=local"`
-	S3    *S3RegistryBackendSource    `json:"s3,omitempty,name=s3"`
+	Local        *LocalRegistryBackendSource        `json:"local,omitempty,name=local"`
+	S3           *S3RegistryBackendSource           `json:"s3,omitempty,name=s3"`
+	GoogleCloud  *GoogleCloudRegistryBackendSource  `json:"googlecloud,omitempty,name=googlecloud"`
+	Azure        *AzureRegistryBackendSource        `json:"azure,omitempty,name=azure"`
+	RADOS        *RADOSRegistryBackendSource        `json:"rados,omitempty,name=rados"`
+	RHOCS        *RHOCSRegistryBackendSource        `json:"rhocs,omitempty,name=rhocs"`
+	Swift        *SwiftRegistryBackendSource        `json:"swift,omitempty,name=swift"`
+	CloudfrontS3 *CloudfrontS3RegistryBackendSource `json:"cloudfronts3,omitempty,name=cloudfronts3"`
 }
 
 // RegistryStorage defines the configurations to support persistent storage
@@ -206,18 +237,111 @@ type LocalRegistryBackendSource struct {
 
 // S3RegistryBackendSource defines S3 registry storage
 type S3RegistryBackendSource struct {
-	StoragePath           string `json:"storage_path,omitempty,name=storage_path"`
-	BucketName            string `json:"s3_bucket,omitempty,name=s3_bucket"`
-	AccessKey             string `json:"s3_access_key,omitempty,name=s3_access_key"`
-	SecretKey             string `json:"s3_secret_key,omitempty,name=s3_secret_key"`
-	Host                  string `json:"host,omitempty,name=host"`
-	Port                  int    `json:"port,omitempty,name=port"`
-	CredentialsSecretName string `json:"credentialsSecretName,omitempty"`
-	ReplicateByDefault    *bool  `json:"replicateByDefault,omitempty"`
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName  string `json:"s3_bucket,omitempty,name=s3_bucket"`
+	AccessKey   string `json:"s3_access_key,omitempty,name=s3_access_key"`
+	SecretKey   string `json:"s3_secret_key,omitempty,name=s3_secret_key"`
+	Host        string `json:"host,omitempty,name=host"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// GoogleCloudRegistryBackendSource defines Google Cloud registry storage
+type GoogleCloudRegistryBackendSource struct {
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName  string `json:"bucket_name,omitempty,name=bucket_name"`
+	AccessKey   string `json:"access_key,omitempty,name=access_key"`
+	SecretKey   string `json:"secret_key,omitempty,name=secret_key"`
+}
+
+// AzureRegistryBackendSource defines Azure blob registry storage
+type AzureRegistryBackendSource struct {
+	StoragePath   string `json:"storage_path,omitempty,name=storage_path"`
+	ContainerName string `json:"azure_container,omitempty,name=azure_container"`
+	AccountName   string `json:"azure_account_name,omitempty,name=azure_account_name"`
+	AccountKey    string `json:"azure_account_key,omitempty,name=azure_account_key"`
+	SasToken      string `json:"sas_token,omitempty,name=sas_token"`
+}
+
+// RADOSRegistryBackendSource defines Ceph RADOS registry storage
+type RADOSRegistryBackendSource struct {
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName  string `json:"s3_bucket,omitempty,name=s3_bucket"`
+	AccessKey   string `json:"access_key,omitempty,name=s3_access_key"`
+	SecretKey   string `json:"secret_key,omitempty,name=s3_secret_key"`
+	Hostname    string `json:"hostname,omitempty,name=hostname"`
+	Secure      bool   `json:"is_secure,omitempty,name=is_secure"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// RHOCSRegistryBackendSource defines RHOCS registry storage
+type RHOCSRegistryBackendSource struct {
+	StoragePath string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName  string `json:"bucket_name,omitempty,name=bucket_name"`
+	AccessKey   string `json:"access_key,omitempty,name=access_key"`
+	SecretKey   string `json:"secret_key,omitempty,name=access_key"`
+	Hostname    string `json:"hostname,omitempty,name=hostname"`
+	Secure      bool   `json:"is_secure,omitempty,name=is_secure"`
+	Port        int    `json:"port,omitempty,name=port"`
+}
+
+// SwiftRegistryBackendSource defines Swift registry storage
+type SwiftRegistryBackendSource struct {
+	AuthVersion string            `json:"auth_version,omitempty,name=auth_version"`
+	AuthURL     string            `json:"auth_url,omitempty,name=auth_url"`
+	Container   string            `json:"swift_container,omitempty,name=swift_container"`
+	StoragePath string            `json:"storage_path,omitempty,name=storage_path"`
+	User        string            `json:"swift_user,omitempty,name=swift_user"`
+	Password    string            `json:"swift_password,omitempty,name=swift_password"`
+	CACertPath  string            `json:"ca_cert_path,omitempty,name=ca_cert_path"`
+	TempURLKey  string            `json:"temp_url_key,omitempty,name=temp_url_key"`
+	OSOptions   map[string]string `json:"os_options,omitempty" protobuf:"bytes,7,rep,name=os_options"`
+}
+
+// CloudfrontS3RegistryBackendSource defines CouldfrontS3 registry storage
+type CloudfrontS3RegistryBackendSource struct {
+	StoragePath        string `json:"storage_path,omitempty,name=storage_path"`
+	BucketName         string `json:"s3_bucket,omitempty,name=s3_bucket"`
+	AccessKey          string `json:"s3_access_key,omitempty,name=s3_access_key"`
+	SecretKey          string `json:"s3_secret_key,omitempty,name=s3_secret_key"`
+	Host               string `json:"host,omitempty,name=host"`
+	Port               int    `json:"port,omitempty,name=port"`
+	DistributionDomain string `json:"cloudfront_distribution_domain,omitempty,name=cloudfront_distribution_domain"`
+	KeyID              string `json:"cloudfront_key_id,omitempty,name=cloudfront_key_id"`
+	PrivateKeyFilename string `json:"cloudfront_privatekey_filename,omitempty,name=cloudfront_privatekey_filename"`
+}
+
+// QuayConfigFiles defines configuration files that are injected into the Quay resources
+type QuayConfigFiles struct {
+	SecretName string             `json:"secretName"`
+	Files      []QuayConfigFile   `json:"files,omitempty,name=files"`
+	Type       QuayConfigFileType `json:"type,omitempty,name=type"`
+}
+
+// QuayConfigFile defines configuration files that are injected into the Quay resources
+type QuayConfigFile struct {
+	// +kubebuilder:validation:Enum=config,extraCaCert
+	Type     QuayConfigFileType `json:"type,omitempty,name=type"`
+	Key      string             `json:"key,name=key"`
+	Filename string             `json:"filename,omitempty,name=filename"`
 }
 
 func init() {
 	SchemeBuilder.Register(&QuayEcosystem{}, &QuayEcosystemList{})
+}
+
+// GetKeys returns the keys found in Configuration Files
+func (quayConfigFiles *QuayConfigFiles) GetKeys() []string {
+	keys := []string{}
+
+	if !utils.IsZeroOfUnderlyingType(quayConfigFiles.Files) {
+		for _, file := range quayConfigFiles.Files {
+			if !utils.IsZeroOfUnderlyingType(file) {
+				keys = append(keys, file.Key)
+			}
+		}
+	}
+	return keys
+
 }
 
 // SetCondition applies the condition

@@ -14,13 +14,13 @@ const (
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
 	// QuayImage is the Quay image
-	QuayImage = "quay.io/redhat/quay:v3.1.0"
+	QuayImage = "quay.io/redhat/quay:v3.1.2"
 	// ImagePullSecret is the name of the image pull secret for retrieving images from a protected image registry
 	ImagePullSecret = "redhat-pull-secret"
 	// RedisImage is the name of the Redis Image
 	RedisImage = "registry.access.redhat.com/rhscl/redis-32-rhel7:latest"
 	// ClairImage is the Clair image
-	ClairImage = "quay.io/redhat/clair-jwt:v3.1.0"
+	ClairImage = "quay.io/redhat/clair-jwt:v3.1.2"
 	// LabelAppKey is the name of the label key
 	LabelAppKey = "app"
 	// LabelAppValue is the name of the label
@@ -151,11 +151,68 @@ const (
 	// RegistryStorageTypeS3StorageName is the value of the Amazon S3 storage type
 	RegistryStorageTypeS3StorageName = "S3Storage"
 
+	// RegistryStorageTypeGoogleCloudStorageName is the value of the Google Cloud storage type
+	RegistryStorageTypeGoogleCloudStorageName = "GoogleCloudStorage"
+
+	// RegistryStorageTypeAzureStorageName is the value of the Azure storage type
+	RegistryStorageTypeAzureStorageName = "AzureStorage"
+
+	// RegistryStorageTypeRHOCSStorageName is the value of the RHOCS storage type
+	RegistryStorageTypeRHOCSStorageName = "RHOCSStorage"
+
+	// RegistryStorageTypeRADOSStorageName is the value of the RHOCS storage type
+	RegistryStorageTypeRADOSStorageName = "RadosGWStorage"
+
+	// RegistryStorageTypeSwiftStorageName is the value of the Swift storage type
+	RegistryStorageTypeSwiftStorageName = "SwiftStorage"
+
+	// RegistryStorageTypeCloudfrontS3StorageName is the value of the Cloudfront S3 storage type
+	RegistryStorageTypeCloudfrontS3StorageName = "CloudFrontedS3Storage"
+
 	// S3AccessKey is the name of the S3 Access Key
 	S3AccessKey = "s3_access_key"
 
-	// S3SecretKey is the name of the S3 Access Key
+	// S3SecretKey is the name of the S3 Secret Key
 	S3SecretKey = "s3_secret_key"
+
+	// AzureAccountName is the name of the Azure Account Name
+	AzureAccountName = "azure_account_name"
+
+	// AzureAccountKey is the name of the Azure Secret Key
+	AzureAccountKey = "azure_account_key"
+
+	// AzureSasToken is the name of the Azure SAS Token
+	AzureSasToken = "sas_token"
+
+	// GoogleCloudAccessKey is the name of the Google Cloud access key
+	GoogleCloudAccessKey = "access_key"
+
+	// GoogleCloudSecretKey is the name of the Google Cloud secret Key
+	GoogleCloudSecretKey = "secret_key"
+
+	// RHOCSAccessKey is the name of the RHOCS access key
+	RHOCSAccessKey = "access_key"
+
+	// RHOCSSecretKey is the name of the RHOCS secret Key
+	RHOCSSecretKey = "secret_key"
+
+	// RADOSAccessKey is the name of the RADOS access key
+	RADOSAccessKey = "access_key"
+
+	// RADOSSecretKey is the name of the RADOS secret Key
+	RADOSSecretKey = "secret_key"
+
+	// SwiftUser is the name of the Swift user Key
+	SwiftUser = "swift_user"
+
+	// SwiftPassword is the name of the Swift password Key
+	SwiftPassword = "swift_password"
+
+	// CloudfrontS3AccessKey is the name of the S3 Access Key
+	CloudfrontS3AccessKey = "s3_access_key"
+
+	// CloudfrontS3SecretKey is the name of the S3 Secret Key
+	CloudfrontS3SecretKey = "s3_secret_key"
 
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
@@ -171,6 +228,8 @@ const (
 	QuayNamespaceEnvironmentVariable = "QE_K8S_NAMESPACE"
 	//QuayExtraCertsDirEnvironmentVariable is the name of the environment variable to specify the location of extra certificates
 	QuayExtraCertsDirEnvironmentVariable = "KUBE_EXTRA_CA_CERTDIR"
+	// QuayExtraCertsDir is the location of extra certificates
+	QuayExtraCertsDir = "/conf/stack/extra_ca_certs"
 	// SecurityScannerService is the name of the security scanner service
 	SecurityScannerService = "security_scanner"
 	// SecurityScannerServiceSecretKey is the name of the key containing the security service private key
@@ -239,8 +298,26 @@ var (
 	// RequiredSslCertificateKeys represents the keys that are required for a provided SSL certificate
 	RequiredSslCertificateKeys = []string{QuayAppConfigSSLCertificateSecretKey, QuayAppConfigSSLPrivateKeySecretKey}
 
-	// RequiredS3CredentialKeys rerpresents the keys that are required for the S3 registry backend
+	// RequiredS3CredentialKeys represents the keys that are required for the S3 registry backend
 	RequiredS3CredentialKeys = []string{S3AccessKey, S3SecretKey}
+
+	// RequiredAzureCredentialKeys represents the keys that are required for the Azure registry backend
+	RequiredAzureCredentialKeys = []string{AzureAccountName, AzureAccountKey}
+
+	// RequiredGoogleCloudCredentialKeys represents the keys that are required for the Google Cloud registry backend
+	RequiredGoogleCloudCredentialKeys = []string{GoogleCloudAccessKey, GoogleCloudSecretKey}
+
+	// RequiredRHOCSCredentialKeys represents the keys that are required for the RHOCS registry backend
+	RequiredRHOCSCredentialKeys = []string{RHOCSAccessKey, RHOCSSecretKey}
+
+	// RequiredRADOSCredentialKeys represents the keys that are required for the RADOS registry backend
+	RequiredRADOSCredentialKeys = []string{RADOSAccessKey, RADOSSecretKey}
+
+	// RequiredSwiftCredentialKeys represents the keys that are required for the Swift registry backend
+	RequiredSwiftCredentialKeys = []string{SwiftUser, SwiftPassword}
+
+	// RequiredCloudfrontS3CredentialKeys represents the keys that are required for the Cloudfront S3 registry backend
+	RequiredCloudfrontS3CredentialKeys = []string{CloudfrontS3AccessKey, CloudfrontS3SecretKey}
 
 	// RequiredAnyUIDSccServiceAccounts is a list of service accounts who require access to the anyuid SCC
 	RequiredAnyUIDSccServiceAccounts = []string{QuayServiceAccount}

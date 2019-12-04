@@ -38,6 +38,9 @@ spec:
                     credentialsSecretName:
                       type: string
                     deploymentStrategy:
+                      enum:
+                      - Recreate
+                      - RollingUpdate
                       type: string
                     envVars:
                       items:
@@ -68,6 +71,9 @@ spec:
                       type: string
                   type: object
                 deploymentStrategy:
+                  enum:
+                  - Recreate
+                  - RollingUpdate
                   type: string
                 enabled:
                   type: boolean
@@ -103,6 +109,15 @@ spec:
                   items:
                     type: object
                   type: array
+                configFiles:
+                  items:
+                    properties:
+                      secretName:
+                        type: string
+                    required:
+                    - secretName
+                    type: object
+                  type: array
                 configResources:
                   type: object
                 configRouteHost:
@@ -116,6 +131,9 @@ spec:
                     credentialsSecretName:
                       type: string
                     deploymentStrategy:
+                      enum:
+                      - Recreate
+                      - RollingUpdate
                       type: string
                     envVars:
                       items:
@@ -146,6 +164,9 @@ spec:
                       type: string
                   type: object
                 deploymentStrategy:
+                  enum:
+                  - Recreate
+                  - RollingUpdate
                   type: string
                 enableNodePortService:
                   type: boolean
@@ -172,8 +193,12 @@ spec:
                 registryBackends:
                   items:
                     properties:
+                      credentialsSecretName:
+                        type: string
                       name:
                         type: string
+                      replicateByDefault:
+                        type: boolean
                     required:
                     - name
                     type: object
@@ -199,6 +224,9 @@ spec:
                 credentialsSecretName:
                   type: string
                 deploymentStrategy:
+                  enum:
+                  - Recreate
+                  - RollingUpdate
                   type: string
                 envVars:
                   items:
