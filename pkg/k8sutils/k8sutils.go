@@ -30,6 +30,12 @@ func GetK8sClient(config *rest.Config) (kubernetes.Interface, error) {
 }
 
 func GetDeploymentStatus(k8sclient kubernetes.Interface, namespace string, name string) bool {
+
+	if k8sclient == nil {
+		logging.Log.Info("Failed to get Deployment: No k8sclient initiated")
+		return false
+	}
+
 	api := k8sclient.AppsV1()
 	var timeout int64 = 420
 	listOptions := metav1.ListOptions{

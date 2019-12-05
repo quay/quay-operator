@@ -1,16 +1,14 @@
 module github.com/redhat-cop/quay-operator
 
 require (
-	github.com/go-logfmt/logfmt v0.4.0 // indirect
+	github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/spec v0.19.0
-	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/openshift/api v3.9.1-0.20190424152011-77b8897ec79a+incompatible
 	github.com/operator-framework/operator-sdk v0.12.0
+	github.com/prometheus/client_golang v1.0.0
 	github.com/redhat-cop/operator-utils v0.0.0-20190520190018-1b1f81b7301e
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
-	google.golang.org/genproto v0.0.0-20181016170114-94acd270e44e // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -47,3 +45,5 @@ replace (
 //replace github.com/operator-framework/operator-sdk => github.com/operator-framework/operator-sdk v0.10.0
 
 //replace git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
+
+go 1.13
