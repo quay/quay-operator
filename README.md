@@ -38,6 +38,13 @@ $ oc create -f deploy/role_binding.yaml
 $ oc create -f deploy/operator.yaml
 ```
 
+**Note: When running on OpenShift 3.x, an alternate Custom Resource Definition (CRD) than the file specified MUST be used. Otherwise an OpenAPI error will be produced**
+
+```
+$ oc create -f deploy/crds/redhatcop.redhat.io_quayecosystems_crd-3.x.yaml
+```
+
+
 ### Deploy a Quay Ecosystem
 
 Create a pull secret to retrieve Quay images from quay.io. If unsure what to use for the pull secret see [Accessing Red Hat Quay (formerly Quay Enterprise) without a CoreOS login](https://access.redhat.com/solutions/3533201).
