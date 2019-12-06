@@ -17,16 +17,14 @@ spec:
       description: QuayEcosystem is the Schema for the quayecosystems API
       properties:
         apiVersion:
-          description:
-            "APIVersion defines the versioned schema of this representation
+          description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources"
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
           type: string
         kind:
-          description:
-            "Kind is a string value representing the REST resource this
+          description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
@@ -37,8 +35,7 @@ spec:
               description: Clair defines the properties of a deployment of Clair
               properties:
                 database:
-                  description:
-                    Database defines a database that will be deployed to
+                  description: Database defines a database that will be deployed to
                     support a particular component
                   properties:
                     cpu:
@@ -47,23 +44,20 @@ spec:
                       type: string
                     deploymentStrategy:
                       enum:
-                        - Recreate
-                        - RollingUpdate
+                      - Recreate
+                      - RollingUpdate
                       type: string
                     envVars:
                       items:
-                        description:
-                          EnvVar represents an environment variable present
+                        description: EnvVar represents an environment variable present
                           in a Container.
                         properties:
                           name:
-                            description:
-                              Name of the environment variable. Must be
+                            description: Name of the environment variable. Must be
                               a C_IDENTIFIER.
                             type: string
                           value:
-                            description:
-                              'Variable references $(VAR_NAME) are expanded
+                            description: 'Variable references $(VAR_NAME) are expanded
                               using the previous defined environment variables in
                               the container and any service environment variables.
                               If a variable cannot be resolved, the reference in the
@@ -73,8 +67,7 @@ spec:
                               the variable exists or not. Defaults to "".'
                             type: string
                           valueFrom:
-                            description:
-                              Source for the environment variable's value.
+                            description: Source for the environment variable's value.
                               Cannot be used if value is not empty.
                             properties:
                               configMapKeyRef:
@@ -84,92 +77,80 @@ spec:
                                     description: The key to select.
                                     type: string
                                   name:
-                                    description:
-                                      "Name of the referent. More info:
+                                    description: 'Name of the referent. More info:
                                       https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                       TODO: Add other useful fields. apiVersion, kind,
-                                      uid?"
+                                      uid?'
                                     type: string
                                   optional:
-                                    description:
-                                      Specify whether the ConfigMap or
+                                    description: Specify whether the ConfigMap or
                                       its key must be defined
                                     type: boolean
                                 required:
-                                  - key
+                                - key
                                 type: object
                               fieldRef:
-                                description:
-                                  "Selects a field of the pod: supports
+                                description: 'Selects a field of the pod: supports
                                   metadata.name, metadata.namespace, metadata.labels,
                                   metadata.annotations, spec.nodeName, spec.serviceAccountName,
-                                  status.hostIP, status.podIP."
+                                  status.hostIP, status.podIP.'
                                 properties:
                                   apiVersion:
-                                    description:
-                                      Version of the schema the FieldPath
+                                    description: Version of the schema the FieldPath
                                       is written in terms of, defaults to "v1".
                                     type: string
                                   fieldPath:
-                                    description:
-                                      Path of the field to select in the
+                                    description: Path of the field to select in the
                                       specified API version.
                                     type: string
                                 required:
-                                  - fieldPath
+                                - fieldPath
                                 type: object
                               resourceFieldRef:
-                                description:
-                                  "Selects a resource of the container:
+                                description: 'Selects a resource of the container:
                                   only resources limits and requests (limits.cpu,
                                   limits.memory, limits.ephemeral-storage, requests.cpu,
                                   requests.memory and requests.ephemeral-storage)
-                                  are currently supported."
+                                  are currently supported.'
                                 properties:
                                   containerName:
-                                    description:
-                                      "Container name: required for volumes,
-                                      optional for env vars"
+                                    description: 'Container name: required for volumes,
+                                      optional for env vars'
                                     type: string
                                   divisor:
-                                    description:
-                                      Specifies the output format of the
+                                    description: Specifies the output format of the
                                       exposed resources, defaults to "1"
                                     type: string
                                   resource:
-                                    description: "Required: resource to select"
+                                    description: 'Required: resource to select'
                                     type: string
                                 required:
-                                  - resource
+                                - resource
                                 type: object
                               secretKeyRef:
-                                description:
-                                  Selects a key of a secret in the pod's
+                                description: Selects a key of a secret in the pod's
                                   namespace
                                 properties:
                                   key:
-                                    description:
-                                      The key of the secret to select from.  Must
+                                    description: The key of the secret to select from.  Must
                                       be a valid secret key.
                                     type: string
                                   name:
-                                    description:
-                                      "Name of the referent. More info:
+                                    description: 'Name of the referent. More info:
                                       https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                       TODO: Add other useful fields. apiVersion, kind,
-                                      uid?"
+                                      uid?'
                                     type: string
                                   optional:
-                                    description:
-                                      Specify whether the Secret or its
+                                    description: Specify whether the Secret or its
                                       key must be defined
                                     type: boolean
                                 required:
-                                  - key
+                                - key
                                 type: object
                             type: object
                         required:
-                          - name
+                        - name
                         type: object
                       type: array
                     image:
@@ -177,19 +158,16 @@ spec:
                     imagePullSecretName:
                       type: string
                     livenessProbe:
-                      description:
-                        Probe describes a health check to be performed
+                      description: Probe describes a health check to be performed
                         against a container to determine whether it is alive or ready
                         to receive traffic.
                       properties:
                         exec:
-                          description:
-                            One and only one of the following should be
+                          description: One and only one of the following should be
                             specified. Exec specifies the action to take.
                           properties:
                             command:
-                              description:
-                                Command is the command line to execute
+                              description: Command is the command line to execute
                                 inside the container, the working directory for the
                                 command  is root ('/') in the container's filesystem.
                                 The command is simply exec'd, it is not run inside
@@ -202,8 +180,7 @@ spec:
                               type: array
                           type: object
                         failureThreshold:
-                          description:
-                            Minimum consecutive failures for the probe
+                          description: Minimum consecutive failures for the probe
                             to be considered failed after having succeeded. Defaults
                             to 3. Minimum value is 1.
                           format: int32
@@ -212,18 +189,15 @@ spec:
                           description: HTTPGet specifies the http request to perform.
                           properties:
                             host:
-                              description:
-                                Host name to connect to, defaults to the
+                              description: Host name to connect to, defaults to the
                                 pod IP. You probably want to set "Host" in httpHeaders
                                 instead.
                               type: string
                             httpHeaders:
-                              description:
-                                Custom headers to set in the request. HTTP
+                              description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description:
-                                  HTTPHeader describes a custom header
+                                description: HTTPHeader describes a custom header
                                   to be used in HTTP probes
                                 properties:
                                   name:
@@ -233,8 +207,8 @@ spec:
                                     description: The header field value
                                     type: string
                                 required:
-                                  - name
-                                  - value
+                                - name
+                                - value
                                 type: object
                               type: array
                             path:
@@ -242,67 +216,58 @@ spec:
                               type: string
                             port:
                               anyOf:
-                                - type: string
-                                - type: integer
-                              description:
-                                Name or number of the port to access on
+                              - type: string
+                              - type: integer
+                              description: Name or number of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
                             scheme:
-                              description:
-                                Scheme to use for connecting to the host.
+                              description: Scheme to use for connecting to the host.
                                 Defaults to HTTP.
                               type: string
                           required:
-                            - port
+                          - port
                           type: object
                         initialDelaySeconds:
-                          description:
-                            "Number of seconds after the container has
+                          description: 'Number of seconds after the container has
                             started before liveness probes are initiated. More info:
-                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                           format: int32
                           type: integer
                         periodSeconds:
-                          description:
-                            How often (in seconds) to perform the probe.
+                          description: How often (in seconds) to perform the probe.
                             Default to 10 seconds. Minimum value is 1.
                           format: int32
                           type: integer
                         successThreshold:
-                          description:
-                            Minimum consecutive successes for the probe
+                          description: Minimum consecutive successes for the probe
                             to be considered successful after having failed. Defaults
                             to 1. Must be 1 for liveness. Minimum value is 1.
                           format: int32
                           type: integer
                         tcpSocket:
-                          description:
-                            "TCPSocket specifies an action involving a
+                          description: 'TCPSocket specifies an action involving a
                             TCP port. TCP hooks not yet supported TODO: implement
-                            a realistic TCP lifecycle hook"
+                            a realistic TCP lifecycle hook'
                           properties:
                             host:
-                              description:
-                                "Optional: Host name to connect to, defaults
-                                to the pod IP."
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
                               type: string
                             port:
                               anyOf:
-                                - type: string
-                                - type: integer
-                              description:
-                                Number or name of the port to access on
+                              - type: string
+                              - type: integer
+                              description: Number or name of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
                           required:
-                            - port
+                          - port
                           type: object
                         timeoutSeconds:
-                          description:
-                            "Number of seconds after which the probe times
+                          description: 'Number of seconds after which the probe times
                             out. Defaults to 1 second. Minimum value is 1. More info:
-                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                           format: int32
                           type: integer
                       type: object
@@ -313,19 +278,16 @@ spec:
                         type: string
                       type: object
                     readinessProbe:
-                      description:
-                        Probe describes a health check to be performed
+                      description: Probe describes a health check to be performed
                         against a container to determine whether it is alive or ready
                         to receive traffic.
                       properties:
                         exec:
-                          description:
-                            One and only one of the following should be
+                          description: One and only one of the following should be
                             specified. Exec specifies the action to take.
                           properties:
                             command:
-                              description:
-                                Command is the command line to execute
+                              description: Command is the command line to execute
                                 inside the container, the working directory for the
                                 command  is root ('/') in the container's filesystem.
                                 The command is simply exec'd, it is not run inside
@@ -338,8 +300,7 @@ spec:
                               type: array
                           type: object
                         failureThreshold:
-                          description:
-                            Minimum consecutive failures for the probe
+                          description: Minimum consecutive failures for the probe
                             to be considered failed after having succeeded. Defaults
                             to 3. Minimum value is 1.
                           format: int32
@@ -348,18 +309,15 @@ spec:
                           description: HTTPGet specifies the http request to perform.
                           properties:
                             host:
-                              description:
-                                Host name to connect to, defaults to the
+                              description: Host name to connect to, defaults to the
                                 pod IP. You probably want to set "Host" in httpHeaders
                                 instead.
                               type: string
                             httpHeaders:
-                              description:
-                                Custom headers to set in the request. HTTP
+                              description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description:
-                                  HTTPHeader describes a custom header
+                                description: HTTPHeader describes a custom header
                                   to be used in HTTP probes
                                 properties:
                                   name:
@@ -369,8 +327,8 @@ spec:
                                     description: The header field value
                                     type: string
                                 required:
-                                  - name
-                                  - value
+                                - name
+                                - value
                                 type: object
                               type: array
                             path:
@@ -378,67 +336,58 @@ spec:
                               type: string
                             port:
                               anyOf:
-                                - type: string
-                                - type: integer
-                              description:
-                                Name or number of the port to access on
+                              - type: string
+                              - type: integer
+                              description: Name or number of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
                             scheme:
-                              description:
-                                Scheme to use for connecting to the host.
+                              description: Scheme to use for connecting to the host.
                                 Defaults to HTTP.
                               type: string
                           required:
-                            - port
+                          - port
                           type: object
                         initialDelaySeconds:
-                          description:
-                            "Number of seconds after the container has
+                          description: 'Number of seconds after the container has
                             started before liveness probes are initiated. More info:
-                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                           format: int32
                           type: integer
                         periodSeconds:
-                          description:
-                            How often (in seconds) to perform the probe.
+                          description: How often (in seconds) to perform the probe.
                             Default to 10 seconds. Minimum value is 1.
                           format: int32
                           type: integer
                         successThreshold:
-                          description:
-                            Minimum consecutive successes for the probe
+                          description: Minimum consecutive successes for the probe
                             to be considered successful after having failed. Defaults
                             to 1. Must be 1 for liveness. Minimum value is 1.
                           format: int32
                           type: integer
                         tcpSocket:
-                          description:
-                            "TCPSocket specifies an action involving a
+                          description: 'TCPSocket specifies an action involving a
                             TCP port. TCP hooks not yet supported TODO: implement
-                            a realistic TCP lifecycle hook"
+                            a realistic TCP lifecycle hook'
                           properties:
                             host:
-                              description:
-                                "Optional: Host name to connect to, defaults
-                                to the pod IP."
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
                               type: string
                             port:
                               anyOf:
-                                - type: string
-                                - type: integer
-                              description:
-                                Number or name of the port to access on
+                              - type: string
+                              - type: integer
+                              description: Number or name of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
                           required:
-                            - port
+                          - port
                           type: object
                         timeoutSeconds:
-                          description:
-                            "Number of seconds after which the probe times
+                          description: 'Number of seconds after which the probe times
                             out. Defaults to 1 second. Minimum value is 1. More info:
-                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                           format: int32
                           type: integer
                       type: object
@@ -446,26 +395,23 @@ spec:
                       format: int32
                       type: integer
                     resources:
-                      description:
-                        ResourceRequirements describes the compute resource
+                      description: ResourceRequirements describes the compute resource
                         requirements.
                       properties:
                         limits:
                           additionalProperties:
                             type: string
-                          description:
-                            "Limits describes the maximum amount of compute
-                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                          description: 'Limits describes the maximum amount of compute
+                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                           type: object
                         requests:
                           additionalProperties:
                             type: string
-                          description:
-                            "Requests describes the minimum amount of compute
+                          description: 'Requests describes the minimum amount of compute
                             resources required. If Requests is omitted for a container,
                             it defaults to Limits if that is explicitly specified,
                             otherwise to an implementation-defined value. More info:
-                            https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                            https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                           type: object
                       type: object
                     server:
@@ -475,23 +421,21 @@ spec:
                   type: object
                 deploymentStrategy:
                   enum:
-                    - Recreate
-                    - RollingUpdate
+                  - Recreate
+                  - RollingUpdate
                   type: string
                 enabled:
                   type: boolean
                 envVars:
                   items:
-                    description:
-                      EnvVar represents an environment variable present
+                    description: EnvVar represents an environment variable present
                       in a Container.
                     properties:
                       name:
                         description: Name of the environment variable. Must be a C_IDENTIFIER.
                         type: string
                       value:
-                        description:
-                          'Variable references $(VAR_NAME) are expanded
+                        description: 'Variable references $(VAR_NAME) are expanded
                           using the previous defined environment variables in the
                           container and any service environment variables. If a variable
                           cannot be resolved, the reference in the input string will
@@ -501,8 +445,7 @@ spec:
                           not. Defaults to "".'
                         type: string
                       valueFrom:
-                        description:
-                          Source for the environment variable's value.
+                        description: Source for the environment variable's value.
                           Cannot be used if value is not empty.
                         properties:
                           configMapKeyRef:
@@ -512,87 +455,76 @@ spec:
                                 description: The key to select.
                                 type: string
                               name:
-                                description:
-                                  "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
-                                  uid?"
+                                  uid?'
                                 type: string
                               optional:
-                                description:
-                                  Specify whether the ConfigMap or its
+                                description: Specify whether the ConfigMap or its
                                   key must be defined
                                 type: boolean
                             required:
-                              - key
+                            - key
                             type: object
                           fieldRef:
-                            description:
-                              "Selects a field of the pod: supports metadata.name,
+                            description: 'Selects a field of the pod: supports metadata.name,
                               metadata.namespace, metadata.labels, metadata.annotations,
                               spec.nodeName, spec.serviceAccountName, status.hostIP,
-                              status.podIP."
+                              status.podIP.'
                             properties:
                               apiVersion:
-                                description:
-                                  Version of the schema the FieldPath is
+                                description: Version of the schema the FieldPath is
                                   written in terms of, defaults to "v1".
                                 type: string
                               fieldPath:
-                                description:
-                                  Path of the field to select in the specified
+                                description: Path of the field to select in the specified
                                   API version.
                                 type: string
                             required:
-                              - fieldPath
+                            - fieldPath
                             type: object
                           resourceFieldRef:
-                            description:
-                              "Selects a resource of the container: only
+                            description: 'Selects a resource of the container: only
                               resources limits and requests (limits.cpu, limits.memory,
                               limits.ephemeral-storage, requests.cpu, requests.memory
-                              and requests.ephemeral-storage) are currently supported."
+                              and requests.ephemeral-storage) are currently supported.'
                             properties:
                               containerName:
-                                description:
-                                  "Container name: required for volumes,
-                                  optional for env vars"
+                                description: 'Container name: required for volumes,
+                                  optional for env vars'
                                 type: string
                               divisor:
-                                description:
-                                  Specifies the output format of the exposed
+                                description: Specifies the output format of the exposed
                                   resources, defaults to "1"
                                 type: string
                               resource:
-                                description: "Required: resource to select"
+                                description: 'Required: resource to select'
                                 type: string
                             required:
-                              - resource
+                            - resource
                             type: object
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
                             properties:
                               key:
-                                description:
-                                  The key of the secret to select from.  Must
+                                description: The key of the secret to select from.  Must
                                   be a valid secret key.
                                 type: string
                               name:
-                                description:
-                                  "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
-                                  uid?"
+                                  uid?'
                                 type: string
                               optional:
-                                description:
-                                  Specify whether the Secret or its key
+                                description: Specify whether the Secret or its key
                                   must be defined
                                 type: boolean
                             required:
-                              - key
+                            - key
                             type: object
                         type: object
                     required:
-                      - name
+                    - name
                     type: object
                   type: array
                 image:
@@ -600,19 +532,16 @@ spec:
                 imagePullSecretName:
                   type: string
                 livenessProbe:
-                  description:
-                    Probe describes a health check to be performed against
+                  description: Probe describes a health check to be performed against
                     a container to determine whether it is alive or ready to receive
                     traffic.
                   properties:
                     exec:
-                      description:
-                        One and only one of the following should be specified.
+                      description: One and only one of the following should be specified.
                         Exec specifies the action to take.
                       properties:
                         command:
-                          description:
-                            Command is the command line to execute inside
+                          description: Command is the command line to execute inside
                             the container, the working directory for the command  is
                             root ('/') in the container's filesystem. The command
                             is simply exec'd, it is not run inside a shell, so traditional
@@ -624,8 +553,7 @@ spec:
                           type: array
                       type: object
                     failureThreshold:
-                      description:
-                        Minimum consecutive failures for the probe to be
+                      description: Minimum consecutive failures for the probe to be
                         considered failed after having succeeded. Defaults to 3. Minimum
                         value is 1.
                       format: int32
@@ -634,17 +562,14 @@ spec:
                       description: HTTPGet specifies the http request to perform.
                       properties:
                         host:
-                          description:
-                            Host name to connect to, defaults to the pod
+                          description: Host name to connect to, defaults to the pod
                             IP. You probably want to set "Host" in httpHeaders instead.
                           type: string
                         httpHeaders:
-                          description:
-                            Custom headers to set in the request. HTTP
+                          description: Custom headers to set in the request. HTTP
                             allows repeated headers.
                           items:
-                            description:
-                              HTTPHeader describes a custom header to be
+                            description: HTTPHeader describes a custom header to be
                               used in HTTP probes
                             properties:
                               name:
@@ -654,8 +579,8 @@ spec:
                                 description: The header field value
                                 type: string
                             required:
-                              - name
-                              - value
+                            - name
+                            - value
                             type: object
                           type: array
                         path:
@@ -663,66 +588,57 @@ spec:
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Name or number of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                         scheme:
-                          description:
-                            Scheme to use for connecting to the host. Defaults
+                          description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
                           type: string
                       required:
-                        - port
+                      - port
                       type: object
                     initialDelaySeconds:
-                      description:
-                        "Number of seconds after the container has started
-                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                      description: 'Number of seconds after the container has started
+                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                     periodSeconds:
-                      description:
-                        How often (in seconds) to perform the probe. Default
+                      description: How often (in seconds) to perform the probe. Default
                         to 10 seconds. Minimum value is 1.
                       format: int32
                       type: integer
                     successThreshold:
-                      description:
-                        Minimum consecutive successes for the probe to
+                      description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
                         1. Must be 1 for liveness. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
-                      description:
-                        "TCPSocket specifies an action involving a TCP
+                      description: 'TCPSocket specifies an action involving a TCP
                         port. TCP hooks not yet supported TODO: implement a realistic
-                        TCP lifecycle hook"
+                        TCP lifecycle hook'
                       properties:
                         host:
-                          description:
-                            "Optional: Host name to connect to, defaults
-                            to the pod IP."
+                          description: 'Optional: Host name to connect to, defaults
+                            to the pod IP.'
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Number or name of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                       required:
-                        - port
+                      - port
                       type: object
                     timeoutSeconds:
-                      description:
-                        "Number of seconds after which the probe times
+                      description: 'Number of seconds after which the probe times
                         out. Defaults to 1 second. Minimum value is 1. More info:
-                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                   type: object
@@ -731,19 +647,16 @@ spec:
                     type: string
                   type: object
                 readinessProbe:
-                  description:
-                    Probe describes a health check to be performed against
+                  description: Probe describes a health check to be performed against
                     a container to determine whether it is alive or ready to receive
                     traffic.
                   properties:
                     exec:
-                      description:
-                        One and only one of the following should be specified.
+                      description: One and only one of the following should be specified.
                         Exec specifies the action to take.
                       properties:
                         command:
-                          description:
-                            Command is the command line to execute inside
+                          description: Command is the command line to execute inside
                             the container, the working directory for the command  is
                             root ('/') in the container's filesystem. The command
                             is simply exec'd, it is not run inside a shell, so traditional
@@ -755,8 +668,7 @@ spec:
                           type: array
                       type: object
                     failureThreshold:
-                      description:
-                        Minimum consecutive failures for the probe to be
+                      description: Minimum consecutive failures for the probe to be
                         considered failed after having succeeded. Defaults to 3. Minimum
                         value is 1.
                       format: int32
@@ -765,17 +677,14 @@ spec:
                       description: HTTPGet specifies the http request to perform.
                       properties:
                         host:
-                          description:
-                            Host name to connect to, defaults to the pod
+                          description: Host name to connect to, defaults to the pod
                             IP. You probably want to set "Host" in httpHeaders instead.
                           type: string
                         httpHeaders:
-                          description:
-                            Custom headers to set in the request. HTTP
+                          description: Custom headers to set in the request. HTTP
                             allows repeated headers.
                           items:
-                            description:
-                              HTTPHeader describes a custom header to be
+                            description: HTTPHeader describes a custom header to be
                               used in HTTP probes
                             properties:
                               name:
@@ -785,8 +694,8 @@ spec:
                                 description: The header field value
                                 type: string
                             required:
-                              - name
-                              - value
+                            - name
+                            - value
                             type: object
                           type: array
                         path:
@@ -794,66 +703,57 @@ spec:
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Name or number of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                         scheme:
-                          description:
-                            Scheme to use for connecting to the host. Defaults
+                          description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
                           type: string
                       required:
-                        - port
+                      - port
                       type: object
                     initialDelaySeconds:
-                      description:
-                        "Number of seconds after the container has started
-                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                      description: 'Number of seconds after the container has started
+                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                     periodSeconds:
-                      description:
-                        How often (in seconds) to perform the probe. Default
+                      description: How often (in seconds) to perform the probe. Default
                         to 10 seconds. Minimum value is 1.
                       format: int32
                       type: integer
                     successThreshold:
-                      description:
-                        Minimum consecutive successes for the probe to
+                      description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
                         1. Must be 1 for liveness. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
-                      description:
-                        "TCPSocket specifies an action involving a TCP
+                      description: 'TCPSocket specifies an action involving a TCP
                         port. TCP hooks not yet supported TODO: implement a realistic
-                        TCP lifecycle hook"
+                        TCP lifecycle hook'
                       properties:
                         host:
-                          description:
-                            "Optional: Host name to connect to, defaults
-                            to the pod IP."
+                          description: 'Optional: Host name to connect to, defaults
+                            to the pod IP.'
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Number or name of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                       required:
-                        - port
+                      - port
                       type: object
                     timeoutSeconds:
-                      description:
-                        "Number of seconds after which the probe times
+                      description: 'Number of seconds after which the probe times
                         out. Defaults to 1 second. Minimum value is 1. More info:
-                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                   type: object
@@ -861,25 +761,22 @@ spec:
                   format: int32
                   type: integer
                 resources:
-                  description:
-                    ResourceRequirements describes the compute resource
+                  description: ResourceRequirements describes the compute resource
                     requirements.
                   properties:
                     limits:
                       additionalProperties:
                         type: string
-                      description:
-                        "Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                      description: 'Limits describes the maximum amount of compute
+                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                     requests:
                       additionalProperties:
                         type: string
-                      description:
-                        "Requests describes the minimum amount of compute
+                      description: 'Requests describes the minimum amount of compute
                         resources required. If Requests is omitted for a container,
                         it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                   type: object
                 sslCertificatesSecretName:
@@ -892,16 +789,14 @@ spec:
               properties:
                 configEnvVars:
                   items:
-                    description:
-                      EnvVar represents an environment variable present
+                    description: EnvVar represents an environment variable present
                       in a Container.
                     properties:
                       name:
                         description: Name of the environment variable. Must be a C_IDENTIFIER.
                         type: string
                       value:
-                        description:
-                          'Variable references $(VAR_NAME) are expanded
+                        description: 'Variable references $(VAR_NAME) are expanded
                           using the previous defined environment variables in the
                           container and any service environment variables. If a variable
                           cannot be resolved, the reference in the input string will
@@ -911,8 +806,7 @@ spec:
                           not. Defaults to "".'
                         type: string
                       valueFrom:
-                        description:
-                          Source for the environment variable's value.
+                        description: Source for the environment variable's value.
                           Cannot be used if value is not empty.
                         properties:
                           configMapKeyRef:
@@ -922,99 +816,86 @@ spec:
                                 description: The key to select.
                                 type: string
                               name:
-                                description:
-                                  "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
-                                  uid?"
+                                  uid?'
                                 type: string
                               optional:
-                                description:
-                                  Specify whether the ConfigMap or its
+                                description: Specify whether the ConfigMap or its
                                   key must be defined
                                 type: boolean
                             required:
-                              - key
+                            - key
                             type: object
                           fieldRef:
-                            description:
-                              "Selects a field of the pod: supports metadata.name,
+                            description: 'Selects a field of the pod: supports metadata.name,
                               metadata.namespace, metadata.labels, metadata.annotations,
                               spec.nodeName, spec.serviceAccountName, status.hostIP,
-                              status.podIP."
+                              status.podIP.'
                             properties:
                               apiVersion:
-                                description:
-                                  Version of the schema the FieldPath is
+                                description: Version of the schema the FieldPath is
                                   written in terms of, defaults to "v1".
                                 type: string
                               fieldPath:
-                                description:
-                                  Path of the field to select in the specified
+                                description: Path of the field to select in the specified
                                   API version.
                                 type: string
                             required:
-                              - fieldPath
+                            - fieldPath
                             type: object
                           resourceFieldRef:
-                            description:
-                              "Selects a resource of the container: only
+                            description: 'Selects a resource of the container: only
                               resources limits and requests (limits.cpu, limits.memory,
                               limits.ephemeral-storage, requests.cpu, requests.memory
-                              and requests.ephemeral-storage) are currently supported."
+                              and requests.ephemeral-storage) are currently supported.'
                             properties:
                               containerName:
-                                description:
-                                  "Container name: required for volumes,
-                                  optional for env vars"
+                                description: 'Container name: required for volumes,
+                                  optional for env vars'
                                 type: string
                               divisor:
-                                description:
-                                  Specifies the output format of the exposed
+                                description: Specifies the output format of the exposed
                                   resources, defaults to "1"
                                 type: string
                               resource:
-                                description: "Required: resource to select"
+                                description: 'Required: resource to select'
                                 type: string
                             required:
-                              - resource
+                            - resource
                             type: object
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
                             properties:
                               key:
-                                description:
-                                  The key of the secret to select from.  Must
+                                description: The key of the secret to select from.  Must
                                   be a valid secret key.
                                 type: string
                               name:
-                                description:
-                                  "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
-                                  uid?"
+                                  uid?'
                                 type: string
                               optional:
-                                description:
-                                  Specify whether the Secret or its key
+                                description: Specify whether the Secret or its key
                                   must be defined
                                 type: boolean
                             required:
-                              - key
+                            - key
                             type: object
                         type: object
                     required:
-                      - name
+                    - name
                     type: object
                   type: array
                 configFiles:
                   items:
-                    description:
-                      QuayConfigFiles defines configuration files that
+                    description: QuayConfigFiles defines configuration files that
                       are injected into the Quay resources
                     properties:
                       files:
                         items:
-                          description:
-                            QuayConfigFile defines configuration files
+                          description: QuayConfigFile defines configuration files
                             that are injected into the Quay resources
                           properties:
                             filename:
@@ -1022,48 +903,43 @@ spec:
                             key:
                               type: string
                             type:
-                              description:
-                                QuayConfigFileType defines the type of
+                              description: QuayConfigFileType defines the type of
                                 configuration file
                               enum:
-                                - config
-                                - extraCaCert
+                              - config
+                              - extraCaCert
                               type: string
                           required:
-                            - key
+                          - key
                           type: object
                         type: array
                       secretName:
                         type: string
                       type:
-                        description:
-                          QuayConfigFileType defines the type of configuration
+                        description: QuayConfigFileType defines the type of configuration
                           file
                         type: string
                     required:
-                      - secretName
+                    - secretName
                     type: object
                   type: array
                 configResources:
-                  description:
-                    ResourceRequirements describes the compute resource
+                  description: ResourceRequirements describes the compute resource
                     requirements.
                   properties:
                     limits:
                       additionalProperties:
                         type: string
-                      description:
-                        "Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                      description: 'Limits describes the maximum amount of compute
+                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                     requests:
                       additionalProperties:
                         type: string
-                      description:
-                        "Requests describes the minimum amount of compute
+                      description: 'Requests describes the minimum amount of compute
                         resources required. If Requests is omitted for a container,
                         it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                   type: object
                 configRouteHost:
@@ -1071,8 +947,7 @@ spec:
                 configSecretName:
                   type: string
                 database:
-                  description:
-                    Database defines a database that will be deployed to
+                  description: Database defines a database that will be deployed to
                     support a particular component
                   properties:
                     cpu:
@@ -1081,23 +956,20 @@ spec:
                       type: string
                     deploymentStrategy:
                       enum:
-                        - Recreate
-                        - RollingUpdate
+                      - Recreate
+                      - RollingUpdate
                       type: string
                     envVars:
                       items:
-                        description:
-                          EnvVar represents an environment variable present
+                        description: EnvVar represents an environment variable present
                           in a Container.
                         properties:
                           name:
-                            description:
-                              Name of the environment variable. Must be
+                            description: Name of the environment variable. Must be
                               a C_IDENTIFIER.
                             type: string
                           value:
-                            description:
-                              'Variable references $(VAR_NAME) are expanded
+                            description: 'Variable references $(VAR_NAME) are expanded
                               using the previous defined environment variables in
                               the container and any service environment variables.
                               If a variable cannot be resolved, the reference in the
@@ -1107,8 +979,7 @@ spec:
                               the variable exists or not. Defaults to "".'
                             type: string
                           valueFrom:
-                            description:
-                              Source for the environment variable's value.
+                            description: Source for the environment variable's value.
                               Cannot be used if value is not empty.
                             properties:
                               configMapKeyRef:
@@ -1118,92 +989,80 @@ spec:
                                     description: The key to select.
                                     type: string
                                   name:
-                                    description:
-                                      "Name of the referent. More info:
+                                    description: 'Name of the referent. More info:
                                       https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                       TODO: Add other useful fields. apiVersion, kind,
-                                      uid?"
+                                      uid?'
                                     type: string
                                   optional:
-                                    description:
-                                      Specify whether the ConfigMap or
+                                    description: Specify whether the ConfigMap or
                                       its key must be defined
                                     type: boolean
                                 required:
-                                  - key
+                                - key
                                 type: object
                               fieldRef:
-                                description:
-                                  "Selects a field of the pod: supports
+                                description: 'Selects a field of the pod: supports
                                   metadata.name, metadata.namespace, metadata.labels,
                                   metadata.annotations, spec.nodeName, spec.serviceAccountName,
-                                  status.hostIP, status.podIP."
+                                  status.hostIP, status.podIP.'
                                 properties:
                                   apiVersion:
-                                    description:
-                                      Version of the schema the FieldPath
+                                    description: Version of the schema the FieldPath
                                       is written in terms of, defaults to "v1".
                                     type: string
                                   fieldPath:
-                                    description:
-                                      Path of the field to select in the
+                                    description: Path of the field to select in the
                                       specified API version.
                                     type: string
                                 required:
-                                  - fieldPath
+                                - fieldPath
                                 type: object
                               resourceFieldRef:
-                                description:
-                                  "Selects a resource of the container:
+                                description: 'Selects a resource of the container:
                                   only resources limits and requests (limits.cpu,
                                   limits.memory, limits.ephemeral-storage, requests.cpu,
                                   requests.memory and requests.ephemeral-storage)
-                                  are currently supported."
+                                  are currently supported.'
                                 properties:
                                   containerName:
-                                    description:
-                                      "Container name: required for volumes,
-                                      optional for env vars"
+                                    description: 'Container name: required for volumes,
+                                      optional for env vars'
                                     type: string
                                   divisor:
-                                    description:
-                                      Specifies the output format of the
+                                    description: Specifies the output format of the
                                       exposed resources, defaults to "1"
                                     type: string
                                   resource:
-                                    description: "Required: resource to select"
+                                    description: 'Required: resource to select'
                                     type: string
                                 required:
-                                  - resource
+                                - resource
                                 type: object
                               secretKeyRef:
-                                description:
-                                  Selects a key of a secret in the pod's
+                                description: Selects a key of a secret in the pod's
                                   namespace
                                 properties:
                                   key:
-                                    description:
-                                      The key of the secret to select from.  Must
+                                    description: The key of the secret to select from.  Must
                                       be a valid secret key.
                                     type: string
                                   name:
-                                    description:
-                                      "Name of the referent. More info:
+                                    description: 'Name of the referent. More info:
                                       https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                       TODO: Add other useful fields. apiVersion, kind,
-                                      uid?"
+                                      uid?'
                                     type: string
                                   optional:
-                                    description:
-                                      Specify whether the Secret or its
+                                    description: Specify whether the Secret or its
                                       key must be defined
                                     type: boolean
                                 required:
-                                  - key
+                                - key
                                 type: object
                             type: object
                         required:
-                          - name
+                        - name
                         type: object
                       type: array
                     image:
@@ -1211,19 +1070,16 @@ spec:
                     imagePullSecretName:
                       type: string
                     livenessProbe:
-                      description:
-                        Probe describes a health check to be performed
+                      description: Probe describes a health check to be performed
                         against a container to determine whether it is alive or ready
                         to receive traffic.
                       properties:
                         exec:
-                          description:
-                            One and only one of the following should be
+                          description: One and only one of the following should be
                             specified. Exec specifies the action to take.
                           properties:
                             command:
-                              description:
-                                Command is the command line to execute
+                              description: Command is the command line to execute
                                 inside the container, the working directory for the
                                 command  is root ('/') in the container's filesystem.
                                 The command is simply exec'd, it is not run inside
@@ -1236,8 +1092,7 @@ spec:
                               type: array
                           type: object
                         failureThreshold:
-                          description:
-                            Minimum consecutive failures for the probe
+                          description: Minimum consecutive failures for the probe
                             to be considered failed after having succeeded. Defaults
                             to 3. Minimum value is 1.
                           format: int32
@@ -1246,18 +1101,15 @@ spec:
                           description: HTTPGet specifies the http request to perform.
                           properties:
                             host:
-                              description:
-                                Host name to connect to, defaults to the
+                              description: Host name to connect to, defaults to the
                                 pod IP. You probably want to set "Host" in httpHeaders
                                 instead.
                               type: string
                             httpHeaders:
-                              description:
-                                Custom headers to set in the request. HTTP
+                              description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description:
-                                  HTTPHeader describes a custom header
+                                description: HTTPHeader describes a custom header
                                   to be used in HTTP probes
                                 properties:
                                   name:
@@ -1267,8 +1119,8 @@ spec:
                                     description: The header field value
                                     type: string
                                 required:
-                                  - name
-                                  - value
+                                - name
+                                - value
                                 type: object
                               type: array
                             path:
@@ -1276,67 +1128,58 @@ spec:
                               type: string
                             port:
                               anyOf:
-                                - type: string
-                                - type: integer
-                              description:
-                                Name or number of the port to access on
+                              - type: string
+                              - type: integer
+                              description: Name or number of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
                             scheme:
-                              description:
-                                Scheme to use for connecting to the host.
+                              description: Scheme to use for connecting to the host.
                                 Defaults to HTTP.
                               type: string
                           required:
-                            - port
+                          - port
                           type: object
                         initialDelaySeconds:
-                          description:
-                            "Number of seconds after the container has
+                          description: 'Number of seconds after the container has
                             started before liveness probes are initiated. More info:
-                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                           format: int32
                           type: integer
                         periodSeconds:
-                          description:
-                            How often (in seconds) to perform the probe.
+                          description: How often (in seconds) to perform the probe.
                             Default to 10 seconds. Minimum value is 1.
                           format: int32
                           type: integer
                         successThreshold:
-                          description:
-                            Minimum consecutive successes for the probe
+                          description: Minimum consecutive successes for the probe
                             to be considered successful after having failed. Defaults
                             to 1. Must be 1 for liveness. Minimum value is 1.
                           format: int32
                           type: integer
                         tcpSocket:
-                          description:
-                            "TCPSocket specifies an action involving a
+                          description: 'TCPSocket specifies an action involving a
                             TCP port. TCP hooks not yet supported TODO: implement
-                            a realistic TCP lifecycle hook"
+                            a realistic TCP lifecycle hook'
                           properties:
                             host:
-                              description:
-                                "Optional: Host name to connect to, defaults
-                                to the pod IP."
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
                               type: string
                             port:
                               anyOf:
-                                - type: string
-                                - type: integer
-                              description:
-                                Number or name of the port to access on
+                              - type: string
+                              - type: integer
+                              description: Number or name of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
                           required:
-                            - port
+                          - port
                           type: object
                         timeoutSeconds:
-                          description:
-                            "Number of seconds after which the probe times
+                          description: 'Number of seconds after which the probe times
                             out. Defaults to 1 second. Minimum value is 1. More info:
-                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                           format: int32
                           type: integer
                       type: object
@@ -1347,19 +1190,16 @@ spec:
                         type: string
                       type: object
                     readinessProbe:
-                      description:
-                        Probe describes a health check to be performed
+                      description: Probe describes a health check to be performed
                         against a container to determine whether it is alive or ready
                         to receive traffic.
                       properties:
                         exec:
-                          description:
-                            One and only one of the following should be
+                          description: One and only one of the following should be
                             specified. Exec specifies the action to take.
                           properties:
                             command:
-                              description:
-                                Command is the command line to execute
+                              description: Command is the command line to execute
                                 inside the container, the working directory for the
                                 command  is root ('/') in the container's filesystem.
                                 The command is simply exec'd, it is not run inside
@@ -1372,8 +1212,7 @@ spec:
                               type: array
                           type: object
                         failureThreshold:
-                          description:
-                            Minimum consecutive failures for the probe
+                          description: Minimum consecutive failures for the probe
                             to be considered failed after having succeeded. Defaults
                             to 3. Minimum value is 1.
                           format: int32
@@ -1382,18 +1221,15 @@ spec:
                           description: HTTPGet specifies the http request to perform.
                           properties:
                             host:
-                              description:
-                                Host name to connect to, defaults to the
+                              description: Host name to connect to, defaults to the
                                 pod IP. You probably want to set "Host" in httpHeaders
                                 instead.
                               type: string
                             httpHeaders:
-                              description:
-                                Custom headers to set in the request. HTTP
+                              description: Custom headers to set in the request. HTTP
                                 allows repeated headers.
                               items:
-                                description:
-                                  HTTPHeader describes a custom header
+                                description: HTTPHeader describes a custom header
                                   to be used in HTTP probes
                                 properties:
                                   name:
@@ -1403,8 +1239,8 @@ spec:
                                     description: The header field value
                                     type: string
                                 required:
-                                  - name
-                                  - value
+                                - name
+                                - value
                                 type: object
                               type: array
                             path:
@@ -1412,67 +1248,58 @@ spec:
                               type: string
                             port:
                               anyOf:
-                                - type: string
-                                - type: integer
-                              description:
-                                Name or number of the port to access on
+                              - type: string
+                              - type: integer
+                              description: Name or number of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
                             scheme:
-                              description:
-                                Scheme to use for connecting to the host.
+                              description: Scheme to use for connecting to the host.
                                 Defaults to HTTP.
                               type: string
                           required:
-                            - port
+                          - port
                           type: object
                         initialDelaySeconds:
-                          description:
-                            "Number of seconds after the container has
+                          description: 'Number of seconds after the container has
                             started before liveness probes are initiated. More info:
-                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                           format: int32
                           type: integer
                         periodSeconds:
-                          description:
-                            How often (in seconds) to perform the probe.
+                          description: How often (in seconds) to perform the probe.
                             Default to 10 seconds. Minimum value is 1.
                           format: int32
                           type: integer
                         successThreshold:
-                          description:
-                            Minimum consecutive successes for the probe
+                          description: Minimum consecutive successes for the probe
                             to be considered successful after having failed. Defaults
                             to 1. Must be 1 for liveness. Minimum value is 1.
                           format: int32
                           type: integer
                         tcpSocket:
-                          description:
-                            "TCPSocket specifies an action involving a
+                          description: 'TCPSocket specifies an action involving a
                             TCP port. TCP hooks not yet supported TODO: implement
-                            a realistic TCP lifecycle hook"
+                            a realistic TCP lifecycle hook'
                           properties:
                             host:
-                              description:
-                                "Optional: Host name to connect to, defaults
-                                to the pod IP."
+                              description: 'Optional: Host name to connect to, defaults
+                                to the pod IP.'
                               type: string
                             port:
                               anyOf:
-                                - type: string
-                                - type: integer
-                              description:
-                                Number or name of the port to access on
+                              - type: string
+                              - type: integer
+                              description: Number or name of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
                           required:
-                            - port
+                          - port
                           type: object
                         timeoutSeconds:
-                          description:
-                            "Number of seconds after which the probe times
+                          description: 'Number of seconds after which the probe times
                             out. Defaults to 1 second. Minimum value is 1. More info:
-                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                            https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                           format: int32
                           type: integer
                       type: object
@@ -1480,26 +1307,23 @@ spec:
                       format: int32
                       type: integer
                     resources:
-                      description:
-                        ResourceRequirements describes the compute resource
+                      description: ResourceRequirements describes the compute resource
                         requirements.
                       properties:
                         limits:
                           additionalProperties:
                             type: string
-                          description:
-                            "Limits describes the maximum amount of compute
-                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                          description: 'Limits describes the maximum amount of compute
+                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                           type: object
                         requests:
                           additionalProperties:
                             type: string
-                          description:
-                            "Requests describes the minimum amount of compute
+                          description: 'Requests describes the minimum amount of compute
                             resources required. If Requests is omitted for a container,
                             it defaults to Limits if that is explicitly specified,
                             otherwise to an implementation-defined value. More info:
-                            https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                            https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                           type: object
                       type: object
                     server:
@@ -1509,8 +1333,8 @@ spec:
                   type: object
                 deploymentStrategy:
                   enum:
-                    - Recreate
-                    - RollingUpdate
+                  - Recreate
+                  - RollingUpdate
                   type: string
                 enableNodePortService:
                   type: boolean
@@ -1518,16 +1342,14 @@ spec:
                   type: boolean
                 envVars:
                   items:
-                    description:
-                      EnvVar represents an environment variable present
+                    description: EnvVar represents an environment variable present
                       in a Container.
                     properties:
                       name:
                         description: Name of the environment variable. Must be a C_IDENTIFIER.
                         type: string
                       value:
-                        description:
-                          'Variable references $(VAR_NAME) are expanded
+                        description: 'Variable references $(VAR_NAME) are expanded
                           using the previous defined environment variables in the
                           container and any service environment variables. If a variable
                           cannot be resolved, the reference in the input string will
@@ -1537,8 +1359,7 @@ spec:
                           not. Defaults to "".'
                         type: string
                       valueFrom:
-                        description:
-                          Source for the environment variable's value.
+                        description: Source for the environment variable's value.
                           Cannot be used if value is not empty.
                         properties:
                           configMapKeyRef:
@@ -1548,87 +1369,76 @@ spec:
                                 description: The key to select.
                                 type: string
                               name:
-                                description:
-                                  "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
-                                  uid?"
+                                  uid?'
                                 type: string
                               optional:
-                                description:
-                                  Specify whether the ConfigMap or its
+                                description: Specify whether the ConfigMap or its
                                   key must be defined
                                 type: boolean
                             required:
-                              - key
+                            - key
                             type: object
                           fieldRef:
-                            description:
-                              "Selects a field of the pod: supports metadata.name,
+                            description: 'Selects a field of the pod: supports metadata.name,
                               metadata.namespace, metadata.labels, metadata.annotations,
                               spec.nodeName, spec.serviceAccountName, status.hostIP,
-                              status.podIP."
+                              status.podIP.'
                             properties:
                               apiVersion:
-                                description:
-                                  Version of the schema the FieldPath is
+                                description: Version of the schema the FieldPath is
                                   written in terms of, defaults to "v1".
                                 type: string
                               fieldPath:
-                                description:
-                                  Path of the field to select in the specified
+                                description: Path of the field to select in the specified
                                   API version.
                                 type: string
                             required:
-                              - fieldPath
+                            - fieldPath
                             type: object
                           resourceFieldRef:
-                            description:
-                              "Selects a resource of the container: only
+                            description: 'Selects a resource of the container: only
                               resources limits and requests (limits.cpu, limits.memory,
                               limits.ephemeral-storage, requests.cpu, requests.memory
-                              and requests.ephemeral-storage) are currently supported."
+                              and requests.ephemeral-storage) are currently supported.'
                             properties:
                               containerName:
-                                description:
-                                  "Container name: required for volumes,
-                                  optional for env vars"
+                                description: 'Container name: required for volumes,
+                                  optional for env vars'
                                 type: string
                               divisor:
-                                description:
-                                  Specifies the output format of the exposed
+                                description: Specifies the output format of the exposed
                                   resources, defaults to "1"
                                 type: string
                               resource:
-                                description: "Required: resource to select"
+                                description: 'Required: resource to select'
                                 type: string
                             required:
-                              - resource
+                            - resource
                             type: object
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
                             properties:
                               key:
-                                description:
-                                  The key of the secret to select from.  Must
+                                description: The key of the secret to select from.  Must
                                   be a valid secret key.
                                 type: string
                               name:
-                                description:
-                                  "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
-                                  uid?"
+                                  uid?'
                                 type: string
                               optional:
-                                description:
-                                  Specify whether the Secret or its key
+                                description: Specify whether the Secret or its key
                                   must be defined
                                 type: boolean
                             required:
-                              - key
+                            - key
                             type: object
                         type: object
                     required:
-                      - name
+                    - name
                     type: object
                   type: array
                 image:
@@ -1638,19 +1448,16 @@ spec:
                 keepConfigDeployment:
                   type: boolean
                 livenessProbe:
-                  description:
-                    Probe describes a health check to be performed against
+                  description: Probe describes a health check to be performed against
                     a container to determine whether it is alive or ready to receive
                     traffic.
                   properties:
                     exec:
-                      description:
-                        One and only one of the following should be specified.
+                      description: One and only one of the following should be specified.
                         Exec specifies the action to take.
                       properties:
                         command:
-                          description:
-                            Command is the command line to execute inside
+                          description: Command is the command line to execute inside
                             the container, the working directory for the command  is
                             root ('/') in the container's filesystem. The command
                             is simply exec'd, it is not run inside a shell, so traditional
@@ -1662,8 +1469,7 @@ spec:
                           type: array
                       type: object
                     failureThreshold:
-                      description:
-                        Minimum consecutive failures for the probe to be
+                      description: Minimum consecutive failures for the probe to be
                         considered failed after having succeeded. Defaults to 3. Minimum
                         value is 1.
                       format: int32
@@ -1672,17 +1478,14 @@ spec:
                       description: HTTPGet specifies the http request to perform.
                       properties:
                         host:
-                          description:
-                            Host name to connect to, defaults to the pod
+                          description: Host name to connect to, defaults to the pod
                             IP. You probably want to set "Host" in httpHeaders instead.
                           type: string
                         httpHeaders:
-                          description:
-                            Custom headers to set in the request. HTTP
+                          description: Custom headers to set in the request. HTTP
                             allows repeated headers.
                           items:
-                            description:
-                              HTTPHeader describes a custom header to be
+                            description: HTTPHeader describes a custom header to be
                               used in HTTP probes
                             properties:
                               name:
@@ -1692,8 +1495,8 @@ spec:
                                 description: The header field value
                                 type: string
                             required:
-                              - name
-                              - value
+                            - name
+                            - value
                             type: object
                           type: array
                         path:
@@ -1701,66 +1504,57 @@ spec:
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Name or number of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                         scheme:
-                          description:
-                            Scheme to use for connecting to the host. Defaults
+                          description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
                           type: string
                       required:
-                        - port
+                      - port
                       type: object
                     initialDelaySeconds:
-                      description:
-                        "Number of seconds after the container has started
-                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                      description: 'Number of seconds after the container has started
+                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                     periodSeconds:
-                      description:
-                        How often (in seconds) to perform the probe. Default
+                      description: How often (in seconds) to perform the probe. Default
                         to 10 seconds. Minimum value is 1.
                       format: int32
                       type: integer
                     successThreshold:
-                      description:
-                        Minimum consecutive successes for the probe to
+                      description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
                         1. Must be 1 for liveness. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
-                      description:
-                        "TCPSocket specifies an action involving a TCP
+                      description: 'TCPSocket specifies an action involving a TCP
                         port. TCP hooks not yet supported TODO: implement a realistic
-                        TCP lifecycle hook"
+                        TCP lifecycle hook'
                       properties:
                         host:
-                          description:
-                            "Optional: Host name to connect to, defaults
-                            to the pod IP."
+                          description: 'Optional: Host name to connect to, defaults
+                            to the pod IP.'
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Number or name of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                       required:
-                        - port
+                      - port
                       type: object
                     timeoutSeconds:
-                      description:
-                        "Number of seconds after which the probe times
+                      description: 'Number of seconds after which the probe times
                         out. Defaults to 1 second. Minimum value is 1. More info:
-                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                   type: object
@@ -1769,19 +1563,16 @@ spec:
                     type: string
                   type: object
                 readinessProbe:
-                  description:
-                    Probe describes a health check to be performed against
+                  description: Probe describes a health check to be performed against
                     a container to determine whether it is alive or ready to receive
                     traffic.
                   properties:
                     exec:
-                      description:
-                        One and only one of the following should be specified.
+                      description: One and only one of the following should be specified.
                         Exec specifies the action to take.
                       properties:
                         command:
-                          description:
-                            Command is the command line to execute inside
+                          description: Command is the command line to execute inside
                             the container, the working directory for the command  is
                             root ('/') in the container's filesystem. The command
                             is simply exec'd, it is not run inside a shell, so traditional
@@ -1793,8 +1584,7 @@ spec:
                           type: array
                       type: object
                     failureThreshold:
-                      description:
-                        Minimum consecutive failures for the probe to be
+                      description: Minimum consecutive failures for the probe to be
                         considered failed after having succeeded. Defaults to 3. Minimum
                         value is 1.
                       format: int32
@@ -1803,17 +1593,14 @@ spec:
                       description: HTTPGet specifies the http request to perform.
                       properties:
                         host:
-                          description:
-                            Host name to connect to, defaults to the pod
+                          description: Host name to connect to, defaults to the pod
                             IP. You probably want to set "Host" in httpHeaders instead.
                           type: string
                         httpHeaders:
-                          description:
-                            Custom headers to set in the request. HTTP
+                          description: Custom headers to set in the request. HTTP
                             allows repeated headers.
                           items:
-                            description:
-                              HTTPHeader describes a custom header to be
+                            description: HTTPHeader describes a custom header to be
                               used in HTTP probes
                             properties:
                               name:
@@ -1823,8 +1610,8 @@ spec:
                                 description: The header field value
                                 type: string
                             required:
-                              - name
-                              - value
+                            - name
+                            - value
                             type: object
                           type: array
                         path:
@@ -1832,78 +1619,67 @@ spec:
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Name or number of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                         scheme:
-                          description:
-                            Scheme to use for connecting to the host. Defaults
+                          description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
                           type: string
                       required:
-                        - port
+                      - port
                       type: object
                     initialDelaySeconds:
-                      description:
-                        "Number of seconds after the container has started
-                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                      description: 'Number of seconds after the container has started
+                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                     periodSeconds:
-                      description:
-                        How often (in seconds) to perform the probe. Default
+                      description: How often (in seconds) to perform the probe. Default
                         to 10 seconds. Minimum value is 1.
                       format: int32
                       type: integer
                     successThreshold:
-                      description:
-                        Minimum consecutive successes for the probe to
+                      description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
                         1. Must be 1 for liveness. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
-                      description:
-                        "TCPSocket specifies an action involving a TCP
+                      description: 'TCPSocket specifies an action involving a TCP
                         port. TCP hooks not yet supported TODO: implement a realistic
-                        TCP lifecycle hook"
+                        TCP lifecycle hook'
                       properties:
                         host:
-                          description:
-                            "Optional: Host name to connect to, defaults
-                            to the pod IP."
+                          description: 'Optional: Host name to connect to, defaults
+                            to the pod IP.'
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Number or name of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                       required:
-                        - port
+                      - port
                       type: object
                     timeoutSeconds:
-                      description:
-                        "Number of seconds after which the probe times
+                      description: 'Number of seconds after which the probe times
                         out. Defaults to 1 second. Minimum value is 1. More info:
-                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                   type: object
                 registryBackends:
                   items:
-                    description:
-                      RegistryBackend defines a particular backend supporting
+                    description: RegistryBackend defines a particular backend supporting
                       the Quay registry
                     properties:
                       azure:
-                        description:
-                          AzureRegistryBackendSource defines Azure blob
+                        description: AzureRegistryBackendSource defines Azure blob
                           registry storage
                         properties:
                           accountKey:
@@ -1918,8 +1694,7 @@ spec:
                             type: string
                         type: object
                       cloudfrontS3:
-                        description:
-                          CloudfrontS3RegistryBackendSource defines CouldfrontS3
+                        description: CloudfrontS3RegistryBackendSource defines CouldfrontS3
                           registry storage
                         properties:
                           accessKey:
@@ -1944,8 +1719,7 @@ spec:
                       credentialsSecretName:
                         type: string
                       googleCloud:
-                        description:
-                          GoogleCloudRegistryBackendSource defines Google
+                        description: GoogleCloudRegistryBackendSource defines Google
                           Cloud registry storage
                         properties:
                           accessKey:
@@ -1958,8 +1732,7 @@ spec:
                             type: string
                         type: object
                       local:
-                        description:
-                          LocalRegistryBackendSource defines local registry
+                        description: LocalRegistryBackendSource defines local registry
                           storage
                         properties:
                           storagePath:
@@ -1968,8 +1741,7 @@ spec:
                       name:
                         type: string
                       rados:
-                        description:
-                          RADOSRegistryBackendSource defines Ceph RADOS
+                        description: RADOSRegistryBackendSource defines Ceph RADOS
                           registry storage
                         properties:
                           accessKey:
@@ -1990,8 +1762,7 @@ spec:
                       replicateByDefault:
                         type: boolean
                       rhocs:
-                        description:
-                          RHOCSRegistryBackendSource defines RHOCS registry
+                        description: RHOCSRegistryBackendSource defines RHOCS registry
                           storage
                         properties:
                           accessKey:
@@ -2026,8 +1797,7 @@ spec:
                             type: string
                         type: object
                       swift:
-                        description:
-                          SwiftRegistryBackendSource defines Swift registry
+                        description: SwiftRegistryBackendSource defines Swift registry
                           storage
                         properties:
                           authURL:
@@ -2052,12 +1822,11 @@ spec:
                             type: string
                         type: object
                     required:
-                      - name
+                    - name
                     type: object
                   type: array
                 registryStorage:
-                  description:
-                    RegistryStorage defines the configurations to support
+                  description: RegistryStorage defines the configurations to support
                     persistent storage
                   properties:
                     persistentVolumeAccessModes:
@@ -2073,25 +1842,22 @@ spec:
                   format: int32
                   type: integer
                 resources:
-                  description:
-                    ResourceRequirements describes the compute resource
+                  description: ResourceRequirements describes the compute resource
                     requirements.
                   properties:
                     limits:
                       additionalProperties:
                         type: string
-                      description:
-                        "Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                      description: 'Limits describes the maximum amount of compute
+                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                     requests:
                       additionalProperties:
                         type: string
-                      description:
-                        "Requests describes the minimum amount of compute
+                      description: 'Requests describes the minimum amount of compute
                         resources required. If Requests is omitted for a container,
                         it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                   type: object
                 routeHost:
@@ -2110,21 +1876,19 @@ spec:
                   type: string
                 deploymentStrategy:
                   enum:
-                    - Recreate
-                    - RollingUpdate
+                  - Recreate
+                  - RollingUpdate
                   type: string
                 envVars:
                   items:
-                    description:
-                      EnvVar represents an environment variable present
+                    description: EnvVar represents an environment variable present
                       in a Container.
                     properties:
                       name:
                         description: Name of the environment variable. Must be a C_IDENTIFIER.
                         type: string
                       value:
-                        description:
-                          'Variable references $(VAR_NAME) are expanded
+                        description: 'Variable references $(VAR_NAME) are expanded
                           using the previous defined environment variables in the
                           container and any service environment variables. If a variable
                           cannot be resolved, the reference in the input string will
@@ -2134,8 +1898,7 @@ spec:
                           not. Defaults to "".'
                         type: string
                       valueFrom:
-                        description:
-                          Source for the environment variable's value.
+                        description: Source for the environment variable's value.
                           Cannot be used if value is not empty.
                         properties:
                           configMapKeyRef:
@@ -2145,87 +1908,76 @@ spec:
                                 description: The key to select.
                                 type: string
                               name:
-                                description:
-                                  "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
-                                  uid?"
+                                  uid?'
                                 type: string
                               optional:
-                                description:
-                                  Specify whether the ConfigMap or its
+                                description: Specify whether the ConfigMap or its
                                   key must be defined
                                 type: boolean
                             required:
-                              - key
+                            - key
                             type: object
                           fieldRef:
-                            description:
-                              "Selects a field of the pod: supports metadata.name,
+                            description: 'Selects a field of the pod: supports metadata.name,
                               metadata.namespace, metadata.labels, metadata.annotations,
                               spec.nodeName, spec.serviceAccountName, status.hostIP,
-                              status.podIP."
+                              status.podIP.'
                             properties:
                               apiVersion:
-                                description:
-                                  Version of the schema the FieldPath is
+                                description: Version of the schema the FieldPath is
                                   written in terms of, defaults to "v1".
                                 type: string
                               fieldPath:
-                                description:
-                                  Path of the field to select in the specified
+                                description: Path of the field to select in the specified
                                   API version.
                                 type: string
                             required:
-                              - fieldPath
+                            - fieldPath
                             type: object
                           resourceFieldRef:
-                            description:
-                              "Selects a resource of the container: only
+                            description: 'Selects a resource of the container: only
                               resources limits and requests (limits.cpu, limits.memory,
                               limits.ephemeral-storage, requests.cpu, requests.memory
-                              and requests.ephemeral-storage) are currently supported."
+                              and requests.ephemeral-storage) are currently supported.'
                             properties:
                               containerName:
-                                description:
-                                  "Container name: required for volumes,
-                                  optional for env vars"
+                                description: 'Container name: required for volumes,
+                                  optional for env vars'
                                 type: string
                               divisor:
-                                description:
-                                  Specifies the output format of the exposed
+                                description: Specifies the output format of the exposed
                                   resources, defaults to "1"
                                 type: string
                               resource:
-                                description: "Required: resource to select"
+                                description: 'Required: resource to select'
                                 type: string
                             required:
-                              - resource
+                            - resource
                             type: object
                           secretKeyRef:
                             description: Selects a key of a secret in the pod's namespace
                             properties:
                               key:
-                                description:
-                                  The key of the secret to select from.  Must
+                                description: The key of the secret to select from.  Must
                                   be a valid secret key.
                                 type: string
                               name:
-                                description:
-                                  "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                   TODO: Add other useful fields. apiVersion, kind,
-                                  uid?"
+                                  uid?'
                                 type: string
                               optional:
-                                description:
-                                  Specify whether the Secret or its key
+                                description: Specify whether the Secret or its key
                                   must be defined
                                 type: boolean
                             required:
-                              - key
+                            - key
                             type: object
                         type: object
                     required:
-                      - name
+                    - name
                     type: object
                   type: array
                 hostname:
@@ -2235,19 +1987,16 @@ spec:
                 imagePullSecretName:
                   type: string
                 livenessProbe:
-                  description:
-                    Probe describes a health check to be performed against
+                  description: Probe describes a health check to be performed against
                     a container to determine whether it is alive or ready to receive
                     traffic.
                   properties:
                     exec:
-                      description:
-                        One and only one of the following should be specified.
+                      description: One and only one of the following should be specified.
                         Exec specifies the action to take.
                       properties:
                         command:
-                          description:
-                            Command is the command line to execute inside
+                          description: Command is the command line to execute inside
                             the container, the working directory for the command  is
                             root ('/') in the container's filesystem. The command
                             is simply exec'd, it is not run inside a shell, so traditional
@@ -2259,8 +2008,7 @@ spec:
                           type: array
                       type: object
                     failureThreshold:
-                      description:
-                        Minimum consecutive failures for the probe to be
+                      description: Minimum consecutive failures for the probe to be
                         considered failed after having succeeded. Defaults to 3. Minimum
                         value is 1.
                       format: int32
@@ -2269,17 +2017,14 @@ spec:
                       description: HTTPGet specifies the http request to perform.
                       properties:
                         host:
-                          description:
-                            Host name to connect to, defaults to the pod
+                          description: Host name to connect to, defaults to the pod
                             IP. You probably want to set "Host" in httpHeaders instead.
                           type: string
                         httpHeaders:
-                          description:
-                            Custom headers to set in the request. HTTP
+                          description: Custom headers to set in the request. HTTP
                             allows repeated headers.
                           items:
-                            description:
-                              HTTPHeader describes a custom header to be
+                            description: HTTPHeader describes a custom header to be
                               used in HTTP probes
                             properties:
                               name:
@@ -2289,8 +2034,8 @@ spec:
                                 description: The header field value
                                 type: string
                             required:
-                              - name
-                              - value
+                            - name
+                            - value
                             type: object
                           type: array
                         path:
@@ -2298,66 +2043,57 @@ spec:
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Name or number of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                         scheme:
-                          description:
-                            Scheme to use for connecting to the host. Defaults
+                          description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
                           type: string
                       required:
-                        - port
+                      - port
                       type: object
                     initialDelaySeconds:
-                      description:
-                        "Number of seconds after the container has started
-                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                      description: 'Number of seconds after the container has started
+                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                     periodSeconds:
-                      description:
-                        How often (in seconds) to perform the probe. Default
+                      description: How often (in seconds) to perform the probe. Default
                         to 10 seconds. Minimum value is 1.
                       format: int32
                       type: integer
                     successThreshold:
-                      description:
-                        Minimum consecutive successes for the probe to
+                      description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
                         1. Must be 1 for liveness. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
-                      description:
-                        "TCPSocket specifies an action involving a TCP
+                      description: 'TCPSocket specifies an action involving a TCP
                         port. TCP hooks not yet supported TODO: implement a realistic
-                        TCP lifecycle hook"
+                        TCP lifecycle hook'
                       properties:
                         host:
-                          description:
-                            "Optional: Host name to connect to, defaults
-                            to the pod IP."
+                          description: 'Optional: Host name to connect to, defaults
+                            to the pod IP.'
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Number or name of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                       required:
-                        - port
+                      - port
                       type: object
                     timeoutSeconds:
-                      description:
-                        "Number of seconds after which the probe times
+                      description: 'Number of seconds after which the probe times
                         out. Defaults to 1 second. Minimum value is 1. More info:
-                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                   type: object
@@ -2369,19 +2105,16 @@ spec:
                   format: int32
                   type: integer
                 readinessProbe:
-                  description:
-                    Probe describes a health check to be performed against
+                  description: Probe describes a health check to be performed against
                     a container to determine whether it is alive or ready to receive
                     traffic.
                   properties:
                     exec:
-                      description:
-                        One and only one of the following should be specified.
+                      description: One and only one of the following should be specified.
                         Exec specifies the action to take.
                       properties:
                         command:
-                          description:
-                            Command is the command line to execute inside
+                          description: Command is the command line to execute inside
                             the container, the working directory for the command  is
                             root ('/') in the container's filesystem. The command
                             is simply exec'd, it is not run inside a shell, so traditional
@@ -2393,8 +2126,7 @@ spec:
                           type: array
                       type: object
                     failureThreshold:
-                      description:
-                        Minimum consecutive failures for the probe to be
+                      description: Minimum consecutive failures for the probe to be
                         considered failed after having succeeded. Defaults to 3. Minimum
                         value is 1.
                       format: int32
@@ -2403,17 +2135,14 @@ spec:
                       description: HTTPGet specifies the http request to perform.
                       properties:
                         host:
-                          description:
-                            Host name to connect to, defaults to the pod
+                          description: Host name to connect to, defaults to the pod
                             IP. You probably want to set "Host" in httpHeaders instead.
                           type: string
                         httpHeaders:
-                          description:
-                            Custom headers to set in the request. HTTP
+                          description: Custom headers to set in the request. HTTP
                             allows repeated headers.
                           items:
-                            description:
-                              HTTPHeader describes a custom header to be
+                            description: HTTPHeader describes a custom header to be
                               used in HTTP probes
                             properties:
                               name:
@@ -2423,8 +2152,8 @@ spec:
                                 description: The header field value
                                 type: string
                             required:
-                              - name
-                              - value
+                            - name
+                            - value
                             type: object
                           type: array
                         path:
@@ -2432,66 +2161,57 @@ spec:
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Name or number of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                         scheme:
-                          description:
-                            Scheme to use for connecting to the host. Defaults
+                          description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
                           type: string
                       required:
-                        - port
+                      - port
                       type: object
                     initialDelaySeconds:
-                      description:
-                        "Number of seconds after the container has started
-                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                      description: 'Number of seconds after the container has started
+                        before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                     periodSeconds:
-                      description:
-                        How often (in seconds) to perform the probe. Default
+                      description: How often (in seconds) to perform the probe. Default
                         to 10 seconds. Minimum value is 1.
                       format: int32
                       type: integer
                     successThreshold:
-                      description:
-                        Minimum consecutive successes for the probe to
+                      description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
                         1. Must be 1 for liveness. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
-                      description:
-                        "TCPSocket specifies an action involving a TCP
+                      description: 'TCPSocket specifies an action involving a TCP
                         port. TCP hooks not yet supported TODO: implement a realistic
-                        TCP lifecycle hook"
+                        TCP lifecycle hook'
                       properties:
                         host:
-                          description:
-                            "Optional: Host name to connect to, defaults
-                            to the pod IP."
+                          description: 'Optional: Host name to connect to, defaults
+                            to the pod IP.'
                           type: string
                         port:
                           anyOf:
-                            - type: string
-                            - type: integer
-                          description:
-                            Number or name of the port to access on the
+                          - type: string
+                          - type: integer
+                          description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
                       required:
-                        - port
+                      - port
                       type: object
                     timeoutSeconds:
-                      description:
-                        "Number of seconds after which the probe times
+                      description: 'Number of seconds after which the probe times
                         out. Defaults to 1 second. Minimum value is 1. More info:
-                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
+                        https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes'
                       format: int32
                       type: integer
                   type: object
@@ -2499,25 +2219,22 @@ spec:
                   format: int32
                   type: integer
                 resources:
-                  description:
-                    ResourceRequirements describes the compute resource
+                  description: ResourceRequirements describes the compute resource
                     requirements.
                   properties:
                     limits:
                       additionalProperties:
                         type: string
-                      description:
-                        "Limits describes the maximum amount of compute
-                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                      description: 'Limits describes the maximum amount of compute
+                        resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                     requests:
                       additionalProperties:
                         type: string
-                      description:
-                        "Requests describes the minimum amount of compute
+                      description: 'Requests describes the minimum amount of compute
                         resources required. If Requests is omitted for a container,
                         it defaults to Limits if that is explicitly specified, otherwise
-                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
+                        to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                   type: object
               type: object
@@ -2527,8 +2244,7 @@ spec:
           properties:
             conditions:
               items:
-                description:
-                  QuayEcosystemCondition defines a list of conditions that
+                description: QuayEcosystemCondition defines a list of conditions that
                   the object will transiton through
                 properties:
                   lastTransitionTime:
@@ -2544,13 +2260,12 @@ spec:
                   status:
                     type: string
                   type:
-                    description:
-                      QuayEcosystemConditionType defines the types of conditions
+                    description: QuayEcosystemConditionType defines the types of conditions
                       the operator will run through
                     type: string
                 required:
-                  - status
-                  - type
+                - status
+                - type
                 type: object
               type: array
             hostname:
@@ -2558,8 +2273,7 @@ spec:
             message:
               type: string
             phase:
-              description:
-                QuayEcosystemPhase defines the phase of lifecycle the operator
+              description: QuayEcosystemPhase defines the phase of lifecycle the operator
                 is running in
               type: string
             setupComplete:
@@ -2567,6 +2281,6 @@ spec:
           type: object
   version: v1alpha1
   versions:
-    - name: v1alpha1
-      served: true
-      storage: true
+  - name: v1alpha1
+    served: true
+    storage: true
