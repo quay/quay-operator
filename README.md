@@ -579,3 +579,22 @@ Using the [operator-sdk](https://github.com/operator-framework/operator-sdk), ru
 ```
 $ operator-sdk up local --namespace=quay-enterprise
 ```
+
+## Upgrading Quay & Clair
+
+Execute the following steps to upgrade an existing deployment to a new version without upgrading the operator:
+
+```
+oc edit quayecosystem/quayecosystem
+```
+
+Find and update the following entries:
+
+```
+image: quay.io/redhat/clair-jwt:vX.X.X
+image: quay.io/redhat/quay:vX.X.X
+```
+
+Once saved, the operator will automatically apply the upgrade.
+
+_Note_: If you used a different name than `QuayEcosystem` for the custom resource to deploy your Quay ecosystem, you will have to replace the name to fit the proper value
