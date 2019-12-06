@@ -29,7 +29,7 @@ $ oc new-project quay-enterprise
 Deploy the cluster resources. Given that a number of elevated permissions are required to resources at a cluster scope the account you are currently logged in must have elevated rights
 
 ```
-$ oc create -f deploy/crds/redhatcop_v1alpha1_quayecosystem_crd.yaml
+$ oc create -f deploy/crds/redhatcop.redhat.io_quayecosystems_crd.yaml
 $ oc create -f deploy/service_account.yaml
 $ oc create -f deploy/cluster_role.yaml
 $ oc create -f deploy/cluster_role_binding.yaml
@@ -37,6 +37,13 @@ $ oc create -f deploy/role.yaml
 $ oc create -f deploy/role_binding.yaml
 $ oc create -f deploy/operator.yaml
 ```
+
+**Note: When running on OpenShift 3.x, an alternate Custom Resource Definition (CRD) than the file specified MUST be used. Otherwise an OpenAPI error will be produced**
+
+```
+$ oc create -f deploy/crds/redhatcop.redhat.io_quayecosystems_crd-3.x.yaml
+```
+
 
 ### Deploy a Quay Ecosystem
 

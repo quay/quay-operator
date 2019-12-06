@@ -454,12 +454,13 @@ func (r *ReconcileQuayEcosystemConfiguration) createClairDatabase(meta metav1.Ob
 
 func (r *ReconcileQuayEcosystemConfiguration) configurePostgreSQL(meta metav1.ObjectMeta) error {
 
-	postgresqlPods := &corev1.PodList{}
-	opts := &client.ListOptions{}
-	opts.SetLabelSelector(fmt.Sprintf("%s=%s", constants.LabelCompoentKey, constants.LabelComponentQuayDatabaseValue))
-	opts.InNamespace(r.quayConfiguration.QuayEcosystem.Namespace)
+	postgresqlPods := corev1.PodList{}
+	opts := []client.ListOption{
+		client.InNamespace(r.quayConfiguration.QuayEcosystem.Namespace),
+		client.MatchingLabels(map[string]string{constants.LabelCompoentKey: constants.LabelComponentQuayDatabaseValue}),
+	}
 
-	err := r.reconcilerBase.GetClient().List(context.TODO(), opts, postgresqlPods)
+	err := r.reconcilerBase.GetClient().List(context.TODO(), &postgresqlPods, opts...)
 
 	if err != nil {
 		return err

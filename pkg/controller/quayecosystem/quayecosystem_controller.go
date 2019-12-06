@@ -44,7 +44,7 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, k8sclient kubernetes.Interface) reconcile.Reconciler {
 
-	reconcilerBase := util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetRecorder("quayecosystem-controller"))
+	reconcilerBase := util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("quayecosystem-controller"))
 
 	return &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: k8sclient, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, k8sclient)}
 }
@@ -119,8 +119,6 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 			logging.Log.Error(err, "Failed to update QuayEcosystem status after setting defaults")
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemUpdateDefaultConfigurationConditionFailure, err)
 		}
-
-		return reconcile.Result{}, nil
 
 	}
 

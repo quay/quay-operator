@@ -82,14 +82,14 @@ spec:
     registryBackends:
       - name: local
         local:
-          storage_path: /opt/quayregistry
+          storagePath: /opt/quayregistry
 ```
 
 The following are a comprehensive list of properties for the `local` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
-| `storage_path` | Storage Directory | No | No |
+| `storagePath` | Storage Directory | No | No |
 
 
 #### Configuring Persistent Local Storage
@@ -127,9 +127,9 @@ spec:
     registryBackends:
       - name: s3
         s3:
-          s3_access_key: <s3_access_key>
-          s3_bucket: <s3_bucket>
-          s3_secret_key: <s3_scret_key>
+          accessKey: <accessKey>
+          bucketName: <bucketName>
+          secretKey: <secretKey>
           host: <host>
 ```
 
@@ -137,10 +137,10 @@ The following are a comprehensive list of properties for the `s3` registry backe
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
-| `storage_path` | Storage Directory | No | No |
-| `s3_bucket` | S3 Bucket | No | Yes |
-| `s3_access_key` | AWS Access Key | Yes | Yes |
-| `s3_secret_key` | AWS Secret Key | Yes | Yes |
+| `storagePath` | Storage Directory | No | No |
+| `bucketName` | S3 Bucket | No | Yes |
+| `accessKey` | AWS Access Key | Yes | Yes |
+| `secretKey` | AWS Secret Key | Yes | Yes |
 | `host` | S3 Host | No | No |
 | `port` | S3 Port | No | No |
 
@@ -160,20 +160,20 @@ spec:
     registryBackends:
       - name: azure
         azure:
-          azure_container: <azure_container>
-          azure_account_name: <azure_account_name>
-          azure_account_key: <azure_account_key>
+          containerName: <containerName>
+          accountName: <accountName>
+          accountKey: <accountKey>
 ```
 
 The following are a comprehensive list of properties for the `azure` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
-| `storage_path` | Storage Directory | No | No |
-| `azure_container` | Azure Storage Container | No | Yes |
-| `azure_account_name` | Azure Account Name | No | Yes |
-| `azure_account_key` | Azure Account Key | No | Yes |
-| `sas_token` | Azure SAS Token | No | No |
+| `storagePath` | Storage Directory | No | No |
+| `containerName` | Azure Storage Container | No | Yes |
+| `accountName` | Azure Account Name | No | Yes |
+| `accountKey` | Azure Account Key | No | Yes |
+| `sasToken` | Azure SAS Token | No | No |
 
 ### Google Cloud
 
@@ -187,21 +187,21 @@ metadata:
 spec:
   quay:
     registryBackends:
-      - name: googlecloud
-        googlecloud:
-          azure_container: <azure_container>
-          azure_account_name: <azure_account_name>
-          azure_account_key: <azure_account_key>
+      - name: googleCloud
+        googleCloud:
+          accessKey: <accessKey>
+          secretKey: <secretKey>
+          bucketName: <bucketName>
 ```
 
-The following are a comprehensive list of properties for the `azure` registry backend:
+The following are a comprehensive list of properties for the `googleCloud` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
-| `storage_path` | Storage Directory | No | No |
-| `access_key` | Cloud Access Key | Yes | Yes |
-| `secret_key` | Cloud Secret Key | Yes | Yes |
-| `bucket_name` | GCS Bucket | No | Yes |
+| `storagePath` | Storage Directory | No | No |
+| `accessKey` | Cloud Access Key | Yes | Yes |
+| `secretKey` | Cloud Secret Key | Yes | Yes |
+| `bucketName` | GCS Bucket | No | Yes |
 
 ### NooBaa (RHOCS)
 
@@ -218,23 +218,23 @@ spec:
       - name: rhocs
         rhocs:
           hostname: <hostname>
-          is_sucure: <is_secure>
-          access_key: <access_key>
-          secret_key: <secret_key>
-          bucket_name: <bucket_name>
+          secure: <secure>
+          accessKey: <accessKey>
+          secretKey: <secretKey>
+          bucketName: <bucketName>
 ```
 
 The following are a comprehensive list of properties for the `rhocs` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
-| `storage_path` | Storage Directory | No | No |
+| `storagePath` | Storage Directory | No | No |
 | `hostname` | NooBaa Server Hostname | No | Yes |
 | `port` | Custom Port | No | No |
-| `is_secure` | Is Secure | No | No |
-| `access_key` | Access Key | Yes | Yes |
-| `secret_key` | Secret Key | Yes | Yes |
-| `bucket_name` | Bucket Name | No | Yes |
+| `secure` | Is Secure | No | No |
+| `accessKey` | Access Key | Yes | Yes |
+| `secretKey` | Secret Key | Yes | Yes |
+| `bucketName` | Bucket Name | No | Yes |
 
 
 ### RADOS
@@ -250,12 +250,12 @@ spec:
   quay:
     registryBackends:
       - name: rados
-        rhocs:
+        rados:
           hostname: <hostname>
-          is_sucure: <is_secure>
-          access_key: <access_key>
-          secret_key: <secret_key>
-          bucket_name: <bucket_name>
+          secure: <secure>
+          accessKey: <accessKey>
+          secretKey: <secretKey>
+          bucketName: <bucketName>
 ```
 
 The following are a comprehensive list of properties for the `rados` registry backend:
@@ -265,10 +265,10 @@ The following are a comprehensive list of properties for the `rados` registry ba
 | `storage_path` | Storage Directory | No | No |
 | `hostname` | Rados Server Hostname | No | Yes |
 | `port` | Custom Port | No | No |
-| `is_secure` | Is Secure | No | No |
-| `access_key` | Access Key | Yes | Yes |
-| `secret_key` | Secret Key | Yes | Yes |
-| `bucket_name` | Bucket Name | No | Yes |
+| `secure` | Is Secure | No | No |
+| `accessKey` | Access Key | Yes | Yes |
+| `secretKey` | Secret Key | Yes | Yes |
+| `bucketName` | Bucket Name | No | Yes |
 
 ### Swift (OpenStack)
 
@@ -283,32 +283,32 @@ spec:
   quay:
     registryBackends:
       - name: swift
-        rhocs:
-          auth_version: <auth_version>
-          auth_url: <auth_url>
-          swift_container: <swift_container>
-          swift_user: <swift_user>
-          swift_password: <swift_password>
-          ca_cert_path: <ca_cert_path>
-          os_options:
+        swift:
+          authVersion: <authVersion>
+          authURL: <authURL>
+          container: <container>
+          user: <user>
+          password: <password>
+          caCertPath: <caCertPath>
+          osOptions:
             object_storage_url: <object_storage_url>
             user_domain_name: <user_domain_name>
             project_id: <project_id>
 ```
 
-The following are a comprehensive list of properties for the `rados` registry backend:
+The following are a comprehensive list of properties for the `swift` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
-| `storage_path` | Storage Directory | No | No |
-| `auth_version` | Swift Auth Version | No | Yes |
-| `auth_url` | Swift Auth URL | No | Yes |
-| `swift_container` | Swift Container Name | No | Yes |
-| `swift_user` | Username | Yes | Yes |
-| `swift_password` | Key/Password | Yes | Yes |
-| `ca_cert_path` | CA Cert Filename | No | No |
-| `temp_url_key` | Temp URL Key | No | No |
-| `os_options` | OS Options | No | No |
+| `storagePath` | Storage Directory | No | No |
+| `authVersion` | Swift Auth Version | No | Yes |
+| `authURL` | Swift Auth URL | No | Yes |
+| `container` | Swift Container Name | No | Yes |
+| `user` | Username | Yes | Yes |
+| `password` | Key/Password | Yes | Yes |
+| `caCertPath` | CA Cert Filename | No | No |
+| `tempURLKey` | Temp URL Key | No | No |
+| `osOptions` | OS Options | No | No |
 
 
 ### CloudFront (S3)
@@ -323,27 +323,27 @@ metadata:
 spec:
   quay:
     registryBackends:
-      - name: s3
-        s3:
-          s3_access_key: <s3_access_key>
-          s3_bucket: <s3_bucket>
-          s3_secret_key: <s3_scret_key>
+      - name: cloudfrontS3
+        cloudfrontS3:
+          accessKey: <accessKey>
+          bucketName: <bucketName>
+          secretKey: <secretKey>
           host: <host>
-          cloudfront_distribution_domain: <cloudfront_distribution_domain>
-          cloudfront_key_id: <cloudfront_key_id>
-          cloudfront_privatekey_filename: <cloudfront_privatekey_filename>
+          distributionDomain: <distributionDomain>
+          keyID: <keyID>
+          privateKeyFilename: <privateKeyFilename>
 ```
 
-The following are a comprehensive list of properties for the `cloudfronts3` registry backend:
+The following are a comprehensive list of properties for the `cloudfrontS3` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
-| `storage_path` | Storage Directory | No | No |
-| `s3_bucket` | S3 Bucket | No | Yes |
-| `s3_access_key` | AWS Access Key | Yes | Yes |
-| `s3_secret_key` | AWS Secret Key | Yes | Yes |
+| `storagePath` | Storage Directory | No | No |
+| `bucketName` | S3 Bucket | No | Yes |
+| `accessKey` | AWS Access Key | Yes | Yes |
+| `secretKey` | AWS Secret Key | Yes | Yes |
 | `host` | S3 Host | No | No |
 | `port` | S3 Port | No | No |
-| `cloudfront_distribution_domain` | CloudFront Distribution Domain Name | No | Yes |
-| `cloudfront_key_id` | CloudFront Key ID | No | Yes |
-| `cloudfront_privatekey_filename` | CloudFront Private Key | No | Yes |
+| `distributionDomain` | CloudFront Distribution Domain Name | No | Yes |
+| `keyID` | CloudFront Key ID | No | Yes |
+| `privateKeyFilename` | CloudFront Private Key Filename | No | Yes |

@@ -153,28 +153,28 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 		if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Local) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeLocalStorageName)
-			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.Local)
+			quayRegistry = append(quayRegistry, resources.LocalRegistryBackendToQuayLocalRegistryBackend(registryBackend.RegistryBackendSource.Local))
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.S3) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeS3StorageName)
-			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.S3)
+			quayRegistry = append(quayRegistry, resources.S3RegistryBackendToQuayS3RegistryBackend(registryBackend.RegistryBackendSource.S3))
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.GoogleCloud) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeGoogleCloudStorageName)
-			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.GoogleCloud)
+			quayRegistry = append(quayRegistry, resources.GoogleCloudRegistryBackendToQuayGoogleCloudRegistryBackend(registryBackend.RegistryBackendSource.GoogleCloud))
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Azure) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeAzureStorageName)
-			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.Azure)
+			quayRegistry = append(quayRegistry, resources.AzureRegistryBackendToQuayAzureRegistryBackend(registryBackend.RegistryBackendSource.Azure))
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.RHOCS) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeRHOCSStorageName)
-			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.RHOCS)
+			quayRegistry = append(quayRegistry, resources.RHOCSRegistryBackendToQuayRHOCSRegistryBackend(registryBackend.RegistryBackendSource.RHOCS))
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.RADOS) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeRADOSStorageName)
-			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.RADOS)
+			quayRegistry = append(quayRegistry, resources.RADOSRegistryBackendToQuayRADOSRegistryBackend(registryBackend.RegistryBackendSource.RADOS))
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.Swift) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeSwiftStorageName)
-			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.Swift)
+			quayRegistry = append(quayRegistry, resources.SwiftRegistryBackendToQuaySwiftRegistryBackend(registryBackend.RegistryBackendSource.Swift))
 		} else if !utils.IsZeroOfUnderlyingType(registryBackend.RegistryBackendSource.CloudfrontS3) {
 			quayRegistry = append(quayRegistry, constants.RegistryStorageTypeCloudfrontS3StorageName)
-			quayRegistry = append(quayRegistry, registryBackend.RegistryBackendSource.CloudfrontS3)
+			quayRegistry = append(quayRegistry, resources.CloudfrontS3RegistryBackendToQuayCloudfrontS3RegistryBackend(registryBackend.RegistryBackendSource.CloudfrontS3))
 		}
 
 		registryBackend.ReplicateByDefault = nil
