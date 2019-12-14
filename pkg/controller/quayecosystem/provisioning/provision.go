@@ -927,7 +927,7 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 
 			clairSslSecret = resources.GetTLSSecretDefinition(meta, privKeyBytes, certBytes)
 
-			err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, clairSslSecret)
+			err = r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, clairSslSecret)
 
 			if err != nil {
 				logging.Log.Error(err, "Error creating Clair SSL secret")
@@ -945,7 +945,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayDeployment(meta metav1.ObjectM
 
 	quayDeployment := resources.GetQuayDeploymentDefinition(meta, r.quayConfiguration)
 
-	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
+	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
 
 	if err != nil {
 		return err
@@ -960,7 +960,7 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 	if !r.quayConfiguration.ValidProvidedQuayConfigPasswordSecret {
 		quayConfigSecret := resources.GetSecretDefinitionFromCredentialsMap(resources.GetQuayConfigResourcesName(r.quayConfiguration.QuayEcosystem), meta, constants.DefaultQuayConfigCredentials)
 
-		err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayConfigSecret)
+		err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayConfigSecret)
 
 		if err != nil {
 			return err
@@ -970,12 +970,13 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 
 	quayDeployment := resources.GetQuayConfigDeploymentDefinition(meta, r.quayConfiguration)
 
-	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
+	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
 
 	if err != nil {
+		fmt.Printf("What the what error? %+v\n\n", err)
 		return err
 	}
-
+	fmt.Printf("created the deployment!!! %+v \n\n", quayDeployment)
 	return nil
 
 }
@@ -984,7 +985,7 @@ func (r *ReconcileQuayEcosystemConfiguration) clairDeployment(meta metav1.Object
 
 	clairDeployment := resources.GetClairDeploymentDefinition(meta, r.quayConfiguration)
 
-	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, clairDeployment)
+	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, clairDeployment)
 
 	if err != nil {
 		return err
@@ -1035,7 +1036,7 @@ func (r *ReconcileQuayEcosystemConfiguration) verifyDeployment(deploymentName st
 	}
 
 	if deployment.Status.AvailableReplicas != 1 {
-		scaled := k8sutils.GetDeploymentStatus(r.k8sclient, deploymentNamespace, deploymentName)
+		scaled := k8sutils.GetDeploymentStatus(r.reconcilerBase.GetClient(), deploymentNamespace, deploymentName)
 
 		if !scaled {
 			return &reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil

@@ -1,11 +1,9 @@
 module github.com/redhat-cop/quay-operator
 
 require (
-	github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/spec v0.19.0
 	github.com/openshift/api v3.9.1-0.20190424152011-77b8897ec79a+incompatible
 	github.com/operator-framework/operator-sdk v0.12.0
-	github.com/prometheus/client_golang v1.0.0
 	github.com/redhat-cop/operator-utils v0.0.0-20190520190018-1b1f81b7301e
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
