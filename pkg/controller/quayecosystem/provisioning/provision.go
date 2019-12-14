@@ -973,10 +973,8 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
 
 	if err != nil {
-		fmt.Printf("What the what error? %+v\n\n", err)
 		return err
 	}
-	fmt.Printf("created the deployment!!! %+v \n\n", quayDeployment)
 	return nil
 
 }
