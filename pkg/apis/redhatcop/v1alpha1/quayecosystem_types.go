@@ -240,7 +240,7 @@ type RegistryBackendSource struct {
 // RegistryStorage defines the configurations to support persistent storage
 // +k8s:openapi-gen=true
 type RegistryStorage struct {
-	// +listType=atomic
+	// +listType=set
 	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessModes,omitempty,name=persistentVolumeAccessModes"`
 	PersistentVolumeSize             string                              `json:"persistentVolumeSize,omitempty,name=volumeSize"`
 	PersistentVolumeStorageClassName string                              `json:"persistentVolumeStorageClassName,omitempty,name=storageClassName"`

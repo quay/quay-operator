@@ -510,7 +510,7 @@ spec:
   quay:
     imagePullSecretName: redhat-pull-secret
     nodeSelector:
-      node-role.kubernetes.io/infra=true
+      node-role.kubernetes.io/infra: true
 ```
 
 ### Deployment Strategy

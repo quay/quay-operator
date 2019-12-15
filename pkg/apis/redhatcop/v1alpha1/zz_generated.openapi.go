@@ -1242,7 +1242,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_RegistryStorage(ref common.ReferenceCall
 					"persistentVolumeAccessModes": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type": "set",
 							},
 						},
 						SchemaProps: spec.SchemaProps{

@@ -105,7 +105,7 @@ spec:
   quay:
     imagePullSecretName: redhat-pull-secret
     registryStorage:
-      persistentVolumeAccessMode:
+      persistentVolumeAccessModes:
         - ReadWriteOnce
       persistentVolumeSize: 10Gi
 ```
