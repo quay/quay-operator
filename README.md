@@ -459,7 +459,7 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    image: myregistry.example.com/quay/quay:3.1.0
+    image: myregistry.example.com/quay/quay:v3.1.0
 ```
 
 ### Compute Resources
