@@ -446,6 +446,22 @@ Each of the following components expose a set of similar properties that can be 
 
 As referenced in prior sections, an Image Pull Secret can specify the name of the secret containing credentials to an image from a protected registry using the property `imagePullSecret`.
 
+### Image
+
+There may be a desire to make use of an alternate image or source location for each of the components in the Quay ecosystem. The most common use case is to to make use of an image registry that contains all of the needed images instead of being sourced from the public internet. Each component has a property called `image` where the location of the related image can be referenced from.
+
+The following is an example of how a customized image location can be specified:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    image: myregistry.example.com/quay/quay:v3.1.0
+```
+
 ### Compute Resources
 
 [Compute Resources](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#resource-requests-and-limits-of-pod-and-container) such as memory and CPU can be specified in the same form as any other value in a `PodTemplate`. CPU and Memory values for _Requests_ and _Limits_ can be specified under a property called `resources`.
@@ -510,7 +526,7 @@ spec:
   quay:
     imagePullSecretName: redhat-pull-secret
     nodeSelector:
-      node-role.kubernetes.io/infra=true
+      node-role.kubernetes.io/infra: true
 ```
 
 ### Deployment Strategy

@@ -349,7 +349,7 @@ func (r *ReconcileQuayEcosystemConfiguration) coreClairResourceDeployment(metaOb
 	}
 
 	// Database (PostgreSQL/MySQL)
-	if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server) {
+	if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.Server) {
 
 		createClairDatabaseResult, err := r.createClairDatabase(metaObject)
 
@@ -475,7 +475,7 @@ func (r *ReconcileQuayEcosystemConfiguration) configurePostgreSQL(meta metav1.Ob
 
 	podName = postgresqlPodsItems[0].Name
 
-	success, stdout, stderr := k8sutils.ExecIntoPod(r.k8sclient, podName, fmt.Sprintf("echo \"SELECT * FROM pg_available_extensions\" | /opt/rh/rh-postgresql96/root/usr/bin/psql -d %s", r.quayConfiguration.QuayDatabase.Database), "", r.quayConfiguration.QuayEcosystem.Namespace)
+	success, stdout, stderr := k8sutils.ExecIntoPod(r.k8sclient, podName, fmt.Sprintf("echo \"SELECT * FROM pg_available_extensions\" | $(which psql) -d %s", r.quayConfiguration.QuayDatabase.Database), "", r.quayConfiguration.QuayEcosystem.Namespace)
 
 	if !success {
 		return fmt.Errorf("Failed to Exec into Postgresql Pod: %s", stderr)
@@ -485,7 +485,7 @@ func (r *ReconcileQuayEcosystemConfiguration) configurePostgreSQL(meta metav1.Ob
 		return nil
 	}
 
-	success, stdout, stderr = k8sutils.ExecIntoPod(r.k8sclient, podName, fmt.Sprintf("echo \"CREATE EXTENSION pg_trgm\" | /opt/rh/rh-postgresql96/root/usr/bin/psql -d %s", r.quayConfiguration.QuayDatabase.Database), "", r.quayConfiguration.QuayEcosystem.Namespace)
+	success, stdout, stderr = k8sutils.ExecIntoPod(r.k8sclient, podName, fmt.Sprintf("echo \"CREATE EXTENSION pg_trgm\" | $(which psql) -d %s", r.quayConfiguration.QuayDatabase.Database), "", r.quayConfiguration.QuayEcosystem.Namespace)
 
 	if !success {
 		return fmt.Errorf("Failed to add pg_trim extension: %s", stderr)
