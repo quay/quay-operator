@@ -229,7 +229,7 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 		if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.S3) {
 
 			if managedRegistryBackend.S3.StoragePath == "" || managedRegistryBackend.S3.BucketName == "" {
-				return false, fmt.Errorf("Failed to validate required credentials secret name for the provided registry backend. Name: %s", managedRegistryBackend.Name)
+				return false, fmt.Errorf("Failed to validate required properties for registry backend. Name: %s", managedRegistryBackend.Name)
 			}
 
 			if !utils.IsZeroOfUnderlyingType(managedRegistryBackend.CredentialsSecretName) {

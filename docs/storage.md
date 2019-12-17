@@ -51,14 +51,14 @@ spec:
     registryBackends:
       - name: azure-ussouthcentral
         credentialsSecretName: azure-ussouthcentral-registry
+        replicateByDefault: true
         azure:
           azure_container: quay
-          replicateByDefault: true
       - name: azure-seasia
         credentialsSecretName: azure-seasia-registry
+        replicateByDefault: true
         azure:
           azure_container: quay
-          replicateByDefault: true
 ```
 
 _Note:_ Support for replicated storage is not available for the `local` registry backend and will result in an error during the verification phase.

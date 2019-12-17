@@ -135,13 +135,11 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 	distributedStoragePreference := []string{}
 	distributedStorageReplicateByDefault := []string{}
 	storageReplication := false
-	truthy := true
 
 	for _, registryBackend := range quaySetupInstance.quayConfiguration.RegistryBackends {
 
 		var quayRegistry []interface{}
-
-		if registryBackend.ReplicateByDefault == &truthy {
+		if registryBackend.ReplicateByDefault != nil && *registryBackend.ReplicateByDefault == true {
 			distributedStorageReplicateByDefault = append(distributedStorageReplicateByDefault, registryBackend.Name)
 			storageReplication = true
 		}
