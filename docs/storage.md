@@ -28,7 +28,7 @@ In many cases, access to storage requires the use of sensitive values. Each back
 Instead of declaring the registry backend properties within the specific backend, the values can be added to a secret as shown below:
 
 ```
-oc create secret generic s3-credentials --from-literal=s3_access_key=<s3_access_key> --from-literal=s3_secret_key=<s3_secret_key>
+oc create secret generic s3-credentials --from-literal=accessKey=<accessKey> --from-literal=secretKey=<secretKey>
 ```
 
 With the values now present in the secret, the properties explicitly declared in the backend can be removed.
