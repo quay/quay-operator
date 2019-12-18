@@ -1,5 +1,5 @@
 channels:
-- currentCSV: quay.v0.0.8
-  name: alpha
-defaultChannel: alpha
+- currentCSV: quay.v1.0.0
+  name: stable
+defaultChannel: stable
 packageName: quay
