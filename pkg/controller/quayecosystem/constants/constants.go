@@ -31,6 +31,8 @@ const (
 	LabelComponentAppValue = "app"
 	// LabelComponentConfigValue is the name of the config label
 	LabelComponentConfigValue = "config"
+	// LabelComponentRepoMirrorValue is the name of the repomirror label
+	LabelComponentRepoMirrorValue = "mirror-app"
 	// LabelComponentClairValue is the name of the config label
 	LabelComponentClairValue = "clair"
 	// LabelComponentRedisValue is the name of the Redis label
@@ -112,6 +114,8 @@ const (
 	QuayEntryName = "QUAYENTRY"
 	// QuayEntryConfigValue represents the value that will start the Quay config container
 	QuayEntryConfigValue = "config"
+	// QuayEntryRepoMirrorValue represents the value that will start the Quay repomirror container
+	QuayEntryRepoMirrorValue = "repomirror"
 	// QuayConfigUsername represents the username of the Quay config container
 	QuayConfigUsername = "quayconfig"
 	// QuayConfigPasswordName represents the name of the environment variable contining the Quay configuration password
@@ -124,6 +128,8 @@ const (
 	QuayConfigDefaultPasswordValue = "quay"
 	// QuayContainerConfigName represents the name of the Quay config container
 	QuayContainerConfigName = "quay-enterprise-config"
+	// QuayContainerRepoMirrorName represents the name of the Quay repo mirror container
+	QuayContainerRepoMirrorName = "quay-enterprise-mirror-app"
 	// QuayContainerAppName represents the name of the Quay app container
 	QuayContainerAppName = "quay-enterprise-app"
 	// QuayContainerCertSecret is the name of the secret for extra Quay certificates

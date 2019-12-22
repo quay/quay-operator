@@ -206,6 +206,21 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		return *deployQuayResult, nil
 	}
 
+	// Deploy Quay Repo Mirror
+	if quayConfiguration.QuayEcosystem.Spec.Quay.EnableRepoMirroring {
+
+		deployQuayRepoMirrorResult, err := configuration.DeployQuayRepoMirror(metaObject)
+		if err != nil {
+			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to deploy Quay Repo Mirror", err.Error())
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+		}
+
+		if deployQuayRepoMirrorResult != nil {
+			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to deploy Quay Repo Mirror", "Failed to deploy Quay Repo Mirror")
+			return *deployQuayRepoMirrorResult, nil
+		}
+	}
+
 	// Manage Clair Resources
 	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
 

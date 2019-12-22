@@ -181,6 +181,14 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 		}
 	}
 	in.ConfigResources.DeepCopyInto(&out.ConfigResources)
+	if in.RepoMirrorEnvVars != nil {
+		in, out := &in.RepoMirrorEnvVars, &out.RepoMirrorEnvVars
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	in.RepoMirrorResources.DeepCopyInto(&out.RepoMirrorResources)
 	if in.Database != nil {
 		in, out := &in.Database, &out.Database
 		*out = new(Database)

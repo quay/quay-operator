@@ -96,6 +96,12 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 	quayConfig.Config["BUILDLOGS_REDIS"] = redisConfiguration
 	quayConfig.Config["USER_EVENTS_REDIS"] = redisConfiguration
 	quayConfig.Config["SERVER_HOSTNAME"] = quaySetupInstance.quayConfiguration.QuayHostname
+	quayConfig.Config["FEATURE_REPO_MIRROR"] = quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.EnableRepoMirroring
+	quayConfig.Config["REPO_MIRROR_TLS_VERIFY"] = quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.RepoMirrorTLSVerify
+
+	if !utils.IsZeroOfUnderlyingType(quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.RepoMirrorServerHostname) {
+		quayConfig.Config["REPO_MIRROR_SERVER_HOSTNAME"] = quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.RepoMirrorServerHostname
+	}
 
 	_, _, err = quaySetupInstance.setupClient.UpdateQuayConfiguration(quayConfig)
 

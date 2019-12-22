@@ -159,6 +159,23 @@ func (r *ReconcileQuayEcosystemConfiguration) DeployQuayConfiguration(metaObject
 
 }
 
+// DeployQuayRepoMirror takes care of the deployment of the quay repo mirror
+func (r *ReconcileQuayEcosystemConfiguration) DeployQuayRepoMirror(metaObject metav1.ObjectMeta) (*reconcile.Result, error) {
+
+	if err := r.quayRepoMirrorDeployment(metaObject); err != nil {
+		logging.Log.Error(err, "Failed to create Quay Repo Mirror deployment")
+		return nil, err
+	}
+
+	time.Sleep(time.Duration(2) * time.Second)
+
+	// Verify Deployment
+	deploymentName := resources.GetQuayRepoMirrorResourcesName(r.quayConfiguration.QuayEcosystem)
+
+	return r.verifyDeployment(deploymentName, r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace)
+
+}
+
 // DeployQuay takes care of base configuration
 func (r *ReconcileQuayEcosystemConfiguration) DeployQuay(metaObject metav1.ObjectMeta) (*reconcile.Result, error) {
 
@@ -969,6 +986,20 @@ func (r *ReconcileQuayEcosystemConfiguration) quayConfigDeployment(meta metav1.O
 	}
 
 	quayDeployment := resources.GetQuayConfigDeploymentDefinition(meta, r.quayConfiguration)
+
+	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) quayRepoMirrorDeployment(meta metav1.ObjectMeta) error {
+
+	quayDeployment := resources.GetQuayRepoMirrorDeploymentDefinition(meta, r.quayConfiguration)
 
 	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quayDeployment)
 
