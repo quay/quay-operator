@@ -29,7 +29,7 @@ spec:
         memory: 1000Mi
     envVars:
       - name: DEBUGLOG
-        value: true
+        value: "true"
   redis:
     credentialsSecretName: quay-redis-password
     imagePullSecretName: redhat-pull-secret
@@ -37,6 +37,3 @@ spec:
     enabled: true
     imagePullSecretName: redhat-pull-secret
     updateInterval: "60m"
-
-
-
