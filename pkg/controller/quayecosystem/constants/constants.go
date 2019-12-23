@@ -170,49 +170,49 @@ const (
 	RegistryStorageTypeCloudfrontS3StorageName = "CloudFrontedS3Storage"
 
 	// S3AccessKey is the name of the S3 Access Key
-	S3AccessKey = "s3_access_key"
+	S3AccessKey = "accessKey"
 
 	// S3SecretKey is the name of the S3 Secret Key
-	S3SecretKey = "s3_secret_key"
+	S3SecretKey = "secretKey"
 
 	// AzureAccountName is the name of the Azure Account Name
-	AzureAccountName = "azure_account_name"
+	AzureAccountName = "accountName"
 
 	// AzureAccountKey is the name of the Azure Secret Key
-	AzureAccountKey = "azure_account_key"
+	AzureAccountKey = "accountKey"
 
 	// AzureSasToken is the name of the Azure SAS Token
-	AzureSasToken = "sas_token"
+	AzureSasToken = "sasToken"
 
 	// GoogleCloudAccessKey is the name of the Google Cloud access key
-	GoogleCloudAccessKey = "access_key"
+	GoogleCloudAccessKey = "accessKey"
 
 	// GoogleCloudSecretKey is the name of the Google Cloud secret Key
-	GoogleCloudSecretKey = "secret_key"
+	GoogleCloudSecretKey = "secretKey"
 
 	// RHOCSAccessKey is the name of the RHOCS access key
-	RHOCSAccessKey = "access_key"
+	RHOCSAccessKey = "accessKey"
 
 	// RHOCSSecretKey is the name of the RHOCS secret Key
-	RHOCSSecretKey = "secret_key"
+	RHOCSSecretKey = "secretKey"
 
 	// RADOSAccessKey is the name of the RADOS access key
-	RADOSAccessKey = "access_key"
+	RADOSAccessKey = "accessKey"
 
 	// RADOSSecretKey is the name of the RADOS secret Key
-	RADOSSecretKey = "secret_key"
+	RADOSSecretKey = "secretKey"
 
 	// SwiftUser is the name of the Swift user Key
-	SwiftUser = "swift_user"
+	SwiftUser = "user"
 
 	// SwiftPassword is the name of the Swift password Key
-	SwiftPassword = "swift_password"
+	SwiftPassword = "password"
 
 	// CloudfrontS3AccessKey is the name of the S3 Access Key
-	CloudfrontS3AccessKey = "s3_access_key"
+	CloudfrontS3AccessKey = "accessKey"
 
 	// CloudfrontS3SecretKey is the name of the S3 Secret Key
-	CloudfrontS3SecretKey = "s3_secret_key"
+	CloudfrontS3SecretKey = "secretKey"
 
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
