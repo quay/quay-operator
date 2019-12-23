@@ -112,10 +112,17 @@ type Quay struct {
 	ConfigResources  corev1.ResourceRequirements `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
 	ConfigRouteHost  string                      `json:"configRouteHost,omitempty"`
 	ConfigSecretName string                      `json:"configSecretName,omitempty"`
-	Database         *Database                   `json:"database,omitempty"`
+	// +listType=atomic
+	RepoMirrorEnvVars        []corev1.EnvVar             `json:"repoMirrorEnvVars,omitempty"`
+	RepoMirrorResources      corev1.ResourceRequirements `json:"repoMirrorResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
+	RepoMirrorServerHostname string                      `json:"repoMirrorServerHostname,omitempty"`
+	RepoMirrorTLSVerify      bool                        `json:"repoMirrorTLSVerify,omitempty"`
+
+	Database *Database `json:"database,omitempty"`
 	// +kubebuilder:validation:Enum=Recreate;RollingUpdate
 	DeploymentStrategy    appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
 	EnableNodePortService bool                          `json:"enableNodePortService,omitempty"`
+	EnableRepoMirroring   bool                          `json:"enableRepoMirroring,omitempty"`
 	// +listType=atomic
 	EnvVars              []corev1.EnvVar   `json:"envVars,omitempty"`
 	Image                string            `json:"image,omitempty"`

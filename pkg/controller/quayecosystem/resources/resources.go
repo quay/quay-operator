@@ -42,7 +42,13 @@ func BuildQuayConfigResourceLabels(resourceMap map[string]string) map[string]str
 	return resourceMap
 }
 
-// BuildClairResourceLabels builds labels for the Quay config resources
+// BuildQuayRepoMirrorResourceLabels builds labels for the Quay repomirror resources
+func BuildQuayRepoMirrorResourceLabels(resourceMap map[string]string) map[string]string {
+	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentRepoMirrorValue
+	return resourceMap
+}
+
+// BuildClairResourceLabels builds labels for the Clair resources
 func BuildClairResourceLabels(resourceMap map[string]string) map[string]string {
 	resourceMap[constants.LabelCompoentKey] = constants.LabelComponentClairValue
 	return resourceMap
@@ -74,6 +80,11 @@ func GetQuayResourcesName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string
 // GetQuayConfigResourcesName returns name of Kubernetes resource name
 func GetQuayConfigResourcesName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
 	return fmt.Sprintf("%s-quay-config", GetGenericResourcesName(quayEcosystem))
+}
+
+// GetQuayRepoMirrorResourcesName returns the name of the Quay repomirror resources
+func GetQuayRepoMirrorResourcesName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-quay-repomirror", GetGenericResourcesName(quayEcosystem))
 }
 
 // GetClairResourcesName returns name of Clair app name

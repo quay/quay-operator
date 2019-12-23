@@ -212,6 +212,27 @@ Quay supports multiple storage backends (configured as an array). The quay opera
 
 Please refer to the [Registry Storage Documentation](docs/storage.md) for the options available.
 
+### Repository Mirroring
+
+Quay provides the capability to create container image repositories that exactly match the content of external registries. This functionality can be enabled by setting the `enableRepoMirroring: true` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    enableRepoMirroring: true
+```
+
+The following additional options are also available:
+
+* `repoMirrorTLSVerify` - Require HTTPS and verify certificates of Quay registry during mirror
+* `repoMirrorServerHostname` - URL for use by the skopeo copy command
+* `repoMirrorEnvVars` - Environment variables to be applied to the repository mirror container
+* `repoMirrorResources` - Compute resources to be applied to the repository mirror container
 
 ### Configuration Files
 

@@ -119,7 +119,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 		},
 	}
 
-	envVars = utils.MergeEnvVars(envVars, quayConfiguration.QuayEcosystem.Spec.Quay.EnvVars)
+	envVars = utils.MergeEnvVars(envVars, quayConfiguration.QuayEcosystem.Spec.Quay.ConfigEnvVars)
 
 	quayDeploymentPodSpec := corev1.PodSpec{
 		Containers: []corev1.Container{{
@@ -154,6 +154,108 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
 						Port: intstr.IntOrString{IntVal: 8443},
+					},
+				},
+			},
+		}},
+		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
+		ServiceAccountName: constants.QuayServiceAccount,
+		Volumes: []corev1.Volume{corev1.Volume{
+			Name: constants.QuayConfigVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				Projected: &corev1.ProjectedVolumeSource{
+					Sources: getBaselineQuayVolumeProjections(quayConfiguration),
+				},
+			}}}}
+
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
+		quayDeploymentPodSpec.ImagePullSecrets = []corev1.LocalObjectReference{corev1.LocalObjectReference{
+			Name: quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName,
+		},
+		}
+	}
+
+	quayDeployment := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+			Kind:       "Deployment",
+		},
+		ObjectMeta: meta,
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: meta.Labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: meta.Labels,
+				},
+				Spec: quayDeploymentPodSpec,
+			},
+			Strategy: appsv1.DeploymentStrategy{
+				Type: quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy,
+			},
+		},
+	}
+
+	return quayDeployment
+}
+
+func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *QuayConfiguration) *appsv1.Deployment {
+
+	meta.Name = GetQuayRepoMirrorResourcesName(quayConfiguration.QuayEcosystem)
+	BuildQuayRepoMirrorResourceLabels(meta.Labels)
+
+	envVars := []corev1.EnvVar{
+		{
+			Name:  constants.QuayEntryName,
+			Value: constants.QuayEntryRepoMirrorValue,
+		},
+		{
+			Name: constants.QuayNamespaceEnvironmentVariable,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+	}
+
+	envVars = utils.MergeEnvVars(envVars, quayConfiguration.QuayEcosystem.Spec.Quay.RepoMirrorEnvVars)
+
+	quayDeploymentPodSpec := corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Image: quayConfiguration.QuayEcosystem.Spec.Quay.Image,
+			Name:  constants.QuayContainerRepoMirrorName,
+			Env:   envVars,
+			Ports: []corev1.ContainerPort{{
+				ContainerPort: 8080,
+				Name:          "http",
+			}, {
+				ContainerPort: 8443,
+				Name:          "https",
+			}},
+			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
+				Name:      constants.QuayConfigVolumeName,
+				MountPath: constants.QuayConfigVolumePath,
+				ReadOnly:  false,
+			}},
+			Resources: quayConfiguration.QuayEcosystem.Spec.Quay.RepoMirrorResources,
+			ReadinessProbe: &corev1.Probe{
+				FailureThreshold:    3,
+				InitialDelaySeconds: 10,
+				Handler: corev1.Handler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.IntOrString{IntVal: 9092},
+					},
+				},
+			},
+			LivenessProbe: &corev1.Probe{
+				FailureThreshold:    3,
+				InitialDelaySeconds: 30,
+				Handler: corev1.Handler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.IntOrString{IntVal: 9092},
 					},
 				},
 			},
