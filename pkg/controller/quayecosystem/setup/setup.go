@@ -183,8 +183,18 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 
 	quayConfig.Config["DISTRIBUTED_STORAGE_CONFIG"] = distributedStorageConfig
 	quayConfig.Config["FEATURE_STORAGE_REPLICATION"] = storageReplication
+
+	// Set storage preference if not set
+	if len(quaySetupInstance.quayConfiguration.RegistryBackends) == 1 {
+		distributedStoragePreference = append(distributedStoragePreference, quaySetupInstance.quayConfiguration.RegistryBackends[0].Name)
+	}
+
 	quayConfig.Config["DISTRIBUTED_STORAGE_PREFERENCE"] = distributedStoragePreference
-	quayConfig.Config["DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS"] = distributedStorageReplicateByDefault
+
+	// Set default storage preference locations if defined
+	if len(distributedStorageReplicateByDefault) > 0 {
+		quayConfig.Config["DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS"] = distributedStorageReplicateByDefault
+	}
 
 	// Setup Security Scanner
 	if quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Clair != nil && quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
