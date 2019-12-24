@@ -1,10 +1,10 @@
 # Registry Storage
 
-Red Hat Quay supports multiple backends for the purpose of image storage and consist of a variety of local and cloud storage options. This page provides an overview how to configure the Quay Operator to make use of these backends.
+Red Hat Quay supports multiple backends for the purpose of image storage and consist of a variety of local and cloud storage options. This page provides an overview on how to configure the Quay Operator to make use of these backends.
 
 ## Overview
 
-Storage for Quay can be configured using the `registryBackend` field within the `quay` property in the  `QuayEcosystem` resource which contain an array of backends. The ability to define multiple backends enables replication and high availability of images.
+Storage for Quay can be configured using the `registryBackend` field within the `quay` property in the  `QuayEcosystem` resource which contains an array of backends. The ability to define multiple backends enables replication and high availability of images.
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -38,7 +38,7 @@ Specific details on the types of properties supported for each backend are found
 
 ### Replication
 
-Support is available to replicate the registry storage to multiple backends. To activate storage replication, set the `enableStorageReplication` property to the value of `true`. Individual registry backends can also be configured to be replicated by default by setting the `replicateByDefault` property to tha value of `true`. A full configuration demonstrating the replication options available is shown below:
+Support is available to replicate the registry storage to multiple backends. To activate storage replication, set the `enableStorageReplication` property to the value of `true`. Individual registry backends can also be configured to be replicated by default by setting the `replicateByDefault` property to that value of `true`. A full configuration demonstrating the replication options available is shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -70,7 +70,7 @@ One or more of the following registry storage backends can be defined to specify
 
 ### Local Storage
 
-The following is an example for configuring the registry to make use of Local storage 
+The following is an example for configuring the registry to make use of local storage 
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -133,7 +133,7 @@ spec:
           host: <host>
 ```
 
-The following are a comprehensive list of properties for the `s3` registry backend:
+The following is a comprehensive list of properties for the `s3` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
@@ -146,7 +146,7 @@ The following are a comprehensive list of properties for the `s3` registry backe
 
 
 
-### Microsoftt Azure
+### Microsoft Azure
 
 The following is an example for configuring the registry to make use of Blob storage on the Microsoft Azure platform 
 
@@ -165,7 +165,7 @@ spec:
           accountKey: <accountKey>
 ```
 
-The following are a comprehensive list of properties for the `azure` registry backend:
+The following is a comprehensive list of properties for the `azure` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
@@ -224,7 +224,7 @@ spec:
           bucketName: <bucketName>
 ```
 
-The following are a comprehensive list of properties for the `rhocs` registry backend:
+The following is a comprehensive list of properties for the `rhocs` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
@@ -296,7 +296,7 @@ spec:
             project_id: <project_id>
 ```
 
-The following are a comprehensive list of properties for the `swift` registry backend:
+The following is a comprehensive list of properties for the `swift` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
@@ -334,7 +334,7 @@ spec:
           privateKeyFilename: <privateKeyFilename>
 ```
 
-The following are a comprehensive list of properties for the `cloudfrontS3` registry backend:
+The following is a comprehensive list of properties for the `cloudfrontS3` registry backend:
 
 | Property | Description | Credential Secret Supported | Required |
 | -------- | ----------- | --------------------------- | -------- |
