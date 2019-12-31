@@ -118,7 +118,8 @@ func (r *LoadBalancerExternalAccess) waitForExternalP(serviceName string) (*core
 		return hasExternalAddress(svc), nil
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 	watchEvent, err := tools_watch.UntilWithoutRetry(ctx, w, condition)
 
 	if err == wait.ErrWaitTimeout {
