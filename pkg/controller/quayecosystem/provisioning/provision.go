@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	routev1 "github.com/openshift/api/route/v1"
 	ossecurityv1 "github.com/openshift/api/security/v1"
 	qclient "github.com/redhat-cop/quay-operator/pkg/client"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/externalaccess"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
@@ -66,9 +66,12 @@ func (r *ReconcileQuayEcosystemConfiguration) CoreQuayResourceDeployment(metaObj
 		return nil, err
 	}
 
-	if err := r.configureAnyUIDSCCs(metaObject); err != nil {
-		logging.Log.Error(err, "Failed to configure SCCs")
-		return nil, err
+	// Configure SCC when running in OpenShift
+	if r.quayConfiguration.IsOpenShift {
+		if err := r.configureAnyUIDSCCs(metaObject); err != nil {
+			logging.Log.Error(err, "Failed to configure SCCs")
+			return nil, err
+		}
 	}
 
 	// Redis
@@ -117,16 +120,6 @@ func (r *ReconcileQuayEcosystemConfiguration) CoreQuayResourceDeployment(metaObj
 
 	if err := r.createQuayConfigService(metaObject); err != nil {
 		logging.Log.Error(err, "Failed to create Quay Config service")
-		return nil, err
-	}
-
-	if err := r.createQuayRoute(metaObject); err != nil {
-		logging.Log.Error(err, "Failed to create Quay route")
-		return nil, err
-	}
-
-	if err := r.createQuayConfigRoute(metaObject); err != nil {
-		logging.Log.Error(err, "Failed to create Quay Config route")
 		return nil, err
 	}
 
@@ -218,7 +211,7 @@ func (r *ReconcileQuayEcosystemConfiguration) DeployClair(metaObject metav1.Obje
 }
 
 // RemoveQuayConfigResources removes the resources associated with the Quay Configuration
-func (r *ReconcileQuayEcosystemConfiguration) RemoveQuayConfigResources(metaObject metav1.ObjectMeta) (*reconcile.Result, error) {
+func (r *ReconcileQuayEcosystemConfiguration) RemoveQuayConfigResources(metaObject metav1.ObjectMeta, external externalaccess.ExternalAccess) (*reconcile.Result, error) {
 
 	quayName := resources.GetQuayConfigResourcesName(r.quayConfiguration.QuayEcosystem)
 
@@ -229,19 +222,9 @@ func (r *ReconcileQuayEcosystemConfiguration) RemoveQuayConfigResources(metaObje
 		return nil, err
 	}
 
-	// OpenShift Route
-	route := &routev1.Route{}
-	err = r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: quayName, Namespace: r.quayConfiguration.QuayEcosystem.Namespace}, route)
-
-	if err != nil && !apierrors.IsNotFound(err) {
-		logging.Log.Error(err, "Error Finding Quay Config Route", "Namespace", r.quayConfiguration.QuayEcosystem.Namespace, "Name", quayName)
-		return nil, err
-	}
-
-	err = r.reconcilerBase.GetClient().Delete(context.TODO(), route)
-
-	if err != nil && !apierrors.IsNotFound(err) {
-		logging.Log.Error(err, "Failed to Delete Quay Config Route", "Namespace", r.quayConfiguration.QuayEcosystem.Namespace, "Name", quayName)
+	// OpenShift External Access
+	if err := external.RemoveQuayConfigExternalAccess(metaObject); err != nil {
+		logging.Log.Error(err, "Error Deleting Quay Config Deployment", "Deployment", r.quayConfiguration.QuayEcosystem.Namespace, "Name", quayName)
 		return nil, err
 	}
 
@@ -642,53 +625,6 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigService(meta metav
 
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) createQuayRoute(meta metav1.ObjectMeta) error {
-
-	meta.Name = resources.GetQuayResourcesName(r.quayConfiguration.QuayEcosystem)
-
-	route := resources.GetQuayRouteDefinition(meta, r.quayConfiguration.QuayEcosystem)
-
-	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, route)
-
-	if err != nil {
-		return err
-	}
-
-	time.Sleep(time.Duration(2) * time.Second)
-
-	createdRoute := &routev1.Route{}
-	err = r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: meta.Name, Namespace: r.quayConfiguration.QuayEcosystem.Namespace}, createdRoute)
-
-	if err != nil {
-		return err
-	}
-
-	if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.RouteHost) {
-		r.quayConfiguration.QuayHostname = createdRoute.Spec.Host
-	} else {
-		r.quayConfiguration.QuayHostname = r.quayConfiguration.QuayEcosystem.Spec.Quay.RouteHost
-	}
-
-	r.quayConfiguration.QuayEcosystem.Status.Hostname = r.quayConfiguration.QuayHostname
-
-	return nil
-
-}
-
-func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigRoute(meta metav1.ObjectMeta) error {
-
-	route := resources.GetQuayConfigRouteDefinition(meta, r.quayConfiguration.QuayEcosystem)
-
-	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, route)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-
-}
-
 func (r *ReconcileQuayEcosystemConfiguration) createClairService(meta metav1.ObjectMeta) error {
 
 	service := resources.GetClairServiceDefinition(meta, r.quayConfiguration.QuayEcosystem)
@@ -886,7 +822,17 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 	if !isQuayCertificatesConfigured(appConfigSecret) {
 
 		if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName) {
-			certBytes, privKeyBytes, err := cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{}, []string{r.quayConfiguration.QuayHostname})
+			var certBytes, privKeyBytes []byte
+
+			// Check if hostname is a IP address or hostname
+			parsedIP := net.ParseIP(r.quayConfiguration.QuayHostname)
+
+			if parsedIP == nil {
+				certBytes, privKeyBytes, err = cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{}, []string{r.quayConfiguration.QuayHostname})
+			} else {
+				certBytes, privKeyBytes, err = cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{parsedIP}, []string{})
+			}
+
 			if err != nil {
 				logging.Log.Error(err, "Error creating public/private key")
 				return nil, err

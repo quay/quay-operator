@@ -348,7 +348,7 @@ spec:
 
 ### Specifying the Quay Route
 
-Quay makes use of an OpenShift route to enable ingress. The hostname for this route is automatically generated as per the configuration of the OpenShift cluster. Alternatively, the hostname for this route can be explicitly specified using the `routeHost` property under the _quay_ field as shown below:
+Quay makes use of an OpenShift route to enable ingress. The hostname for this route is automatically generated as per the configuration of the OpenShift cluster. Alternatively, the hostname for this route can be explicitly specified using the `hostname` property under the _quay_ field as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -357,8 +357,33 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    routeHost: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
+    hostname: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
     imagePullSecretName: redhat-pull-secret
+```
+
+### Methods for Exteral Access
+
+Support is available to access Quay through a number of OpenShift and Kubernetes mechanisms for ingress. When running on OpenShift, a [Route](https://docs.openshift.com/container-platform/4.2/networking/routes/route-configuration.html) is used while a [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) is used. 
+
+The type of external access can be specified by setting the `externalAccessType` using one of the available options in the table below:
+
+| External Access Type | Description |  Notes |
+| --------- | ---------- | ---------- |
+| `Route` | [OpenShift Route](https://docs.openshift.com/container-platform/4.2/networking/routes/route-configuration.html) | Can only be specified when running in OpenShift |
+| `LoadBalancer` | [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) | |
+| `NodePort` | [NodePort Service](https://kubernetes.io/docs/concepts/services-networking/service/#nodeport) | A dns based hostname or IP address **must** be specified using the `hostname` property of the `quay` resource |
+
+An example of how to specify the `externalAccessType` is shown below
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+     externalAccessType: LoadBalancer
 ```
 
 
@@ -366,7 +391,7 @@ spec:
 
 During the development process, you may want to test the provisioning and setup of Quay Enterprise server. By default, the operator will use the internal service to communicate with the configuration pod. However, when running external to the cluster, you will need to specify the ingress location for which the setup process can use.
 
-Specify the `configRoute` as shown below:
+Specify the `configHostname` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -375,7 +400,7 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    configRouteHost: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
+    configHostname: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
     imagePullSecretName: redhat-pull-secret
 ```
 

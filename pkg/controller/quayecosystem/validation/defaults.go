@@ -77,10 +77,16 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	}
 
 	// Default Quay Config Route
-	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigRouteHost) {
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigHostname) {
 		quayConfiguration.QuayConfigHostname = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
 	} else {
-		quayConfiguration.QuayConfigHostname = quayConfiguration.QuayEcosystem.Spec.Quay.ConfigRouteHost
+		quayConfiguration.QuayConfigHostname = quayConfiguration.QuayEcosystem.Spec.Quay.ConfigHostname
+	}
+
+	// Default External Access Type
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType) {
+		changed = true
+		quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType = redhatcopv1alpha1.RouteExternalAccessType
 	}
 
 	// Apply default values for Redis

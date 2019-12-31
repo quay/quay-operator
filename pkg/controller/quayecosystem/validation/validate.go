@@ -213,6 +213,16 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	}
 
+	// Validate Hostname Provided if NodePort external access
+	if redhatcopv1alpha1.NodePortExternalAccessType == quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType && utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Hostname) {
+		return false, fmt.Errorf("Cannot use NodePort External Access Type Without Hostname Defined")
+	}
+
+	// Validate Route not specified when not running in OpenShift
+	if redhatcopv1alpha1.RouteExternalAccessType == quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType && !quayConfiguration.IsOpenShift {
+		return false, fmt.Errorf("Cannot use NodePort External Access Type Without Hostname Defined")
+	}
+
 	// Registry Backends
 	for _, registryBackend := range quayConfiguration.QuayEcosystem.Spec.Quay.RegistryBackends {
 

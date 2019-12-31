@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"fmt"
 	"reflect"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -33,6 +35,23 @@ func MergeEnvVars(baseEnvVars []corev1.EnvVar, overrideEnvVars []corev1.EnvVar) 
 	}
 
 	return baseEnvVars
+}
+
+func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
+	for i := 0; ; i++ {
+		err = f()
+		if err == nil {
+			return
+		}
+
+		if i >= (attempts - 1) {
+			break
+		}
+
+		time.Sleep(sleep)
+
+	}
+	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }
 
 func checkExistingKey(envVar corev1.EnvVar, envVars []corev1.EnvVar) (bool, int) {

@@ -35,8 +35,8 @@ func GetQuayConfigRouteDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatc
 
 	route.ObjectMeta.Labels = BuildQuayConfigResourceLabels(meta.Labels)
 
-	if !utils.IsZeroOfUnderlyingType(quayEcosystem.Spec.Quay.ConfigRouteHost) {
-		route.Spec.Host = quayEcosystem.Spec.Quay.ConfigRouteHost
+	if !utils.IsZeroOfUnderlyingType(quayEcosystem.Spec.Quay.ConfigHostname) {
+		route.Spec.Host = quayEcosystem.Spec.Quay.ConfigHostname
 	}
 
 	return route
@@ -67,8 +67,8 @@ func GetQuayRouteDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1al
 
 	route.ObjectMeta.Labels = BuildQuayResourceLabels(meta.Labels)
 
-	if !utils.IsZeroOfUnderlyingType(quayEcosystem.Spec.Quay.RouteHost) {
-		route.Spec.Host = quayEcosystem.Spec.Quay.RouteHost
+	if !utils.IsZeroOfUnderlyingType(quayEcosystem.Spec.Quay.Hostname) {
+		route.Spec.Host = quayEcosystem.Spec.Quay.Hostname
 	}
 
 	return route

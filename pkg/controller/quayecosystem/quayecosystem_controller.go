@@ -8,6 +8,7 @@ import (
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 
 	"github.com/redhat-cop/operator-utils/pkg/util"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/externalaccess"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/provisioning"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
@@ -46,7 +47,22 @@ func newReconciler(mgr manager.Manager, k8sclient kubernetes.Interface) reconcil
 
 	reconcilerBase := util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("quayecosystem-controller"))
 
-	return &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: k8sclient, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, k8sclient)}
+	discoveryClient, _ := reconcilerBase.GetDiscoveryClient()
+
+	// Query for known OpenShift API resource to verify it is available
+	_, resourcesErr := discoveryClient.ServerResourcesForGroupVersion("security.openshift.io/v1")
+
+	isOpenShift := true
+
+	if resourcesErr != nil {
+		if errors.IsNotFound(resourcesErr) {
+			isOpenShift = false
+		} else {
+			logging.Log.Error(resourcesErr, "Error Determing Whether Quay Operator Running in OpenShift")
+		}
+	}
+
+	return &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: k8sclient, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, k8sclient), isOpenShift: isOpenShift}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -74,6 +90,7 @@ type ReconcileQuayEcosystem struct {
 	reconcilerBase   util.ReconcilerBase
 	k8sclient        kubernetes.Interface
 	quaySetupManager *setup.QuaySetupManager
+	isOpenShift      bool
 }
 
 // Reconcile performs the primary reconciliation loop
@@ -94,6 +111,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	// Initialize a new Quay Configuration Resource
 	quayConfiguration := resources.QuayConfiguration{
 		QuayEcosystem: quayEcosystem,
+		IsOpenShift:   r.isOpenShift,
 	}
 
 	// Initialize Configuration
@@ -102,7 +120,6 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	// Set default values
 	changed := validation.SetDefaults(r.reconcilerBase.GetClient(), &quayConfiguration)
-
 	if changed {
 
 		err := r.reconcilerBase.GetClient().Update(context.TODO(), quayConfiguration.QuayEcosystem)
@@ -131,6 +148,24 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemValidationFailure, err)
 	}
 
+	// Instantiate External Access
+	var external externalaccess.ExternalAccess
+
+	switch quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType {
+	case redhatcopv1alpha1.RouteExternalAccessType:
+		external = &externalaccess.RouteExternalAccess{
+			QuayConfiguration: &quayConfiguration,
+			ReconcilerBase:    r.reconcilerBase,
+		}
+	case redhatcopv1alpha1.LoadBalancerExternalAccessType:
+		external = &externalaccess.LoadBalancerExternalAccess{
+			QuayConfiguration: &quayConfiguration,
+			K8sClient:         r.k8sclient,
+		}
+	case redhatcopv1alpha1.NodePortExternalAccessType:
+		external = &externalaccess.NodePortExternalAccess{}
+	}
+
 	result, err := configuration.CoreQuayResourceDeployment(metaObject)
 	if err != nil {
 		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
@@ -138,6 +173,19 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	if result != nil {
 		return *result, nil
+	}
+
+	// Manage Quay and QuayConfig External Access
+	if err := external.ManageQuayExternalAccess(metaObject); err != nil {
+		logging.Log.Error(err, "Failed to Setup Quay External Access")
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+	}
+
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigHostname) && quayConfiguration.DeployQuayConfiguration {
+		if err := external.ManageQuayConfigExternalAccess(metaObject); err != nil {
+			logging.Log.Error(err, "Failed to Setup Quay Config External Access")
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+		}
 	}
 
 	result, err = configuration.ManageQuayEcosystemCertificates(metaObject)
@@ -284,7 +332,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	// Spin down the config pod
 	if !quayConfiguration.DeployQuayConfiguration {
 
-		removeQuayConfigResult, err := configuration.RemoveQuayConfigResources(metaObject)
+		removeQuayConfigResult, err := configuration.RemoveQuayConfigResources(metaObject, external)
 
 		if err != nil {
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
