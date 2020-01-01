@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -65,4 +66,8 @@ func checkExistingKey(envVar corev1.EnvVar, envVars []corev1.EnvVar) (bool, int)
 
 	return false, 0
 
+}
+
+func GetHostFromHostname(hostname string) string {
+	return strings.Split(hostname, ":")[0]
 }
