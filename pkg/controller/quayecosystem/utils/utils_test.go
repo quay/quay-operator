@@ -92,3 +92,46 @@ func TestMergeEnvVars(t *testing.T) {
 	}
 
 }
+
+func TestHostFromostname(t *testing.T) {
+
+	cases := []struct {
+		name     string
+		input    string
+		expected string
+	}{{
+		name:     "hostname-plain",
+		input:    "quay.example.com",
+		expected: "quay.example.com",
+	},
+		{
+			name:     "hostname-port",
+			input:    "quay.example.com:5000",
+			expected: "quay.example.com",
+		},
+		{
+			name:     "hostname-ip",
+			input:    "192.168.100.100",
+			expected: "192.168.100.100",
+		},
+		{
+			name:     "hostname-ip-port",
+			input:    "192.168.100.100:5000",
+			expected: "192.168.100.100",
+		},
+	}
+
+	for i, c := range cases {
+
+		t.Run(c.name, func(t *testing.T) {
+
+			result := GetHostFromHostname(c.input)
+
+			if !reflect.DeepEqual(c.expected, result) {
+				t.Errorf("Test case %d did not match\nExpected: %#v\nActual: %#v", i, c.expected, result)
+			}
+		})
+
+	}
+
+}

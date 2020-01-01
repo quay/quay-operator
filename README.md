@@ -369,7 +369,7 @@ The type of external access can be specified by setting the `externalAccessType`
 
 | External Access Type | Description |  Notes |
 | --------- | ---------- | ---------- |
-| `Route` | [OpenShift Route](https://docs.openshift.com/container-platform/4.2/networking/routes/route-configuration.html) | Can only be specified when running in OpenShift |
+| `Route` | [OpenShift Route](https://docs.openshift.com/container-platform/latest/networking/routes/route-configuration.html) | Can only be specified when running in OpenShift |
 | `LoadBalancer` | [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) | |
 | `NodePort` | [NodePort Service](https://kubernetes.io/docs/concepts/services-networking/service/#nodeport) | A dns based hostname or IP address **must** be specified using the `hostname` property of the `quay` resource |
 
@@ -383,7 +383,24 @@ metadata:
 spec:
   quay:
     imagePullSecretName: redhat-pull-secret
-     externalAccessType: LoadBalancer
+    externalAccessType: LoadBalancer
+```
+
+#### NodePorts
+
+By default, `NodePort` type Services are allocated a randomly assigned network port between 30000-32767. To support a predictive allocation of resources, the `NodePort` services for Quay and Quay Config can be define using the `nodePort` and `configNodePort` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    externalAccessType: NodePort
+    nodePort: 30100
+    configNodePort: 30101
 ```
 
 

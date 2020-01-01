@@ -163,7 +163,10 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 			K8sClient:         r.k8sclient,
 		}
 	case redhatcopv1alpha1.NodePortExternalAccessType:
-		external = &externalaccess.NodePortExternalAccess{}
+		external = &externalaccess.NodePortExternalAccess{
+			QuayConfiguration: &quayConfiguration,
+			ReconcilerBase:    r.reconcilerBase,
+		}
 	}
 
 	result, err := configuration.CoreQuayResourceDeployment(metaObject)

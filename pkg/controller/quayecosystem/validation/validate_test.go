@@ -23,6 +23,7 @@ func TestDefaultValidation(t *testing.T) {
 	quayEcosystem := &redhatcopv1alpha1.QuayEcosystem{}
 	quayConfiguration := resources.QuayConfiguration{
 		QuayEcosystem: quayEcosystem,
+		IsOpenShift:   true,
 	}
 
 	// Set default values

@@ -186,10 +186,10 @@ func (r *ReconcileQuayEcosystemConfiguration) DeployQuay(metaObject metav1.Objec
 
 		return r.verifyDeployment(deploymentName, r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace)
 
-	} else {
-		logging.Log.Info("Skipping Quay Deployment verification as setup marked as skipped")
-		return &reconcile.Result{}, nil
 	}
+
+	logging.Log.Info("Skipping Quay Deployment verification as setup marked as skipped")
+	return &reconcile.Result{}, nil
 
 }
 
@@ -601,40 +601,28 @@ func (r *ReconcileQuayEcosystemConfiguration) createRBAC(meta metav1.ObjectMeta)
 
 func (r *ReconcileQuayEcosystemConfiguration) createQuayService(meta metav1.ObjectMeta) error {
 
+	serviceName := resources.GetQuayResourcesName(r.quayConfiguration.QuayEcosystem)
 	service := resources.GetQuayServiceDefinition(meta, r.quayConfiguration.QuayEcosystem)
 
-	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, service)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.manageService(serviceName, service)
 
 }
 
 func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigService(meta metav1.ObjectMeta) error {
 
+	serviceName := resources.GetQuayConfigResourcesName(r.quayConfiguration.QuayEcosystem)
 	service := resources.GetQuayConfigServiceDefinition(meta, r.quayConfiguration.QuayEcosystem)
 
-	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, service)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.manageService(serviceName, service)
 
 }
 
 func (r *ReconcileQuayEcosystemConfiguration) createClairService(meta metav1.ObjectMeta) error {
 
+	serviceName := resources.GetClairResourcesName(r.quayConfiguration.QuayEcosystem)
 	service := resources.GetClairServiceDefinition(meta, r.quayConfiguration.QuayEcosystem)
 
-	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, service)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.manageService(serviceName, service)
 
 }
 
@@ -825,10 +813,12 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 			var certBytes, privKeyBytes []byte
 
 			// Check if hostname is a IP address or hostname
-			parsedIP := net.ParseIP(r.quayConfiguration.QuayHostname)
+			hostnameParts := strings.Split(r.quayConfiguration.QuayHostname, ":")
+
+			parsedIP := net.ParseIP(hostnameParts[0])
 
 			if parsedIP == nil {
-				certBytes, privKeyBytes, err = cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{}, []string{r.quayConfiguration.QuayHostname})
+				certBytes, privKeyBytes, err = cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{}, []string{hostnameParts[0]})
 			} else {
 				certBytes, privKeyBytes, err = cert.GenerateSelfSignedCertKey(constants.QuayEnterprise, []net.IP{parsedIP}, []string{})
 			}
@@ -973,15 +963,10 @@ func (r *ReconcileQuayEcosystemConfiguration) clairDeployment(meta metav1.Object
 
 func (r *ReconcileQuayEcosystemConfiguration) createRedisService(meta metav1.ObjectMeta) error {
 
+	serviceName := resources.GetRedisResourcesName(r.quayConfiguration.QuayEcosystem)
 	service := resources.GetRedisServiceDefinition(meta, r.quayConfiguration.QuayEcosystem)
 
-	err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, service)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return r.manageService(serviceName, service)
 
 }
 
@@ -1021,6 +1006,26 @@ func (r *ReconcileQuayEcosystemConfiguration) verifyDeployment(deploymentName st
 	}
 
 	return nil, nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) manageService(serviceName string, service *corev1.Service) error {
+
+	existingService := &corev1.Service{}
+	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: resources.GetQuayResourcesName(r.quayConfiguration.QuayEcosystem), Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, existingService)
+
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			err := r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, service)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	return nil
 
 }
 

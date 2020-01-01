@@ -220,7 +220,7 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	// Validate Route not specified when not running in OpenShift
 	if redhatcopv1alpha1.RouteExternalAccessType == quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType && !quayConfiguration.IsOpenShift {
-		return false, fmt.Errorf("Cannot use NodePort External Access Type Without Hostname Defined")
+		return false, fmt.Errorf("Cannot use 'Route` as External Access Type when not running in OpenShift")
 	}
 
 	// Registry Backends

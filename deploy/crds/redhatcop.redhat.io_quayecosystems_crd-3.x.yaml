@@ -925,6 +925,9 @@ spec:
                   type: array
                 configHostname:
                   type: string
+                configNodePort:
+                  format: int32
+                  type: integer
                 configResources:
                   description: ResourceRequirements describes the compute resource
                     requirements.
@@ -2237,6 +2240,9 @@ spec:
                       format: int32
                       type: integer
                   type: object
+                nodePort:
+                  format: int32
+                  type: integer
                 nodeSelector:
                   additionalProperties:
                     type: string

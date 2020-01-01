@@ -63,6 +63,10 @@ func GetQuayServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1
 	switch quayEcosystem.Spec.Quay.ExternalAccessType {
 	case redhatcopv1alpha1.NodePortExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeNodePort
+
+		if quayEcosystem.Spec.Quay.NodePort != nil {
+			service.Spec.Ports[0].NodePort = *quayEcosystem.Spec.Quay.NodePort
+		}
 	case redhatcopv1alpha1.LoadBalancerExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeLoadBalancer
 	default:
@@ -100,6 +104,11 @@ func GetQuayConfigServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redha
 	switch quayEcosystem.Spec.Quay.ExternalAccessType {
 	case redhatcopv1alpha1.NodePortExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeNodePort
+
+		if quayEcosystem.Spec.Quay.ConfigNodePort != nil {
+			service.Spec.Ports[0].NodePort = *quayEcosystem.Spec.Quay.ConfigNodePort
+		}
+
 	case redhatcopv1alpha1.LoadBalancerExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeLoadBalancer
 	default:
