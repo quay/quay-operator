@@ -218,7 +218,7 @@ spec:
       - name: rhocs
         rhocs:
           hostname: <hostname>
-          sucure: <sucure>
+          secure: <secure>
           accessKey: <accessKey>
           secretKey: <secretKey>
           bucketName: <bucketName>
@@ -250,7 +250,7 @@ spec:
   quay:
     registryBackends:
       - name: rados
-        rhocs:
+        rados:
           hostname: <hostname>
           secure: <secure>
           accessKey: <accessKey>
@@ -283,7 +283,7 @@ spec:
   quay:
     registryBackends:
       - name: swift
-        rhocs:
+        swift:
           authVersion: <authVersion>
           authURL: <authURL>
           container: <container>
