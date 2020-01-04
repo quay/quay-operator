@@ -1,6 +1,6 @@
 # Build dependencies
 vendor/
-
+openshift.local.clusterup/
 # Platform Dependencies
 .DS_Store
 # Temporary Build Files

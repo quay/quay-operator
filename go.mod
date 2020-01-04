@@ -1,23 +1,21 @@
 module github.com/redhat-cop/quay-operator
 
 require (
-	github.com/NYTimes/gziphandler v1.0.1 // indirect
 	github.com/coreos/prometheus-operator v0.31.1 // indirect
 	github.com/elazarl/goproxy v0.0.0-20190711103511-473e67f1d7d2 // indirect
 	github.com/elazarl/goproxy/ext v0.0.0-20190711103511-473e67f1d7d2 // indirect
 	github.com/emicklei/go-restful v2.9.6+incompatible // indirect
-	github.com/evanphx/json-patch v4.5.0+incompatible // indirect
+	github.com/go-openapi/spec v0.17.2
 	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
-	github.com/googleapis/gnostic v0.3.1 // indirect
 	github.com/gophercloud/gophercloud v0.3.0 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/onsi/ginkgo v1.9.0 // indirect
 	github.com/onsi/gomega v1.6.0 // indirect
+	github.com/openshift/api v3.9.0+incompatible
 	github.com/prometheus/client_golang v1.1.0 // indirect
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4 // indirect
 	github.com/redhat-cop/operator-utils v0.0.0-20190520190018-1b1f81b7301e
-	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
 	go.uber.org/zap v1.10.0 // indirect
@@ -59,3 +57,5 @@ replace (
 //replace github.com/operator-framework/operator-sdk => github.com/operator-framework/operator-sdk v0.10.0
 
 //replace git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
+
+go 1.13
