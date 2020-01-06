@@ -81,11 +81,11 @@ docker-build:
 docker-push:
 	docker push ${IMG}
 
-# Travis Latest Tag Deployment
-travis-latest-deploy: docker-login docker-build docker-push
+# CI Latest Tag Deployment
+ci-latest-deploy: docker-login docker-build docker-push
 
-# Travis Dev Deployment
-travis-dev-deploy: docker-login docker-build docker-push-dev
+# CI Dev Deployment
+ci-dev-deploy: docker-login docker-build docker-push-dev
 
-# Travis Release
-travis-release-deploy: docker-login docker-build docker-push-release
+# CI Release
+ci-release-deploy: docker-login docker-build docker-push-release
