@@ -38,7 +38,7 @@ Specific details on the types of properties supported for each backend are found
 
 ### Replication
 
-Support is available to replicate the registry storage to multiple backends. To activate storage replication, set the `enableStorageReplication` property to the value of `true`. Individual registry backends can also be configured to be replicated by default by setting the `replicateByDefault` property to that value of `true`. A full configuration demonstrating the replication options available is shown below:
+Support is available to replicate the registry storage to multiple backends. To activate storage replication, set the `enableStorageReplication` property to the value of `true`. Individual registry backends can also be configured to be replicated by default by setting the `replicateByDefault` property to the value of `true`. A full configuration demonstrating the replication options available is shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
