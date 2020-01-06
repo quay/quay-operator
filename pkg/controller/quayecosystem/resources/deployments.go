@@ -94,6 +94,10 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 
 	envVars := []corev1.EnvVar{
 		{
+			Name:  "ENCRYPTED_ROBOT_TOKEN_MIGRATION_PHASE",
+			Value: "new-installation",
+		},
+		{
 			Name:  constants.QuayEntryName,
 			Value: constants.QuayEntryConfigValue,
 		},
@@ -206,6 +210,10 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 	BuildQuayResourceLabels(meta.Labels)
 
 	configEnvVars := []corev1.EnvVar{
+		{
+			Name:  "ENCRYPTED_ROBOT_TOKEN_MIGRATION_PHASE",
+			Value: "new-installation",
+		},
 		{
 			Name: constants.QuayNamespaceEnvironmentVariable,
 			ValueFrom: &corev1.EnvVarSource{
