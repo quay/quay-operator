@@ -16,14 +16,18 @@ go test -v ./pkg/...
 
 ### Running E2E Tests
 
-The E2E tests are handled by the Operator SDK and must be run against a live K8 based instance.
+The E2E tests are handled by the Operator SDK and must be run against a live K8 based instance. The below example will run the operator
+within a local 3.x okd instance.
 
 ```bash
-# Have an instance of K8 running
+# Run within the root project folder
+# Start a local instance
+echo "Starting OKD"
+oc cluster up --skip-registry-check=true
 echo "Login"
 oc login -u system:admin
-echo "Creating new project $QUAY_NAMESPACE"
-oc new-project $QUAY_NAMESPACE
+echo "Creating new project quay-enterprise"
+oc new-project "quay-enterprise"
 oc create serviceaccount quay
 oc adm policy add-scc-to-user anyuid -z quay
 oc adm policy add-cluster-role-to-user cluster-admin admin

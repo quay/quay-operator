@@ -14,10 +14,9 @@ import (
 // QuayEcosystemSpec defines the desired state of QuayEcosystem
 // +k8s:openapi-gen=true
 type QuayEcosystemSpec struct {
-	Quay           *Quay  `json:"quay,omitempty"`
-	Redis          *Redis `json:"redis,omitempty"`
-	Clair          *Clair `json:"clair,omitempty"`
-	SkipValidation bool   `json:"skipValidation,omitempty"`
+	Quay  *Quay  `json:"quay,omitempty"`
+	Redis *Redis `json:"redis,omitempty"`
+	Clair *Clair `json:"clair,omitempty"`
 }
 
 // QuayEcosystemPhase defines the phase of lifecycle the operator is running in

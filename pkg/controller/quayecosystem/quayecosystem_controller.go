@@ -122,36 +122,33 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	}
 
-	// Validate Configuration
-	if !quayEcosystem.Spec.SkipValidation {
-
-		valid, err := validation.Validate(r.reconcilerBase.GetClient(), &quayConfiguration)
-		if err != nil {
-			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemValidationFailure, err)
-		}
-		if !valid {
-			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemValidationFailure, err)
-		}
-
-		result, err := configuration.CoreQuayResourceDeployment(metaObject)
-		if err != nil {
-			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
-		}
-
-		if result != nil {
-			return *result, nil
-		}
-
-		result, err = configuration.ManageQuayEcosystemCertificates(metaObject)
-
-		if err != nil {
-			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
-		}
-
-		if result != nil {
-			return *result, nil
-		}
+	valid, err := validation.Validate(r.reconcilerBase.GetClient(), &quayConfiguration)
+	if err != nil {
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemValidationFailure, err)
 	}
+	if !valid {
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemValidationFailure, err)
+	}
+
+	result, err := configuration.CoreQuayResourceDeployment(metaObject)
+	if err != nil {
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+	}
+
+	if result != nil {
+		return *result, nil
+	}
+
+	result, err = configuration.ManageQuayEcosystemCertificates(metaObject)
+
+	if err != nil {
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
+	}
+
+	if result != nil {
+		return *result, nil
+	}
+
 	if quayConfiguration.DeployQuayConfiguration {
 
 		deployQuayConfigResult, err := configuration.DeployQuayConfiguration(metaObject)
@@ -183,12 +180,10 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupFailure, err)
 		}
 
-		if !quayEcosystem.Spec.SkipValidation {
-			err = r.quaySetupManager.SetupQuay(quaySetupInstance)
-			if err != nil {
-				r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Setup Quay", err.Error())
-				return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupFailure, err)
-			}
+		err = r.quaySetupManager.SetupQuay(quaySetupInstance)
+		if err != nil {
+			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Setup Quay", err.Error())
+			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemQuaySetupFailure, err)
 		}
 
 		// Update flags when setup is completed
@@ -216,57 +211,53 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	// Manage Clair Resources
 	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
 
-		if !quayEcosystem.Spec.SkipValidation {
-
-			// Setup Security Scanner
-			configureSecurityScannerResult, err := configuration.ConfigureSecurityScanner(metaObject)
-			if err != nil {
-				r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Configure Security Scanner", err.Error())
-				return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemSecurityScannerConfigurationFailure, err)
-			}
-
-			if configureSecurityScannerResult != nil {
-				r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Configure Security Scanner", "Failed to Configure Security Scanner")
-				return *configureSecurityScannerResult, nil
-			}
-		}
-		_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationSuccess, "", "Clair Configuration Updated Successfully")
-
+		// Setup Security Scanner
+		configureSecurityScannerResult, err := configuration.ConfigureSecurityScanner(metaObject)
 		if err != nil {
-			logging.Log.Error(err, "Failed to update QuayEcosystem after security scanner completion")
+			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Configure Security Scanner", err.Error())
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemSecurityScannerConfigurationFailure, err)
 		}
 
-		// Clair components
-		manageClairResourceResult, err := configuration.ManageClairComponents(metaObject)
-		if err != nil {
-			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Configure Clair", err.Error())
-			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationFailure, err)
+		if configureSecurityScannerResult != nil {
+			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Configure Security Scanner", "Failed to Configure Security Scanner")
+			return *configureSecurityScannerResult, nil
 		}
+	}
+	_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationSuccess, "", "Clair Configuration Updated Successfully")
 
-		if manageClairResourceResult != nil {
-			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Configure Clair", "Failed to Configure Clair")
-			return *manageClairResourceResult, nil
-		}
+	if err != nil {
+		logging.Log.Error(err, "Failed to update QuayEcosystem after security scanner completion")
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemSecurityScannerConfigurationFailure, err)
+	}
 
-		_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationSuccess, "", "Clair Configuration Updated Successfully")
+	// Clair components
+	manageClairResourceResult, err := configuration.ManageClairComponents(metaObject)
+	if err != nil {
+		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Configure Clair", err.Error())
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationFailure, err)
+	}
 
-		if err != nil {
-			logging.Log.Error(err, "Failed to update QuayEcosystem after Clair configuration success")
-			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationFailure, err)
-		}
+	if manageClairResourceResult != nil {
+		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Configure Clair", "Failed to Configure Clair")
+		return *manageClairResourceResult, nil
+	}
 
-		deployClairResult, err := configuration.DeployClair(metaObject)
-		if err != nil {
-			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Deploy Clair", err.Error())
-			return reconcile.Result{}, err
-		}
+	_, err = r.manageSuccess(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationSuccess, "", "Clair Configuration Updated Successfully")
 
-		if deployClairResult != nil {
-			r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Deploy Clair", "Failed to Deploy Clair")
-			return *deployClairResult, nil
-		}
+	if err != nil {
+		logging.Log.Error(err, "Failed to update QuayEcosystem after Clair configuration success")
+		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemClairConfigurationFailure, err)
+	}
 
+	deployClairResult, err := configuration.DeployClair(metaObject)
+	if err != nil {
+		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Deploy Clair", err.Error())
+		return reconcile.Result{}, err
+	}
+
+	if deployClairResult != nil {
+		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Deploy Clair", "Failed to Deploy Clair")
+		return *deployClairResult, nil
 	}
 
 	// Determine if Config pod should be spun down
