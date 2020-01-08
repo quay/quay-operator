@@ -142,6 +142,8 @@ const (
 	QuaySuperuserDefaultPassword = "password"
 	// QuaySuperuserDefaultEmail represents the default Quay superuser password
 	QuaySuperuserDefaultEmail = "quay@redhat.com"
+	// EncryptedRobotTokenMigrationPhase represents the name of a envirnment variable required or quay containers
+	EncryptedRobotTokenMigrationPhase = "EncryptedRobotTokenMigrationPhase"
 
 	// RegistryStorageDefaultName is the name of the default storage
 	RegistryStorageDefaultName = "default"

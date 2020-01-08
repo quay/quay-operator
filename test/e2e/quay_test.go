@@ -25,14 +25,14 @@ var (
 	name                 = "quay-operator"
 )
 
-func TestClairConfiguration(t *testing.T) {
+func TestQuayConfiguration(t *testing.T) {
 	ctx := framework.NewTestCtx(t)
 	defer ctx.Cleanup()
 	test.AddToFrameworkSchemeForTests(t, ctx)
-	defaultClairDeploy(t, framework.Global, ctx)
+	defaultQuayDeploy(t, framework.Global, ctx)
 }
 
-func defaultClairDeploy(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
+func defaultQuayDeploy(t *testing.T, f *framework.Framework, ctx *framework.TestCtx) {
 	namespace, err := ctx.GetNamespace()
 	assert.NoError(t, err)
 

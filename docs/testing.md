@@ -16,8 +16,7 @@ go test -v ./pkg/...
 
 ### Running E2E Tests
 
-The E2E tests are handled by the Operator SDK and must be run against a live K8 based instance. The below example will run the operator
-within a local 3.x okd instance.
+The E2E tests are handled by the Operator SDK and must be run against a live K8 based instance. The below example will run the operator within a local 3.x okd instance.
 
 ```bash
 # Run within the root project folder
