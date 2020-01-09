@@ -33,8 +33,8 @@ func GetK8sClient(config *rest.Config) (kubernetes.Interface, error) {
 
 func GetDeploymentStatus(operatorClient client.Client, namespace string, name string) bool {
 
-	var timeout time.Duration = time.Duration(42) * time.Second
-	var retryInterval time.Duration = time.Duration(10) * time.Second
+	var timeout time.Duration = time.Duration(420) * time.Second
+	var retryInterval time.Duration = time.Duration(100) * time.Second
 
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 
