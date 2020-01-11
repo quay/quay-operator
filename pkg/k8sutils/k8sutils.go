@@ -10,7 +10,6 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -34,19 +33,16 @@ func GetK8sClient(config *rest.Config) (kubernetes.Interface, error) {
 func GetDeploymentStatus(operatorClient client.Client, namespace string, name string) bool {
 
 	var timeout time.Duration = time.Duration(420) * time.Second
-	var retryInterval time.Duration = time.Duration(100) * time.Second
+	var retryInterval time.Duration = time.Duration(5) * time.Second
 
 	err := wait.Poll(retryInterval, timeout, func() (done bool, err error) {
 
 		logging.Log.Info("Waiting for deployment", "Namespace", namespace, "Name", name, "Timeout", timeout)
-		// check before watching in case the deployment is already scaled to 1
-		fieldSelector := fields.OneTermEqualSelector("metadata.name", name)
-		listOps := client.ListOptions{
-			Namespace:     namespace,
-			FieldSelector: fieldSelector,
+		opts := []client.ListOption{
+			client.InNamespace(namespace),
 		}
 		deploymentList := &appsv1.DeploymentList{}
-		err = operatorClient.List(context.TODO(), deploymentList, &listOps)
+		err = operatorClient.List(context.TODO(), deploymentList, opts...)
 
 		for _, deployment := range deploymentList.Items {
 			if deployment.Status.AvailableReplicas == 1 {
