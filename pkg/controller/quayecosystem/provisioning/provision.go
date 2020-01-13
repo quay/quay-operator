@@ -1035,7 +1035,7 @@ func (r *ReconcileQuayEcosystemConfiguration) verifyDeployment(deploymentName st
 	}
 
 	if deployment.Status.AvailableReplicas != 1 {
-		scaled := k8sutils.GetDeploymentStatus(r.reconcilerBase.GetClient(), deploymentNamespace, deploymentName)
+		scaled := k8sutils.GetDeploymentStatus(r.k8sclient, deploymentNamespace, deploymentName)
 
 		if !scaled {
 			return &reconcile.Result{Requeue: true, RequeueAfter: time.Second * 5}, nil
