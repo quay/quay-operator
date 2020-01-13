@@ -68,4 +68,4 @@ jobs:
           DOCKER_USER: ${{ secrets.DockerUser }}
           DOCKER_PASSWORD: ${{ secrets.DockerPassword }}
           REPOSITORY: ${{ secrets.Repository }}
-        run: "make ci-latest-deploy"
+        run: "make ci-release-deploy"
