@@ -1012,7 +1012,7 @@ func (r *ReconcileQuayEcosystemConfiguration) verifyDeployment(deploymentName st
 func (r *ReconcileQuayEcosystemConfiguration) manageService(serviceName string, service *corev1.Service) error {
 
 	existingService := &corev1.Service{}
-	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: resources.GetQuayResourcesName(r.quayConfiguration.QuayEcosystem), Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, existingService)
+	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: serviceName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, existingService)
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {

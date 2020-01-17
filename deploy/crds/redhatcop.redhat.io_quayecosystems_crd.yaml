@@ -1579,6 +1579,9 @@ spec:
                   - backfill-then-read-only-new
                   - remove-old-field
                   type: string
+                nodePort:
+                  format: int32
+                  type: integer
                 nodeSelector:
                   additionalProperties:
                     type: string
@@ -2240,9 +2243,6 @@ spec:
                       format: int32
                       type: integer
                   type: object
-                nodePort:
-                  format: int32
-                  type: integer
                 nodeSelector:
                   additionalProperties:
                     type: string
