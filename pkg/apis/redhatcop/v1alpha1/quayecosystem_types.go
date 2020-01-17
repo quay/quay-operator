@@ -139,6 +139,10 @@ type Quay struct {
 	// +patchStrategy=merge
 	// +listType=atomic
 	ConfigFiles []QuayConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
+	// +kubebuilder:validation:Enum=new-installation;add-new-fields;backfill-then-read-only-new;remove-old-field
+	MigrationPhase QuayMigrationPhase `json:"migrationPhase,omitempty" protobuf:"bytes,1,opt,name=migrationPhase,casttype=QuayMigrationPhase"`
+}
+
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -351,6 +355,15 @@ type QuayConfigFile struct {
 	Key      string             `json:"key,name=key"`
 	Filename string             `json:"filename,omitempty,name=filename"`
 }
+
+type QuayMigrationPhase string
+
+var (
+	NewInstallation         QuayMigrationPhase = "new-installation"
+	AddNewFields            QuayMigrationPhase = "add-new-fields"
+	BackfillThenReadOnlyNew QuayMigrationPhase = "backfill-then-read-only-new"
+	RemoveOldField          QuayMigrationPhase = "remove-old-field"
+)
 
 func init() {
 	SchemeBuilder.Register(&QuayEcosystem{}, &QuayEcosystemList{})

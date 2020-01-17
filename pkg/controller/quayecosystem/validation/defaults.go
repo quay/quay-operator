@@ -55,6 +55,12 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		quayConfiguration.QuayEcosystem.Spec.Quay.Image = constants.QuayImage
 	}
 
+	// Quay Migration Phase
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.MigrationPhase) {
+		changed = true
+		quayConfiguration.QuayEcosystem.Spec.Quay.MigrationPhase = redhatcopv1alpha1.NewInstallation
+	}
+
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy) {
 		changed = true
 		quayConfiguration.QuayEcosystem.Spec.Quay.DeploymentStrategy = appsv1.RollingUpdateDeploymentStrategyType

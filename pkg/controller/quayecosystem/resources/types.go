@@ -47,25 +47,11 @@ type QuayConfiguration struct {
 	SecurityScannerKeyID                  string
 	RegistryBackends                      []redhatcopv1alpha1.RegistryBackend
 	ConfigFiles                           []redhatcopv1alpha1.QuayConfigFiles
-	MigrationPhase                        QuayMigrationPhase
 
 	// Clair
 	ClairSslCertificate []byte
 	ClairSslPrivateKey  []byte
 	ClairUpdateInterval time.Duration
-}
-
-type QuayMigrationPhase int
-
-var (
-	NewInstallation         QuayMigrationPhase
-	AddNewFields            QuayMigrationPhase
-	BackfillThenReadOnlyNew QuayMigrationPhase
-	RemoveOldField          QuayMigrationPhase
-)
-
-func (q QuayMigrationPhase) String() string {
-	return [...]string{"new-installation", "add-new-fields", "backfill-then-read-only-new", "remove-old-field"}[q]
 }
 
 // DatabaseConfig is an internal structure representing a database

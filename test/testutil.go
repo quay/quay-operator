@@ -1,16 +1,13 @@
 package test
 
 import (
-	"flag"
 	"testing"
 
 	"github.com/redhat-cop/quay-operator/pkg/apis"
 
 	ossecurityv1 "github.com/openshift/api/security/v1"
-	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
-	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,10 +82,10 @@ var PostgresPod = &corev1.Pod{
 func SetupLogging() {
 	// Setup logging
 	// Add the zap logger flag set to the CLI. The flag set must be added before calling pflag.Parse().
-	pflag.CommandLine.AddFlagSet(zap.FlagSet())
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
-	logf.SetLogger(zap.Logger())
+	//pflag.CommandLine.AddFlagSet(zap.FlagSet())
+	//pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	//pflag.Parse()
+	//logf.SetLogger(zap.Logger())
 
 }
 
