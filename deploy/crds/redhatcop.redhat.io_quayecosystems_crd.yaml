@@ -1560,6 +1560,13 @@ spec:
                       format: int32
                       type: integer
                   type: object
+                migrationPhase:
+                  enum:
+                  - new-installation
+                  - add-new-fields
+                  - backfill-then-read-only-new
+                  - remove-old-field
+                  type: string
                 nodeSelector:
                   additionalProperties:
                     type: string
