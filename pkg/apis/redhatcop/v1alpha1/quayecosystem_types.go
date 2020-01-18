@@ -165,7 +165,7 @@ type Quay struct {
 	// +kubebuilder:validation:Enum=new-installation;add-new-fields;backfill-then-read-only-new;remove-old-field
 	MigrationPhase QuayMigrationPhase `json:"migrationPhase,omitempty" protobuf:"bytes,1,opt,name=migrationPhase,casttype=QuayMigrationPhase"`
 
-	// +kubebuilder:validation:Enum=Route;LoadBalancer;Ingress;NodePort
+	// +kubebuilder:validation:Enum=Route;LoadBalancer;NodePort
 	ExternalAccessType ExternalAccessType `json:"externalAccessType,omitempty"`
 }
 

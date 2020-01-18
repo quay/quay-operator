@@ -1450,7 +1450,6 @@ spec:
                   enum:
                   - Route
                   - LoadBalancer
-                  - Ingress
                   - NodePort
                   type: string
                 hostname:
