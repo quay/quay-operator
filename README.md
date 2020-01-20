@@ -1,6 +1,7 @@
 # quay-operator
 
-[![Build Status](https://travis-ci.org/redhat-cop/quay-operator.svg?branch=master)](https://travis-ci.org/redhat-cop/quay-operator) [![Docker Repository on Quay](https://quay.io/repository/redhat-cop/quay-operator/status "Docker Repository on Quay")](https://quay.io/repository/redhat-cop/quay-operator)
+[![Build Status](https://github.com/redhat-cop/quay-operator/workflows/.github/workflows/ci.yml/badge.svg?branch=master)](https://github.com/redhat-cop/quay-operator/actions?workflow=CI%2FCD)
+ [![Docker Repository on Quay](https://quay.io/repository/redhat-cop/quay-operator/status "Docker Repository on Quay")](https://quay.io/repository/redhat-cop/quay-operator)
 
 Operator to manage the lifecycle of [Quay](https://www.openshift.com/products/quay).
 
