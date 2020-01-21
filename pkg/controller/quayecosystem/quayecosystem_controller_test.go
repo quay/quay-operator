@@ -121,7 +121,7 @@ func TestRedisDeployment(t *testing.T) {
 	cl := fake.NewFakeClient(objs...)
 
 	reconcilerBase := util.NewReconcilerBase(cl, s, nil, nil)
-	r := &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: nil, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, nil)}
+	r := &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: nil, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, nil), isOpenShift: true}
 
 	// Create the Quay Service Account and Secret
 	err := cl.Create(context.TODO(), testutil.ServiceAccount)
