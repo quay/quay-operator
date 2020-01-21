@@ -72,7 +72,7 @@ const (
 	// RouteExternalAccessType specifies external access using a Route
 	RouteExternalAccessType ExternalAccessType = "Route"
 
-	// LoadBalancerExternalAccessType specifies external access using a LoadBalancerr
+	// LoadBalancerExternalAccessType specifies external access using a LoadBalancer
 	LoadBalancerExternalAccessType ExternalAccessType = "LoadBalancer"
 
 	// IngressExternalAccessType specifies external access using a Ingress

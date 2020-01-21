@@ -19,7 +19,11 @@ The following components are supported to be maintained by the Operator:
 
 ### Deploy the Operator
 
-Quay recommends that it by deployed in a namespace called `quay-enterprise`, however support is available for deploying the operator to a namespace of your choosing. When choosing a namespace other than `quay-enterprise`, the _namespace_ field in the [deploy/cluster_role_binding.yaml](deploy/cluster_role_binding.yaml) must be updated with the new namespace otherwise permission issues will occur.
+The Quay Operator can be deployed on OpenShift or Kubernetes platforms. Quay recommends that it by deployed in a namespace called `quay-enterprise`, however support is available for deploying the operator to a namespace of your choosing. The steps below illustrate the steps necessary to deploy to an OpenShift or Kubernetes environment.
+
+#### OpenShift Deployment
+
+When choosing a namespace other than `quay-enterprise`, the _namespace_ field in the [deploy/cluster_role_binding.yaml](deploy/cluster_role_binding.yaml) must be updated with the new namespace otherwise permission issues will occur when deploying in OpenShift.
 
 The steps described below assume the namespace that will be utilized is called `quay-enterprise`.
 
@@ -43,6 +47,27 @@ $ oc create -f deploy/operator.yaml
 
 ```
 $ oc create -f deploy/crds/redhatcop.redhat.io_quayecosystems_crd-3.x.yaml
+```
+
+#### Kubernetes Deployment
+
+
+The steps described below assume the namespace that will be utilized is called `quay-enterprise`.
+
+```
+$ kubectl create namespace quay-enterprise
+```
+
+Deploy the cluster resources. Given that a number of elevated permissions are required to resources at a cluster scope the account you are currently logged in must have elevated rights
+
+```
+$ kubectl -n quay-enterprise create -f deploy/crds/redhatcop.redhat.io_quayecosystems_crd.yaml
+$ kubectl -n quay-enterprise create -f deploy/service_account.yaml
+$ kubectl -n quay-enterprise create -f deploy/cluster_role.yaml
+$ kubectl -n quay-enterprise create -f deploy/cluster_role_binding.yaml
+$ kubectl -n quay-enterprise create -f deploy/role.yaml
+$ kubectl -n quay-enterprise create -f deploy/role_binding.yaml
+$ kubectl -n quay-enterprise create -f deploy/operator.yaml
 ```
 
 

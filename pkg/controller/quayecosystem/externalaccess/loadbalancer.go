@@ -82,12 +82,9 @@ func (r *LoadBalancerExternalAccess) getHostnameFromExternalName(serviceName str
 		})
 		if err != nil {
 			return "", fmt.Errorf("Failed to resolve LoadBalancer service: %s", hostname)
-
 		}
 
 		logging.Log.Info(fmt.Sprintf("LoadBalancer Service '%s' Resolved", hostname))
-
-		time.Sleep(time.Duration(2) * time.Second)
 
 		return service.Status.LoadBalancer.Ingress[0].Hostname, nil
 	} else if service.Status.LoadBalancer.Ingress[0].IP != "" {

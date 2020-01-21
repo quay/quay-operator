@@ -812,7 +812,7 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 		if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName) {
 			var certBytes, privKeyBytes []byte
 
-			// Check if hostname is a IP address or hostname
+			// Check if hostname is an IP address or hostname
 			hostnameParts := strings.Split(r.quayConfiguration.QuayHostname, ":")
 
 			parsedIP := net.ParseIP(hostnameParts[0])
