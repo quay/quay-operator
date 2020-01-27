@@ -348,14 +348,14 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 					return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
 				}
 
-				managedRegistryBackend.RHOCS.AccessKey = string(RADOSSecret.Data[constants.RADOSAccessKey])
-				managedRegistryBackend.RHOCS.SecretKey = string(RADOSSecret.Data[constants.RADOSSecretKey])
+				managedRegistryBackend.RADOS.AccessKey = string(RADOSSecret.Data[constants.RADOSAccessKey])
+				managedRegistryBackend.RADOS.SecretKey = string(RADOSSecret.Data[constants.RADOSSecretKey])
 
 				managedRegistryBackend.CredentialsSecretName = ""
 
 			}
 
-			if managedRegistryBackend.RHOCS.StoragePath == "" || managedRegistryBackend.RHOCS.BucketName == "" {
+			if managedRegistryBackend.RADOS.StoragePath == "" || managedRegistryBackend.RADOS.BucketName == "" {
 				return false, fmt.Errorf("Failed to validate provided registry backend. Name: %s", managedRegistryBackend.Name)
 			}
 
