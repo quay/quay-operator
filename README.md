@@ -19,7 +19,11 @@ The following components are supported to be maintained by the Operator:
 
 ### Deploy the Operator
 
-Quay recommends that it by deployed in a namespace called `quay-enterprise`, however support is available for deploying the operator to a namespace of your choosing. When choosing a namespace other than `quay-enterprise`, the _namespace_ field in the [deploy/cluster_role_binding.yaml](deploy/cluster_role_binding.yaml) must be updated with the new namespace otherwise permission issues will occur.
+The Quay Operator can be deployed on OpenShift or Kubernetes platforms. Quay recommends that it by deployed in a namespace called `quay-enterprise`, however support is available for deploying the operator to a namespace of your choosing. The steps below illustrate the steps necessary to deploy to an OpenShift or Kubernetes environment.
+
+#### OpenShift Deployment
+
+When choosing a namespace other than `quay-enterprise`, the _namespace_ field in the [deploy/cluster_role_binding.yaml](deploy/cluster_role_binding.yaml) must be updated with the new namespace otherwise permission issues will occur when deploying in OpenShift.
 
 The steps described below assume the namespace that will be utilized is called `quay-enterprise`.
 
@@ -43,6 +47,27 @@ $ oc create -f deploy/operator.yaml
 
 ```
 $ oc create -f deploy/crds/redhatcop.redhat.io_quayecosystems_crd-3.x.yaml
+```
+
+#### Kubernetes Deployment
+
+
+The steps described below assume the namespace that will be utilized is called `quay-enterprise`.
+
+```
+$ kubectl create namespace quay-enterprise
+```
+
+Deploy the cluster resources. Given that a number of elevated permissions are required to resources at a cluster scope the account you are currently logged in must have elevated rights
+
+```
+$ kubectl -n quay-enterprise create -f deploy/crds/redhatcop.redhat.io_quayecosystems_crd.yaml
+$ kubectl -n quay-enterprise create -f deploy/service_account.yaml
+$ kubectl -n quay-enterprise create -f deploy/cluster_role.yaml
+$ kubectl -n quay-enterprise create -f deploy/cluster_role_binding.yaml
+$ kubectl -n quay-enterprise create -f deploy/role.yaml
+$ kubectl -n quay-enterprise create -f deploy/role_binding.yaml
+$ kubectl -n quay-enterprise create -f deploy/operator.yaml
 ```
 
 
@@ -348,7 +373,7 @@ spec:
 
 ### Specifying the Quay Route
 
-Quay makes use of an OpenShift route to enable ingress. The hostname for this route is automatically generated as per the configuration of the OpenShift cluster. Alternatively, the hostname for this route can be explicitly specified using the `routeHost` property under the _quay_ field as shown below:
+Quay makes use of an OpenShift route to enable ingress. The hostname for this route is automatically generated as per the configuration of the OpenShift cluster. Alternatively, the hostname for this route can be explicitly specified using the `hostname` property under the _quay_ field as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -357,8 +382,50 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    routeHost: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
+    hostname: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
     imagePullSecretName: redhat-pull-secret
+```
+
+### Methods for Exteral Access
+
+Support is available to access Quay through a number of OpenShift and Kubernetes mechanisms for ingress. When running on OpenShift, a [Route](https://docs.openshift.com/container-platform/4.2/networking/routes/route-configuration.html) is used while a [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) is used. 
+
+The type of external access can be specified by setting the `externalAccessType` using one of the available options in the table below:
+
+| External Access Type | Description |  Notes |
+| --------- | ---------- | ---------- |
+| `Route` | [OpenShift Route](https://docs.openshift.com/container-platform/latest/networking/routes/route-configuration.html) | Can only be specified when running in OpenShift |
+| `LoadBalancer` | [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) | |
+| `NodePort` | [NodePort Service](https://kubernetes.io/docs/concepts/services-networking/service/#nodeport) | A dns based hostname or IP address **must** be specified using the `hostname` property of the `quay` resource |
+
+An example of how to specify the `externalAccessType` is shown below
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    externalAccessType: LoadBalancer
+```
+
+#### NodePorts
+
+By default, `NodePort` type Services are allocated a randomly assigned network port between 30000-32767. To support a predictive allocation of resources, the `NodePort` services for Quay and Quay Config can be define using the `nodePort` and `configNodePort` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    externalAccessType: NodePort
+    nodePort: 30100
+    configNodePort: 30101
 ```
 
 
@@ -366,7 +433,7 @@ spec:
 
 During the development process, you may want to test the provisioning and setup of Quay Enterprise server. By default, the operator will use the internal service to communicate with the configuration pod. However, when running external to the cluster, you will need to specify the ingress location for which the setup process can use.
 
-Specify the `configRoute` as shown below:
+Specify the `configHostname` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -375,7 +442,7 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    configRouteHost: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
+    configHostname: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
     imagePullSecretName: redhat-pull-secret
 ```
 

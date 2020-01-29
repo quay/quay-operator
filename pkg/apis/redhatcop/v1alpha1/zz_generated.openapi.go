@@ -453,7 +453,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
-					"configRouteHost": {
+					"configHostname": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",
@@ -507,12 +507,6 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 					"deploymentStrategy": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"enableNodePortService": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
 							Format: "",
 						},
 					},
@@ -576,6 +570,18 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							},
 						},
 					},
+					"nodePort": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"configNodePort": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/api/core/v1.Probe"),
@@ -614,7 +620,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
-					"routeHost": {
+					"hostname": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",
@@ -664,6 +670,12 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 						},
 					},
 					"migrationPhase": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"externalAccessType": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",

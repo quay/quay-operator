@@ -160,7 +160,7 @@ func UpdateMetaWithName(meta metav1.ObjectMeta, name string) metav1.ObjectMeta {
 	return meta
 }
 
-// GenerateClairCertificateSANs generates tthe SANs for the generated certificate
+// GenerateClairCertificateSANs generates the SANs for the generated certificate
 func GenerateClairCertificateSANs(serviceName, namespace string) []string {
 	return []string{
 		fmt.Sprintf("%s", serviceName),

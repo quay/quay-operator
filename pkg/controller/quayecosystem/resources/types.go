@@ -52,6 +52,8 @@ type QuayConfiguration struct {
 	ClairSslCertificate []byte
 	ClairSslPrivateKey  []byte
 	ClairUpdateInterval time.Duration
+
+	IsOpenShift bool
 }
 
 // DatabaseConfig is an internal structure representing a database

@@ -213,6 +213,16 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 			(*out)[key] = val
 		}
 	}
+	if in.NodePort != nil {
+		in, out := &in.NodePort, &out.NodePort
+		*out = new(int32)
+		**out = **in
+	}
+	if in.ConfigNodePort != nil {
+		in, out := &in.ConfigNodePort, &out.ConfigNodePort
+		*out = new(int32)
+		**out = **in
+	}
 	if in.ReadinessProbe != nil {
 		in, out := &in.ReadinessProbe, &out.ReadinessProbe
 		*out = new(v1.Probe)

@@ -923,6 +923,11 @@ spec:
                     - secretName
                     type: object
                   type: array
+                configHostname:
+                  type: string
+                configNodePort:
+                  format: int32
+                  type: integer
                 configResources:
                   description: ResourceRequirements describes the compute resource
                     requirements.
@@ -942,8 +947,6 @@ spec:
                         to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                   type: object
-                configRouteHost:
-                  type: string
                 configSecretName:
                   type: string
                 database:
@@ -1336,8 +1339,6 @@ spec:
                   - Recreate
                   - RollingUpdate
                   type: string
-                enableNodePortService:
-                  type: boolean
                 enableRepoMirroring:
                   type: boolean
                 enableStorageReplication:
@@ -1443,6 +1444,16 @@ spec:
                     - name
                     type: object
                   type: array
+                externalAccessType:
+                  description: ExternalAccessType defines the method for accessing
+                    Quay from an external source
+                  enum:
+                  - Route
+                  - LoadBalancer
+                  - NodePort
+                  type: string
+                hostname:
+                  type: string
                 image:
                   type: string
                 imagePullSecretName:
@@ -1567,6 +1578,9 @@ spec:
                   - backfill-then-read-only-new
                   - remove-old-field
                   type: string
+                nodePort:
+                  format: int32
+                  type: integer
                 nodeSelector:
                   additionalProperties:
                     type: string
@@ -1993,8 +2007,6 @@ spec:
                         to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/'
                       type: object
                   type: object
-                routeHost:
-                  type: string
                 skipSetup:
                   type: boolean
                 sslCertificatesSecretName:

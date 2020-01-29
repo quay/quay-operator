@@ -60,9 +60,16 @@ func GetQuayServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1
 
 	service.ObjectMeta.Labels = BuildQuayResourceLabels(meta.Labels)
 
-	if quayEcosystem.Spec.Quay.EnableNodePortService {
+	switch quayEcosystem.Spec.Quay.ExternalAccessType {
+	case redhatcopv1alpha1.NodePortExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeNodePort
-	} else {
+
+		if quayEcosystem.Spec.Quay.NodePort != nil {
+			service.Spec.Ports[0].NodePort = *quayEcosystem.Spec.Quay.NodePort
+		}
+	case redhatcopv1alpha1.LoadBalancerExternalAccessType:
+		service.Spec.Type = corev1.ServiceTypeLoadBalancer
+	default:
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 	}
 
@@ -94,12 +101,19 @@ func GetQuayConfigServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redha
 
 	service.ObjectMeta.Labels = BuildQuayConfigResourceLabels(meta.Labels)
 
-	if quayEcosystem.Spec.Quay.EnableNodePortService {
+	switch quayEcosystem.Spec.Quay.ExternalAccessType {
+	case redhatcopv1alpha1.NodePortExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeNodePort
-	} else {
+
+		if quayEcosystem.Spec.Quay.ConfigNodePort != nil {
+			service.Spec.Ports[0].NodePort = *quayEcosystem.Spec.Quay.ConfigNodePort
+		}
+
+	case redhatcopv1alpha1.LoadBalancerExternalAccessType:
+		service.Spec.Type = corev1.ServiceTypeLoadBalancer
+	default:
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 	}
-
 	return service
 
 }
