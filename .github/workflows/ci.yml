@@ -41,6 +41,9 @@ jobs:
           name: quay-operator
           path: build/_output/bin
 
+      - name: Update Operator Binary Permissions
+        run: chmod 775 build/_output/bin/quay-operator
+
       - name: Build and Publish Latest Image
         env:
           DOCKER_USER: ${{ secrets.DockerUser }}
@@ -62,6 +65,9 @@ jobs:
         with:
           name: quay-operator
           path: build/_output/bin
+
+      - name: Update Operator Binary Permissions
+        run: chmod 775 build/_output/bin/quay-operator
 
       - name: Build and Publish Release Image
         env:
