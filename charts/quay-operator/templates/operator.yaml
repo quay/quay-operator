@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "quay-operator.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: {{ include "quay-operator.fullname" . }}
+  template:
+    metadata:
+      labels:
+        name: {{ include "quay-operator.fullname" . }}
+    spec:
+      serviceAccountName: {{ include "quay-operator.fullname" . }}
+      containers:
+        - name: {{ include "quay-operator.fullname" . }}
+          image: {{ include "quay-operator.image" . }}
+          command:
+            - quay-operator
+          imagePullPolicy: {{ .Values.image.pullPolicy}}
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "{{ include "quay-operator.fullname" . }}"
+{{- if .Values.imagePullSecret }}
+          imagePullSecrets:
+            - name: {{ .Values.imagePullSecret }}
+{{- end -}}

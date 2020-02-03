@@ -70,6 +70,22 @@ $ kubectl -n quay-enterprise create -f deploy/role_binding.yaml
 $ kubectl -n quay-enterprise create -f deploy/operator.yaml
 ```
 
+#### Helm
+
+The Quay Operator can also be deployed as a [Helm](https://helm.sh/) chart.
+
+Create a new OpenShift project or Kubernetes Namespace
+
+```
+$ kubectl create namespace quay-enterprise
+```
+
+Deploy the Helm Chart
+
+```
+helm install quay-operator ./charts/quay-operator
+```
+
 
 ### Deploy a Quay Ecosystem
 
