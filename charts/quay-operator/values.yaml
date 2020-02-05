@@ -1,0 +1,14 @@
+# Determines whether to apply configurations for OpenShift Continer Platform support
+openshift: true
+
+image:
+  registry: quay.io
+  repository: redhat-cop/quay-operator
+  tag: ""
+  pullPolicy: Always
+
+# Specify the Image Pull Secret if the image is located in a private repository
+imagePullSecret: ""
+
+nameOverride: ""
+fullnameOverride: ""

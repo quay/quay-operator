@@ -1,0 +1,17 @@
+{{- if .Values.openshift -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: {{ include "quay-operator.fullname" . }}
+rules:
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    verbs:
+      - 'update'
+      - 'get'
+      - 'list'
+      - 'watch'
+{{- end -}}
