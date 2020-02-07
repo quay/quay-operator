@@ -1,0 +1,25 @@
+apiVersion: v1
+entries:
+  quay-operator:
+  - apiVersion: v2
+    appVersion: 1.0.1
+    created: "2020-02-06T18:06:04.618863-06:00"
+    description: A Helm Chart for the Quay Operator
+    digest: 0ab9716d7b788ecd67e829f19913ca86984fb8a446463ee4c70318c012c7c9a2
+    home: https://github.com/redhat-cop/quay-operator
+    icon: https://cdn.freebiesupply.com/logos/thumbs/2x/quay-1-logo.png
+    keywords:
+    - operator
+    - quay
+    - registry
+    maintainers:
+    - email: andy.block@gmail.com
+      name: sabre1041
+    name: quay-operator
+    sources:
+    - https://github.com/redhat-cop/quay-operator
+    type: application
+    urls:
+    - https://redhat-cop.github.io/quay-operator/quay-operator-1.0.0.tgz
+    version: 1.0.0
+generated: "2020-02-06T18:06:04.611735-06:00"
