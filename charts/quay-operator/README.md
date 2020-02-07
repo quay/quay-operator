@@ -15,8 +15,16 @@ This chart installs the Quay Operator to your Kubernetes based cluster.
 
 To install the chart run the following command:
 
+Add the helm repository:
+
 ```bash
-$ helm install quay-operator .
+$ helm repo add quay-operator https://redhat-cop.github.io/quay-operator
+```
+
+Install the chart
+
+```bash
+$ helm install quay-operator quay-operator/quay-operator
 ```
 
 ## Deleting
