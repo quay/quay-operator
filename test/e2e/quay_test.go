@@ -49,7 +49,7 @@ func defaultQuayDeploy(t *testing.T, f *framework.Framework, ctx *framework.Test
 	quayEcosystem.Spec.Quay.Image = "quay.io/cnuland/quay:deval"
 	// Get the host IP and then specify the external route for quay
 	ip := strings.Trim(strings.Split(f.KubeConfig.Host, ":")[1], "//")
-	quayEcosystem.Spec.Quay.ConfigRouteHost = "quay-operator-quay-config-quay-enterprise." + ip + ".nip.io"
+	quayEcosystem.Spec.Quay.ConfigHostname = "quay-operator-quay-config-quay-enterprise." + ip + ".nip.io"
 
 	// Add clair enabled, image pull secret, and the name
 	// TODO - Make Clair work in a CI environment. Currently broken because of subpath mounting broken in minishift https://github.com/openshift/origin/issues/21404
@@ -64,8 +64,6 @@ func defaultQuayDeploy(t *testing.T, f *framework.Framework, ctx *framework.Test
 	// Check if the CR has been created
 	cr := &redhatcopv1alpha1.QuayEcosystem{}
 	err = f.Client.Get(goctx.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cr)
-	assert.NoError(t, err)
-
 	//Wait for the redis pod deployment
 	success := WaitForPodWithImage(t, f, ctx, namespace, "quay-operator-redis", constants.RedisImage, retryInterval, timeout)
 	assert.NoError(t, success)
