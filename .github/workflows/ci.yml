@@ -76,7 +76,7 @@ jobs:
   release-image:
     name: Build Release Image
     runs-on: ubuntu-latest
-    if: "github.repository == 'redhat-cop/quay-operator' && startsWith(github.ref, 'refs/tags') && github.ref == 'refs/heads/master'"
+    if: "github.repository == 'redhat-cop/quay-operator' && startsWith(github.ref, 'refs/tags')"
     needs: ["build"]
     steps:
       - name: Check Out Code
