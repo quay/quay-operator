@@ -184,7 +184,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigHostname) && quayConfiguration.DeployQuayConfiguration {
+	if !quayConfiguration.QuayEcosystem.Status.SetupComplete || quayConfiguration.DeployQuayConfiguration {
 		if err := external.ManageQuayConfigExternalAccess(metaObject); err != nil {
 			logging.Log.Error(err, "Failed to Setup Quay Config External Access")
 			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemProvisioningFailure, err)
