@@ -7,24 +7,24 @@ import (
 	"os"
 	"runtime"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/client-go/rest"
 	routev1 "github.com/openshift/api/route/v1"
 	ossecurityv1 "github.com/openshift/api/security/v1"
-
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"github.com/redhat-cop/quay-operator/version"
-	"github.com/redhat-cop/quay-operator/pkg/apis"
-	"github.com/redhat-cop/quay-operator/pkg/controller"
+	"k8s.io/client-go/rest"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
 	"github.com/operator-framework/operator-sdk/pkg/log/zap"
 	"github.com/operator-framework/operator-sdk/pkg/metrics"
-	"github.com/operator-framework/operator-sdk/pkg/restmapper"
 	sdkVersion "github.com/operator-framework/operator-sdk/version"
+	"github.com/redhat-cop/quay-operator/pkg/apis"
+	"github.com/redhat-cop/quay-operator/pkg/controller"
+	"github.com/redhat-cop/quay-operator/version"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -36,8 +36,8 @@ import (
 
 // Change below variables to serve metrics on different host or port.
 var (
-	metricsHost       = "0.0.0.0"
-	metricsPort int32 = 8383
+	metricsHost               = "0.0.0.0"
+	metricsPort         int32 = 8383
 	operatorMetricsPort int32 = 8686
 )
 var log = logf.Log.WithName("cmd")
@@ -95,9 +95,12 @@ func main() {
 	}
 
 	// Create a new Cmd to provide shared dependencies and start components
+	mapperProvider := func(c *rest.Config) (meta.RESTMapper, error) {
+		return apiutil.NewDynamicRESTMapper(cfg)
+	}
 	mgr, err := manager.New(cfg, manager.Options{
 		Namespace:          namespace,
-		MapperProvider:     restmapper.NewDynamicRESTMapper,
+		MapperProvider:     mapperProvider,
 		MetricsBindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
 	})
 	if err != nil {
@@ -190,4 +193,3 @@ func serveCRMetrics(cfg *rest.Config) error {
 	}
 	return nil
 }
-

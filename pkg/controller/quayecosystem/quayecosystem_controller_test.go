@@ -51,7 +51,7 @@ func TestDefaultConfiguration(t *testing.T) {
 		t.Fatal(err, "")
 	}
 	// Initialize fake client
-	cl := fake.NewFakeClient(objs...)
+	cl := fake.NewFakeClientWithScheme(s, objs...)
 
 	reconcilerBase := util.NewReconcilerBase(cl, s, nil, nil)
 	r := &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: nil, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, nil), isOpenShift: true}
@@ -118,7 +118,7 @@ func TestRedisDeployment(t *testing.T) {
 		t.Fatal(err, "")
 	}
 	// Initialize fake client
-	cl := fake.NewFakeClient(objs...)
+	cl := fake.NewFakeClientWithScheme(s, objs...)
 
 	reconcilerBase := util.NewReconcilerBase(cl, s, nil, nil)
 	r := &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: nil, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, nil), isOpenShift: true}
@@ -131,7 +131,7 @@ func TestRedisDeployment(t *testing.T) {
 	err = cl.Create(context.TODO(), testutil.Secret)
 	assert.NoError(t, err)
 
-	// Initialize the reconicer request
+	// Initialize the reconciler request
 	nsn := types.NamespacedName{
 		Name:      name,
 		Namespace: namespace,
@@ -191,7 +191,7 @@ func InvalidTestClairDeployment(t *testing.T) {
 		t.Fatal(err, "")
 	}
 	// Initialize fake client
-	cl := fake.NewFakeClient(objs...)
+	cl := fake.NewFakeClientWithScheme(s, objs...)
 
 	reconcilerBase := util.NewReconcilerBase(cl, s, nil, nil)
 	r := &ReconcileQuayEcosystem{reconcilerBase: reconcilerBase, k8sclient: nil, quaySetupManager: setup.NewQuaySetupManager(reconcilerBase, nil)}
