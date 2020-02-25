@@ -441,8 +441,8 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 			return false, fmt.Errorf("Failed to validate provided Quay SSL Certificate")
 		}
 
-		quayConfiguration.QuaySslCertificate = quaySslCertificateSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey]
-		quayConfiguration.QuaySslPrivateKey = quaySslCertificateSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]
+		quayConfiguration.QuaySslCertificate = quaySslCertificateSecret.Data[corev1.TLSCertKey]
+		quayConfiguration.QuaySslPrivateKey = quaySslCertificateSecret.Data[corev1.TLSPrivateKeyKey]
 
 	}
 
