@@ -304,7 +304,7 @@ var (
 	RequiredDatabaseCredentialKeys = []string{DatabaseCredentialsUsernameKey, DatabaseCredentialsPasswordKey, DatabaseCredentialsDatabaseKey}
 
 	// RequiredSslCertificateKeys represents the keys that are required for a provided SSL certificate
-	RequiredSslCertificateKeys = []string{QuayAppConfigSSLCertificateSecretKey, QuayAppConfigSSLPrivateKeySecretKey}
+	RequiredSslCertificateKeys = []string{corev1.TLSCertKey, corev1.TLSPrivateKeyKey}
 
 	// RequiredS3CredentialKeys represents the keys that are required for the S3 registry backend
 	RequiredS3CredentialKeys = []string{S3AccessKey, S3SecretKey}

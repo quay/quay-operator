@@ -374,13 +374,13 @@ SSL certificates can be provided and used instead of having the operator generat
 
 The secret containing custom certificates must define the following keys:
 
-* `ssl.cert` -  All of the certificates (root, intermediate, certificate) concatinated into a single file 
-* `ssl.key` - Private key as for the SSL certificate
+* `tls.cert` -  All of the certificates (root, intermediate, certificate) concatinated into a single file
+* `tls.key` - Private key as for the SSL certificate
 
 Create a secret containing the certificate and private key
 
 ```
-oc create secret generic custom-quay-ssl --from-file=ssl.key=<ssl_private_key> --from-file=ssl.cert=<ssl_certificate>
+oc create secret tls custom-quay-ssl --key=tls.key=<ssl_private_key> --cert=tls.cert=<ssl_certificate>
 ```
 
 The secret containing the certificates are referenced using the `sslCertificatesSecretName` proprety as shown below
