@@ -2,8 +2,6 @@
 # Image URL to use all building/pushing image targets
 REGISTRY ?= quay.io
 REPOSITORY ?= $(REGISTRY)/redhat-cop/quay-operator
-DEV_TAG ?= dev
-
 IMG := $(REPOSITORY):latest
 
 VERSION := v1.0.2
@@ -11,6 +9,7 @@ VERSION := v1.0.2
 BUILD_COMMIT := $(shell ./scripts/build/get-build-commit.sh)
 BUILD_TIMESTAMP := $(shell ./scripts/build/get-build-timestamp.sh)
 BUILD_HOSTNAME := $(shell ./scripts/build/get-build-hostname.sh)
+CUSTOM_TAG ?= $(BUILD_COMMIT)
 
 LDFLAGS := "-X github.com/redhat-cop/quay-operator/version.Version=$(VERSION) \
 	-X github.com/redhat-cop/quay-operator/version.Vcs=$(BUILD_COMMIT) \
@@ -55,9 +54,9 @@ generate:
 docker-login:
 	@docker login -u $(DOCKER_USER) -p $(DOCKER_PASSWORD) $(REGISTRY)
 
-# Tag for Dev
-docker-tag-dev:
-	@docker tag $(IMG) $(REPOSITORY):$(DEV_TAG)
+# Custom Tag
+docker-tag-custom-tag:
+	@docker tag $(IMG) $(REPOSITORY):$(CUSTOM_TAG)
 
 # Tag for Dev
 docker-tag-release:
@@ -65,8 +64,8 @@ docker-tag-release:
 	@docker tag $(IMG) $(REPOSITORY):latest	
 
 # Push for Dev
-docker-push-dev:  docker-tag-dev
-	@docker push $(REPOSITORY):$(DEV_TAG)
+docker-push-custom-tag:  docker-tag-custom-tag
+	@docker push $(REPOSITORY):$(CUSTOM_TAG)
 
 # Push for Release
 docker-push-release:  docker-tag-release
@@ -84,8 +83,8 @@ docker-push:
 # CI Latest Tag Deployment
 ci-latest-deploy: docker-login docker-build docker-push
 
-# CI Dev Deployment
-ci-dev-deploy: docker-login docker-build docker-push-dev
+# CI Custom Tag Deployment
+ci-custom-tag-deploy: docker-login docker-build docker-push-custom-tag
 
 # CI Release
 ci-release-deploy: docker-login docker-build docker-push-release

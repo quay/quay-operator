@@ -1,5 +1,8 @@
 name: CI/CD
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize]
 jobs:
   build:
     name: Build
@@ -51,7 +54,7 @@ jobs:
   latest-image:
     name: Build Latest Image
     runs-on: ubuntu-latest
-    if: "github.repository == 'redhat-cop/quay-operator' && !startsWith(github.ref, 'refs/tags') && github.ref == 'refs/heads/master'"
+    if: "github.repository == 'redhat-cop/quay-operator' && !startsWith(github.ref, 'refs/tags') && github.ref == 'refs/heads/master' && github.event_name != 'pull_request'"
     needs: ["build"]
     steps:
       - name: Check out code
@@ -73,10 +76,10 @@ jobs:
           REPOSITORY: ${{ secrets.Repository }}
         run: "make ci-latest-deploy"
 
-  release-image:
+  release:
     name: Build Release Image
     runs-on: ubuntu-latest
-    if: "github.repository == 'redhat-cop/quay-operator' && startsWith(github.ref, 'refs/tags')"
+    if: "github.repository == 'redhat-cop/quay-operator' && startsWith(github.ref, 'refs/tags') && github.event_name != 'pull_request'"
     needs: ["build"]
     steps:
       - name: Check Out Code
@@ -97,3 +100,46 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.DockerPassword }}
           REPOSITORY: ${{ secrets.Repository }}
         run: "make ci-release-deploy"
+
+  pull-request:
+    name: Build PR Image
+    runs-on: ubuntu-latest
+    if: "github.repository == 'redhat-cop/quay-operator' && github.event_name == 'pull_request'"
+    needs: ["build"]
+    steps:
+      - name: Check Out Code
+        uses: actions/checkout@v1
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: quay-operator
+          path: build/_output/bin
+
+      - name: Update Operator Binary Permissions
+        run: chmod 775 build/_output/bin/quay-operator
+
+      - name: Build and Publish PR Image
+        env:
+          DOCKER_USER: ${{ secrets.DockerUser }}
+          DOCKER_PASSWORD: ${{ secrets.DockerPassword }}
+          REPOSITORY: ${{ secrets.Repository }}
+        run: |
+          make ci-custom-tag-deploy CUSTOM_TAG=PR-$(echo "$GITHUB_REF" | awk -F / '{print $3}')
+
+      - name: Set Output Variables
+        if: github.event.action == 'opened'
+        env:
+          REPOSITORY: ${{ secrets.Repository }}
+        run: |
+          echo "::set-output name=pr_image::${REPOSITORY}:PR-$(echo "$GITHUB_REF" | awk -F / '{print $3}')"
+          echo "::set-output name=pr_tags::https://quay.io/repository/$(echo ${REPOSITORY} | cut -d'/' -f2-3)?tab=tags"
+        id: pr_image_references
+      - name: Comment on PR
+        if: github.event.action == 'opened'
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            Pull Request Image: [${{ steps.pr_image_references.outputs.pr_image }}](${{ steps.pr_image_references.outputs.pr_tags }})
