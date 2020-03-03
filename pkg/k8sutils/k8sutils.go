@@ -59,16 +59,16 @@ func GetDeploymentStatus(k8sclient kubernetes.Interface, namespace string, name 
 			logging.Log.Error(err, "Failed to get Deployment", "Name", deployment.Name)
 			return false
 		}
-		if deployment.Status.AvailableReplicas == 1 {
-			logging.Log.Info("Deployment successfully scaled up", deployment.Name, deployment.Status.AvailableReplicas)
+		if deployment.Status.UpdatedReplicas == deployment.Status.Replicas {
+			logging.Log.Info("Deployment successfully scaled up", deployment.Name, deployment.Status.UpdatedReplicas)
 			return true
 		}
 		switch event.Type {
 		case watch.Error:
 			watcher.Stop()
 		case watch.Modified:
-			if dc.Status.AvailableReplicas == 1 {
-				logging.Log.Info("Deployment '%s' successfully scaled", "Name", deployment.Name, "Replicas", dc.Status.AvailableReplicas)
+			if dc.Status.UpdatedReplicas == deployment.Status.Replicas {
+				logging.Log.Info("Deployment '%s' successfully scaled", "Name", deployment.Name, "UpdatedReplicas", dc.Status.UpdatedReplicas)
 				watcher.Stop()
 				return true
 
@@ -76,7 +76,7 @@ func GetDeploymentStatus(k8sclient kubernetes.Interface, namespace string, name 
 		}
 	}
 	dc, _ := k8sclient.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
-	if dc.Status.AvailableReplicas != 1 {
+	if dc.Status.UpdatedReplicas != dc.Status.Replicas {
 		logging.Log.Error(err, "Failed to verify a successful deployment", "Name", dc.Name)
 		return false
 	}
