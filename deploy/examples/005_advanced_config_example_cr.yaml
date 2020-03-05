@@ -17,7 +17,7 @@ spec:
     deploymentStrategy: RollingUpdate
     skipSetup: false
     registryStorage:
-      persistentVolumeAccessMode:
+      persistentVolumeAccessModes:
         - ReadWriteOnce
       persistentVolumeSize: 10Gi
       persistentVolumeStorageClassName: quay-storageclass
