@@ -364,6 +364,111 @@ spec:
     skipSetup: true
 ```
 
+### Methods for Exteral Access
+
+Support is available to access Quay through a number of OpenShift and Kubernetes mechanisms for ingress. When running on OpenShift, a [Route](https://docs.openshift.com/container-platform/4.2/networking/routes/route-configuration.html) is used while a [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) and [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) is used. 
+
+All of the properties for defining the configuration for external access can be managed within the `externalAccess` property
+
+The type of external access can be specified by setting the `type` property within `externalAccess` using one of the available options in the table below:
+
+| External Access Type | Description |  Notes |
+| --------- | ---------- | ---------- |
+| `Route` | [OpenShift Route](https://docs.openshift.com/container-platform/latest/networking/routes/route-configuration.html) | Can only be specified when running in OpenShift |
+| `LoadBalancer` | [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) | |
+| `NodePort` | [NodePort Service](https://kubernetes.io/docs/concepts/services-networking/service/#nodeport) | A dns based hostname or IP address **must** be specified using the `hostname` property of the `quay` resource |
+| `Ingress` | [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) | Kubernetes native solution for external access | 
+
+An example of how to specify the `type` is shown below
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    externalAccess:
+      type: LoadBalancer
+```
+
+#### NodePorts
+
+By default, `NodePort` type Services are allocated a randomly assigned network port between 30000-32767. To support a predictive allocation of resources, the `NodePort` services for Quay and Quay Config can be define using the `nodePort` and `configNodePort` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    externalAccess:
+      type: NodePort
+      nodePort: 30100
+      configNodePort: 30101
+```
+
+#### Ingress
+
+Ingress makes use of a similar concept as an OpenShift route, but requires a separate deployment of an ingress controller that manages external traffic. There are a variety of ingress controllers that can be used and implementation specific properties are typically defined through the use of annotations on the ingress resource.
+
+The following is an example of how to define an _Ingress_ type of External Access using annotations specific for an Nginx controller:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    externalAccess:
+      type: Ingress
+      annotations:
+        nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+        nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+```
+
+Annotations can also be applied for the Config ingress by using the `configAnnotations` property
+
+### Specifying the Quay Route
+
+Quay makes use of an OpenShift route to enable ingress. The hostname for this route is automatically generated as per the configuration of the OpenShift cluster. Alternatively, the hostname for this route can be explicitly specified using the `hostname` property under the _externalAccess_ field as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    externalAccess:
+      hostname: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
+```
+
+
+### Specifying a Quay Configuration Route
+
+During the development process, you may want to test the provisioning and setup of Quay Enterprise server. By default, the operator will use the internal service to communicate with the configuration pod. However, when running external to the cluster, you will need to specify the ingress location for which the setup process can use.
+
+Specify the `configHostname` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    externalAccess:
+      configHostname: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
+```
+
 ### SSL Certificates
 
 Quay, as a secure registry, makes use of SSL certificates to secure communication between the various components within the ecosystem. Transport to the Quay user interface and container registry is secured via SSL certificates. These certificates are generated at startup with the OpenShift route being configured with a TLS termination type of _Passthrough_.
@@ -383,7 +488,7 @@ Create a secret containing the certificate and private key
 oc create secret tls custom-quay-ssl --key=tls.key=<ssl_private_key> --cert=tls.cert=<ssl_certificate>
 ```
 
-The secret containing the certificates are referenced using the `sslCertificatesSecretName` proprety as shown below
+The secret containing the certificates are referenced using the `secretName` underneath a property called `tls` as defined within the `externalAccess` proprety as shown below
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -393,12 +498,14 @@ metadata:
 spec:
   quay:
     imagePullSecretName: redhat-pull-secret
-    sslCertificatesSecretName: custom-quay-ssl
+    externalAccess:
+      tls:
+        secretName: custom-quay-ssl
 ```
 
-### Specifying the Quay Route
+### TLS Termination
 
-Quay makes use of an OpenShift route to enable ingress. The hostname for this route is automatically generated as per the configuration of the OpenShift cluster. Alternatively, the hostname for this route can be explicitly specified using the `hostname` property under the _quay_ field as shown below:
+Quay can be configured to protect connections using SSL certificates. By default, SSL communicated is termminated within Quay. There are several different ways that SSL termination can be configured including omitting the use of certificates altogeter. TLS termination is determined by the `termination` property as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -407,69 +514,20 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    hostname: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
     imagePullSecretName: redhat-pull-secret
+    externalAccess:
+      tls:
+        termination: passthrough
 ```
 
-### Methods for Exteral Access
+The example above is the default configuration applied to Quay. Alternate options are available as described in the table below:
 
-Support is available to access Quay through a number of OpenShift and Kubernetes mechanisms for ingress. When running on OpenShift, a [Route](https://docs.openshift.com/container-platform/4.2/networking/routes/route-configuration.html) is used while a [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) is used. 
-
-The type of external access can be specified by setting the `externalAccessType` using one of the available options in the table below:
-
-| External Access Type | Description |  Notes |
+| TLS Termination Type | Description |  Notes |
 | --------- | ---------- | ---------- |
-| `Route` | [OpenShift Route](https://docs.openshift.com/container-platform/latest/networking/routes/route-configuration.html) | Can only be specified when running in OpenShift |
-| `LoadBalancer` | [LoadBalancer Service](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer) | |
-| `NodePort` | [NodePort Service](https://kubernetes.io/docs/concepts/services-networking/service/#nodeport) | A dns based hostname or IP address **must** be specified using the `hostname` property of the `quay` resource |
+| `passthrough` | SSL communication is terminated at Quay | Default configuration |
+| `edge` | SSL commmunication is terminated prior to reaching Quay. Traffic reaching quay is not encrypted (HTTP) |
+| `none` | All communication is unencrypted |
 
-An example of how to specify the `externalAccessType` is shown below
-
-```
-apiVersion: redhatcop.redhat.io/v1alpha1
-kind: QuayEcosystem
-metadata:
-  name: example-quayecosystem
-spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
-    externalAccessType: LoadBalancer
-```
-
-#### NodePorts
-
-By default, `NodePort` type Services are allocated a randomly assigned network port between 30000-32767. To support a predictive allocation of resources, the `NodePort` services for Quay and Quay Config can be define using the `nodePort` and `configNodePort` as shown below:
-
-```
-apiVersion: redhatcop.redhat.io/v1alpha1
-kind: QuayEcosystem
-metadata:
-  name: example-quayecosystem
-spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
-    externalAccessType: NodePort
-    nodePort: 30100
-    configNodePort: 30101
-```
-
-
-### Specifying a Quay Configuration Route
-
-During the development process, you may want to test the provisioning and setup of Quay Enterprise server. By default, the operator will use the internal service to communicate with the configuration pod. However, when running external to the cluster, you will need to specify the ingress location for which the setup process can use.
-
-Specify the `configHostname` as shown below:
-
-```
-apiVersion: redhatcop.redhat.io/v1alpha1
-kind: QuayEcosystem
-metadata:
-  name: example-quayecosystem
-spec:
-  quay:
-    configHostname: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
-    imagePullSecretName: redhat-pull-secret
-```
 
 ### Configuration Deployment After Initial Setup
 

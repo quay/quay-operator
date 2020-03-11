@@ -50,9 +50,9 @@ func GetQuayServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1
 			Selector:  meta.Labels,
 			Ports: []corev1.ServicePort{
 				{
-					Port:       443,
+					Port:       GetQuayServicePort(*quayEcosystem),
 					Protocol:   "TCP",
-					TargetPort: intstr.FromInt(8443),
+					TargetPort: intstr.FromInt(int(quayEcosystem.GetQuayPort())),
 				},
 			},
 		},
@@ -60,12 +60,12 @@ func GetQuayServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1
 
 	service.ObjectMeta.Labels = BuildQuayResourceLabels(meta.Labels)
 
-	switch quayEcosystem.Spec.Quay.ExternalAccessType {
+	switch quayEcosystem.Spec.Quay.ExternalAccess.Type {
 	case redhatcopv1alpha1.NodePortExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeNodePort
 
-		if quayEcosystem.Spec.Quay.NodePort != nil {
-			service.Spec.Ports[0].NodePort = *quayEcosystem.Spec.Quay.NodePort
+		if quayEcosystem.Spec.Quay.ExternalAccess.NodePort != nil {
+			service.Spec.Ports[0].NodePort = *quayEcosystem.Spec.Quay.ExternalAccess.NodePort
 		}
 	case redhatcopv1alpha1.LoadBalancerExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeLoadBalancer
@@ -101,12 +101,12 @@ func GetQuayConfigServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redha
 
 	service.ObjectMeta.Labels = BuildQuayConfigResourceLabels(meta.Labels)
 
-	switch quayEcosystem.Spec.Quay.ExternalAccessType {
+	switch quayEcosystem.Spec.Quay.ExternalAccess.Type {
 	case redhatcopv1alpha1.NodePortExternalAccessType:
 		service.Spec.Type = corev1.ServiceTypeNodePort
 
-		if quayEcosystem.Spec.Quay.ConfigNodePort != nil {
-			service.Spec.Ports[0].NodePort = *quayEcosystem.Spec.Quay.ConfigNodePort
+		if quayEcosystem.Spec.Quay.ExternalAccess.ConfigNodePort != nil {
+			service.Spec.Ports[0].NodePort = *quayEcosystem.Spec.Quay.ExternalAccess.ConfigNodePort
 		}
 
 	case redhatcopv1alpha1.LoadBalancerExternalAccessType:
@@ -176,4 +176,11 @@ func GetDatabaseServiceResourceDefinition(meta metav1.ObjectMeta, port int) *cor
 	}
 
 	return service
+}
+
+func GetQuayServicePort(quayEcosystem redhatcopv1alpha1.QuayEcosystem) int32 {
+	if quayEcosystem.IsInsecureQuay() {
+		return 443
+	}
+	return 80
 }

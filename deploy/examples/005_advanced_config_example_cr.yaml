@@ -13,9 +13,10 @@ spec:
     imagePullSecretName: redhat-pull-secret
     superuserCredentialsSecretName: quay-super-user
     configSecretName: quay-config-app
-    configHostname: example-quayecosystem-quay-enterprise.apps
     deploymentStrategy: RollingUpdate
     skipSetup: false
+    externalAccess:
+      configHostname: example-quayecosystem-quay-enterprise.apps
     registryStorage:
       persistentVolumeAccessModes:
         - ReadWriteOnce

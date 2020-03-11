@@ -721,19 +721,24 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 				},
 			},
 		},
-		{
-			Secret: &corev1.SecretProjection{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
-				},
-				Items: []corev1.KeyToPath{
-					corev1.KeyToPath{
-						Key:  constants.QuayAppConfigSSLCertificateSecretKey,
-						Path: "extra_ca_certs/quay.crt",
-					},
+	}
+
+	quaySSLVolumeProjection := corev1.VolumeProjection{
+		Secret: &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+			},
+			Items: []corev1.KeyToPath{
+				corev1.KeyToPath{
+					Key:  constants.QuayAppConfigSSLCertificateSecretKey,
+					Path: "extra_ca_certs/quay.crt",
 				},
 			},
 		},
+	}
+
+	if !quayConfiguration.QuayEcosystem.IsInsecureQuay() {
+		configVolumeSources = append(configVolumeSources, quaySSLVolumeProjection)
 	}
 
 	// Add Clair SSL

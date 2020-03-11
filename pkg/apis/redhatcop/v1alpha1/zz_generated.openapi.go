@@ -15,6 +15,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair":                             schema_pkg_apis_redhatcop_v1alpha1_Clair(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource": schema_pkg_apis_redhatcop_v1alpha1_CloudfrontS3RegistryBackendSource(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database":                          schema_pkg_apis_redhatcop_v1alpha1_Database(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess":                    schema_pkg_apis_redhatcop_v1alpha1_ExternalAccess(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource":  schema_pkg_apis_redhatcop_v1alpha1_GoogleCloudRegistryBackendSource(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_LocalRegistryBackendSource(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay":                              schema_pkg_apis_redhatcop_v1alpha1_Quay(ref),
@@ -32,6 +33,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage":                   schema_pkg_apis_redhatcop_v1alpha1_RegistryStorage(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource":           schema_pkg_apis_redhatcop_v1alpha1_S3RegistryBackendSource(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_SwiftRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess":                 schema_pkg_apis_redhatcop_v1alpha1_TLSExternalAccess(ref),
 	}
 }
 
@@ -368,6 +370,84 @@ func schema_pkg_apis_redhatcop_v1alpha1_Database(ref common.ReferenceCallback) c
 	}
 }
 
+func schema_pkg_apis_redhatcop_v1alpha1_ExternalAccess(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ExternalAccess defines the properies of a Quay External Access",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"annotations": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"configAnnotations": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
+					"configHostname": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"configNodePort": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"nodePort": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
+					"tls": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess"),
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess"},
+	}
+}
+
 func schema_pkg_apis_redhatcop_v1alpha1_GoogleCloudRegistryBackendSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -451,12 +531,6 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 					"configResources": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
-						},
-					},
-					"configHostname": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
 						},
 					},
 					"configSecretName": {
@@ -570,18 +644,6 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							},
 						},
 					},
-					"nodePort": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int32",
-						},
-					},
-					"configNodePort": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int32",
-						},
-					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/api/core/v1.Probe"),
@@ -620,21 +682,9 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
-					"hostname": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
 					"skipSetup": {
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-					"sslCertificatesSecretName": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
 							Format: "",
 						},
 					},
@@ -675,17 +725,16 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Format: "",
 						},
 					},
-					"externalAccessType": {
+					"externalAccess": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -775,14 +824,14 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"kind": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -1452,6 +1501,33 @@ func schema_pkg_apis_redhatcop_v1alpha1_SwiftRegistryBackendSource(ref common.Re
 						},
 					},
 				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_TLSExternalAccess(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TLSExternalAccess defines the properies of TLS properties for External Access",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"secretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"termination": {
+						SchemaProps: spec.SchemaProps{
+							Description: "termination indicates termination type.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"termination"},
 			},
 		},
 	}

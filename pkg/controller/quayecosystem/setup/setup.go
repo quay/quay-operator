@@ -3,10 +3,11 @@ package setup
 import (
 	"fmt"
 
-	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 
 	"github.com/redhat-cop/operator-utils/pkg/util"
 	"github.com/redhat-cop/quay-operator/pkg/client"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
@@ -210,17 +211,19 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 	}
 
 	// Add Certificates
-	_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLPrivateKeySecretKey, quaySetupInstance.quayConfiguration.QuaySslPrivateKey)
+	if !quaySetupInstance.quayConfiguration.QuayEcosystem.IsInsecureQuay() {
+		_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLPrivateKeySecretKey, quaySetupInstance.quayConfiguration.QuaySslPrivateKey)
 
-	if err != nil {
-		logging.Log.Error(err, "Failed to upload SSL certificates")
-		return fmt.Errorf("Failed to upload SSL certificates: %s", err.Error())
-	}
+		if err != nil {
+			logging.Log.Error(err, "Failed to upload SSL certificates")
+			return fmt.Errorf("Failed to upload SSL certificates: %s", err.Error())
+		}
 
-	_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLCertificateSecretKey, quaySetupInstance.quayConfiguration.QuaySslCertificate)
+		_, _, err = quaySetupInstance.setupClient.UploadFileResource(constants.QuayAppConfigSSLCertificateSecretKey, quaySetupInstance.quayConfiguration.QuaySslCertificate)
 
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	// Validate multiple components
@@ -233,7 +236,20 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		}
 	}
 
-	quayConfig.Config["PREFERRED_URL_SCHEME"] = "https"
+	if quaySetupInstance.quayConfiguration.QuayEcosystem.IsInsecureQuay() {
+
+		if redhatcopv1alpha1.EdgeTLSTerminationType == quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.Termination {
+			quayConfig.Config["PREFERRED_URL_SCHEME"] = "https"
+			quayConfig.Config["EXTERNAL_TLS_TERMINATION"] = true
+
+		} else {
+			quayConfig.Config["PREFERRED_URL_SCHEME"] = "http"
+		}
+
+	} else {
+		quayConfig.Config["PREFERRED_URL_SCHEME"] = "https"
+
+	}
 
 	quayConfig.Config["SETUP_COMPLETE"] = true
 	_, quayConfig, err = quaySetupInstance.setupClient.UpdateQuayConfiguration(quayConfig)

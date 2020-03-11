@@ -31,6 +31,9 @@ type QuayConfigFileType string
 // ExternalAccessType defines the method for accessing Quay from an external source
 type ExternalAccessType string
 
+// TLSTerminationType defines the the method for TLS termination
+type TLSTerminationType string
+
 const (
 
 	// QuayEcosystemValidationFailure indicates that there was an error validating the configuration
@@ -80,6 +83,21 @@ const (
 
 	// NodePortExternalAccessType specifies external access using a NodePort
 	NodePortExternalAccessType ExternalAccessType = "NodePort"
+
+	// EdgeTLSTerminationType specifies that TLS termination will occur at the Router
+	EdgeTLSTerminationType TLSTerminationType = "edge"
+
+	// ReencryptTLSTerminationType specifies that TLS rencryption will occur
+	ReencryptTLSTerminationType TLSTerminationType = "reencrypt"
+
+	// PassthroughTLSTerminationType specifies that TLS termination will occur at the application
+	PassthroughTLSTerminationType TLSTerminationType = "passthrough"
+
+	// NoneTLSTerminationType specifies that SSL will be disabled
+	NoneTLSTerminationType TLSTerminationType = "none"
+
+	SecureQuayPort   = 8443
+	InsecureQuayPort = 8080
 )
 
 // QuayEcosystemStatus defines the observed state of QuayEcosystem
@@ -125,7 +143,6 @@ type Quay struct {
 	// +listType=atomic
 	ConfigEnvVars    []corev1.EnvVar             `json:"configEnvVars,omitempty"`
 	ConfigResources  corev1.ResourceRequirements `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
-	ConfigHostname   string                      `json:"configHostname,omitempty"`
 	ConfigSecretName string                      `json:"configSecretName,omitempty"`
 	// +listType=atomic
 	RepoMirrorEnvVars        []corev1.EnvVar             `json:"repoMirrorEnvVars,omitempty"`
@@ -144,17 +161,13 @@ type Quay struct {
 	LivenessProbe        *corev1.Probe     `json:"livenessProbe,omitempty"`
 	KeepConfigDeployment bool              `json:"keepConfigDeployment,omitempty"`
 	NodeSelector         map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	NodePort             *int32            `json:"nodePort,omitempty"`
-	ConfigNodePort       *int32            `json:"configNodePort,omitempty"`
 	ReadinessProbe       *corev1.Probe     `json:"readinessProbe,omitempty"`
 	// +listType=atomic
 	RegistryBackends               []RegistryBackend           `json:"registryBackends,omitempty"`
 	RegistryStorage                *RegistryStorage            `json:"registryStorage,omitempty"`
 	Replicas                       *int32                      `json:"replicas,omitempty"`
 	Resources                      corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-	Hostname                       string                      `json:"hostname,omitempty"`
 	SkipSetup                      bool                        `json:"skipSetup,omitempty"`
-	SslCertificatesSecretName      string                      `json:"sslCertificatesSecretName,omitempty"`
 	SuperuserCredentialsSecretName string                      `json:"superuserCredentialsSecretName,omitempty"`
 	EnableStorageReplication       bool                        `json:"enableStorageReplication,omitempty"`
 	// +optional
@@ -165,8 +178,7 @@ type Quay struct {
 	// +kubebuilder:validation:Enum=new-installation;add-new-fields;backfill-then-read-only-new;remove-old-field
 	MigrationPhase QuayMigrationPhase `json:"migrationPhase,omitempty" protobuf:"bytes,1,opt,name=migrationPhase,casttype=QuayMigrationPhase"`
 
-	// +kubebuilder:validation:Enum=Route;LoadBalancer;NodePort
-	ExternalAccessType ExternalAccessType `json:"externalAccessType,omitempty"`
+	ExternalAccess *ExternalAccess `json:"externalAccess,omitempty"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -272,6 +284,28 @@ type RegistryStorage struct {
 	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessModes,omitempty,name=persistentVolumeAccessModes"`
 	PersistentVolumeSize             string                              `json:"persistentVolumeSize,omitempty,name=volumeSize"`
 	PersistentVolumeStorageClassName string                              `json:"persistentVolumeStorageClassName,omitempty,name=storageClassName"`
+}
+
+// ExternalAccess defines the properies of a Quay External Access
+// +k8s:openapi-gen=true
+type ExternalAccess struct {
+	Annotations       map[string]string  `json:"annotations,omitempty" protobuf:"bytes,7,rep,name=annotations"`
+	ConfigAnnotations map[string]string  `json:"configAnnotations,omitempty" protobuf:"bytes,7,rep,name=configAnnotations"`
+	ConfigHostname    string             `json:"configHostname,omitempty"`
+	ConfigNodePort    *int32             `json:"configNodePort,omitempty"`
+	Hostname          string             `json:"hostname,omitempty"`
+	NodePort          *int32             `json:"nodePort,omitempty"`
+	TLS               *TLSExternalAccess `json:"tls,omitempty"`
+	// +kubebuilder:validation:Enum=Route;LoadBalancer;NodePort;Ingress
+	Type ExternalAccessType `json:"type,omitempty"`
+}
+
+// TLSExternalAccess defines the properies of TLS properties for External Access
+// +k8s:openapi-gen=true
+type TLSExternalAccess struct {
+	SecretName string `json:"secretName,omitempty"`
+	// termination indicates termination type.
+	Termination TLSTerminationType `json:"termination" protobuf:"bytes,1,opt,name=termination,casttype=TLSTerminationType"`
 }
 
 // LocalRegistryBackendSource defines local registry storage
@@ -450,4 +484,23 @@ func (q *QuayEcosystem) FindConditionByType(conditionType QuayEcosystemCondition
 	}
 
 	return &QuayEcosystemCondition{}, false
+}
+
+// GetQuayPort returns the port associated with Quay
+func (q *QuayEcosystem) GetQuayPort() int32 {
+	if q.IsInsecureQuay() {
+		return InsecureQuayPort
+	}
+	return SecureQuayPort
+}
+
+// IsInsecureQuay determines whether Quay is insecure
+func (q *QuayEcosystem) IsInsecureQuay() bool {
+
+	if utils.IsZeroOfUnderlyingType(q.Spec.Quay.ExternalAccess.TLS.Termination) || q.Spec.Quay.ExternalAccess.TLS.Termination == EdgeTLSTerminationType || q.Spec.Quay.ExternalAccess.TLS.Termination == NoneTLSTerminationType {
+		return true
+	}
+
+	return false
+
 }

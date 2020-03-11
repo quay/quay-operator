@@ -97,6 +97,11 @@ func GetRedisResourcesName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) strin
 	return fmt.Sprintf("%s-redis", GetGenericResourcesName(quayEcosystem))
 }
 
+// GetQuaySSLSecretName returns the name of the secret containing the Quay SSL certificate
+func GetQuaySSLSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-quay-ssl", GetGenericResourcesName(quayEcosystem))
+}
+
 // GetQuayConfigMapSecretName returns the name of the Quay config secret
 func GetQuayConfigMapSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
 	//configSecretName := fmt.Sprintf("%s-config-secret", GetGenericResourcesName(quayEcosystem))
