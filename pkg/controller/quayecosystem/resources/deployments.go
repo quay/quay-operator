@@ -250,7 +250,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				InitialDelaySeconds: 10,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 9092},
+						Port: intstr.IntOrString{IntVal: 9091},
 					},
 				},
 			},
@@ -259,7 +259,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				InitialDelaySeconds: 30,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 9092},
+						Port: intstr.IntOrString{IntVal: 9091},
 					},
 				},
 			},
