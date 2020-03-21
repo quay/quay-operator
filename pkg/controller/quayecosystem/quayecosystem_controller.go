@@ -58,7 +58,7 @@ func newReconciler(mgr manager.Manager, k8sclient kubernetes.Interface) reconcil
 		if errors.IsNotFound(resourcesErr) {
 			isOpenShift = false
 		} else {
-			logging.Log.Error(resourcesErr, "Error Determing Whether Quay Operator Running in OpenShift")
+			logging.Log.Error(resourcesErr, "Error Determining Whether Quay Operator Running in OpenShift")
 		}
 	}
 
