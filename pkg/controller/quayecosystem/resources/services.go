@@ -180,7 +180,7 @@ func GetDatabaseServiceResourceDefinition(meta metav1.ObjectMeta, port int) *cor
 
 func GetQuayServicePort(quayEcosystem redhatcopv1alpha1.QuayEcosystem) int32 {
 	if quayEcosystem.IsInsecureQuay() {
-		return 443
+		return 80
 	}
-	return 80
+	return 443
 }

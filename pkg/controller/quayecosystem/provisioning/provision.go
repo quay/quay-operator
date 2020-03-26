@@ -15,6 +15,7 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/validation"
 	"github.com/redhat-cop/quay-operator/pkg/k8sutils"
 	yaml "gopkg.in/yaml.v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -680,7 +681,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 	clairConfigFile.Clair.Updater.Interval = r.quayConfiguration.ClairUpdateInterval
 
 	clairConfigFile.Clair.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
-		Endpoint: fmt.Sprintf("https://%s/secscan/notify", r.quayConfiguration.QuayEcosystem.Status.Hostname),
+		Endpoint: fmt.Sprintf("%s://%s/secscan/notify", validation.GetScheme(r.quayConfiguration.QuayEcosystem.IsInsecureQuay()), r.quayConfiguration.QuayEcosystem.Status.Hostname),
 		Proxy:    "http://localhost:6063",
 	}
 
