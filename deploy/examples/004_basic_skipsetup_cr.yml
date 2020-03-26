@@ -8,7 +8,8 @@ spec:
     deploymentStrategy: Recreate
     skipSetup: true
     keepConfigDeployment: true
-    routeHost: quay.app.example.com
+    externalAccess:
+      routeHost: quay.app.example.com
   clair:
     enabled: true
     imagePullSecretName: redhat-pull-secret

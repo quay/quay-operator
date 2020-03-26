@@ -151,7 +151,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	// Instantiate External Access
 	var external externalaccess.ExternalAccess
 
-	switch quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType {
+	switch quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Type {
 	case redhatcopv1alpha1.RouteExternalAccessType:
 		external = &externalaccess.RouteExternalAccess{
 			QuayConfiguration: &quayConfiguration,
@@ -164,6 +164,11 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		}
 	case redhatcopv1alpha1.NodePortExternalAccessType:
 		external = &externalaccess.NodePortExternalAccess{
+			QuayConfiguration: &quayConfiguration,
+			ReconcilerBase:    r.reconcilerBase,
+		}
+	case redhatcopv1alpha1.IngressExternalAccessType:
+		external = &externalaccess.IngressExternalAccess{
 			QuayConfiguration: &quayConfiguration,
 			ReconcilerBase:    r.reconcilerBase,
 		}

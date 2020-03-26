@@ -35,8 +35,8 @@ func GetQuayConfigRouteDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatc
 
 	route.ObjectMeta.Labels = BuildQuayConfigResourceLabels(meta.Labels)
 
-	if !utils.IsZeroOfUnderlyingType(quayEcosystem.Spec.Quay.ConfigHostname) {
-		route.Spec.Host = quayEcosystem.Spec.Quay.ConfigHostname
+	if !utils.IsZeroOfUnderlyingType(quayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname) {
+		route.Spec.Host = quayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname
 	}
 
 	return route
@@ -56,19 +56,35 @@ func GetQuayRouteDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1al
 				Name: meta.Name,
 			},
 			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromInt(8443),
-			},
-			TLS: &routev1.TLSConfig{
-				Termination:                   routev1.TLSTerminationPassthrough,
-				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+				TargetPort: intstr.FromInt(int(quayEcosystem.GetQuayPort())),
 			},
 		},
 	}
 
+	if redhatcopv1alpha1.NoneTLSTerminationType != quayEcosystem.Spec.Quay.ExternalAccess.TLS.Termination {
+
+		var termination routev1.TLSTerminationType
+		switch quayEcosystem.Spec.Quay.ExternalAccess.TLS.Termination {
+		case redhatcopv1alpha1.EdgeTLSTerminationType:
+			termination = routev1.TLSTerminationEdge
+		case redhatcopv1alpha1.PassthroughTLSTerminationType:
+			termination = routev1.TLSTerminationPassthrough
+		case redhatcopv1alpha1.ReencryptTLSTerminationType:
+			termination = routev1.TLSTerminationReencrypt
+
+		}
+
+		route.Spec.TLS = &routev1.TLSConfig{
+			Termination:                   termination,
+			InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+		}
+
+	}
+
 	route.ObjectMeta.Labels = BuildQuayResourceLabels(meta.Labels)
 
-	if !utils.IsZeroOfUnderlyingType(quayEcosystem.Spec.Quay.Hostname) {
-		route.Spec.Host = quayEcosystem.Spec.Quay.Hostname
+	if !utils.IsZeroOfUnderlyingType(quayEcosystem.Spec.Quay.ExternalAccess.Hostname) {
+		route.Spec.Host = quayEcosystem.Spec.Quay.ExternalAccess.Hostname
 	}
 
 	return route

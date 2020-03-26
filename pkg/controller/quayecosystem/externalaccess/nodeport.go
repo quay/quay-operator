@@ -31,6 +31,8 @@ func (r *NodePortExternalAccess) ManageQuayExternalAccess(meta metav1.ObjectMeta
 
 	r.QuayConfiguration.QuayHostname = r.formatHostname(r.QuayConfiguration.QuayHostname, nodePort)
 
+	r.QuayConfiguration.QuayEcosystem.Status.Hostname = r.QuayConfiguration.QuayHostname
+
 	return nil
 }
 

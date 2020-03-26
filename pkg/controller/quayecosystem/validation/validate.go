@@ -214,12 +214,12 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 	}
 
 	// Validate Hostname Provided if NodePort external access
-	if redhatcopv1alpha1.NodePortExternalAccessType == quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType && utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Hostname) {
-		return false, fmt.Errorf("Cannot use NodePort External Access Type Without Hostname Defined")
+	if (redhatcopv1alpha1.NodePortExternalAccessType == quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Type || redhatcopv1alpha1.IngressExternalAccessType == quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Type) && utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname) {
+		return false, fmt.Errorf("Cannot use %s External Access Type Without Hostname Defined", quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Type)
 	}
 
 	// Validate Route not specified when not running in OpenShift
-	if redhatcopv1alpha1.RouteExternalAccessType == quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType && !quayConfiguration.IsOpenShift {
+	if redhatcopv1alpha1.RouteExternalAccessType == quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Type && !quayConfiguration.IsOpenShift {
 		return false, fmt.Errorf("Cannot use 'Route` as External Access Type when not running in OpenShift")
 	}
 
@@ -430,8 +430,8 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 	}
 
 	// Validate Quay SSL Certificates
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName) {
-		validQuaySslCertificateSecret, quaySslCertificateSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName, constants.RequiredSslCertificateKeys)
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.SecretName) {
+		validQuaySslCertificateSecret, quaySslCertificateSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.SecretName, constants.RequiredSslCertificateKeys)
 
 		if err != nil {
 			return false, err

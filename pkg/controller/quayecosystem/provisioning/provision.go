@@ -15,6 +15,7 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/validation"
 	"github.com/redhat-cop/quay-operator/pkg/k8sutils"
 	yaml "gopkg.in/yaml.v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -680,7 +681,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 	clairConfigFile.Clair.Updater.Interval = r.quayConfiguration.ClairUpdateInterval
 
 	clairConfigFile.Clair.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
-		Endpoint: fmt.Sprintf("https://%s/secscan/notify", r.quayConfiguration.QuayEcosystem.Status.Hostname),
+		Endpoint: fmt.Sprintf("%s://%s/secscan/notify", validation.GetScheme(r.quayConfiguration.QuayEcosystem.IsInsecureQuay()), r.quayConfiguration.QuayEcosystem.Status.Hostname),
 		Proxy:    "http://localhost:6063",
 	}
 
@@ -809,7 +810,7 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 
 	if !isQuayCertificatesConfigured(appConfigSecret) {
 
-		if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName) {
+		if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.SecretName) {
 			var certBytes, privKeyBytes []byte
 
 			// Check if hostname is an IP address or hostname
@@ -831,9 +832,32 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 			r.quayConfiguration.QuaySslCertificate = certBytes
 			r.quayConfiguration.QuaySslPrivateKey = privKeyBytes
 
+			meta.Name = r.quayConfiguration.QuayTLSSecretName
+
+			quaySslSecret := &corev1.Secret{}
+			err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: r.quayConfiguration.QuayTLSSecretName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, quaySslSecret)
+
+			if err != nil && !apierrors.IsNotFound(err) {
+				logging.Log.Error(err, "Error Finding Quay SSL Secret", "Namespace", r.quayConfiguration.QuayEcosystem.Namespace, "Name", r.quayConfiguration.QuayTLSSecretName)
+				return nil, err
+			}
+
+			// Only Process if Secret is not found
+			if apierrors.IsNotFound(err) {
+				quaySslSecret = resources.GetTLSSecretDefinition(meta, privKeyBytes, certBytes)
+
+				err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, quaySslSecret)
+
+				if err != nil {
+					logging.Log.Error(err, "Error creating Quay SSL secret")
+					return nil, err
+				}
+
+			}
+
 		}
 	} else {
-		if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.SslCertificatesSecretName) {
+		if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.SecretName) {
 			r.quayConfiguration.QuaySslPrivateKey = appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey]
 			r.quayConfiguration.QuaySslCertificate = appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey]
 		}
@@ -844,8 +868,13 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 		appConfigSecret.Data = map[string][]byte{}
 	}
 
-	appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey] = r.quayConfiguration.QuaySslPrivateKey
-	appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = r.quayConfiguration.QuaySslCertificate
+	if r.quayConfiguration.QuayEcosystem.IsInsecureQuay() {
+		delete(appConfigSecret.Data, constants.QuayAppConfigSSLPrivateKeySecretKey)
+		delete(appConfigSecret.Data, constants.QuayAppConfigSSLCertificateSecretKey)
+	} else {
+		appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey] = r.quayConfiguration.QuaySslPrivateKey
+		appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = r.quayConfiguration.QuaySslCertificate
+	}
 
 	err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
 

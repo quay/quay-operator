@@ -447,85 +447,66 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 
 	envVars = utils.MergeEnvVars(envVars, quayConfiguration.QuayEcosystem.Spec.Clair.EnvVars)
 
-	clairDeploymentPodSpec := corev1.PodSpec{
-		Containers: []corev1.Container{{
-			Image: quayConfiguration.QuayEcosystem.Spec.Clair.Image,
-			Name:  constants.ClairContainerName,
-			Env:   envVars,
-			Ports: []corev1.ContainerPort{{
-				ContainerPort: 6060,
-				Name:          "clair-api",
-			}, {
-				ContainerPort: 6061,
-				Name:          "clair-health",
-			}},
-			Resources: quayConfiguration.QuayEcosystem.Spec.Clair.Resources,
-			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
-				Name:      "configvolume",
-				MountPath: constants.ClairConfigVolumePath,
-			},
-				corev1.VolumeMount{
-					Name:      "quay-ssl",
-					MountPath: constants.ClairTrustCaPath,
-					SubPath:   "ca.crt",
-				}},
-			ReadinessProbe: quayConfiguration.QuayEcosystem.Spec.Clair.ReadinessProbe,
-			LivenessProbe:  quayConfiguration.QuayEcosystem.Spec.Clair.LivenessProbe,
-		}},
-		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Clair.NodeSelector,
-		ServiceAccountName: constants.ClairServiceAccount,
-		Volumes: []corev1.Volume{corev1.Volume{
-			Name: "configvolume",
-			VolumeSource: corev1.VolumeSource{
-				Projected: &corev1.ProjectedVolumeSource{
-					Sources: []corev1.VolumeProjection{
-						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: GetSecurityScannerSecretName(quayConfiguration.QuayEcosystem),
-								},
-								Items: []corev1.KeyToPath{
-									corev1.KeyToPath{
-										Key:  constants.SecurityScannerServiceSecretKey,
-										Path: constants.SecurityScannerServiceSecretKey,
-									},
+	clairVolumes := []corev1.Volume{corev1.Volume{
+		Name: "configvolume",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{
+					{
+						Secret: &corev1.SecretProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: GetSecurityScannerSecretName(quayConfiguration.QuayEcosystem),
+							},
+							Items: []corev1.KeyToPath{
+								corev1.KeyToPath{
+									Key:  constants.SecurityScannerServiceSecretKey,
+									Path: constants.SecurityScannerServiceSecretKey,
 								},
 							},
 						},
-						{
-							Secret: &corev1.SecretProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: GetClairSSLSecretName(quayConfiguration.QuayEcosystem),
+					},
+					{
+						Secret: &corev1.SecretProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: GetClairSSLSecretName(quayConfiguration.QuayEcosystem),
+							},
+							Items: []corev1.KeyToPath{
+								corev1.KeyToPath{
+									Key:  corev1.TLSPrivateKeyKey,
+									Path: constants.ClairSSLPrivateKeySecretKey,
 								},
-								Items: []corev1.KeyToPath{
-									corev1.KeyToPath{
-										Key:  corev1.TLSPrivateKeyKey,
-										Path: constants.ClairSSLPrivateKeySecretKey,
-									},
-									corev1.KeyToPath{
-										Key:  corev1.TLSCertKey,
-										Path: constants.ClairSSLCertificateSecretKey,
-									},
+								corev1.KeyToPath{
+									Key:  corev1.TLSCertKey,
+									Path: constants.ClairSSLCertificateSecretKey,
 								},
 							},
 						},
-						{
-							ConfigMap: &corev1.ConfigMapProjection{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: GetClairConfigMapName(quayConfiguration.QuayEcosystem),
-								},
-								Items: []corev1.KeyToPath{
-									corev1.KeyToPath{
-										Key:  constants.ClairConfigFileKey,
-										Path: constants.ClairConfigFileKey,
-									},
+					},
+					{
+						ConfigMap: &corev1.ConfigMapProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: GetClairConfigMapName(quayConfiguration.QuayEcosystem),
+							},
+							Items: []corev1.KeyToPath{
+								corev1.KeyToPath{
+									Key:  constants.ClairConfigFileKey,
+									Path: constants.ClairConfigFileKey,
 								},
 							},
 						},
 					},
 				},
 			},
-		}, corev1.Volume{
+		},
+	}}
+
+	clairVolumeMounts := []corev1.VolumeMount{corev1.VolumeMount{
+		Name:      "configvolume",
+		MountPath: constants.ClairConfigVolumePath,
+	}}
+
+	if !quayConfiguration.QuayEcosystem.IsInsecureQuay() {
+		clairVolumes = append(clairVolumes, corev1.Volume{
 			Name: "quay-ssl",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
@@ -538,7 +519,35 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 					},
 				},
 			},
+		})
+
+		clairVolumeMounts = append(clairVolumeMounts, corev1.VolumeMount{
+			Name:      "quay-ssl",
+			MountPath: constants.ClairTrustCaPath,
+			SubPath:   "ca.crt",
+		})
+	}
+
+	clairDeploymentPodSpec := corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Image: quayConfiguration.QuayEcosystem.Spec.Clair.Image,
+			Name:  constants.ClairContainerName,
+			Env:   envVars,
+			Ports: []corev1.ContainerPort{{
+				ContainerPort: 6060,
+				Name:          "clair-api",
+			}, {
+				ContainerPort: 6061,
+				Name:          "clair-health",
+			}},
+			Resources:      quayConfiguration.QuayEcosystem.Spec.Clair.Resources,
+			VolumeMounts:   clairVolumeMounts,
+			ReadinessProbe: quayConfiguration.QuayEcosystem.Spec.Clair.ReadinessProbe,
+			LivenessProbe:  quayConfiguration.QuayEcosystem.Spec.Clair.LivenessProbe,
 		}},
+		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Clair.NodeSelector,
+		ServiceAccountName: constants.ClairServiceAccount,
+		Volumes:            clairVolumes,
 	}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.ImagePullSecretName) {
@@ -721,19 +730,24 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 				},
 			},
 		},
-		{
-			Secret: &corev1.SecretProjection{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
-				},
-				Items: []corev1.KeyToPath{
-					corev1.KeyToPath{
-						Key:  constants.QuayAppConfigSSLCertificateSecretKey,
-						Path: "extra_ca_certs/quay.crt",
-					},
+	}
+
+	quaySSLVolumeProjection := corev1.VolumeProjection{
+		Secret: &corev1.SecretProjection{
+			LocalObjectReference: corev1.LocalObjectReference{
+				Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+			},
+			Items: []corev1.KeyToPath{
+				corev1.KeyToPath{
+					Key:  constants.QuayAppConfigSSLCertificateSecretKey,
+					Path: "extra_ca_certs/quay.crt",
 				},
 			},
 		},
+	}
+
+	if !quayConfiguration.QuayEcosystem.IsInsecureQuay() {
+		configVolumeSources = append(configVolumeSources, quaySSLVolumeProjection)
 	}
 
 	// Add Clair SSL

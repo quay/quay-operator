@@ -19,12 +19,12 @@ spec:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
             of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
           type: string
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
@@ -216,11 +216,12 @@ spec:
                               type: string
                             port:
                               anyOf:
-                              - type: string
                               - type: integer
+                              - type: string
                               description: Name or number of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
                             scheme:
                               description: Scheme to use for connecting to the host.
                                 Defaults to HTTP.
@@ -242,7 +243,8 @@ spec:
                         successThreshold:
                           description: Minimum consecutive successes for the probe
                             to be considered successful after having failed. Defaults
-                            to 1. Must be 1 for liveness. Minimum value is 1.
+                            to 1. Must be 1 for liveness and startup. Minimum value
+                            is 1.
                           format: int32
                           type: integer
                         tcpSocket:
@@ -256,11 +258,12 @@ spec:
                               type: string
                             port:
                               anyOf:
-                              - type: string
                               - type: integer
+                              - type: string
                               description: Number or name of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
                           required:
                           - port
                           type: object
@@ -336,11 +339,12 @@ spec:
                               type: string
                             port:
                               anyOf:
-                              - type: string
                               - type: integer
+                              - type: string
                               description: Name or number of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
                             scheme:
                               description: Scheme to use for connecting to the host.
                                 Defaults to HTTP.
@@ -362,7 +366,8 @@ spec:
                         successThreshold:
                           description: Minimum consecutive successes for the probe
                             to be considered successful after having failed. Defaults
-                            to 1. Must be 1 for liveness. Minimum value is 1.
+                            to 1. Must be 1 for liveness and startup. Minimum value
+                            is 1.
                           format: int32
                           type: integer
                         tcpSocket:
@@ -376,11 +381,12 @@ spec:
                               type: string
                             port:
                               anyOf:
-                              - type: string
                               - type: integer
+                              - type: string
                               description: Number or name of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
                           required:
                           - port
                           type: object
@@ -588,11 +594,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                         scheme:
                           description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
@@ -613,7 +620,7 @@ spec:
                     successThreshold:
                       description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
-                        1. Must be 1 for liveness. Minimum value is 1.
+                        1. Must be 1 for liveness and startup. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
@@ -627,11 +634,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                       required:
                       - port
                       type: object
@@ -703,11 +711,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                         scheme:
                           description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
@@ -728,7 +737,7 @@ spec:
                     successThreshold:
                       description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
-                        1. Must be 1 for liveness. Minimum value is 1.
+                        1. Must be 1 for liveness and startup. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
@@ -742,11 +751,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                       required:
                       - port
                       type: object
@@ -923,11 +933,6 @@ spec:
                     - secretName
                     type: object
                   type: array
-                configHostname:
-                  type: string
-                configNodePort:
-                  format: int32
-                  type: integer
                 configResources:
                   description: ResourceRequirements describes the compute resource
                     requirements.
@@ -1131,11 +1136,12 @@ spec:
                               type: string
                             port:
                               anyOf:
-                              - type: string
                               - type: integer
+                              - type: string
                               description: Name or number of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
                             scheme:
                               description: Scheme to use for connecting to the host.
                                 Defaults to HTTP.
@@ -1157,7 +1163,8 @@ spec:
                         successThreshold:
                           description: Minimum consecutive successes for the probe
                             to be considered successful after having failed. Defaults
-                            to 1. Must be 1 for liveness. Minimum value is 1.
+                            to 1. Must be 1 for liveness and startup. Minimum value
+                            is 1.
                           format: int32
                           type: integer
                         tcpSocket:
@@ -1171,11 +1178,12 @@ spec:
                               type: string
                             port:
                               anyOf:
-                              - type: string
                               - type: integer
+                              - type: string
                               description: Number or name of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
                           required:
                           - port
                           type: object
@@ -1251,11 +1259,12 @@ spec:
                               type: string
                             port:
                               anyOf:
-                              - type: string
                               - type: integer
+                              - type: string
                               description: Name or number of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
                             scheme:
                               description: Scheme to use for connecting to the host.
                                 Defaults to HTTP.
@@ -1277,7 +1286,8 @@ spec:
                         successThreshold:
                           description: Minimum consecutive successes for the probe
                             to be considered successful after having failed. Defaults
-                            to 1. Must be 1 for liveness. Minimum value is 1.
+                            to 1. Must be 1 for liveness and startup. Minimum value
+                            is 1.
                           format: int32
                           type: integer
                         tcpSocket:
@@ -1291,11 +1301,12 @@ spec:
                               type: string
                             port:
                               anyOf:
-                              - type: string
                               - type: integer
+                              - type: string
                               description: Number or name of the port to access on
                                 the container. Number must be in the range 1 to 65535.
                                 Name must be an IANA_SVC_NAME.
+                              x-kubernetes-int-or-string: true
                           required:
                           - port
                           type: object
@@ -1444,16 +1455,50 @@ spec:
                     - name
                     type: object
                   type: array
-                externalAccessType:
-                  description: ExternalAccessType defines the method for accessing
-                    Quay from an external source
-                  enum:
-                  - Route
-                  - LoadBalancer
-                  - NodePort
-                  type: string
-                hostname:
-                  type: string
+                externalAccess:
+                  description: ExternalAccess defines the properies of a Quay External
+                    Access
+                  properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    configAnnotations:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    configHostname:
+                      type: string
+                    configNodePort:
+                      format: int32
+                      type: integer
+                    hostname:
+                      type: string
+                    nodePort:
+                      format: int32
+                      type: integer
+                    tls:
+                      description: TLSExternalAccess defines the properies of TLS
+                        properties for External Access
+                      properties:
+                        secretName:
+                          type: string
+                        termination:
+                          description: termination indicates termination type.
+                          type: string
+                      required:
+                      - termination
+                      type: object
+                    type:
+                      description: ExternalAccessType defines the method for accessing
+                        Quay from an external source
+                      enum:
+                      - Route
+                      - LoadBalancer
+                      - NodePort
+                      - Ingress
+                      type: string
+                  type: object
                 image:
                   type: string
                 imagePullSecretName:
@@ -1517,11 +1562,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                         scheme:
                           description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
@@ -1542,7 +1588,7 @@ spec:
                     successThreshold:
                       description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
-                        1. Must be 1 for liveness. Minimum value is 1.
+                        1. Must be 1 for liveness and startup. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
@@ -1556,11 +1602,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                       required:
                       - port
                       type: object
@@ -1578,9 +1625,6 @@ spec:
                   - backfill-then-read-only-new
                   - remove-old-field
                   type: string
-                nodePort:
-                  format: int32
-                  type: integer
                 nodeSelector:
                   additionalProperties:
                     type: string
@@ -1642,11 +1686,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                         scheme:
                           description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
@@ -1667,7 +1712,7 @@ spec:
                     successThreshold:
                       description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
-                        1. Must be 1 for liveness. Minimum value is 1.
+                        1. Must be 1 for liveness and startup. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
@@ -1681,11 +1726,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                       required:
                       - port
                       type: object
@@ -2009,8 +2055,6 @@ spec:
                   type: object
                 skipSetup:
                   type: boolean
-                sslCertificatesSecretName:
-                  type: string
                 superuserCredentialsSecretName:
                   type: string
               type: object
@@ -2188,11 +2232,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                         scheme:
                           description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
@@ -2213,7 +2258,7 @@ spec:
                     successThreshold:
                       description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
-                        1. Must be 1 for liveness. Minimum value is 1.
+                        1. Must be 1 for liveness and startup. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
@@ -2227,11 +2272,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                       required:
                       - port
                       type: object
@@ -2306,11 +2352,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Name or number of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                         scheme:
                           description: Scheme to use for connecting to the host. Defaults
                             to HTTP.
@@ -2331,7 +2378,7 @@ spec:
                     successThreshold:
                       description: Minimum consecutive successes for the probe to
                         be considered successful after having failed. Defaults to
-                        1. Must be 1 for liveness. Minimum value is 1.
+                        1. Must be 1 for liveness and startup. Minimum value is 1.
                       format: int32
                       type: integer
                     tcpSocket:
@@ -2345,11 +2392,12 @@ spec:
                           type: string
                         port:
                           anyOf:
-                          - type: string
                           - type: integer
+                          - type: string
                           description: Number or name of the port to access on the
                             container. Number must be in the range 1 to 65535. Name
                             must be an IANA_SVC_NAME.
+                          x-kubernetes-int-or-string: true
                       required:
                       - port
                       type: object

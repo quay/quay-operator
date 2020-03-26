@@ -49,7 +49,9 @@ func defaultQuayDeploy(t *testing.T, f *framework.Framework, ctx *framework.Test
 	quayEcosystem.Spec.Quay.Image = "quay.io/cnuland/quay:deval"
 	// Get the host IP and then specify the external route for quay
 	ip := strings.Trim(strings.Split(f.KubeConfig.Host, ":")[1], "//")
-	quayEcosystem.Spec.Quay.ConfigHostname = "quay-operator-quay-config-quay-enterprise." + ip + ".nip.io"
+	quayEcosystem.Spec.Quay.ExternalAccess = &redhatcopv1alpha1.ExternalAccess{
+		ConfigHostname: "quay-operator-quay-config-quay-enterprise." + ip + ".nip.io",
+	}
 
 	// Add clair enabled, image pull secret, and the name
 	// TODO - Make Clair work in a CI environment. Currently broken because of subpath mounting broken in minishift https://github.com/openshift/origin/issues/21404

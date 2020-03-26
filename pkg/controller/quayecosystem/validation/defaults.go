@@ -49,6 +49,28 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 		changed = true
 	}
 
+	if quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess == nil {
+		quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess = &redhatcopv1alpha1.ExternalAccess{}
+		changed = true
+	}
+
+	if quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS == nil {
+		quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS = &redhatcopv1alpha1.TLSExternalAccess{}
+		changed = true
+	}
+
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.SecretName) {
+		quayConfiguration.QuayTLSSecretName = resources.GetQuaySSLSecretName(quayConfiguration.QuayEcosystem)
+		changed = true
+	} else {
+		quayConfiguration.QuayTLSSecretName = quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.SecretName
+	}
+
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.Termination) {
+		quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.TLS.Termination = redhatcopv1alpha1.PassthroughTLSTerminationType
+		changed = true
+	}
+
 	// Core Quay Values
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Image) {
 		changed = true
@@ -68,25 +90,25 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ReadinessProbe) {
 		changed = true
-		quayConfiguration.QuayEcosystem.Spec.Quay.ReadinessProbe = getDefaultQuayReadinessProbe()
+		quayConfiguration.QuayEcosystem.Spec.Quay.ReadinessProbe = getDefaultQuayReadinessProbe(*quayConfiguration.QuayEcosystem)
 	}
 
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe) {
 		changed = true
-		quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe = getDefaultQuayLivenessProbe()
+		quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe = getDefaultQuayLivenessProbe(*quayConfiguration.QuayEcosystem)
 	}
 
 	// Default Quay Config Route
-	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigHostname) {
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname) {
 		quayConfiguration.QuayConfigHostname = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
 	} else {
-		quayConfiguration.QuayConfigHostname = quayConfiguration.QuayEcosystem.Spec.Quay.ConfigHostname
+		quayConfiguration.QuayConfigHostname = quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname
 	}
 
 	// Default External Access Type
-	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType) {
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Type) {
 		changed = true
-		quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccessType = redhatcopv1alpha1.RouteExternalAccessType
+		quayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Type = redhatcopv1alpha1.RouteExternalAccessType
 	}
 
 	// Apply default values for Redis
@@ -159,7 +181,7 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	}
 
 	// Clair Core Values
-	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
+	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled == true {
 
 		// Add Clair Service Account to List of SCC's
 		constants.RequiredAnyUIDSccServiceAccounts = append(constants.RequiredAnyUIDSccServiceAccounts, constants.ClairServiceAccount)
@@ -300,21 +322,21 @@ func getDefaultClairLivenessProbe() *corev1.Probe {
 	}
 }
 
-func getDefaultQuayReadinessProbe() *corev1.Probe {
+func getDefaultQuayReadinessProbe(quayEcosystem redhatcopv1alpha1.QuayEcosystem) *corev1.Probe {
 	return &corev1.Probe{
 		FailureThreshold:    3,
 		InitialDelaySeconds: 5,
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path:   constants.QuayHealthEndpoint,
-				Port:   intstr.IntOrString{IntVal: 8443},
-				Scheme: "HTTPS",
+				Port:   intstr.IntOrString{IntVal: quayEcosystem.GetQuayPort()},
+				Scheme: GetScheme(quayEcosystem.IsInsecureQuay()),
 			},
 		},
 	}
 }
 
-func getDefaultQuayLivenessProbe() *corev1.Probe {
+func getDefaultQuayLivenessProbe(quayEcosystem redhatcopv1alpha1.QuayEcosystem) *corev1.Probe {
 	return &corev1.Probe{
 		TimeoutSeconds:      5,
 		FailureThreshold:    3,
@@ -322,8 +344,8 @@ func getDefaultQuayLivenessProbe() *corev1.Probe {
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path:   constants.QuayHealthEndpoint,
-				Port:   intstr.IntOrString{IntVal: 8443},
-				Scheme: "HTTPS",
+				Port:   intstr.IntOrString{IntVal: quayEcosystem.GetQuayPort()},
+				Scheme: GetScheme(quayEcosystem.IsInsecureQuay()),
 			},
 		},
 	}
@@ -449,4 +471,12 @@ func setDefaultBackendSourceValues(registryBackends []redhatcopv1alpha1.Registry
 
 	return registryBackends, changed
 
+}
+
+func GetScheme(isInsecure bool) corev1.URIScheme {
+	if isInsecure == false {
+		return corev1.URISchemeHTTPS
+	}
+
+	return corev1.URISchemeHTTP
 }

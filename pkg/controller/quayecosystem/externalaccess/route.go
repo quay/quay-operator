@@ -40,10 +40,10 @@ func (r *RouteExternalAccess) ManageQuayExternalAccess(meta metav1.ObjectMeta) e
 		return err
 	}
 
-	if utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.Hostname) {
+	if utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname) {
 		r.QuayConfiguration.QuayHostname = createdRoute.Spec.Host
 	} else {
-		r.QuayConfiguration.QuayHostname = r.QuayConfiguration.QuayEcosystem.Spec.Quay.Hostname
+		r.QuayConfiguration.QuayHostname = r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname
 	}
 
 	r.QuayConfiguration.QuayEcosystem.Status.Hostname = r.QuayConfiguration.QuayHostname
