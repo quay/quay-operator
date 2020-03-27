@@ -6,11 +6,13 @@ import (
 	"time"
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
+	"gopkg.in/yaml.v3"
 
 	"github.com/redhat-cop/operator-utils/pkg/util"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/externalaccess"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/provisioning"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/quayconfig"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/setup"
 
@@ -20,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -351,6 +354,173 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 			return *removeQuayConfigResult, nil
 		}
 
+	}
+
+	// Reconcile Quay configuration specified in the CR.
+	// TODO: This controller is too long. Refactor and clean it up.
+	// NOTE: This is a naive implementation for the sake of time and simplicity.
+	//       A cleaner implementation should be designed and implemented in the
+	//       future.
+	if quayConfiguration.QuayEcosystem.Status.SetupComplete {
+
+		logging.Log.Info("Reconciling Quay configuration.")
+
+		// Fetch the configuration as specified in the CR
+		db := quayconfig.DatabaseConfig{
+			Host:     quayConfiguration.QuayDatabase.Server,
+			Username: quayConfiguration.QuayDatabase.Username,
+			Password: quayConfiguration.QuayDatabase.Password,
+			Name:     quayConfiguration.QuayDatabase.Database,
+		}
+
+		redis := quayconfig.RedisConfig{
+			Host:     quayConfiguration.RedisHostname,
+			Password: quayConfiguration.RedisPassword,
+			Port:     int(*quayConfiguration.RedisPort),
+		}
+
+		desiredConfig := quayconfig.InfrastructureConfig{
+			Database: db,
+			Redis:    redis,
+			Hostname: quayConfiguration.QuayHostname,
+		}
+
+		// Fetch Quay's `config.yaml` from its configuration secret
+		secret := &corev1.Secret{}
+		target := types.NamespacedName{
+			Namespace: request.Namespace,
+			Name:      "quay-enterprise-config-secret", // TODO: Should not be hard-coded
+		}
+		err := r.reconcilerBase.GetClient().Get(context.TODO(), target, secret)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				logging.Log.Error(err, "Unable to find Quay's configuration secret.")
+				return reconcile.Result{}, nil
+			}
+			logging.Log.Error(err, "Unable to fetch Quay's configuration secret.")
+			return reconcile.Result{}, err
+		}
+
+		// Verify and reconcile all configuration values managed by the operator
+		if fileContents, ok := secret.Data["config.yaml"]; ok {
+
+			// Unmarshall those values managed by the Operator
+			persistedConfig := &quayconfig.ConfigFile{}
+			err = yaml.Unmarshal(fileContents, persistedConfig)
+			if err != nil {
+				logging.Log.Error(err, "Unable to deserialize configuration file.")
+				return reconcile.Result{}, err
+			}
+
+			// Unmarshall the rest of the file
+			// NOTE: This is done because the operator does not have a defined
+			//       struct which represents the entire config.yaml schema. It
+			//       also avoids unintentionally adding new fields to the
+			//       configuration file.
+			if persistedConfig.NotManagedByOperator == nil {
+				persistedConfig.NotManagedByOperator = make(map[string]interface{})
+			}
+			err = yaml.Unmarshal(fileContents, persistedConfig.NotManagedByOperator)
+			if err != nil {
+				logging.Log.Error(err, "Unable to deserialize configuration file.")
+				return reconcile.Result{}, err
+			}
+
+			// Reconcile Hostname Changes
+			if persistedConfig.Hostname != desiredConfig.Hostname {
+
+				logging.Log.Info("Quay's Hostname has changed. Reconciling.")
+
+				configFileKey := "SERVER_HOSTNAME"
+
+				// Update the Hostname in the internal config.yaml representation
+				persistedConfig.NotManagedByOperator[configFileKey] = desiredConfig.Hostname
+				data, err := yaml.Marshal(persistedConfig.NotManagedByOperator)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Quay's Hostname.")
+					return reconcile.Result{}, err
+				}
+
+				// Update the `config.yaml` stored in the secret used by Quay
+				secret.Data["config.yaml"] = data
+				err = r.reconcilerBase.GetClient().Update(context.Background(), secret)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Quay's Hostname configuration.")
+					return reconcile.Result{}, err
+				}
+
+				logging.Log.Info("Updated Quay's Hostname configuration.")
+
+			} else {
+				logging.Log.Info("Quay's Hostname is correct. No changes needed.")
+			}
+
+			// Reconcile Redis Changes
+			// TODO: This conditional statement is too long. Refactor.
+			if persistedConfig.Redis.Host != desiredConfig.Redis.Host || persistedConfig.Redis.Port != desiredConfig.Redis.Port || persistedConfig.Redis.Password != desiredConfig.Redis.Password {
+
+				logging.Log.Info("Redis has changed. Reconciling.")
+				configFileKey := "USER_EVENTS_REDIS"
+
+				// Update the Redis Configuration in the internal config.yaml representation
+				persistedConfig.NotManagedByOperator[configFileKey] = desiredConfig.Redis
+				data, err := yaml.Marshal(persistedConfig.NotManagedByOperator)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Redis Configuration.")
+				}
+
+				// Update the `config.yaml` stored in the secret used by Quay
+				secret.Data["config.yaml"] = data
+				err = r.reconcilerBase.GetClient().Update(context.Background(), secret)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Redis configuration.")
+					return reconcile.Result{}, err
+				}
+
+				logging.Log.Info("Updated Quay's Redis configuration.")
+
+			} else {
+				logging.Log.Info("Redis configuration is correct. No changes needed.")
+			}
+
+			// Reconcile Database Changes
+			desiredConnectionString, err := desiredConfig.Database.ToConnectionString()
+			if err != nil {
+				logging.Log.Error(err, "Unable to construct Database connection string.")
+				return reconcile.Result{}, err
+			}
+
+			if persistedConfig.DatabaseURI != desiredConnectionString {
+
+				logging.Log.Info("Quay's Database configuration has changed. Reconciling.")
+				configFileKey := "DB_URI"
+
+				// Update the Redis Configuration in the internal config.yaml representation
+				persistedConfig.NotManagedByOperator[configFileKey] = desiredConnectionString
+				data, err := yaml.Marshal(persistedConfig.NotManagedByOperator)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Quay's Database Configuration.")
+				}
+
+				// Update the `config.yaml` stored in the secret used by Quay
+				secret.Data["config.yaml"] = data
+				err = r.reconcilerBase.GetClient().Update(context.Background(), secret)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Quay's Database configuration.")
+					return reconcile.Result{}, err
+				}
+
+				logging.Log.Info("Updated Quay's Database configuration.")
+
+			} else {
+				logging.Log.Info("Quay's Database configuration is correct. No changes needed.")
+			}
+
+		} else {
+			msg := "Unable to reconcile Quay configuration. Cannot access `config.yaml`."
+			logging.Log.Error(nil, msg)
+			return reconcile.Result{}, nil
+		}
 	}
 
 	return reconcile.Result{}, nil

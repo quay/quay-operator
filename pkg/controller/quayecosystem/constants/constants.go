@@ -14,7 +14,7 @@ const (
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
 	// QuayImage is the Quay image
-	QuayImage = "quay.io/redhat/quay:v3.2.0"
+	QuayImage = "quay.io/projectquay/quay:latest"
 	// ImagePullSecret is the name of the image pull secret for retrieving images from a protected image registry
 	ImagePullSecret = "redhat-pull-secret"
 	// RedisImage is the name of the Redis Image
@@ -69,6 +69,8 @@ const (
 	QuayDatabaseName = "quay"
 	// QuayDatabasePVCSize is the size of the PVC for Quay
 	QuayDatabasePVCSize = "1Gi"
+	// QuayReplicaCount is the number of Quay instances to run
+	QuayReplicas int32 = 1
 
 	// DatabaseCredentialsUsernameKey represents the key for the database username
 	DatabaseCredentialsUsernameKey = "database-username"
@@ -126,6 +128,8 @@ const (
 	QuayConfigSecretName = "quay-config"
 	// QuayConfigDefaultPasswordValue is the default password for the Quay Config endpoint
 	QuayConfigDefaultPasswordValue = "quay"
+	// QuayConfigReplicas specifies how many Quay-Config pods should be ran
+	QuayConfigReplicas int32 = 1
 	// QuayContainerConfigName represents the name of the Quay config container
 	QuayContainerConfigName = "quay-enterprise-config"
 	// QuayContainerRepoMirrorName represents the name of the Quay repo mirror container
@@ -147,7 +151,7 @@ const (
 	// QuaySuperuserDefaultPassword represents the default Quay superuser password
 	QuaySuperuserDefaultPassword = "password"
 	// QuaySuperuserDefaultEmail represents the default Quay superuser password
-	QuaySuperuserDefaultEmail = "quay@redhat.com"
+	QuaySuperuserDefaultEmail = "changeme@example.com"
 	// EncryptedRobotTokenMigrationPhase represents the name of a envirnment variable required or quay containers
 	EncryptedRobotTokenMigrationPhase = "EncryptedRobotTokenMigrationPhase"
 
