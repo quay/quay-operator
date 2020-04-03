@@ -56,7 +56,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		DeleteFunc:  func(e event.DeleteEvent) bool { return false },
 		GenericFunc: func(e event.GenericEvent) bool { return false },
 
-		// Only handle updates to the Quay configuration Secret after N minutes
+		// Only handle updates to the Quay configuration Secret
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// TODO: This shouldn't be hard-coded.
 			//       The file `resources.go` can produce this value, but it's
