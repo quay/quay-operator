@@ -253,6 +253,7 @@ type Clair struct {
 	Resources                 corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	SslCertificatesSecretName string                      `json:"sslCertificatesSecretName,omitempty"`
 	UpdateInterval            string                      `json:"updateInterval,omitempty"`
+	ClairDatabaseSslMode      string                      `json:"clairDatabaseSslMode,omitempty"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry

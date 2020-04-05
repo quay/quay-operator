@@ -674,7 +674,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 	clairConfigFile = resources.GenerateDefaultClairConfigFile()
 	//	}
 
-	clairConfigFile.Clair.Database.Options["source"] = fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", r.quayConfiguration.ClairDatabase.Username, r.quayConfiguration.ClairDatabase.Password, r.quayConfiguration.ClairDatabase.Server, r.quayConfiguration.ClairDatabase.Database)
+	clairConfigFile.Clair.Database.Options["source"] = fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=%s", r.quayConfiguration.ClairDatabase.Username, r.quayConfiguration.ClairDatabase.Password, r.quayConfiguration.ClairDatabase.Server, r.quayConfiguration.ClairDatabase.Database, r.quayConfiguration.QuayEcosystem.Spec.Clair.ClairDatabaseSslMode)
 
 	clairAudience, _ := url.Parse(resources.GetClairEndpointAddress(r.quayConfiguration.QuayEcosystem))
 

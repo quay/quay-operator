@@ -216,6 +216,11 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 			quayConfiguration.QuayEcosystem.Spec.Clair.Database.ReadinessProbe = getDefaultDatabaseReadinessProbe()
 		}
 
+		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.ClairDatabaseSslMode) {
+			changed = true
+			quayConfiguration.QuayEcosystem.Spec.Clair.ClairDatabaseSslMode = constants.ClairDatabaseSslModeDefault
+		}
+
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Database.LivenessProbe) {
 			changed = true
 			quayConfiguration.QuayEcosystem.Spec.Clair.Database.LivenessProbe = getDefaultDatabaseLivenessProbe()
