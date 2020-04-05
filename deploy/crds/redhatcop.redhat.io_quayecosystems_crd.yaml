@@ -24,7 +24,7 @@ spec:
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In camelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
@@ -41,7 +41,8 @@ spec:
                   - verify-ca
                   - verify-full
                   type: string
-                  description: databaseSslMode sets the sslmode for Clair Postgresql database connection. If not set, defaults to sslmode=disable
+                  description: databaseSslMode sets the sslmode for Clair Postgresql database connection. 
+                    If not set, defaults to sslmode=disable
                 database:
                   description: Database defines a database that will be deployed to
                     support a particular component
