@@ -51,7 +51,7 @@ jobs:
   latest-image:
     name: Build Latest Image
     runs-on: ubuntu-latest
-    if: "github.repository == 'sabre1041/quay-operator'"
+    if: "github.repository == 'sabre1041/quay-operator' && !startsWith(github.ref, 'refs/tags')"
     needs: ["build"]
     steps:
       - name: Check out code
