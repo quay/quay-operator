@@ -66,12 +66,12 @@ jobs:
       - name: Update Operator Binary Permissions
         run: chmod 775 build/_output/bin/quay-operator
 
-  #      - name: Build and Publish Latest Image
-  #        env:
-  #          DOCKER_USER: ${{ secrets.DockerUser }}
-  #          DOCKER_PASSWORD: ${{ secrets.DockerPassword }}
-  #          REPOSITORY: ${{ secrets.Repository }}
-  #        run: "make ci-latest-deploy"
+      - name: Build and Publish Latest Image
+        env:
+          DOCKER_USER: ${{ secrets.DockerUser }}
+          DOCKER_PASSWORD: ${{ secrets.DockerPassword }}
+          REPOSITORY: ${{ secrets.Repository }}
+        run: "make ci-latest-deploy"
 
   release-image:
     name: Build Release Image
