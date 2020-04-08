@@ -131,10 +131,10 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 			Name:  constants.QuayContainerConfigName,
 			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 8080,
+				ContainerPort: constants.QuayHTTPContainerPort,
 				Name:          "http",
 			}, {
-				ContainerPort: 8443,
+				ContainerPort: constants.QuayHTTPSContainerPort,
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
@@ -148,7 +148,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				InitialDelaySeconds: 10,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 8443},
+						Port: intstr.IntOrString{IntVal: quayConfiguration.QuayEcosystem.GetQuayPort()},
 					},
 				},
 			},
@@ -157,7 +157,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				InitialDelaySeconds: 30,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 8443},
+						Port: intstr.IntOrString{IntVal: quayConfiguration.QuayEcosystem.GetQuayPort()},
 					},
 				},
 			},
@@ -233,10 +233,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 			Name:  constants.QuayContainerRepoMirrorName,
 			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 8080,
-				Name:          "http",
-			}, {
-				ContainerPort: 8443,
+				ContainerPort: constants.QuayRepoMirrorContainerPort,
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
@@ -250,7 +247,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				InitialDelaySeconds: 10,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 9092},
+						Port: intstr.IntOrString{IntVal: constants.QuayRepoMirrorContainerPort},
 					},
 				},
 			},
@@ -259,7 +256,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				InitialDelaySeconds: 30,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 9092},
+						Port: intstr.IntOrString{IntVal: constants.QuayRepoMirrorContainerPort},
 					},
 				},
 			},
@@ -349,10 +346,10 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 			Name:  constants.QuayContainerAppName,
 			Env:   configEnvVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 8080,
+				ContainerPort: constants.QuayHTTPContainerPort,
 				Name:          "http",
 			}, {
-				ContainerPort: 8443,
+				ContainerPort: constants.QuayHTTPSContainerPort,
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
@@ -510,7 +507,7 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 			Name: "quay-ssl",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+					SecretName: GetQuaySecretName(quayConfiguration.QuayEcosystem),
 					Items: []corev1.KeyToPath{
 						corev1.KeyToPath{
 							Key:  constants.QuayAppConfigSSLCertificateSecretKey,
@@ -534,10 +531,10 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 			Name:  constants.ClairContainerName,
 			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 6060,
+				ContainerPort: constants.ClairPort,
 				Name:          "clair-api",
 			}, {
-				ContainerPort: 6061,
+				ContainerPort: constants.ClairHealthPort,
 				Name:          "clair-health",
 			}},
 			Resources:      quayConfiguration.QuayEcosystem.Spec.Clair.Resources,
@@ -726,7 +723,7 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 		{
 			Secret: &corev1.SecretProjection{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+					Name: GetQuaySecretName(quayConfiguration.QuayEcosystem),
 				},
 			},
 		},
@@ -735,7 +732,7 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 	quaySSLVolumeProjection := corev1.VolumeProjection{
 		Secret: &corev1.SecretProjection{
 			LocalObjectReference: corev1.LocalObjectReference{
-				Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+				Name: GetQuaySecretName(quayConfiguration.QuayEcosystem),
 			},
 			Items: []corev1.KeyToPath{
 				corev1.KeyToPath{

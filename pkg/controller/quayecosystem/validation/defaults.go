@@ -300,7 +300,7 @@ func getDefaultClairReadinessProbe() *corev1.Probe {
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path:   constants.ClairHealthEndpoint,
-				Port:   intstr.IntOrString{IntVal: 6061},
+				Port:   intstr.IntOrString{IntVal: constants.ClairHealthPort},
 				Scheme: "HTTP",
 			},
 		},
@@ -315,7 +315,7 @@ func getDefaultClairLivenessProbe() *corev1.Probe {
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path:   constants.ClairHealthEndpoint,
-				Port:   intstr.IntOrString{IntVal: 6061},
+				Port:   intstr.IntOrString{IntVal: constants.ClairHealthPort},
 				Scheme: "HTTP",
 			},
 		},

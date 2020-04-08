@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"time"
 
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	appsv1 "k8s.io/api/apps/v1"
 
@@ -95,9 +96,6 @@ const (
 
 	// NoneTLSTerminationType specifies that SSL will be disabled
 	NoneTLSTerminationType TLSTerminationType = "none"
-
-	SecureQuayPort   = 8443
-	InsecureQuayPort = 8080
 )
 
 // QuayEcosystemStatus defines the observed state of QuayEcosystem
@@ -489,9 +487,9 @@ func (q *QuayEcosystem) FindConditionByType(conditionType QuayEcosystemCondition
 // GetQuayPort returns the port associated with Quay
 func (q *QuayEcosystem) GetQuayPort() int32 {
 	if q.IsInsecureQuay() {
-		return InsecureQuayPort
+		return constants.QuayHTTPContainerPort
 	}
-	return SecureQuayPort
+	return constants.QuayHTTPSContainerPort
 }
 
 // IsInsecureQuay determines whether Quay is insecure

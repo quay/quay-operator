@@ -242,6 +242,12 @@ const (
 	QuayExtraCertsDirEnvironmentVariable = "KUBE_EXTRA_CA_CERTDIR"
 	// QuayExtraCertsDir is the location of extra certificates
 	QuayExtraCertsDir = "/conf/stack/extra_ca_certs"
+	// QuayHTTPContainerPort is the HTTP container port for Quay
+	QuayHTTPContainerPort = 8080
+	// QuayHTTPSContainerPort is the HTTPS container port for Quay
+	QuayHTTPSContainerPort = 8443
+	// QuayRepoMirrorContainerPort is the port for the Quay Repo Mirror
+	QuayRepoMirrorContainerPort = 9092
 	// SecurityScannerService is the name of the security scanner service
 	SecurityScannerService = "security_scanner"
 	// SecurityScannerServiceSecretKey is the name of the key containing the security service private key
@@ -252,8 +258,14 @@ const (
 	ClairDefaultPaginationKey = "XxoPtCUzrUv4JV5dS+yQ+MdW7yLEJnRMwigVY/bpgtQ="
 	// ClairConfigFileKey represents the config.yaml file ConfigMap key
 	ClairConfigFileKey = "config.yaml"
-	// ClairPort is the port to communicate with Clair
-	ClairPort = "6060"
+	// ClairPort is the port to communicate with Clair API
+	ClairPort = 6060
+	// ClairHealthPort is the port to communicate with Clair health
+	ClairHealthPort = 6061
+	// ClairAPIPort is the port to communicate with Clair health
+	ClairAPIPort = 6062
+	// ClairProxyPort is the port to communicate with Clair proxy
+	ClairProxyPort = 6063
 	// ClairTrustCaPath is the location of the trusted SSL anchors file
 	ClairTrustCaPath = "/etc/pki/ca-trust/source/anchors/ca.crt"
 	// ClairConfigVolumePath is the location of within the Clair pod to mount configuration files

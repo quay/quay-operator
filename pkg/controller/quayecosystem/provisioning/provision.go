@@ -497,7 +497,7 @@ func (r *ReconcileQuayEcosystemConfiguration) configurePostgreSQL(meta metav1.Ob
 
 func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1.ObjectMeta) error {
 
-	configSecretName := resources.GetQuayConfigMapSecretName(r.quayConfiguration.QuayEcosystem)
+	configSecretName := resources.GetQuaySecretName(r.quayConfiguration.QuayEcosystem)
 
 	meta.Name = configSecretName
 
@@ -682,7 +682,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 
 	clairConfigFile.Clair.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
 		Endpoint: fmt.Sprintf("%s://%s/secscan/notify", validation.GetScheme(r.quayConfiguration.QuayEcosystem.IsInsecureQuay()), r.quayConfiguration.QuayEcosystem.Status.Hostname),
-		Proxy:    "http://localhost:6063",
+		Proxy:    fmt.Sprintf("http://localhost:%d", constants.ClairProxyPort),
 	}
 
 	clairConfigFile.JwtProxy.VerifierProxies[0].Verifier.KeyServer.Options = map[string]interface{}{
@@ -792,7 +792,7 @@ func (r *ReconcileQuayEcosystemConfiguration) removeQuayRegistryStorage(meta met
 
 func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(meta metav1.ObjectMeta) (*reconcile.Result, error) {
 
-	configSecretName := resources.GetQuayConfigMapSecretName(r.quayConfiguration.QuayEcosystem)
+	configSecretName := resources.GetQuaySecretName(r.quayConfiguration.QuayEcosystem)
 
 	meta.Name = configSecretName
 
@@ -876,6 +876,8 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 		appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = r.quayConfiguration.QuaySslCertificate
 	}
 
+	// Copy Certificates to Config Secret?
+
 	err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
 
 	if err != nil {
@@ -908,6 +910,8 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 			}
 
 			clairSslSecret = resources.GetTLSSecretDefinition(meta, privKeyBytes, certBytes)
+
+			// Copy Certificates to Config Secret?
 
 			err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, clairSslSecret)
 
@@ -1081,4 +1085,22 @@ func isQuayCertificatesConfigured(secret *corev1.Secret) bool {
 
 	}
 	return false
+}
+
+// Copies content from a secret.
+func copySecretContent(source *corev1.Secret, dest *corev1.Secret, prefix string) *corev1.Secret {
+
+	if source == nil || source.Data == nil || dest == nil {
+		return dest
+	}
+
+	if dest.Data == nil {
+		dest.Data = map[string][]byte{}
+	}
+
+	for key, value := range source.Data {
+		dest.Data[fmt.Sprintf("%s%s", prefix, key)] = value
+	}
+
+	return dest
 }
