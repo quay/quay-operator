@@ -292,6 +292,12 @@ const (
 	RedisPasswordEnvVar = "REDIS_PASSWORD"
 	// ExtraCaCertsFilenamePrefix is the prefix for Extra Ca Certificates
 	ExtraCaCertsFilenamePrefix = "extra_ca_certs_"
+	// OperationAdd signifies that an operation requires an addition
+	OperationAdd = "add"
+	// OperationRemove signifies that an operation requires a removal
+	OperationRemove = "remove"
+	// OperatorFinalizer is the name of the finalizer attached to the QuayEcosystem resource
+	OperatorFinalizer = "quayecosystem.redhatcop.redhat.io"
 )
 
 var (
@@ -345,8 +351,8 @@ var (
 	// RequiredCloudfrontS3CredentialKeys represents the keys that are required for the Cloudfront S3 registry backend
 	RequiredCloudfrontS3CredentialKeys = []string{CloudfrontS3AccessKey, CloudfrontS3SecretKey}
 
-	// RequiredAnyUIDSccServiceAccounts is a list of service accounts who require access to the anyuid SCC
-	RequiredAnyUIDSccServiceAccounts = []string{QuayServiceAccount}
+	// QuayEcosystemServiceAccounts is a list of service accounts that are part of the QuayEcosystem
+	QuayEcosystemServiceAccounts = []string{QuayServiceAccount, ClairServiceAccount}
 
 	// DefaultQuayConfigCredentials represents a map containing the default Quay Config
 	DefaultQuayConfigCredentials = map[string]string{

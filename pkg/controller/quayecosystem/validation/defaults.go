@@ -1,9 +1,11 @@
 package validation
 
 import (
+	"github.com/redhat-cop/operator-utils/pkg/util"
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
+
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +35,20 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.ClairDatabase.Database = constants.ClairDatabaseCredentialsDefaultDatabaseName
 	quayConfiguration.ClairDatabase.RootPassword = constants.ClairDatabaseCredentialsDefaultRootPassword
 	quayConfiguration.ClairUpdateInterval = constants.ClairDefaultUpdateInterval
+
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.EnableFinalizers) && quayConfiguration.QuayEcosystem.Spec.EnableFinalizers {
+
+		if !util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
+			util.AddFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
+			changed = true
+		}
+
+	} else {
+		if util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
+			util.RemoveFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
+			changed = true
+		}
+	}
 
 	if quayConfiguration.QuayEcosystem.Spec.Quay == nil {
 		quayConfiguration.QuayEcosystem.Spec.Quay = &redhatcopv1alpha1.Quay{}
@@ -184,7 +200,7 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled == true {
 
 		// Add Clair Service Account to List of SCC's
-		constants.RequiredAnyUIDSccServiceAccounts = append(constants.RequiredAnyUIDSccServiceAccounts, constants.ClairServiceAccount)
+		quayConfiguration.RequiredSCCServiceAccounts = append(quayConfiguration.RequiredSCCServiceAccounts, utils.MakeServiceAccountUsername(quayConfiguration.QuayEcosystem.Namespace, constants.ClairServiceAccount))
 
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Image) {
 			changed = true

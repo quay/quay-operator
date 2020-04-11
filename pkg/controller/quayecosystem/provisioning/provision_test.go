@@ -103,13 +103,13 @@ func TestCopySecretContent(t *testing.T) {
 func TestConfigFileExtraCaCertToConfigSecret(t *testing.T) {
 
 	cases := []struct {
-		configFiles  []redhatcopv1alpha1.QuayConfigFiles
+		configFiles  []redhatcopv1alpha1.ConfigFiles
 		configSecret *corev1.Secret
 		output       *corev1.Secret
 		changed      bool
 	}{
 		{
-			configFiles: []redhatcopv1alpha1.QuayConfigFiles{},
+			configFiles: []redhatcopv1alpha1.ConfigFiles{},
 			configSecret: &corev1.Secret{
 				Data: map[string][]byte{
 					constants.QuayAppConfigSSLCertificateSecretKey: []byte("quaycert"),
@@ -121,11 +121,11 @@ func TestConfigFileExtraCaCertToConfigSecret(t *testing.T) {
 			changed: false,
 		},
 		{
-			configFiles: []redhatcopv1alpha1.QuayConfigFiles{
-				redhatcopv1alpha1.QuayConfigFiles{
+			configFiles: []redhatcopv1alpha1.ConfigFiles{
+				redhatcopv1alpha1.ConfigFiles{
 					Type: redhatcopv1alpha1.ConfigQuayConfigFileType,
-					Files: []redhatcopv1alpha1.QuayConfigFile{
-						redhatcopv1alpha1.QuayConfigFile{
+					Files: []redhatcopv1alpha1.ConfigFile{
+						redhatcopv1alpha1.ConfigFile{
 							Type:          redhatcopv1alpha1.ConfigQuayConfigFileType,
 							Filename:      "some_config_file.txt",
 							Key:           "some_config_file.txt",
@@ -145,11 +145,11 @@ func TestConfigFileExtraCaCertToConfigSecret(t *testing.T) {
 			changed: false,
 		},
 		{
-			configFiles: []redhatcopv1alpha1.QuayConfigFiles{
-				redhatcopv1alpha1.QuayConfigFiles{
+			configFiles: []redhatcopv1alpha1.ConfigFiles{
+				redhatcopv1alpha1.ConfigFiles{
 					Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
-					Files: []redhatcopv1alpha1.QuayConfigFile{
-						redhatcopv1alpha1.QuayConfigFile{
+					Files: []redhatcopv1alpha1.ConfigFile{
+						redhatcopv1alpha1.ConfigFile{
 							Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
 							Filename:      "my_cert.crt",
 							Key:           "my_cert.crt",

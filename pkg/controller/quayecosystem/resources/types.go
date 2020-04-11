@@ -47,15 +47,16 @@ type QuayConfiguration struct {
 	QuayTLSSecretName                     string
 	SecurityScannerKeyID                  string
 	RegistryBackends                      []redhatcopv1alpha1.RegistryBackend
-	QuayConfigFiles                       []redhatcopv1alpha1.QuayConfigFiles
+	QuayConfigFiles                       []redhatcopv1alpha1.ConfigFiles
 
 	// Clair
 	ClairSslCertificate []byte
 	ClairSslPrivateKey  []byte
 	ClairUpdateInterval time.Duration
-	ClairConfigFiles    []redhatcopv1alpha1.QuayConfigFiles
+	ClairConfigFiles    []redhatcopv1alpha1.ConfigFiles
 
-	IsOpenShift bool
+	IsOpenShift                bool
+	RequiredSCCServiceAccounts []string
 }
 
 // DatabaseConfig is an internal structure representing a database

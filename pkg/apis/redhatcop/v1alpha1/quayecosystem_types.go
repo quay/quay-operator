@@ -15,9 +15,10 @@ import (
 // QuayEcosystemSpec defines the desired state of QuayEcosystem
 // +k8s:openapi-gen=true
 type QuayEcosystemSpec struct {
-	Quay  *Quay  `json:"quay,omitempty"`
-	Redis *Redis `json:"redis,omitempty"`
-	Clair *Clair `json:"clair,omitempty"`
+	Quay             *Quay  `json:"quay,omitempty"`
+	Redis            *Redis `json:"redis,omitempty"`
+	Clair            *Clair `json:"clair,omitempty"`
+	EnableFinalizers bool   `json:"enableFinalizers,omitempty"`
 }
 
 // QuayEcosystemPhase defines the phase of lifecycle the operator is running in
@@ -51,6 +52,9 @@ const (
 
 	// QuayEcosystemProvisioningFailure indicates that the QuayEcosystem provisioning failed
 	QuayEcosystemProvisioningFailure QuayEcosystemConditionType = "QuayEcosystemProvisioningFailure"
+
+	// QuayEcosystemCleanupFailure indicates that the QuayEcosystem provisioning failed to cleanup resources
+	QuayEcosystemCleanupFailure QuayEcosystemConditionType = "QuayEcosystemCleanupFailure"
 
 	// QuayEcosystemQuaySetupSuccess indicates that the Quay setup process was successful
 	QuayEcosystemQuaySetupSuccess QuayEcosystemConditionType = "QuaySetupSuccess"
@@ -172,7 +176,7 @@ type Quay struct {
 	// +patchMergeKey=secretName
 	// +patchStrategy=merge
 	// +listType=atomic
-	ConfigFiles []QuayConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
+	ConfigFiles []ConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
 	// +kubebuilder:validation:Enum=new-installation;add-new-fields;backfill-then-read-only-new;remove-old-field
 	MigrationPhase QuayMigrationPhase `json:"migrationPhase,omitempty" protobuf:"bytes,1,opt,name=migrationPhase,casttype=QuayMigrationPhase"`
 
@@ -255,7 +259,7 @@ type Clair struct {
 	// +patchMergeKey=secretName
 	// +patchStrategy=merge
 	// +listType=atomic
-	ConfigFiles []QuayConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
+	ConfigFiles []ConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry
@@ -399,18 +403,18 @@ type CloudfrontS3RegistryBackendSource struct {
 	PrivateKeyFilename string `json:"privateKeyFilename,omitempty,name=privateKeyFilename"`
 }
 
-// QuayConfigFiles defines configuration files that are injected into the Quay resources
+// ConfigFiles defines configuration files that are injected into the Quay resources
 // +k8s:openapi-gen=true
-type QuayConfigFiles struct {
+type ConfigFiles struct {
 	SecretName string `json:"secretName"`
 	// +listType=atomic
-	Files []QuayConfigFile   `json:"files,omitempty,name=files"`
+	Files []ConfigFile       `json:"files,omitempty,name=files"`
 	Type  QuayConfigFileType `json:"type,omitempty,name=type"`
 }
 
-// QuayConfigFile defines configuration files that are injected into the Quay resources
+// ConfigFile defines configuration files that are injected into the Quay resources
 // +k8s:openapi-gen=true
-type QuayConfigFile struct {
+type ConfigFile struct {
 	// +kubebuilder:validation:Enum=config;extraCaCert
 	Type          QuayConfigFileType `json:"type,omitempty,name=type"`
 	Key           string             `json:"key,name=key"`
@@ -432,7 +436,7 @@ func init() {
 }
 
 // GetKeys returns the keys found in Configuration Files
-func (quayConfigFiles *QuayConfigFiles) GetKeys() []string {
+func (quayConfigFiles *ConfigFiles) GetKeys() []string {
 	keys := []string{}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfigFiles.Files) {

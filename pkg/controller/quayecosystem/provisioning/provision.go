@@ -72,7 +72,7 @@ func (r *ReconcileQuayEcosystemConfiguration) CoreQuayResourceDeployment(metaObj
 
 	// Configure SCC when running in OpenShift
 	if r.quayConfiguration.IsOpenShift {
-		if err := r.configureAnyUIDSCCs(metaObject); err != nil {
+		if err := r.ConfigureAnyUIDSCCs(metaObject, r.quayConfiguration.RequiredSCCServiceAccounts, constants.OperationAdd); err != nil {
 			logging.Log.Error(err, "Failed to configure SCCs")
 			return nil, err
 		}
@@ -518,16 +518,15 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1
 	return nil
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCCs(meta metav1.ObjectMeta) error {
+func (r *ReconcileQuayEcosystemConfiguration) ConfigureAnyUIDSCCs(meta metav1.ObjectMeta, sccUsers []string, operation string) error {
 
 	// Configure Quay Service Account for AnyUID SCC
-	for _, serviceAccountName := range constants.RequiredAnyUIDSccServiceAccounts {
-		err := r.configureAnyUIDSCC(serviceAccountName, meta)
+	err := r.configureAnyUIDSCC(sccUsers, meta, operation)
 
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return err
 	}
+
 	return nil
 
 }
@@ -719,9 +718,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountName string, meta metav1.ObjectMeta) error {
-
-	sccUser := "system:serviceaccount:" + meta.Namespace + ":" + serviceAccountName
+func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(sccUsers []string, meta metav1.ObjectMeta, operation string) error {
 
 	anyUIDSCC := &ossecurityv1.SecurityContextConstraints{}
 	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: constants.AnyUIDSCC, Namespace: ""}, anyUIDSCC)
@@ -731,21 +728,18 @@ func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountN
 		return err
 	}
 
-	sccUserFound := false
-	for _, user := range anyUIDSCC.Users {
-		if user == sccUser {
-
-			sccUserFound = true
-			break
-		}
+	if operation == constants.OperationRemove {
+		_, remainingUsers := diff(sccUsers, anyUIDSCC.Users)
+		anyUIDSCC.Users = remainingUsers
+	} else {
+		usersToAdd, _ := diff(sccUsers, anyUIDSCC.Users)
+		anyUIDSCC.Users = append(anyUIDSCC.Users, usersToAdd...)
 	}
 
-	if !sccUserFound {
-		anyUIDSCC.Users = append(anyUIDSCC.Users, sccUser)
-		err = r.reconcilerBase.CreateOrUpdateResource(nil, r.quayConfiguration.QuayEcosystem.Namespace, anyUIDSCC)
-		if err != nil {
-			return err
-		}
+	err = r.reconcilerBase.CreateOrUpdateResource(nil, r.quayConfiguration.QuayEcosystem.Namespace, anyUIDSCC)
+
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -879,13 +873,13 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 		appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = r.quayConfiguration.QuaySslCertificate
 
 		// Add Quay Certificate to Extra Certificates Config File
-		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.QuayConfigFiles{
+		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.ConfigFiles{
 			Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
-			Files: []redhatcopv1alpha1.QuayConfigFile{
-				redhatcopv1alpha1.QuayConfigFile{
+			Files: []redhatcopv1alpha1.ConfigFile{
+				redhatcopv1alpha1.ConfigFile{
 					Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
-					Filename:      "quay_ssl.crt",
-					Key:           "quay_ssl.crt",
+					Filename:      "quay.crt",
+					Key:           "quay.crt",
 					SecretContent: r.quayConfiguration.QuaySslCertificate,
 				},
 			},
@@ -939,10 +933,10 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 		r.quayConfiguration.ClairSslPrivateKey = clairSslSecret.Data[corev1.TLSPrivateKeyKey]
 
 		// Add Quay Certificate to Extra Certificates Config File
-		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.QuayConfigFiles{
+		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.ConfigFiles{
 			Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
-			Files: []redhatcopv1alpha1.QuayConfigFile{
-				redhatcopv1alpha1.QuayConfigFile{
+			Files: []redhatcopv1alpha1.ConfigFile{
+				redhatcopv1alpha1.ConfigFile{
 					Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
 					Filename:      constants.ClairSSLCertificateSecretKey,
 					Key:           constants.ClairSSLCertificateSecretKey,
@@ -1167,7 +1161,7 @@ func copySecretContent(source *corev1.Secret, dest *corev1.Secret, prefix string
 	return dest
 }
 
-func copyConfigFileExtraCaCertToConfigSecret(configFiles []redhatcopv1alpha1.QuayConfigFiles, secret *corev1.Secret) (*corev1.Secret, bool) {
+func copyConfigFileExtraCaCertToConfigSecret(configFiles []redhatcopv1alpha1.ConfigFiles, secret *corev1.Secret) (*corev1.Secret, bool) {
 	/*
 	   1. Check to make sure files are not null or empty
 	   2. Iterate through all files
@@ -1203,4 +1197,26 @@ func copyConfigFileExtraCaCertToConfigSecret(configFiles []redhatcopv1alpha1.Qua
 	}
 
 	return secret, changed
+}
+
+func diff(lhsSlice, rhsSlice []string) (lhsOnly []string, rhsOnly []string) {
+	return singleDiff(lhsSlice, rhsSlice), singleDiff(rhsSlice, lhsSlice)
+}
+
+func singleDiff(lhsSlice, rhsSlice []string) (lhsOnly []string) {
+	for _, lhs := range lhsSlice {
+		found := false
+		for _, rhs := range rhsSlice {
+			if lhs == rhs {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			lhsOnly = append(lhsOnly, lhs)
+		}
+	}
+
+	return lhsOnly
 }

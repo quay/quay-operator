@@ -36,13 +36,13 @@ spec:
               properties:
                 configFiles:
                   items:
-                    description: QuayConfigFiles defines configuration files that
-                      are injected into the Quay resources
+                    description: ConfigFiles defines configuration files that are
+                      injected into the Quay resources
                     properties:
                       files:
                         items:
-                          description: QuayConfigFile defines configuration files
-                            that are injected into the Quay resources
+                          description: ConfigFile defines configuration files that
+                            are injected into the Quay resources
                           properties:
                             content:
                               format: byte
@@ -832,6 +832,8 @@ spec:
                 updateInterval:
                   type: string
               type: object
+            enableFinalizers:
+              type: boolean
             quay:
               description: Quay defines the properies of a deployment of Quay
               properties:
@@ -938,13 +940,13 @@ spec:
                   type: array
                 configFiles:
                   items:
-                    description: QuayConfigFiles defines configuration files that
-                      are injected into the Quay resources
+                    description: ConfigFiles defines configuration files that are
+                      injected into the Quay resources
                     properties:
                       files:
                         items:
-                          description: QuayConfigFile defines configuration files
-                            that are injected into the Quay resources
+                          description: ConfigFile defines configuration files that
+                            are injected into the Quay resources
                           properties:
                             content:
                               format: byte
