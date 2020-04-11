@@ -290,6 +290,8 @@ const (
 	RedisPasswordKey = "password"
 	// RedisPasswordEnvVar represents the name of the environment variable that contains the Redis password
 	RedisPasswordEnvVar = "REDIS_PASSWORD"
+	// ExtraCaCertsFilenamePrefix is the prefix for Extra Ca Certificates
+	ExtraCaCertsFilenamePrefix = "extra_ca_certs_"
 )
 
 var (

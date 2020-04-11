@@ -175,7 +175,7 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	}
 
-	// Validate Config Files
+	// Validate Quay Config Files
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFiles) {
 
 		for _, configFiles := range quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFiles {
@@ -197,17 +197,23 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 			// If the user did not provide a list of keys, grab all of the files
 			if utils.IsZeroOfUnderlyingType(managedConfigFiles.Files) || len(managedConfigFiles.Files) == 0 {
-				for secretDataFiles := range configFilesSecret.Data {
+				for secretDataFileKey, secretDataFileValue := range configFilesSecret.Data {
 
 					managedConfigFiles.Files = append(managedConfigFiles.Files, redhatcopv1alpha1.QuayConfigFile{
-						Type:     redhatcopv1alpha1.ConfigQuayConfigFileType,
-						Key:      secretDataFiles,
-						Filename: secretDataFiles,
+						Type:          redhatcopv1alpha1.ConfigQuayConfigFileType,
+						Key:           secretDataFileKey,
+						Filename:      secretDataFileKey,
+						SecretContent: secretDataFileValue,
 					})
+				}
+			} else {
+				for _, managedConfigFile := range managedConfigFiles.Files {
+
+					managedConfigFile.SecretContent = configFilesSecret.Data[managedConfigFile.Key]
 				}
 			}
 
-			quayConfiguration.ConfigFiles = append(quayConfiguration.ConfigFiles, *managedConfigFiles)
+			quayConfiguration.QuayConfigFiles = append(quayConfiguration.QuayConfigFiles, *managedConfigFiles)
 
 		}
 

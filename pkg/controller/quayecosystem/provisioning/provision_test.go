@@ -5,6 +5,8 @@ import (
 
 	"reflect"
 
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
+
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -94,6 +96,86 @@ func TestCopySecretContent(t *testing.T) {
 
 		if !reflect.DeepEqual(c.output, result) {
 			t.Errorf("Test case %d did not match\nExpected: %#v\nActual: %#v", i, c.output, result)
+		}
+	}
+}
+
+func TestConfigFileExtraCaCertToConfigSecret(t *testing.T) {
+
+	cases := []struct {
+		configFiles  []redhatcopv1alpha1.QuayConfigFiles
+		configSecret *corev1.Secret
+		output       *corev1.Secret
+		changed      bool
+	}{
+		{
+			configFiles: []redhatcopv1alpha1.QuayConfigFiles{},
+			configSecret: &corev1.Secret{
+				Data: map[string][]byte{
+					constants.QuayAppConfigSSLCertificateSecretKey: []byte("quaycert"),
+				}},
+			output: &corev1.Secret{
+				Data: map[string][]byte{
+					constants.QuayAppConfigSSLCertificateSecretKey: []byte("quaycert"),
+				}},
+			changed: false,
+		},
+		{
+			configFiles: []redhatcopv1alpha1.QuayConfigFiles{
+				redhatcopv1alpha1.QuayConfigFiles{
+					Type: redhatcopv1alpha1.ConfigQuayConfigFileType,
+					Files: []redhatcopv1alpha1.QuayConfigFile{
+						redhatcopv1alpha1.QuayConfigFile{
+							Type:          redhatcopv1alpha1.ConfigQuayConfigFileType,
+							Filename:      "some_config_file.txt",
+							Key:           "some_config_file.txt",
+							SecretContent: []byte("contentoffile"),
+						},
+					},
+				},
+			},
+			configSecret: &corev1.Secret{
+				Data: map[string][]byte{
+					constants.QuayAppConfigSSLCertificateSecretKey: []byte("quaycert"),
+				}},
+			output: &corev1.Secret{
+				Data: map[string][]byte{
+					constants.QuayAppConfigSSLCertificateSecretKey: []byte("quaycert"),
+				}},
+			changed: false,
+		},
+		{
+			configFiles: []redhatcopv1alpha1.QuayConfigFiles{
+				redhatcopv1alpha1.QuayConfigFiles{
+					Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+					Files: []redhatcopv1alpha1.QuayConfigFile{
+						redhatcopv1alpha1.QuayConfigFile{
+							Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+							Filename:      "my_cert.crt",
+							Key:           "my_cert.crt",
+							SecretContent: []byte("certcontent"),
+						},
+					},
+				},
+			},
+			configSecret: &corev1.Secret{
+				Data: map[string][]byte{
+					constants.QuayAppConfigSSLCertificateSecretKey: []byte("quaycert"),
+				}},
+			output: &corev1.Secret{
+				Data: map[string][]byte{
+					constants.QuayAppConfigSSLCertificateSecretKey: []byte("quaycert"),
+					"extra_ca_certs_my_cert.crt":                   []byte("certcontent"),
+				}},
+			changed: true,
+		},
+	}
+
+	for i, c := range cases {
+		result, changed := copyConfigFileExtraCaCertToConfigSecret(c.configFiles, c.configSecret)
+
+		if !reflect.DeepEqual(c.output, result) || changed != c.changed {
+			t.Errorf("Test case %d did not match\nExpected: %#v\nActual: %#v\nExpected Change Found: %#v\nActual Change Found: %#v", i, c.output, result, c.changed, changed)
 		}
 	}
 }

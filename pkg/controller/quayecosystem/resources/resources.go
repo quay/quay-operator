@@ -129,11 +129,6 @@ func GetClairSSLSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) strin
 	return fmt.Sprintf("%s-clair-ssl", GetGenericResourcesName(quayEcosystem))
 }
 
-// GetQuayExtraCertsSecretName returns the name of the Quay extra certs secret
-func GetQuayExtraCertsSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
-	return "quay-enterprise-cert-secret"
-}
-
 // GetDatabaseResourceName returns the name of the database
 func GetDatabaseResourceName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem, databaseComponent constants.DatabaseComponent) string {
 	return fmt.Sprintf("%s-%s-%s", GetGenericResourcesName(quayEcosystem), string(databaseComponent), constants.PostgresqlName)

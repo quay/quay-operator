@@ -47,12 +47,13 @@ type QuayConfiguration struct {
 	QuayTLSSecretName                     string
 	SecurityScannerKeyID                  string
 	RegistryBackends                      []redhatcopv1alpha1.RegistryBackend
-	ConfigFiles                           []redhatcopv1alpha1.QuayConfigFiles
+	QuayConfigFiles                       []redhatcopv1alpha1.QuayConfigFiles
 
 	// Clair
 	ClairSslCertificate []byte
 	ClairSslPrivateKey  []byte
 	ClairUpdateInterval time.Duration
+	ClairConfigFiles    []redhatcopv1alpha1.QuayConfigFiles
 
 	IsOpenShift bool
 }

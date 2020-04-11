@@ -251,6 +251,11 @@ type Clair struct {
 	Resources                 corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	SslCertificatesSecretName string                      `json:"sslCertificatesSecretName,omitempty"`
 	UpdateInterval            string                      `json:"updateInterval,omitempty"`
+	// +optional
+	// +patchMergeKey=secretName
+	// +patchStrategy=merge
+	// +listType=atomic
+	ConfigFiles []QuayConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry
@@ -407,9 +412,10 @@ type QuayConfigFiles struct {
 // +k8s:openapi-gen=true
 type QuayConfigFile struct {
 	// +kubebuilder:validation:Enum=config;extraCaCert
-	Type     QuayConfigFileType `json:"type,omitempty,name=type"`
-	Key      string             `json:"key,name=key"`
-	Filename string             `json:"filename,omitempty,name=filename"`
+	Type          QuayConfigFileType `json:"type,omitempty,name=type"`
+	Key           string             `json:"key,name=key"`
+	Filename      string             `json:"filename,omitempty,name=filename"`
+	SecretContent []byte             `json:"content,omitempty,name=content"`
 }
 
 type QuayMigrationPhase string

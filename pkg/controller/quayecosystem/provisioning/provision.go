@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
+
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 
 	ossecurityv1 "github.com/openshift/api/security/v1"
 	qclient "github.com/redhat-cop/quay-operator/pkg/client"
@@ -874,9 +877,21 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 	} else {
 		appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey] = r.quayConfiguration.QuaySslPrivateKey
 		appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = r.quayConfiguration.QuaySslCertificate
-	}
 
-	// Copy Certificates to Config Secret?
+		// Add Quay Certificate to Extra Certificates Config File
+		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.QuayConfigFiles{
+			Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+			Files: []redhatcopv1alpha1.QuayConfigFile{
+				redhatcopv1alpha1.QuayConfigFile{
+					Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+					Filename:      "quay_ssl.crt",
+					Key:           "quay_ssl.crt",
+					SecretContent: r.quayConfiguration.QuaySslCertificate,
+				},
+			},
+		})
+
+	}
 
 	err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
 
@@ -911,8 +926,6 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 
 			clairSslSecret = resources.GetTLSSecretDefinition(meta, privKeyBytes, certBytes)
 
-			// Copy Certificates to Config Secret?
-
 			err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, clairSslSecret)
 
 			if err != nil {
@@ -920,6 +933,55 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 				return nil, err
 			}
 
+		}
+
+		r.quayConfiguration.ClairSslCertificate = clairSslSecret.Data[corev1.TLSCertKey]
+		r.quayConfiguration.ClairSslPrivateKey = clairSslSecret.Data[corev1.TLSPrivateKeyKey]
+
+		// Add Quay Certificate to Extra Certificates Config File
+		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.QuayConfigFiles{
+			Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+			Files: []redhatcopv1alpha1.QuayConfigFile{
+				redhatcopv1alpha1.QuayConfigFile{
+					Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+					Filename:      constants.ClairSSLCertificateSecretKey,
+					Key:           constants.ClairSSLCertificateSecretKey,
+					SecretContent: r.quayConfiguration.ClairSslCertificate,
+				},
+			},
+		})
+	}
+
+	return nil, nil
+}
+
+// SyncQuayConfigSecret manages the content of the Quay Config Secret. Thisn
+func (r *ReconcileQuayEcosystemConfiguration) SyncQuayConfigSecret(meta metav1.ObjectMeta) (*reconcile.Result, error) {
+
+	configSecretName := resources.GetQuaySecretName(r.quayConfiguration.QuayEcosystem)
+
+	meta.Name = configSecretName
+
+	appConfigSecret := &corev1.Secret{}
+	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: configSecretName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, appConfigSecret)
+
+	if err != nil {
+
+		if apierrors.IsNotFound(err) {
+			// Config Secret Not Found. Requeue object
+			return &reconcile.Result{}, nil
+		}
+		return nil, err
+	}
+
+	appConfigSecret, changed := copyConfigFileExtraCaCertToConfigSecret(r.quayConfiguration.QuayConfigFiles, appConfigSecret)
+
+	if changed {
+		err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
+
+		if err != nil {
+			logging.Log.Error(err, "Error Updating app secret with synchronized changes")
+			return nil, err
 		}
 
 	}
@@ -1103,4 +1165,42 @@ func copySecretContent(source *corev1.Secret, dest *corev1.Secret, prefix string
 	}
 
 	return dest
+}
+
+func copyConfigFileExtraCaCertToConfigSecret(configFiles []redhatcopv1alpha1.QuayConfigFiles, secret *corev1.Secret) (*corev1.Secret, bool) {
+	/*
+	   1. Check to make sure files are not null or empty
+	   2. Iterate through all files
+	*/
+	changed := false
+
+	if utils.IsZeroOfUnderlyingType(configFiles) {
+		return secret, false
+	}
+
+	for _, configFile := range configFiles {
+
+		// Only Work with Extra Certificate Files
+		if configFile.Type == redhatcopv1alpha1.ExtraCaCertQuayConfigFileType {
+			if !utils.IsZeroOfUnderlyingType(configFile.Files) {
+
+				for _, cFile := range configFile.Files {
+					// Check if config file in
+					extraCaCertFileName := fmt.Sprintf("%s%s", constants.ExtraCaCertsFilenamePrefix, cFile.Filename)
+
+					if secretFile, ok := secret.Data[extraCaCertFileName]; ok {
+						if reflect.DeepEqual(secretFile, cFile.SecretContent) {
+							continue
+						}
+					}
+
+					secret.Data[extraCaCertFileName] = cFile.SecretContent
+					changed = true
+
+				}
+			}
+		}
+	}
+
+	return secret, changed
 }

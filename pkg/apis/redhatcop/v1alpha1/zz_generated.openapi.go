@@ -180,11 +180,30 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 							Format: "",
 						},
 					},
+					"configFiles": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type":       "atomic",
+								"x-kubernetes-patch-merge-key": "secretName",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -761,6 +780,12 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFile(ref common.ReferenceCallb
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "",
+						},
+					},
+					"content": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "byte",
 						},
 					},
 				},

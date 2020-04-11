@@ -292,7 +292,7 @@ Files related to the configuration of Quay are located in the `/conf/stack` dire
 Two types of configuration files can be specified by the `type` property:
 
 1. `config` - Configuration files that will be added to the `/conf/stack` directory
-2. `extraCaCerts` - Certificates to be trusted container
+2. `extraCaCert` - Certificates to be trusted container
 
 Configuration files are stored as values within _Secrets_. The first step is to create a secret containing these files. The following command illustrates how a private key can be added: 
 

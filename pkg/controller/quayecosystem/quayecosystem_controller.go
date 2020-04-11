@@ -254,6 +254,14 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	}
 
+	// Manage Config Secret
+
+	_, err = configuration.SyncQuayConfigSecret(metaObject)
+	if err != nil {
+		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Synchronize the Quay Config Secret", err.Error())
+		return reconcile.Result{}, err
+	}
+
 	deployQuayResult, err := configuration.DeployQuay(metaObject)
 	if err != nil {
 		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Deploy Quay", err.Error())

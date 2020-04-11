@@ -34,6 +34,44 @@ spec:
             clair:
               description: Clair defines the properties of a deployment of Clair
               properties:
+                configFiles:
+                  items:
+                    description: QuayConfigFiles defines configuration files that
+                      are injected into the Quay resources
+                    properties:
+                      files:
+                        items:
+                          description: QuayConfigFile defines configuration files
+                            that are injected into the Quay resources
+                          properties:
+                            content:
+                              format: byte
+                              type: string
+                            filename:
+                              type: string
+                            key:
+                              type: string
+                            type:
+                              description: QuayConfigFileType defines the type of
+                                configuration file
+                              enum:
+                              - config
+                              - extraCaCert
+                              type: string
+                          required:
+                          - key
+                          type: object
+                        type: array
+                      secretName:
+                        type: string
+                      type:
+                        description: QuayConfigFileType defines the type of configuration
+                          file
+                        type: string
+                    required:
+                    - secretName
+                    type: object
+                  type: array
                 database:
                   description: Database defines a database that will be deployed to
                     support a particular component
@@ -908,6 +946,9 @@ spec:
                           description: QuayConfigFile defines configuration files
                             that are injected into the Quay resources
                           properties:
+                            content:
+                              format: byte
+                              type: string
                             filename:
                               type: string
                             key:
