@@ -123,10 +123,10 @@ func TestConfigFileExtraCaCertToConfigSecret(t *testing.T) {
 		{
 			configFiles: []redhatcopv1alpha1.ConfigFiles{
 				redhatcopv1alpha1.ConfigFiles{
-					Type: redhatcopv1alpha1.ConfigQuayConfigFileType,
+					Type: redhatcopv1alpha1.ConfigConfigFileType,
 					Files: []redhatcopv1alpha1.ConfigFile{
 						redhatcopv1alpha1.ConfigFile{
-							Type:          redhatcopv1alpha1.ConfigQuayConfigFileType,
+							Type:          redhatcopv1alpha1.ConfigConfigFileType,
 							Filename:      "some_config_file.txt",
 							Key:           "some_config_file.txt",
 							SecretContent: []byte("contentoffile"),
@@ -147,10 +147,10 @@ func TestConfigFileExtraCaCertToConfigSecret(t *testing.T) {
 		{
 			configFiles: []redhatcopv1alpha1.ConfigFiles{
 				redhatcopv1alpha1.ConfigFiles{
-					Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+					Type: redhatcopv1alpha1.ExtraCaCertConfigFileType,
 					Files: []redhatcopv1alpha1.ConfigFile{
 						redhatcopv1alpha1.ConfigFile{
-							Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+							Type:          redhatcopv1alpha1.ExtraCaCertConfigFileType,
 							Filename:      "my_cert.crt",
 							Key:           "my_cert.crt",
 							SecretContent: []byte("certcontent"),

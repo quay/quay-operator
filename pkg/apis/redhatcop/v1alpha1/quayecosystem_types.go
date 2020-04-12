@@ -27,8 +27,8 @@ type QuayEcosystemPhase string
 // QuayEcosystemConditionType defines the types of conditions the operator will run through
 type QuayEcosystemConditionType string
 
-// QuayConfigFileType defines the type of configuration file
-type QuayConfigFileType string
+// ConfigFileType defines the type of configuration file
+type ConfigFileType string
 
 // ExternalAccessType defines the method for accessing Quay from an external source
 type ExternalAccessType string
@@ -71,11 +71,11 @@ const (
 	// QuayEcosystemSecurityScannerConfigurationFailure indicates that the security scanner configuration failed
 	QuayEcosystemSecurityScannerConfigurationFailure QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationFailure"
 
-	// ExtraCaCertQuayConfigFileType specifies a Extra Ca Certificate file type
-	ExtraCaCertQuayConfigFileType QuayConfigFileType = "extraCaCert"
+	// ExtraCaCertConfigFileType specifies a Extra Ca Certificate file type
+	ExtraCaCertConfigFileType ConfigFileType = "extraCaCert"
 
-	// ConfigQuayConfigFileType specifies a Extra Ca Certificate file type
-	ConfigQuayConfigFileType QuayConfigFileType = "config"
+	// ConfigConfigFileType specifies a Config file type
+	ConfigConfigFileType ConfigFileType = "config"
 
 	// RouteExternalAccessType specifies external access using a Route
 	RouteExternalAccessType ExternalAccessType = "Route"
@@ -408,18 +408,19 @@ type CloudfrontS3RegistryBackendSource struct {
 type ConfigFiles struct {
 	SecretName string `json:"secretName"`
 	// +listType=atomic
-	Files []ConfigFile       `json:"files,omitempty,name=files"`
-	Type  QuayConfigFileType `json:"type,omitempty,name=type"`
+	Files []ConfigFile   `json:"files,omitempty,name=files"`
+	Type  ConfigFileType `json:"type,omitempty,name=type"`
 }
 
 // ConfigFile defines configuration files that are injected into the Quay resources
 // +k8s:openapi-gen=true
 type ConfigFile struct {
 	// +kubebuilder:validation:Enum=config;extraCaCert
-	Type          QuayConfigFileType `json:"type,omitempty,name=type"`
-	Key           string             `json:"key,name=key"`
-	Filename      string             `json:"filename,omitempty,name=filename"`
-	SecretContent []byte             `json:"content,omitempty,name=content"`
+	Type     ConfigFileType `json:"type,omitempty,name=type"`
+	Key      string         `json:"key,name=key"`
+	Filename string         `json:"filename,omitempty,name=filename"`
+	// +listType=atomic
+	SecretContent []byte `json:"secretContent,omitempty,name=secretContent"`
 }
 
 type QuayMigrationPhase string

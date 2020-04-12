@@ -737,7 +737,7 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 					filename := ""
 
 					// Only Mount Config Files
-					if !utils.IsZeroOfUnderlyingType(configFile.Type) && redhatcopv1alpha1.ExtraCaCertQuayConfigFileType == configFile.Type {
+					if !utils.IsZeroOfUnderlyingType(configFile.Type) && redhatcopv1alpha1.ExtraCaCertConfigFileType == configFile.Type {
 						continue
 					}
 
@@ -769,4 +769,8 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 
 	return configVolumeSources
 
+}
+
+func getConfigVolumeProjections(configFiles []redhatcopv1alpha1.ConfigFiles, configFileType redhatcopv1alpha1.ConfigFileType) []redhatcopv1alpha1.ConfigFiles {
+	return nil
 }

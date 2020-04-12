@@ -299,7 +299,12 @@ func schema_pkg_apis_redhatcop_v1alpha1_ConfigFile(ref common.ReferenceCallback)
 							Format: "",
 						},
 					},
-					"content": {
+					"secretContent": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"string"},
 							Format: "byte",

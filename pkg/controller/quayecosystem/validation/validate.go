@@ -579,7 +579,7 @@ func validateConfigFiles(client client.Client, namespace string, inputConfigFile
 			for secretDataFileKey, secretDataFileValue := range configFilesSecret.Data {
 
 				managedConfigFiles.Files = append(managedConfigFiles.Files, redhatcopv1alpha1.ConfigFile{
-					Type:          redhatcopv1alpha1.ConfigQuayConfigFileType,
+					Type:          redhatcopv1alpha1.ConfigConfigFileType,
 					Key:           secretDataFileKey,
 					Filename:      secretDataFileKey,
 					SecretContent: secretDataFileValue,

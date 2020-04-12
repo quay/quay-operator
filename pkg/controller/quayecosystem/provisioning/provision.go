@@ -874,10 +874,10 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 
 		// Add Quay Certificate to Extra Certificates Config File
 		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.ConfigFiles{
-			Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+			Type: redhatcopv1alpha1.ExtraCaCertConfigFileType,
 			Files: []redhatcopv1alpha1.ConfigFile{
 				redhatcopv1alpha1.ConfigFile{
-					Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+					Type:          redhatcopv1alpha1.ExtraCaCertConfigFileType,
 					Filename:      "quay.crt",
 					Key:           "quay.crt",
 					SecretContent: r.quayConfiguration.QuaySslCertificate,
@@ -934,10 +934,10 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 
 		// Add Quay Certificate to Extra Certificates Config File
 		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.ConfigFiles{
-			Type: redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+			Type: redhatcopv1alpha1.ExtraCaCertConfigFileType,
 			Files: []redhatcopv1alpha1.ConfigFile{
 				redhatcopv1alpha1.ConfigFile{
-					Type:          redhatcopv1alpha1.ExtraCaCertQuayConfigFileType,
+					Type:          redhatcopv1alpha1.ExtraCaCertConfigFileType,
 					Filename:      constants.ClairSSLCertificateSecretKey,
 					Key:           constants.ClairSSLCertificateSecretKey,
 					SecretContent: r.quayConfiguration.ClairSslCertificate,
@@ -1175,7 +1175,7 @@ func copyConfigFileExtraCaCertToConfigSecret(configFiles []redhatcopv1alpha1.Con
 	for _, configFile := range configFiles {
 
 		// Only Work with Extra Certificate Files
-		if configFile.Type == redhatcopv1alpha1.ExtraCaCertQuayConfigFileType {
+		if configFile.Type == redhatcopv1alpha1.ExtraCaCertConfigFileType {
 			if !utils.IsZeroOfUnderlyingType(configFile.Files) {
 
 				for _, cFile := range configFile.Files {
