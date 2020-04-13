@@ -1668,6 +1668,9 @@ spec:
                   - backfill-then-read-only-new
                   - remove-old-field
                   type: string
+                mirrorReplicas:
+                  format: int32
+                  type: integer
                 nodeSelector:
                   additionalProperties:
                     type: string

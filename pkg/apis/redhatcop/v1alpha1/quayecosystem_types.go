@@ -163,6 +163,7 @@ type Quay struct {
 	LivenessProbe        *corev1.Probe     `json:"livenessProbe,omitempty"`
 	KeepConfigDeployment bool              `json:"keepConfigDeployment,omitempty"`
 	NodeSelector         map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	MirrorReplicas       *int32            `json:"mirrorReplicas,omitempty"`
 	ReadinessProbe       *corev1.Probe     `json:"readinessProbe,omitempty"`
 	// +listType=atomic
 	RegistryBackends               []RegistryBackend           `json:"registryBackends,omitempty"`

@@ -751,6 +751,12 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							},
 						},
 					},
+					"mirrorReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/api/core/v1.Probe"),

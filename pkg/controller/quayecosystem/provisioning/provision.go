@@ -878,8 +878,8 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 			Files: []redhatcopv1alpha1.ConfigFile{
 				redhatcopv1alpha1.ConfigFile{
 					Type:          redhatcopv1alpha1.ExtraCaCertConfigFileType,
-					Filename:      "quay.crt",
-					Key:           "quay.crt",
+					Filename:      constants.QuaySSLCertificate,
+					Key:           constants.QuaySSLCertificate,
 					SecretContent: r.quayConfiguration.QuaySslCertificate,
 				},
 			},

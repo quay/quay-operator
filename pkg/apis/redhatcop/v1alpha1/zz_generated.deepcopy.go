@@ -309,6 +309,11 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 			(*out)[key] = val
 		}
 	}
+	if in.MirrorReplicas != nil {
+		in, out := &in.MirrorReplicas, &out.MirrorReplicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.ReadinessProbe != nil {
 		in, out := &in.ReadinessProbe, &out.ReadinessProbe
 		*out = new(v1.Probe)

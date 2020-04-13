@@ -226,6 +226,8 @@ const (
 	// CloudfrontS3SecretKey is the name of the S3 Secret Key
 	CloudfrontS3SecretKey = "secretKey"
 
+	// QuaySSLCertificate is name of the file containing quay SSL certificate
+	QuaySSLCertificate = "quay.crt"
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
 	// QuayConfigVolumeName is the name of the volume containing Quay configurations
@@ -238,10 +240,6 @@ const (
 	QuayAppConfigSSLPrivateKeySecretKey = "ssl.key"
 	//QuayNamespaceEnvironmentVariable is the name of the environment variable to specify the namespace Quay is deployed within
 	QuayNamespaceEnvironmentVariable = "QE_K8S_NAMESPACE"
-	//QuayExtraCertsDirEnvironmentVariable is the name of the environment variable to specify the location of extra certificates
-	QuayExtraCertsDirEnvironmentVariable = "KUBE_EXTRA_CA_CERTDIR"
-	// QuayExtraCertsDir is the location of extra certificates
-	QuayExtraCertsDir = "/conf/stack/extra_ca_certs"
 	// QuayHTTPContainerPort is the HTTP container port for Quay
 	QuayHTTPContainerPort = 8080
 	// QuayHTTPSContainerPort is the HTTPS container port for Quay

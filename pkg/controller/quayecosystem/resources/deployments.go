@@ -209,6 +209,8 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 	meta.Name = GetQuayRepoMirrorResourcesName(quayConfiguration.QuayEcosystem)
 	BuildQuayRepoMirrorResourceLabels(meta.Labels)
 
+	mirrorReplicas := utils.CheckValue(quayConfiguration.QuayEcosystem.Spec.Quay.MirrorReplicas, &constants.OneInt)
+
 	envVars := []corev1.EnvVar{
 		{
 			Name:  constants.QuayEntryName,
@@ -285,6 +287,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 		},
 		ObjectMeta: meta,
 		Spec: appsv1.DeploymentSpec{
+			Replicas: mirrorReplicas.(*int32),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: meta.Labels,
 			},
@@ -518,7 +521,7 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 				Items: []corev1.KeyToPath{
 					corev1.KeyToPath{
 						Key:  constants.QuayAppConfigSSLCertificateSecretKey,
-						Path: "quay.crt",
+						Path: constants.QuaySSLCertificate,
 					},
 				},
 			},
