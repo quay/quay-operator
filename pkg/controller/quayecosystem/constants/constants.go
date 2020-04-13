@@ -266,8 +266,8 @@ const (
 	ClairAPIPort = 6062
 	// ClairProxyPort is the port to communicate with Clair proxy
 	ClairProxyPort = 6063
-	// ClairTrustCaPath is the location of the trusted SSL anchors file
-	ClairTrustCaPath = "/etc/pki/ca-trust/source/anchors/ca.crt"
+	// ClairTrustCaDir is the location of the trusted SSL anchors file
+	ClairTrustCaDir = "/etc/pki/ca-trust/source/anchors"
 	// ClairConfigVolumePath is the location of within the Clair pod to mount configuration files
 	ClairConfigVolumePath = "/clair/config"
 	// ClairHealthEndpoint is the endpoint that contains the health status of Clair

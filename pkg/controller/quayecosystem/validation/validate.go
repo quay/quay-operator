@@ -578,8 +578,14 @@ func validateConfigFiles(client client.Client, namespace string, inputConfigFile
 		if utils.IsZeroOfUnderlyingType(managedConfigFiles.Files) || len(managedConfigFiles.Files) == 0 {
 			for secretDataFileKey, secretDataFileValue := range configFilesSecret.Data {
 
+				fileType := redhatcopv1alpha1.ConfigConfigFileType
+
+				if !utils.IsZeroOfUnderlyingType(managedConfigFiles.Type) {
+					fileType = configFiles.Type
+				}
+
 				managedConfigFiles.Files = append(managedConfigFiles.Files, redhatcopv1alpha1.ConfigFile{
-					Type:          redhatcopv1alpha1.ConfigConfigFileType,
+					Type:          fileType,
 					Key:           secretDataFileKey,
 					Filename:      secretDataFileKey,
 					SecretContent: secretDataFileValue,
@@ -588,6 +594,15 @@ func validateConfigFiles(client client.Client, namespace string, inputConfigFile
 		} else {
 			for _, managedConfigFile := range managedConfigFiles.Files {
 
+				fileType := redhatcopv1alpha1.ConfigConfigFileType
+
+				if !utils.IsZeroOfUnderlyingType(managedConfigFile.Type) {
+					fileType = managedConfigFile.Type
+				} else if !utils.IsZeroOfUnderlyingType(configFiles.Type) {
+					fileType = configFiles.Type
+				}
+
+				managedConfigFile.Type = fileType
 				managedConfigFile.SecretContent = configFilesSecret.Data[managedConfigFile.Key]
 			}
 		}

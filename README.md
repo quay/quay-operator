@@ -287,14 +287,25 @@ The following additional options are also available:
 
 ### Configuration Files
 
-Files related to the configuration of Quay are located in the `/conf/stack` directory. There are situations for which additional user defined configuration files need to be added to this directory (such as certificates and private keys). The Quay Operator supports the injection of these assets within the `configFiles` property in the `quay` property of the `QuayEcosystem` object where one or more assets can be specified.
+Files related to the configuration of Quay and Clair can be provided to be injected at runtime. Common examples include certificates, private keys and configuration files. The Quay Operator supports the injection of these assets within the `configFiles` property in the `quay` or `clair` property of the `QuayEcosystem` object where one or more assets can be specified.
 
 Two types of configuration files can be specified by the `type` property:
 
-1. `config` - Configuration files that will be added to the `/conf/stack` directory
-2. `extraCaCert` - Certificates to be trusted container
+1. `config` - Configuration files
+2. `extraCaCert` - Certificates to be trusted by the container
 
-Configuration files are stored as values within _Secrets_. The first step is to create a secret containing these files. The following command illustrates how a private key can be added: 
+The following table illustrates the location for which `configFiles` are injected:
+
+| Component | Type | Injection Location |
+| --------- | ---- | ----------- |
+| Quay | `config` | Mounted within the `/conf/stack` directory in Quay components |
+| Quay | `extraCaCert` | Added to the `quay-enterprise-config-secret` which is automatically processed as an additional CA certificate |
+| Clair | `config` | Added to the `/clair/config` directory
+| Clair | `extraCaCert` | Added to the `/etc/pki/ca-trust/source/anchors` directory |
+
+Configuration files are stored as values within _Secrets_. The following describes several of the ways that this feature can be leveraged.
+
+The first step is to create a secret containing these files. The following command illustrates how a private key can be added: 
 
 ```
 oc create secret generic quayconfigfile --from-file=<path_to_file>
@@ -313,7 +324,7 @@ spec:
       - secretName: quayconfigfile
   ```
 
-By default, the `config` type is assumed. If the contents of the secret contains certificates that should be added to the `extra_ca_certs` directory, specify the type as `extraCaCert` as shown below:
+By default, the `config` type is assumed.  If the contents of the secret contains certificates that should be added as a trusted certificate, specify the type as `extraCaCert` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
