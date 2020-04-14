@@ -802,7 +802,7 @@ _Note_: If you used a different name than `QuayEcosystem` for the custom resourc
 
 In most cases, the resources that are created within the cluster when creating a `QuayEcosystem` resource are removed automatically. When running in certain environments, such OpenShift, additional resources are created and/or modified that would not be removed as part of the typical garbage collection process. A [Finalizer](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#advanced-topics) are automatically applied to the `QuayEcosystem` object by default which will allow the operator to manage the cleanup process of all necessary resources when a `QuayEcosystem` resource is deleted.
 
-To disable automatically applying a finalizer to the `QuayEcosystem` resource, you can specify `enableFinalizers: false` as shown below:
+To disable automatically applying a finalizer to the `QuayEcosystem` resource, you can specify `disableFinalizers: true` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -810,7 +810,7 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  enableFinalizers: false
+  disableFinalizers: false
   quay:
     imagePullSecretName: redhat-pull-secret
 ```
