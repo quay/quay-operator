@@ -126,9 +126,12 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	// QuayEcosystem object is being deleted
 	if util.IsBeingDeleted(quayEcosystem) {
 		logging.Log.Info("QuayEcosystem Object Being Deleted. Cleaning up")
-		if err := configuration.ConfigureAnyUIDSCCs(metaObject, utils.MakeServiceAccountsUsername(quayEcosystem.Namespace, constants.QuayEcosystemServiceAccounts), constants.OperationRemove); err != nil {
-			logging.Log.Error(err, "Failed to Remove Users from SCCs")
-			return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemUpdateDefaultConfigurationConditionFailure, err)
+
+		if r.isOpenShift == true {
+			if err := configuration.ConfigureAnyUIDSCCs(metaObject, utils.MakeServiceAccountsUsername(quayEcosystem.Namespace, constants.QuayEcosystemServiceAccounts), constants.OperationRemove); err != nil {
+				logging.Log.Error(err, "Failed to Remove Users from SCCs")
+				return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemUpdateDefaultConfigurationConditionFailure, err)
+			}
 		}
 
 		if util.HasFinalizer(quayEcosystem, constants.OperatorFinalizer) {

@@ -36,15 +36,19 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.ClairDatabase.RootPassword = constants.ClairDatabaseCredentialsDefaultRootPassword
 	quayConfiguration.ClairUpdateInterval = constants.ClairDefaultUpdateInterval
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.EnableFinalizers) && quayConfiguration.QuayEcosystem.Spec.EnableFinalizers {
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.EnableFinalizers) {
+		quayConfiguration.QuayEcosystem.Spec.EnableFinalizers = true
+		changed = true
 
 		if !util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
 			util.AddFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
-			changed = true
 		}
-
 	} else {
-		if util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
+		if quayConfiguration.QuayEcosystem.Spec.EnableFinalizers == true && !util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
+			util.AddFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
+			changed = true
+
+		} else if quayConfiguration.QuayEcosystem.Spec.EnableFinalizers == false && util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
 			util.RemoveFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
 			changed = true
 		}
