@@ -797,3 +797,26 @@ image: quay.io/redhat/quay:vX.X.X
 Once saved, the operator will automatically apply the upgrade.
 
 _Note_: If you used a different name than `QuayEcosystem` for the custom resource to deploy your Quay ecosystem, you will have to replace the name to fit the proper value
+
+## QuayEcosystem Resource Cleanup
+
+In most cases, the resources that are created within the cluster when creating a `QuayEcosystem` resource are removed automatically. When running in certain environments, such OpenShift, additional resources are created and/or modified that would not be removed as part of the typical garbage collection process. A [Finalizer](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#advanced-topics) are automatically applied to the `QuayEcosystem` object by default which will allow the operator to manage the cleanup process of all necessary resources when a `QuayEcosystem` resource is deleted.
+
+To disable automatically applying a finalizer to the `QuayEcosystem` resource, you can specify `enableFinalizers: false` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  enableFinalizers: false
+  quay:
+    imagePullSecretName: redhat-pull-secret
+```
+
+If the operator has been stopped and a finalizer has been applied, attempting to delete the `QuayEcosystem` resource will hang as it is waiting for the finalizer to be removed (as would occur once the operator has finished its processing). To remove the finalizer manually and unblock the deletion process, execute the following command:
+
+```
+kubectl patch quayecosystem example-quayecosystem --type=merge -p '{"metadata":{"finalizers":null}}'
+```
