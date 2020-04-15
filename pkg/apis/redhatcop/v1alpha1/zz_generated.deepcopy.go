@@ -349,6 +349,11 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 		*out = new(ExternalAccess)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Superusers != nil {
+		in, out := &in.Superusers, &out.Superusers
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

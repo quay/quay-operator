@@ -3,6 +3,7 @@ package quayecosystem
 import (
 	"context"
 	"math"
+	"reflect"
 	"time"
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
@@ -417,9 +418,10 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		}
 
 		desiredConfig := quayconfig.InfrastructureConfig{
-			Database: db,
-			Redis:    redis,
-			Hostname: quayConfiguration.QuayHostname,
+			Database:   db,
+			Redis:      redis,
+			Hostname:   quayConfiguration.QuayHostname,
+			Superusers: quayConfiguration.QuayEcosystem.Spec.Quay.Superusers,
 		}
 
 		// Fetch Quay's `config.yaml` from its configuration secret
@@ -490,6 +492,33 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 			} else {
 				logging.Log.Info("Quay's Hostname is correct. No changes needed.")
+			}
+
+			// Reconcile Superusers
+			if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) && len(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) > 0 && !reflect.DeepEqual(persistedConfig.Superusers, desiredConfig.Superusers) {
+				logging.Log.Info("Superusers have changed. Reconciling.")
+
+				configFileKey := "SUPER_USERS"
+
+				// Update the Hostname in the internal config.yaml representation
+				persistedConfig.NotManagedByOperator[configFileKey] = desiredConfig.Superusers
+				data, err := yaml.Marshal(persistedConfig.NotManagedByOperator)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Quay's Superusers.")
+					return reconcile.Result{}, err
+				}
+
+				// Update the `config.yaml` stored in the secret used by Quay
+				secret.Data["config.yaml"] = data
+				err = r.reconcilerBase.GetClient().Update(context.Background(), secret)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Quay's superuser configuration.")
+					return reconcile.Result{}, err
+				}
+
+				logging.Log.Info("Updated Quay's superuser configuration.")
+			} else {
+				logging.Log.Info("Superusers are correct. No changes needed.")
 			}
 
 			// Reconcile Redis Changes

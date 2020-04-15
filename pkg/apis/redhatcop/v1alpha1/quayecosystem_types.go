@@ -182,6 +182,8 @@ type Quay struct {
 	MigrationPhase QuayMigrationPhase `json:"migrationPhase,omitempty" protobuf:"bytes,1,opt,name=migrationPhase,casttype=QuayMigrationPhase"`
 
 	ExternalAccess *ExternalAccess `json:"externalAccess,omitempty"`
+	// +listType=set
+	Superusers []string `json:"superusers,omitempty"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through

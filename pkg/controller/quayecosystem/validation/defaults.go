@@ -20,9 +20,9 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	// Initialize Base variables and objects
 	quayConfiguration.QuayConfigUsername = constants.QuayConfigUsername
 	quayConfiguration.QuayConfigPassword = constants.QuayConfigDefaultPasswordValue
-	quayConfiguration.QuaySuperuserUsername = constants.QuaySuperuserDefaultUsername
-	quayConfiguration.QuaySuperuserPassword = constants.QuaySuperuserDefaultPassword
-	quayConfiguration.QuaySuperuserEmail = constants.QuaySuperuserDefaultEmail
+	quayConfiguration.InitialQuaySuperuserUsername = constants.InitialQuaySuperuserDefaultUsername
+	quayConfiguration.InitialQuaySuperuserPassword = constants.InitialQuaySuperuserDefaultPassword
+	quayConfiguration.InitialQuaySuperuserEmail = constants.InitialQuaySuperuserDefaultEmail
 	quayConfiguration.QuayConfigPasswordSecret = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
 	quayConfiguration.QuayDatabase.Username = constants.QuayDatabaseCredentialsDefaultUsername
 	quayConfiguration.QuayDatabase.Password = constants.QuayDatabaseCredentialsDefaultPassword
@@ -88,6 +88,15 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Image) {
 		changed = true
 		quayConfiguration.QuayEcosystem.Spec.Quay.Image = constants.QuayImage
+	}
+
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) && utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.SuperuserCredentialsSecretName) && !quayConfiguration.QuayEcosystem.Spec.Quay.SkipSetup && !quayConfiguration.QuayEcosystem.Status.SetupComplete {
+		changed = true
+		quayConfiguration.QuayEcosystem.Spec.Quay.Superusers = []string{constants.InitialQuaySuperuserDefaultUsername}
+	}
+
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) && len(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) > 0 {
+		quayConfiguration.InitialQuaySuperuserUsername = quayConfiguration.QuayEcosystem.Spec.Quay.Superusers[0]
 	}
 
 	// Quay Migration Phase

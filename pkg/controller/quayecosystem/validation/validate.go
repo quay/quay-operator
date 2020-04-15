@@ -23,8 +23,8 @@ import (
 // Validate performs validation across all resources
 func Validate(client client.Client, quayConfiguration *resources.QuayConfiguration) (bool, error) {
 
-	// Validate Superuser Credentials Secret
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.SuperuserCredentialsSecretName) {
+	// Validate Initial Superuser Credentials Secret
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.SuperuserCredentialsSecretName) && !quayConfiguration.QuayEcosystem.Spec.Quay.SkipSetup && !quayConfiguration.QuayEcosystem.Status.SetupComplete {
 
 		validQuaySuperuserSecret, superuserSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.SuperuserCredentialsSecretName, constants.DefaultQuaySuperuserCredentials)
 
@@ -36,13 +36,13 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 			return false, fmt.Errorf("Failed to validate provided Quay Superuser Secret")
 		}
 
-		quayConfiguration.QuaySuperuserEmail = string(superuserSecret.Data[constants.QuaySuperuserEmailKey])
-		quayConfiguration.QuaySuperuserUsername = string(superuserSecret.Data[constants.QuaySuperuserUsernameKey])
-		quayConfiguration.QuaySuperuserPassword = string(superuserSecret.Data[constants.QuaySuperuserPasswordKey])
-		quayConfiguration.ValidProvidedQuaySuperuserSecret = true
+		quayConfiguration.InitialQuaySuperuserEmail = string(superuserSecret.Data[constants.InitialQuaySuperuserEmailKey])
+		quayConfiguration.InitialQuaySuperuserUsername = string(superuserSecret.Data[constants.InitialQuaySuperuserUsernameKey])
+		quayConfiguration.InitialQuaySuperuserPassword = string(superuserSecret.Data[constants.InitialQuaySuperuserPasswordKey])
+		quayConfiguration.ValidProvidedInitialQuaySuperuserSecret = true
 	}
 
-	if len(quayConfiguration.QuaySuperuserPassword) < 8 {
+	if len(quayConfiguration.InitialQuaySuperuserPassword) < 8 {
 		return false, fmt.Errorf("Quay Superuser Password Must Be At Least 8 Characters in Length")
 	}
 

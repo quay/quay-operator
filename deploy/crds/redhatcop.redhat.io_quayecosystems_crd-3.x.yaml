@@ -2103,6 +2103,10 @@ spec:
                   type: boolean
                 superuserCredentialsSecretName:
                   type: string
+                superusers:
+                  items:
+                    type: string
+                  type: array
               type: object
             redis:
               description: Redis defines the properies of a deployment of Redis

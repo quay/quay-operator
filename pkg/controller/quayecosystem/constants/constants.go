@@ -138,20 +138,20 @@ const (
 	QuayContainerAppName = "quay-enterprise-app"
 	// QuayContainerCertSecret is the name of the secret for extra Quay certificates
 	QuayContainerCertSecret = "quay-enterprise-cert-secret"
-	// QuaySuperuserUsernameKey represents the key for the superuser username
-	QuaySuperuserUsernameKey = "superuser-username"
-	// QuaySuperuserPasswordKey represents the key for the superuser password
-	QuaySuperuserPasswordKey = "superuser-password"
-	// QuaySuperuserEmailKey represents the key for the superuser email
-	QuaySuperuserEmailKey = "superuser-email"
-	// QuaySuperuserSecretName represents the name of the secret containing the quay superuser details
-	QuaySuperuserSecretName = "quay-superuser"
-	// QuaySuperuserDefaultUsername represents the default Quay superuser username
-	QuaySuperuserDefaultUsername = "quay"
-	// QuaySuperuserDefaultPassword represents the default Quay superuser password
-	QuaySuperuserDefaultPassword = "password"
-	// QuaySuperuserDefaultEmail represents the default Quay superuser password
-	QuaySuperuserDefaultEmail = "changeme@example.com"
+	// InitialQuaySuperuserUsernameKey represents the key for the superuser username
+	InitialQuaySuperuserUsernameKey = "superuser-username"
+	// InitialQuaySuperuserPasswordKey represents the key for the superuser password
+	InitialQuaySuperuserPasswordKey = "superuser-password"
+	// InitialQuaySuperuserEmailKey represents the key for the superuser email
+	InitialQuaySuperuserEmailKey = "superuser-email"
+	// InitialQuaySuperuserSecretName represents the name of the secret containing the quay superuser details
+	InitialQuaySuperuserSecretName = "quay-superuser"
+	// InitialQuaySuperuserDefaultUsername represents the default Quay superuser username
+	InitialQuaySuperuserDefaultUsername = "quay"
+	// InitialQuaySuperuserDefaultPassword represents the default Quay superuser password
+	InitialQuaySuperuserDefaultPassword = "password"
+	// InitialQuaySuperuserDefaultEmail represents the default Quay superuser password
+	InitialQuaySuperuserDefaultEmail = "changeme@example.com"
 	// EncryptedRobotTokenMigrationPhase represents the name of a envirnment variable required or quay containers
 	EncryptedRobotTokenMigrationPhase = "EncryptedRobotTokenMigrationPhase"
 
@@ -303,9 +303,9 @@ var (
 
 	// DefaultQuaySuperuserCredentials represents a map containing the default values for the Quay Superuser
 	DefaultQuaySuperuserCredentials = map[string]string{
-		QuaySuperuserUsernameKey: QuaySuperuserDefaultUsername,
-		QuaySuperuserPasswordKey: QuaySuperuserDefaultPassword,
-		QuaySuperuserEmailKey:    QuaySuperuserDefaultEmail,
+		InitialQuaySuperuserUsernameKey: InitialQuaySuperuserDefaultUsername,
+		InitialQuaySuperuserPasswordKey: InitialQuaySuperuserDefaultPassword,
+		InitialQuaySuperuserEmailKey:    InitialQuaySuperuserDefaultEmail,
 	}
 	// DefaultQuayDatabaseCredentials represents a map containing the default values for Quay database
 	DefaultQuayDatabaseCredentials = map[string]string{

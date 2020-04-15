@@ -10,11 +10,11 @@ import (
 type QuayConfiguration struct {
 	QuayEcosystem *redhatcopv1alpha1.QuayEcosystem
 
-	// Superuser
-	QuaySuperuserUsername            string
-	QuaySuperuserPassword            string
-	QuaySuperuserEmail               string
-	ValidProvidedQuaySuperuserSecret bool
+	// Initial Superuser
+	InitialQuaySuperuserUsername            string
+	InitialQuaySuperuserPassword            string
+	InitialQuaySuperuserEmail               string
+	ValidProvidedInitialQuaySuperuserSecret bool
 
 	// Database
 	ValidProvidedQuayDatabaseSecret bool

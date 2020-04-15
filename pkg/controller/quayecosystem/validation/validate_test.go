@@ -53,7 +53,7 @@ func TestShortQuayPwdError(t *testing.T) {
 	defaultConfig := SetDefaults(cl, &quayConfiguration)
 	assert.Equal(t, defaultConfig, true)
 
-	quayConfiguration.QuaySuperuserPassword = "ToShort"
+	quayConfiguration.InitialQuaySuperuserPassword = "ToShort"
 
 	validate, err := Validate(cl, &quayConfiguration)
 

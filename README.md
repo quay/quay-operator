@@ -153,6 +153,8 @@ spec:
     imagePullSecretName: redhat-pull-secret
 ```
 
+_Note:_ It is recommended that you also set the `superusers` field of the `quay` property in the `QuayEcosystem` object so as to ensure consistency between the the various properties. See the _Superusers_ section below.
+
 #### Quay Configuration
 
 A dedicated deployment of Quay Enterprise is used to manage the configuration of Quay. Access to the configuration interface is secured and requires authentication in order for access. By default, the following values are used:
@@ -554,6 +556,25 @@ spec:
     imagePullSecretName: redhat-pull-secret
     keepConfigDeployment: true
 ```
+
+### Superusers
+
+Superusers in Quay have elevated rights and the ability to administer the server. By default, a superuser with the username `quay` wil be created. Additional superusers may be desired in order to aid in managing the server. The full list of superusers can be specifed in the `superusers` field of the _Quay_ object as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    superusers:
+      - jim
+      - joe
+```
+
+If multiple superusers are specified, during the initial setup of Quay, the first user specified will be configured unless specified within a secret as described earlier. After the initial setup, passwords are managed witihn Quay itself and not using either the default value or the value provided in the secret.
 
 ### Redis Password
 
