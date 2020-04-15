@@ -236,7 +236,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: constants.QuayRepoMirrorContainerPort,
-				Name:          "https",
+				Name:          "http",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
 				Name:      constants.QuayConfigVolumeName,

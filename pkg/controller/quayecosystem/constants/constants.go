@@ -245,7 +245,7 @@ const (
 	// QuayHTTPSContainerPort is the HTTPS container port for Quay
 	QuayHTTPSContainerPort = 8443
 	// QuayRepoMirrorContainerPort is the port for the Quay Repo Mirror
-	QuayRepoMirrorContainerPort = 9092
+	QuayRepoMirrorContainerPort = 9091
 	// SecurityScannerService is the name of the security scanner service
 	SecurityScannerService = "security_scanner"
 	// SecurityScannerServiceSecretKey is the name of the key containing the security service private key
