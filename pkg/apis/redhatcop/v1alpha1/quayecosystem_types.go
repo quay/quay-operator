@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"time"
 
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	appsv1 "k8s.io/api/apps/v1"
 
@@ -14,9 +15,10 @@ import (
 // QuayEcosystemSpec defines the desired state of QuayEcosystem
 // +k8s:openapi-gen=true
 type QuayEcosystemSpec struct {
-	Quay  *Quay  `json:"quay,omitempty"`
-	Redis *Redis `json:"redis,omitempty"`
-	Clair *Clair `json:"clair,omitempty"`
+	Quay              *Quay  `json:"quay,omitempty"`
+	Redis             *Redis `json:"redis,omitempty"`
+	Clair             *Clair `json:"clair,omitempty"`
+	DisableFinalizers bool   `json:"disableFinalizers,omitempty"`
 }
 
 // QuayEcosystemPhase defines the phase of lifecycle the operator is running in
@@ -25,8 +27,8 @@ type QuayEcosystemPhase string
 // QuayEcosystemConditionType defines the types of conditions the operator will run through
 type QuayEcosystemConditionType string
 
-// QuayConfigFileType defines the type of configuration file
-type QuayConfigFileType string
+// ConfigFileType defines the type of configuration file
+type ConfigFileType string
 
 // ExternalAccessType defines the method for accessing Quay from an external source
 type ExternalAccessType string
@@ -51,6 +53,9 @@ const (
 	// QuayEcosystemProvisioningFailure indicates that the QuayEcosystem provisioning failed
 	QuayEcosystemProvisioningFailure QuayEcosystemConditionType = "QuayEcosystemProvisioningFailure"
 
+	// QuayEcosystemCleanupFailure indicates that the QuayEcosystem provisioning failed to cleanup resources
+	QuayEcosystemCleanupFailure QuayEcosystemConditionType = "QuayEcosystemCleanupFailure"
+
 	// QuayEcosystemQuaySetupSuccess indicates that the Quay setup process was successful
 	QuayEcosystemQuaySetupSuccess QuayEcosystemConditionType = "QuaySetupSuccess"
 	// QuayEcosystemQuaySetupFailure indicates that the Quay setup process failed
@@ -66,11 +71,11 @@ const (
 	// QuayEcosystemSecurityScannerConfigurationFailure indicates that the security scanner configuration failed
 	QuayEcosystemSecurityScannerConfigurationFailure QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationFailure"
 
-	// ExtraCaCertQuayConfigFileType specifies a Extra Ca Certificate file type
-	ExtraCaCertQuayConfigFileType QuayConfigFileType = "extraCaCert"
+	// ExtraCaCertConfigFileType specifies a Extra Ca Certificate file type
+	ExtraCaCertConfigFileType ConfigFileType = "extraCaCert"
 
-	// ConfigQuayConfigFileType specifies a Extra Ca Certificate file type
-	ConfigQuayConfigFileType QuayConfigFileType = "config"
+	// ConfigConfigFileType specifies a Config file type
+	ConfigConfigFileType ConfigFileType = "config"
 
 	// RouteExternalAccessType specifies external access using a Route
 	RouteExternalAccessType ExternalAccessType = "Route"
@@ -95,9 +100,6 @@ const (
 
 	// NoneTLSTerminationType specifies that SSL will be disabled
 	NoneTLSTerminationType TLSTerminationType = "none"
-
-	SecureQuayPort   = 8443
-	InsecureQuayPort = 8080
 )
 
 // QuayEcosystemStatus defines the observed state of QuayEcosystem
@@ -161,6 +163,7 @@ type Quay struct {
 	LivenessProbe        *corev1.Probe     `json:"livenessProbe,omitempty"`
 	KeepConfigDeployment bool              `json:"keepConfigDeployment,omitempty"`
 	NodeSelector         map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	MirrorReplicas       *int32            `json:"mirrorReplicas,omitempty"`
 	ReadinessProbe       *corev1.Probe     `json:"readinessProbe,omitempty"`
 	// +listType=atomic
 	RegistryBackends               []RegistryBackend           `json:"registryBackends,omitempty"`
@@ -174,11 +177,13 @@ type Quay struct {
 	// +patchMergeKey=secretName
 	// +patchStrategy=merge
 	// +listType=atomic
-	ConfigFiles []QuayConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
+	ConfigFiles []ConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
 	// +kubebuilder:validation:Enum=new-installation;add-new-fields;backfill-then-read-only-new;remove-old-field
 	MigrationPhase QuayMigrationPhase `json:"migrationPhase,omitempty" protobuf:"bytes,1,opt,name=migrationPhase,casttype=QuayMigrationPhase"`
 
 	ExternalAccess *ExternalAccess `json:"externalAccess,omitempty"`
+	// +listType=set
+	Superusers []string `json:"superusers,omitempty"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -253,6 +258,11 @@ type Clair struct {
 	Resources                 corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	SslCertificatesSecretName string                      `json:"sslCertificatesSecretName,omitempty"`
 	UpdateInterval            string                      `json:"updateInterval,omitempty"`
+	// +optional
+	// +patchMergeKey=secretName
+	// +patchStrategy=merge
+	// +listType=atomic
+	ConfigFiles []ConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry
@@ -396,22 +406,24 @@ type CloudfrontS3RegistryBackendSource struct {
 	PrivateKeyFilename string `json:"privateKeyFilename,omitempty,name=privateKeyFilename"`
 }
 
-// QuayConfigFiles defines configuration files that are injected into the Quay resources
+// ConfigFiles defines configuration files that are injected into the Quay resources
 // +k8s:openapi-gen=true
-type QuayConfigFiles struct {
+type ConfigFiles struct {
 	SecretName string `json:"secretName"`
 	// +listType=atomic
-	Files []QuayConfigFile   `json:"files,omitempty,name=files"`
-	Type  QuayConfigFileType `json:"type,omitempty,name=type"`
+	Files []ConfigFile   `json:"files,omitempty,name=files"`
+	Type  ConfigFileType `json:"type,omitempty,name=type"`
 }
 
-// QuayConfigFile defines configuration files that are injected into the Quay resources
+// ConfigFile defines configuration files that are injected into the Quay resources
 // +k8s:openapi-gen=true
-type QuayConfigFile struct {
+type ConfigFile struct {
 	// +kubebuilder:validation:Enum=config;extraCaCert
-	Type     QuayConfigFileType `json:"type,omitempty,name=type"`
-	Key      string             `json:"key,name=key"`
-	Filename string             `json:"filename,omitempty,name=filename"`
+	Type     ConfigFileType `json:"type,omitempty,name=type"`
+	Key      string         `json:"key,name=key"`
+	Filename string         `json:"filename,omitempty,name=filename"`
+	// +listType=atomic
+	SecretContent []byte `json:"secretContent,omitempty,name=secretContent"`
 }
 
 type QuayMigrationPhase string
@@ -428,7 +440,7 @@ func init() {
 }
 
 // GetKeys returns the keys found in Configuration Files
-func (quayConfigFiles *QuayConfigFiles) GetKeys() []string {
+func (quayConfigFiles *ConfigFiles) GetKeys() []string {
 	keys := []string{}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfigFiles.Files) {
@@ -489,9 +501,9 @@ func (q *QuayEcosystem) FindConditionByType(conditionType QuayEcosystemCondition
 // GetQuayPort returns the port associated with Quay
 func (q *QuayEcosystem) GetQuayPort() int32 {
 	if q.IsInsecureQuay() {
-		return InsecureQuayPort
+		return constants.QuayHTTPContainerPort
 	}
-	return SecureQuayPort
+	return constants.QuayHTTPSContainerPort
 }
 
 // IsInsecureQuay determines whether Quay is insecure

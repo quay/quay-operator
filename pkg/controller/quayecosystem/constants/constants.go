@@ -138,20 +138,20 @@ const (
 	QuayContainerAppName = "quay-enterprise-app"
 	// QuayContainerCertSecret is the name of the secret for extra Quay certificates
 	QuayContainerCertSecret = "quay-enterprise-cert-secret"
-	// QuaySuperuserUsernameKey represents the key for the superuser username
-	QuaySuperuserUsernameKey = "superuser-username"
-	// QuaySuperuserPasswordKey represents the key for the superuser password
-	QuaySuperuserPasswordKey = "superuser-password"
-	// QuaySuperuserEmailKey represents the key for the superuser email
-	QuaySuperuserEmailKey = "superuser-email"
-	// QuaySuperuserSecretName represents the name of the secret containing the quay superuser details
-	QuaySuperuserSecretName = "quay-superuser"
-	// QuaySuperuserDefaultUsername represents the default Quay superuser username
-	QuaySuperuserDefaultUsername = "quay"
-	// QuaySuperuserDefaultPassword represents the default Quay superuser password
-	QuaySuperuserDefaultPassword = "password"
-	// QuaySuperuserDefaultEmail represents the default Quay superuser password
-	QuaySuperuserDefaultEmail = "changeme@example.com"
+	// InitialQuaySuperuserUsernameKey represents the key for the superuser username
+	InitialQuaySuperuserUsernameKey = "superuser-username"
+	// InitialQuaySuperuserPasswordKey represents the key for the superuser password
+	InitialQuaySuperuserPasswordKey = "superuser-password"
+	// InitialQuaySuperuserEmailKey represents the key for the superuser email
+	InitialQuaySuperuserEmailKey = "superuser-email"
+	// InitialQuaySuperuserSecretName represents the name of the secret containing the quay superuser details
+	InitialQuaySuperuserSecretName = "quay-superuser"
+	// InitialQuaySuperuserDefaultUsername represents the default Quay superuser username
+	InitialQuaySuperuserDefaultUsername = "quay"
+	// InitialQuaySuperuserDefaultPassword represents the default Quay superuser password
+	InitialQuaySuperuserDefaultPassword = "password"
+	// InitialQuaySuperuserDefaultEmail represents the default Quay superuser password
+	InitialQuaySuperuserDefaultEmail = "changeme@example.com"
 	// EncryptedRobotTokenMigrationPhase represents the name of a envirnment variable required or quay containers
 	EncryptedRobotTokenMigrationPhase = "EncryptedRobotTokenMigrationPhase"
 
@@ -226,6 +226,8 @@ const (
 	// CloudfrontS3SecretKey is the name of the S3 Secret Key
 	CloudfrontS3SecretKey = "secretKey"
 
+	// QuaySSLCertificate is name of the file containing quay SSL certificate
+	QuaySSLCertificate = "quay.crt"
 	// QuayAppConfigSSLCertificateSecretKey is key in the app-config secret representing the SSL Certificate
 	QuayAppConfigSSLCertificateSecretKey = "ssl.cert"
 	// QuayConfigVolumeName is the name of the volume containing Quay configurations
@@ -238,10 +240,12 @@ const (
 	QuayAppConfigSSLPrivateKeySecretKey = "ssl.key"
 	//QuayNamespaceEnvironmentVariable is the name of the environment variable to specify the namespace Quay is deployed within
 	QuayNamespaceEnvironmentVariable = "QE_K8S_NAMESPACE"
-	//QuayExtraCertsDirEnvironmentVariable is the name of the environment variable to specify the location of extra certificates
-	QuayExtraCertsDirEnvironmentVariable = "KUBE_EXTRA_CA_CERTDIR"
-	// QuayExtraCertsDir is the location of extra certificates
-	QuayExtraCertsDir = "/conf/stack/extra_ca_certs"
+	// QuayHTTPContainerPort is the HTTP container port for Quay
+	QuayHTTPContainerPort = 8080
+	// QuayHTTPSContainerPort is the HTTPS container port for Quay
+	QuayHTTPSContainerPort = 8443
+	// QuayRepoMirrorContainerPort is the port for the Quay Repo Mirror
+	QuayRepoMirrorContainerPort = 9091
 	// SecurityScannerService is the name of the security scanner service
 	SecurityScannerService = "security_scanner"
 	// SecurityScannerServiceSecretKey is the name of the key containing the security service private key
@@ -252,10 +256,16 @@ const (
 	ClairDefaultPaginationKey = "XxoPtCUzrUv4JV5dS+yQ+MdW7yLEJnRMwigVY/bpgtQ="
 	// ClairConfigFileKey represents the config.yaml file ConfigMap key
 	ClairConfigFileKey = "config.yaml"
-	// ClairPort is the port to communicate with Clair
-	ClairPort = "6060"
-	// ClairTrustCaPath is the location of the trusted SSL anchors file
-	ClairTrustCaPath = "/etc/pki/ca-trust/source/anchors/ca.crt"
+	// ClairPort is the port to communicate with Clair API
+	ClairPort = 6060
+	// ClairHealthPort is the port to communicate with Clair health
+	ClairHealthPort = 6061
+	// ClairAPIPort is the port to communicate with Clair health
+	ClairAPIPort = 6062
+	// ClairProxyPort is the port to communicate with Clair proxy
+	ClairProxyPort = 6063
+	// ClairTrustCaDir is the location of the trusted SSL anchors file
+	ClairTrustCaDir = "/etc/pki/ca-trust/source/anchors"
 	// ClairConfigVolumePath is the location of within the Clair pod to mount configuration files
 	ClairConfigVolumePath = "/clair/config"
 	// ClairHealthEndpoint is the endpoint that contains the health status of Clair
@@ -278,6 +288,14 @@ const (
 	RedisPasswordKey = "password"
 	// RedisPasswordEnvVar represents the name of the environment variable that contains the Redis password
 	RedisPasswordEnvVar = "REDIS_PASSWORD"
+	// ExtraCaCertsFilenamePrefix is the prefix for Extra Ca Certificates
+	ExtraCaCertsFilenamePrefix = "extra_ca_certs_"
+	// OperationAdd signifies that an operation requires an addition
+	OperationAdd = "add"
+	// OperationRemove signifies that an operation requires a removal
+	OperationRemove = "remove"
+	// OperatorFinalizer is the name of the finalizer attached to the QuayEcosystem resource
+	OperatorFinalizer = "quayecosystem.redhatcop.redhat.io"
 )
 
 var (
@@ -285,9 +303,9 @@ var (
 
 	// DefaultQuaySuperuserCredentials represents a map containing the default values for the Quay Superuser
 	DefaultQuaySuperuserCredentials = map[string]string{
-		QuaySuperuserUsernameKey: QuaySuperuserDefaultUsername,
-		QuaySuperuserPasswordKey: QuaySuperuserDefaultPassword,
-		QuaySuperuserEmailKey:    QuaySuperuserDefaultEmail,
+		InitialQuaySuperuserUsernameKey: InitialQuaySuperuserDefaultUsername,
+		InitialQuaySuperuserPasswordKey: InitialQuaySuperuserDefaultPassword,
+		InitialQuaySuperuserEmailKey:    InitialQuaySuperuserDefaultEmail,
 	}
 	// DefaultQuayDatabaseCredentials represents a map containing the default values for Quay database
 	DefaultQuayDatabaseCredentials = map[string]string{
@@ -331,8 +349,8 @@ var (
 	// RequiredCloudfrontS3CredentialKeys represents the keys that are required for the Cloudfront S3 registry backend
 	RequiredCloudfrontS3CredentialKeys = []string{CloudfrontS3AccessKey, CloudfrontS3SecretKey}
 
-	// RequiredAnyUIDSccServiceAccounts is a list of service accounts who require access to the anyuid SCC
-	RequiredAnyUIDSccServiceAccounts = []string{QuayServiceAccount}
+	// QuayEcosystemServiceAccounts is a list of service accounts that are part of the QuayEcosystem
+	QuayEcosystemServiceAccounts = []string{QuayServiceAccount, ClairServiceAccount}
 
 	// DefaultQuayConfigCredentials represents a map containing the default Quay Config
 	DefaultQuayConfigCredentials = map[string]string{

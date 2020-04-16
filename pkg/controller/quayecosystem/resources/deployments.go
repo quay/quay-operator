@@ -1,7 +1,7 @@
 package resources
 
 import (
-	"fmt"
+	"path/filepath"
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
@@ -131,10 +131,10 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 			Name:  constants.QuayContainerConfigName,
 			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 8080,
+				ContainerPort: constants.QuayHTTPContainerPort,
 				Name:          "http",
 			}, {
-				ContainerPort: 8443,
+				ContainerPort: constants.QuayHTTPSContainerPort,
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
@@ -148,7 +148,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				InitialDelaySeconds: 10,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 8443},
+						Port: intstr.IntOrString{IntVal: quayConfiguration.QuayEcosystem.GetQuayPort()},
 					},
 				},
 			},
@@ -157,7 +157,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				InitialDelaySeconds: 30,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 8443},
+						Port: intstr.IntOrString{IntVal: quayConfiguration.QuayEcosystem.GetQuayPort()},
 					},
 				},
 			},
@@ -209,6 +209,8 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 	meta.Name = GetQuayRepoMirrorResourcesName(quayConfiguration.QuayEcosystem)
 	BuildQuayRepoMirrorResourceLabels(meta.Labels)
 
+	mirrorReplicas := utils.CheckValue(quayConfiguration.QuayEcosystem.Spec.Quay.MirrorReplicas, &constants.OneInt)
+
 	envVars := []corev1.EnvVar{
 		{
 			Name:  constants.QuayEntryName,
@@ -233,11 +235,8 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 			Name:  constants.QuayContainerRepoMirrorName,
 			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 8080,
+				ContainerPort: constants.QuayRepoMirrorContainerPort,
 				Name:          "http",
-			}, {
-				ContainerPort: 8443,
-				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
 				Name:      constants.QuayConfigVolumeName,
@@ -250,7 +249,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				InitialDelaySeconds: 10,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 9092},
+						Port: intstr.IntOrString{IntVal: constants.QuayRepoMirrorContainerPort},
 					},
 				},
 			},
@@ -259,7 +258,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				InitialDelaySeconds: 30,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: 9092},
+						Port: intstr.IntOrString{IntVal: constants.QuayRepoMirrorContainerPort},
 					},
 				},
 			},
@@ -288,6 +287,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 		},
 		ObjectMeta: meta,
 		Spec: appsv1.DeploymentSpec{
+			Replicas: mirrorReplicas.(*int32),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: meta.Labels,
 			},
@@ -325,10 +325,6 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				},
 			},
 		},
-		{
-			Name:  constants.QuayExtraCertsDirEnvironmentVariable,
-			Value: constants.QuayExtraCertsDir,
-		},
 	}
 
 	configEnvVars = utils.MergeEnvVars(configEnvVars, quayConfiguration.QuayEcosystem.Spec.Quay.EnvVars)
@@ -349,10 +345,10 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 			Name:  constants.QuayContainerAppName,
 			Env:   configEnvVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 8080,
+				ContainerPort: constants.QuayHTTPContainerPort,
 				Name:          "http",
 			}, {
-				ContainerPort: 8443,
+				ContainerPort: constants.QuayHTTPSContainerPort,
 				Name:          "https",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
@@ -447,55 +443,63 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 
 	envVars = utils.MergeEnvVars(envVars, quayConfiguration.QuayEcosystem.Spec.Clair.EnvVars)
 
+	clairConfigVolumeProjections := []corev1.VolumeProjection{
+
+		{
+			Secret: &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: GetSecurityScannerSecretName(quayConfiguration.QuayEcosystem),
+				},
+				Items: []corev1.KeyToPath{
+					corev1.KeyToPath{
+						Key:  constants.SecurityScannerServiceSecretKey,
+						Path: constants.SecurityScannerServiceSecretKey,
+					},
+				},
+			},
+		},
+		{
+			Secret: &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: GetClairSSLSecretName(quayConfiguration.QuayEcosystem),
+				},
+				Items: []corev1.KeyToPath{
+					corev1.KeyToPath{
+						Key:  corev1.TLSPrivateKeyKey,
+						Path: constants.ClairSSLPrivateKeySecretKey,
+					},
+					corev1.KeyToPath{
+						Key:  corev1.TLSCertKey,
+						Path: constants.ClairSSLCertificateSecretKey,
+					},
+				},
+			},
+		},
+		{
+			ConfigMap: &corev1.ConfigMapProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: GetClairConfigMapName(quayConfiguration.QuayEcosystem),
+				},
+				Items: []corev1.KeyToPath{
+					corev1.KeyToPath{
+						Key:  constants.ClairConfigFileKey,
+						Path: constants.ClairConfigFileKey,
+					},
+				},
+			},
+		},
+	}
+
+	// Add configuration files
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.ClairConfigFiles) {
+		clairConfigVolumeProjections = append(clairConfigVolumeProjections, getConfigVolumeProjections(quayConfiguration.ClairConfigFiles, redhatcopv1alpha1.ConfigConfigFileType)...)
+	}
+
 	clairVolumes := []corev1.Volume{corev1.Volume{
 		Name: "configvolume",
 		VolumeSource: corev1.VolumeSource{
 			Projected: &corev1.ProjectedVolumeSource{
-				Sources: []corev1.VolumeProjection{
-					{
-						Secret: &corev1.SecretProjection{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: GetSecurityScannerSecretName(quayConfiguration.QuayEcosystem),
-							},
-							Items: []corev1.KeyToPath{
-								corev1.KeyToPath{
-									Key:  constants.SecurityScannerServiceSecretKey,
-									Path: constants.SecurityScannerServiceSecretKey,
-								},
-							},
-						},
-					},
-					{
-						Secret: &corev1.SecretProjection{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: GetClairSSLSecretName(quayConfiguration.QuayEcosystem),
-							},
-							Items: []corev1.KeyToPath{
-								corev1.KeyToPath{
-									Key:  corev1.TLSPrivateKeyKey,
-									Path: constants.ClairSSLPrivateKeySecretKey,
-								},
-								corev1.KeyToPath{
-									Key:  corev1.TLSCertKey,
-									Path: constants.ClairSSLCertificateSecretKey,
-								},
-							},
-						},
-					},
-					{
-						ConfigMap: &corev1.ConfigMapProjection{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: GetClairConfigMapName(quayConfiguration.QuayEcosystem),
-							},
-							Items: []corev1.KeyToPath{
-								corev1.KeyToPath{
-									Key:  constants.ClairConfigFileKey,
-									Path: constants.ClairConfigFileKey,
-								},
-							},
-						},
-					},
-				},
+				Sources: clairConfigVolumeProjections,
 			},
 		},
 	}}
@@ -505,27 +509,53 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 		MountPath: constants.ClairConfigVolumePath,
 	}}
 
+	// Configure Quay Certificate and Extra CA Certificates
+	clairCertificateVolumeProjections := []corev1.VolumeProjection{}
+
 	if !quayConfiguration.QuayEcosystem.IsInsecureQuay() {
-		clairVolumes = append(clairVolumes, corev1.Volume{
-			Name: "quay-ssl",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
-					Items: []corev1.KeyToPath{
-						corev1.KeyToPath{
-							Key:  constants.QuayAppConfigSSLCertificateSecretKey,
-							Path: "ca.crt",
-						},
+		clairCertificateVolumeProjections = append(clairCertificateVolumeProjections, corev1.VolumeProjection{
+			Secret: &corev1.SecretProjection{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: GetQuaySecretName(quayConfiguration.QuayEcosystem),
+				},
+				Items: []corev1.KeyToPath{
+					corev1.KeyToPath{
+						Key:  constants.QuayAppConfigSSLCertificateSecretKey,
+						Path: constants.QuaySSLCertificate,
 					},
 				},
 			},
 		})
+	}
 
-		clairVolumeMounts = append(clairVolumeMounts, corev1.VolumeMount{
-			Name:      "quay-ssl",
-			MountPath: constants.ClairTrustCaPath,
-			SubPath:   "ca.crt",
-		})
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.ClairConfigFiles) {
+		clairCertificateVolumeProjections = append(clairCertificateVolumeProjections, getConfigVolumeProjections(quayConfiguration.ClairConfigFiles, redhatcopv1alpha1.ExtraCaCertConfigFileType)...)
+	}
+
+	clairVolumes = append(clairVolumes, corev1.Volume{
+		Name: "sslvolume",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: clairCertificateVolumeProjections,
+			},
+		},
+	})
+
+	// Iterate over certificate projections
+	for _, clairCertificateVolumeProjection := range clairCertificateVolumeProjections {
+
+		// We only support secrets currently for ConfigFiles
+		if !utils.IsZeroOfUnderlyingType(clairCertificateVolumeProjection.Secret) {
+			for _, secretItems := range clairCertificateVolumeProjection.Secret.Items {
+				clairVolumeMounts = append(clairVolumeMounts, corev1.VolumeMount{
+					Name:      "sslvolume",
+					MountPath: filepath.Join(constants.ClairTrustCaDir, secretItems.Path),
+					SubPath:   secretItems.Path,
+				})
+			}
+
+		}
+
 	}
 
 	clairDeploymentPodSpec := corev1.PodSpec{
@@ -534,10 +564,10 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 			Name:  constants.ClairContainerName,
 			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: 6060,
+				ContainerPort: constants.ClairPort,
 				Name:          "clair-api",
 			}, {
-				ContainerPort: 6061,
+				ContainerPort: constants.ClairHealthPort,
 				Name:          "clair-health",
 			}},
 			Resources:      quayConfiguration.QuayEcosystem.Spec.Clair.Resources,
@@ -722,87 +752,63 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 
 func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []corev1.VolumeProjection {
 
-	configVolumeSources := []corev1.VolumeProjection{
+	configVolumeProjections := []corev1.VolumeProjection{
 		{
 			Secret: &corev1.SecretProjection{
 				LocalObjectReference: corev1.LocalObjectReference{
-					Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
+					Name: GetQuaySecretName(quayConfiguration.QuayEcosystem),
 				},
 			},
 		},
-	}
-
-	quaySSLVolumeProjection := corev1.VolumeProjection{
-		Secret: &corev1.SecretProjection{
-			LocalObjectReference: corev1.LocalObjectReference{
-				Name: GetQuayConfigMapSecretName(quayConfiguration.QuayEcosystem),
-			},
-			Items: []corev1.KeyToPath{
-				corev1.KeyToPath{
-					Key:  constants.QuayAppConfigSSLCertificateSecretKey,
-					Path: "extra_ca_certs/quay.crt",
-				},
-			},
-		},
-	}
-
-	if !quayConfiguration.QuayEcosystem.IsInsecureQuay() {
-		configVolumeSources = append(configVolumeSources, quaySSLVolumeProjection)
-	}
-
-	// Add Clair SSL
-	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
-
-		configVolumeSources = append(configVolumeSources, corev1.VolumeProjection{
-			Secret: &corev1.SecretProjection{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: GetClairSSLSecretName(quayConfiguration.QuayEcosystem),
-				},
-				Items: []corev1.KeyToPath{
-					corev1.KeyToPath{
-						Key:  "tls.crt",
-						Path: "extra_ca_certs/clair.crt",
-					},
-				},
-			},
-		})
-
 	}
 
 	// Add User Defined Config Files
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.ConfigFiles) {
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayConfigFiles) {
 
-		for _, configFiles := range quayConfiguration.ConfigFiles {
+		configVolumeProjections = append(configVolumeProjections, getConfigVolumeProjections(quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.ConfigConfigFileType)...)
+	}
 
-			configFilesKeyToPaths := []corev1.KeyToPath{}
+	return configVolumeProjections
 
-			if !utils.IsZeroOfUnderlyingType(configFiles.Files) {
+}
 
-				for _, configFile := range configFiles.Files {
+func getConfigVolumeProjections(inputConfigFiles []redhatcopv1alpha1.ConfigFiles, configFileType redhatcopv1alpha1.ConfigFileType) []corev1.VolumeProjection {
 
-					baseDir := ""
-					filename := ""
+	configVolumeSources := []corev1.VolumeProjection{}
 
-					if !utils.IsZeroOfUnderlyingType(configFile.Type) && redhatcopv1alpha1.ExtraCaCertQuayConfigFileType == configFile.Type {
-						baseDir = "extra_ca_certs/"
+	for _, configFiles := range inputConfigFiles {
 
-					} else if !utils.IsZeroOfUnderlyingType(configFiles.Type) && redhatcopv1alpha1.ExtraCaCertQuayConfigFileType == configFiles.Type {
-						baseDir = "extra_ca_certs/"
+		configFilesKeyToPaths := []corev1.KeyToPath{}
+
+		if !utils.IsZeroOfUnderlyingType(configFiles.Files) {
+
+			for _, configFile := range configFiles.Files {
+
+				if utils.IsZeroOfUnderlyingType(configFile.Type) && redhatcopv1alpha1.ExtraCaCertConfigFileType == configFileType {
+					continue
+				} else {
+					if configFile.Type != configFileType {
+						continue
 					}
-
-					if utils.IsZeroOfUnderlyingType(configFile.Filename) {
-						filename = configFile.Key
-					} else {
-						filename = configFile.Filename
-					}
-
-					configFilesKeyToPaths = append(configFilesKeyToPaths, corev1.KeyToPath{
-						Key:  configFile.Key,
-						Path: fmt.Sprintf("%s%s", baseDir, filename),
-					})
 				}
-			}
 
+				filename := ""
+
+				if utils.IsZeroOfUnderlyingType(configFile.Filename) {
+					filename = configFile.Key
+				} else {
+					filename = configFile.Filename
+				}
+
+				configFilesKeyToPaths = append(configFilesKeyToPaths, corev1.KeyToPath{
+					Key:  configFile.Key,
+					Path: filename,
+				})
+
+			}
+		}
+
+		if len(configFilesKeyToPaths) > 0 {
 			configVolumeSources = append(configVolumeSources, corev1.VolumeProjection{
 				Secret: &corev1.SecretProjection{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -811,11 +817,9 @@ func getBaselineQuayVolumeProjections(quayConfiguration *QuayConfiguration) []co
 					Items: configFilesKeyToPaths,
 				},
 			})
-
 		}
 
 	}
 
 	return configVolumeSources
-
 }

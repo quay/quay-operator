@@ -1,9 +1,11 @@
 package validation
 
 import (
+	"github.com/redhat-cop/operator-utils/pkg/util"
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
+
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,9 +20,9 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	// Initialize Base variables and objects
 	quayConfiguration.QuayConfigUsername = constants.QuayConfigUsername
 	quayConfiguration.QuayConfigPassword = constants.QuayConfigDefaultPasswordValue
-	quayConfiguration.QuaySuperuserUsername = constants.QuaySuperuserDefaultUsername
-	quayConfiguration.QuaySuperuserPassword = constants.QuaySuperuserDefaultPassword
-	quayConfiguration.QuaySuperuserEmail = constants.QuaySuperuserDefaultEmail
+	quayConfiguration.InitialQuaySuperuserUsername = constants.InitialQuaySuperuserDefaultUsername
+	quayConfiguration.InitialQuaySuperuserPassword = constants.InitialQuaySuperuserDefaultPassword
+	quayConfiguration.InitialQuaySuperuserEmail = constants.InitialQuaySuperuserDefaultEmail
 	quayConfiguration.QuayConfigPasswordSecret = resources.GetQuayConfigResourcesName(quayConfiguration.QuayEcosystem)
 	quayConfiguration.QuayDatabase.Username = constants.QuayDatabaseCredentialsDefaultUsername
 	quayConfiguration.QuayDatabase.Password = constants.QuayDatabaseCredentialsDefaultPassword
@@ -33,6 +35,17 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.ClairDatabase.Database = constants.ClairDatabaseCredentialsDefaultDatabaseName
 	quayConfiguration.ClairDatabase.RootPassword = constants.ClairDatabaseCredentialsDefaultRootPassword
 	quayConfiguration.ClairUpdateInterval = constants.ClairDefaultUpdateInterval
+	if quayConfiguration.QuayEcosystem.Spec.DisableFinalizers == true {
+		if util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
+			util.RemoveFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
+			changed = true
+		}
+	} else {
+		if !util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
+			util.AddFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
+			changed = true
+		}
+	}
 
 	if quayConfiguration.QuayEcosystem.Spec.Quay == nil {
 		quayConfiguration.QuayEcosystem.Spec.Quay = &redhatcopv1alpha1.Quay{}
@@ -75,6 +88,15 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Image) {
 		changed = true
 		quayConfiguration.QuayEcosystem.Spec.Quay.Image = constants.QuayImage
+	}
+
+	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) && utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.SuperuserCredentialsSecretName) && !quayConfiguration.QuayEcosystem.Spec.Quay.SkipSetup && !quayConfiguration.QuayEcosystem.Status.SetupComplete {
+		changed = true
+		quayConfiguration.QuayEcosystem.Spec.Quay.Superusers = []string{constants.InitialQuaySuperuserDefaultUsername}
+	}
+
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) && len(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) > 0 {
+		quayConfiguration.InitialQuaySuperuserUsername = quayConfiguration.QuayEcosystem.Spec.Quay.Superusers[0]
 	}
 
 	// Quay Migration Phase
@@ -184,7 +206,7 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled == true {
 
 		// Add Clair Service Account to List of SCC's
-		constants.RequiredAnyUIDSccServiceAccounts = append(constants.RequiredAnyUIDSccServiceAccounts, constants.ClairServiceAccount)
+		quayConfiguration.RequiredSCCServiceAccounts = append(quayConfiguration.RequiredSCCServiceAccounts, utils.MakeServiceAccountUsername(quayConfiguration.QuayEcosystem.Namespace, constants.ClairServiceAccount))
 
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Image) {
 			changed = true
@@ -300,7 +322,7 @@ func getDefaultClairReadinessProbe() *corev1.Probe {
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path:   constants.ClairHealthEndpoint,
-				Port:   intstr.IntOrString{IntVal: 6061},
+				Port:   intstr.IntOrString{IntVal: constants.ClairHealthPort},
 				Scheme: "HTTP",
 			},
 		},
@@ -315,7 +337,7 @@ func getDefaultClairLivenessProbe() *corev1.Probe {
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path:   constants.ClairHealthEndpoint,
-				Port:   intstr.IntOrString{IntVal: 6061},
+				Port:   intstr.IntOrString{IntVal: constants.ClairHealthPort},
 				Scheme: "HTTP",
 			},
 		},

@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
+
+	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 
 	ossecurityv1 "github.com/openshift/api/security/v1"
 	qclient "github.com/redhat-cop/quay-operator/pkg/client"
@@ -69,7 +72,7 @@ func (r *ReconcileQuayEcosystemConfiguration) CoreQuayResourceDeployment(metaObj
 
 	// Configure SCC when running in OpenShift
 	if r.quayConfiguration.IsOpenShift {
-		if err := r.configureAnyUIDSCCs(metaObject); err != nil {
+		if err := r.ConfigureAnyUIDSCCs(metaObject, r.quayConfiguration.RequiredSCCServiceAccounts, constants.OperationAdd); err != nil {
 			logging.Log.Error(err, "Failed to configure SCCs")
 			return nil, err
 		}
@@ -497,7 +500,7 @@ func (r *ReconcileQuayEcosystemConfiguration) configurePostgreSQL(meta metav1.Ob
 
 func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1.ObjectMeta) error {
 
-	configSecretName := resources.GetQuayConfigMapSecretName(r.quayConfiguration.QuayEcosystem)
+	configSecretName := resources.GetQuaySecretName(r.quayConfiguration.QuayEcosystem)
 
 	meta.Name = configSecretName
 
@@ -515,16 +518,15 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1
 	return nil
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCCs(meta metav1.ObjectMeta) error {
+func (r *ReconcileQuayEcosystemConfiguration) ConfigureAnyUIDSCCs(meta metav1.ObjectMeta, sccUsers []string, operation string) error {
 
 	// Configure Quay Service Account for AnyUID SCC
-	for _, serviceAccountName := range constants.RequiredAnyUIDSccServiceAccounts {
-		err := r.configureAnyUIDSCC(serviceAccountName, meta)
+	err := r.configureAnyUIDSCC(sccUsers, meta, operation)
 
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return err
 	}
+
 	return nil
 
 }
@@ -682,7 +684,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 
 	clairConfigFile.Clair.Notifier.Params["http"] = &qclient.ClairHttpNotifier{
 		Endpoint: fmt.Sprintf("%s://%s/secscan/notify", validation.GetScheme(r.quayConfiguration.QuayEcosystem.IsInsecureQuay()), r.quayConfiguration.QuayEcosystem.Status.Hostname),
-		Proxy:    "http://localhost:6063",
+		Proxy:    fmt.Sprintf("http://localhost:%d", constants.ClairProxyPort),
 	}
 
 	clairConfigFile.JwtProxy.VerifierProxies[0].Verifier.KeyServer.Options = map[string]interface{}{
@@ -716,9 +718,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountName string, meta metav1.ObjectMeta) error {
-
-	sccUser := "system:serviceaccount:" + meta.Namespace + ":" + serviceAccountName
+func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(sccUsers []string, meta metav1.ObjectMeta, operation string) error {
 
 	anyUIDSCC := &ossecurityv1.SecurityContextConstraints{}
 	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: constants.AnyUIDSCC, Namespace: ""}, anyUIDSCC)
@@ -728,21 +728,18 @@ func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(serviceAccountN
 		return err
 	}
 
-	sccUserFound := false
-	for _, user := range anyUIDSCC.Users {
-		if user == sccUser {
-
-			sccUserFound = true
-			break
-		}
+	if operation == constants.OperationRemove {
+		_, remainingUsers := diff(sccUsers, anyUIDSCC.Users)
+		anyUIDSCC.Users = remainingUsers
+	} else {
+		usersToAdd, _ := diff(sccUsers, anyUIDSCC.Users)
+		anyUIDSCC.Users = append(anyUIDSCC.Users, usersToAdd...)
 	}
 
-	if !sccUserFound {
-		anyUIDSCC.Users = append(anyUIDSCC.Users, sccUser)
-		err = r.reconcilerBase.CreateOrUpdateResource(nil, r.quayConfiguration.QuayEcosystem.Namespace, anyUIDSCC)
-		if err != nil {
-			return err
-		}
+	err = r.reconcilerBase.CreateOrUpdateResource(nil, r.quayConfiguration.QuayEcosystem.Namespace, anyUIDSCC)
+
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -792,7 +789,7 @@ func (r *ReconcileQuayEcosystemConfiguration) removeQuayRegistryStorage(meta met
 
 func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(meta metav1.ObjectMeta) (*reconcile.Result, error) {
 
-	configSecretName := resources.GetQuayConfigMapSecretName(r.quayConfiguration.QuayEcosystem)
+	configSecretName := resources.GetQuaySecretName(r.quayConfiguration.QuayEcosystem)
 
 	meta.Name = configSecretName
 
@@ -874,6 +871,20 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 	} else {
 		appConfigSecret.Data[constants.QuayAppConfigSSLPrivateKeySecretKey] = r.quayConfiguration.QuaySslPrivateKey
 		appConfigSecret.Data[constants.QuayAppConfigSSLCertificateSecretKey] = r.quayConfiguration.QuaySslCertificate
+
+		// Add Quay Certificate to Extra Certificates Config File
+		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.ConfigFiles{
+			Type: redhatcopv1alpha1.ExtraCaCertConfigFileType,
+			Files: []redhatcopv1alpha1.ConfigFile{
+				redhatcopv1alpha1.ConfigFile{
+					Type:          redhatcopv1alpha1.ExtraCaCertConfigFileType,
+					Filename:      constants.QuaySSLCertificate,
+					Key:           constants.QuaySSLCertificate,
+					SecretContent: r.quayConfiguration.QuaySslCertificate,
+				},
+			},
+		})
+
 	}
 
 	err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
@@ -916,6 +927,55 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 				return nil, err
 			}
 
+		}
+
+		r.quayConfiguration.ClairSslCertificate = clairSslSecret.Data[corev1.TLSCertKey]
+		r.quayConfiguration.ClairSslPrivateKey = clairSslSecret.Data[corev1.TLSPrivateKeyKey]
+
+		// Add Quay Certificate to Extra Certificates Config File
+		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.ConfigFiles{
+			Type: redhatcopv1alpha1.ExtraCaCertConfigFileType,
+			Files: []redhatcopv1alpha1.ConfigFile{
+				redhatcopv1alpha1.ConfigFile{
+					Type:          redhatcopv1alpha1.ExtraCaCertConfigFileType,
+					Filename:      constants.ClairSSLCertificateSecretKey,
+					Key:           constants.ClairSSLCertificateSecretKey,
+					SecretContent: r.quayConfiguration.ClairSslCertificate,
+				},
+			},
+		})
+	}
+
+	return nil, nil
+}
+
+// SyncQuayConfigSecret manages the content of the Quay Config Secret. Thisn
+func (r *ReconcileQuayEcosystemConfiguration) SyncQuayConfigSecret(meta metav1.ObjectMeta) (*reconcile.Result, error) {
+
+	configSecretName := resources.GetQuaySecretName(r.quayConfiguration.QuayEcosystem)
+
+	meta.Name = configSecretName
+
+	appConfigSecret := &corev1.Secret{}
+	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: configSecretName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, appConfigSecret)
+
+	if err != nil {
+
+		if apierrors.IsNotFound(err) {
+			// Config Secret Not Found. Requeue object
+			return &reconcile.Result{}, nil
+		}
+		return nil, err
+	}
+
+	appConfigSecret, changed := copyConfigFileExtraCaCertToConfigSecret(r.quayConfiguration.QuayConfigFiles, appConfigSecret)
+
+	if changed {
+		err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
+
+		if err != nil {
+			logging.Log.Error(err, "Error Updating app secret with synchronized changes")
+			return nil, err
 		}
 
 	}
@@ -1081,4 +1141,82 @@ func isQuayCertificatesConfigured(secret *corev1.Secret) bool {
 
 	}
 	return false
+}
+
+// Copies content from a secret.
+func copySecretContent(source *corev1.Secret, dest *corev1.Secret, prefix string) *corev1.Secret {
+
+	if source == nil || source.Data == nil || dest == nil {
+		return dest
+	}
+
+	if dest.Data == nil {
+		dest.Data = map[string][]byte{}
+	}
+
+	for key, value := range source.Data {
+		dest.Data[fmt.Sprintf("%s%s", prefix, key)] = value
+	}
+
+	return dest
+}
+
+func copyConfigFileExtraCaCertToConfigSecret(configFiles []redhatcopv1alpha1.ConfigFiles, secret *corev1.Secret) (*corev1.Secret, bool) {
+	/*
+	   1. Check to make sure files are not null or empty
+	   2. Iterate through all files
+	*/
+	changed := false
+
+	if utils.IsZeroOfUnderlyingType(configFiles) {
+		return secret, false
+	}
+
+	for _, configFile := range configFiles {
+
+		// Only Work with Extra Certificate Files
+		if configFile.Type == redhatcopv1alpha1.ExtraCaCertConfigFileType {
+			if !utils.IsZeroOfUnderlyingType(configFile.Files) {
+
+				for _, cFile := range configFile.Files {
+					// Check if config file in
+					extraCaCertFileName := fmt.Sprintf("%s%s", constants.ExtraCaCertsFilenamePrefix, cFile.Filename)
+
+					if secretFile, ok := secret.Data[extraCaCertFileName]; ok {
+						if reflect.DeepEqual(secretFile, cFile.SecretContent) {
+							continue
+						}
+					}
+
+					secret.Data[extraCaCertFileName] = cFile.SecretContent
+					changed = true
+
+				}
+			}
+		}
+	}
+
+	return secret, changed
+}
+
+func diff(lhsSlice, rhsSlice []string) (lhsOnly []string, rhsOnly []string) {
+	return singleDiff(lhsSlice, rhsSlice), singleDiff(rhsSlice, lhsSlice)
+}
+
+func singleDiff(lhsSlice, rhsSlice []string) (lhsOnly []string) {
+	for _, lhs := range lhsSlice {
+		found := false
+		for _, rhs := range rhsSlice {
+			if lhs == rhs {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			lhsOnly = append(lhsOnly, lhs)
+		}
+	}
+
+	return lhsOnly
 }

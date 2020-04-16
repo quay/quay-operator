@@ -23,8 +23,8 @@ import (
 // Validate performs validation across all resources
 func Validate(client client.Client, quayConfiguration *resources.QuayConfiguration) (bool, error) {
 
-	// Validate Superuser Credentials Secret
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.SuperuserCredentialsSecretName) {
+	// Validate Initial Superuser Credentials Secret
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.SuperuserCredentialsSecretName) && !quayConfiguration.QuayEcosystem.Spec.Quay.SkipSetup && !quayConfiguration.QuayEcosystem.Status.SetupComplete {
 
 		validQuaySuperuserSecret, superuserSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.SuperuserCredentialsSecretName, constants.DefaultQuaySuperuserCredentials)
 
@@ -36,13 +36,13 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 			return false, fmt.Errorf("Failed to validate provided Quay Superuser Secret")
 		}
 
-		quayConfiguration.QuaySuperuserEmail = string(superuserSecret.Data[constants.QuaySuperuserEmailKey])
-		quayConfiguration.QuaySuperuserUsername = string(superuserSecret.Data[constants.QuaySuperuserUsernameKey])
-		quayConfiguration.QuaySuperuserPassword = string(superuserSecret.Data[constants.QuaySuperuserPasswordKey])
-		quayConfiguration.ValidProvidedQuaySuperuserSecret = true
+		quayConfiguration.InitialQuaySuperuserEmail = string(superuserSecret.Data[constants.InitialQuaySuperuserEmailKey])
+		quayConfiguration.InitialQuaySuperuserUsername = string(superuserSecret.Data[constants.InitialQuaySuperuserUsernameKey])
+		quayConfiguration.InitialQuaySuperuserPassword = string(superuserSecret.Data[constants.InitialQuaySuperuserPasswordKey])
+		quayConfiguration.ValidProvidedInitialQuaySuperuserSecret = true
 	}
 
-	if len(quayConfiguration.QuaySuperuserPassword) < 8 {
+	if len(quayConfiguration.InitialQuaySuperuserPassword) < 8 {
 		return false, fmt.Errorf("Quay Superuser Password Must Be At Least 8 Characters in Length")
 	}
 
@@ -175,41 +175,16 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	}
 
-	// Validate Config Files
+	// Validate Quay Config Files
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFiles) {
 
-		for _, configFiles := range quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFiles {
+		quayConfigFiles, err := validateConfigFiles(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFiles)
 
-			managedConfigFiles := configFiles.DeepCopy()
-
-			if managedConfigFiles.SecretName == "" {
-				return false, fmt.Errorf("Failed to validate provided config files. `secretName` must not be empty")
-			}
-
-			validConfigFilesSecret, configFilesSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, managedConfigFiles.SecretName, managedConfigFiles.GetKeys())
-
-			if err != nil {
-				return false, err
-			}
-			if !validConfigFilesSecret {
-				return false, fmt.Errorf("Failed to validate required provided config file parameters. Invalid Secret Name: %s", managedConfigFiles.SecretName)
-			}
-
-			// If the user did not provide a list of keys, grab all of the files
-			if utils.IsZeroOfUnderlyingType(managedConfigFiles.Files) || len(managedConfigFiles.Files) == 0 {
-				for secretDataFiles := range configFilesSecret.Data {
-
-					managedConfigFiles.Files = append(managedConfigFiles.Files, redhatcopv1alpha1.QuayConfigFile{
-						Type:     redhatcopv1alpha1.ConfigQuayConfigFileType,
-						Key:      secretDataFiles,
-						Filename: secretDataFiles,
-					})
-				}
-			}
-
-			quayConfiguration.ConfigFiles = append(quayConfiguration.ConfigFiles, *managedConfigFiles)
-
+		if err != nil {
+			return false, err
 		}
+
+		quayConfiguration.QuayConfigFiles = append(quayConfiguration.QuayConfigFiles, quayConfigFiles...)
 
 	}
 
@@ -502,6 +477,19 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 			quayConfiguration.ValidProvidedClairDatabaseSecret = true
 		}
 
+		// Validate Clair Config Files
+		if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.ConfigFiles) {
+
+			clairConfigFiles, err := validateConfigFiles(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Clair.ConfigFiles)
+
+			if err != nil {
+				return false, err
+			}
+
+			quayConfiguration.ClairConfigFiles = append(quayConfiguration.ClairConfigFiles, clairConfigFiles...)
+
+		}
+
 	}
 
 	return true, nil
@@ -563,4 +551,65 @@ func validateProvidedSecretSlice(secret *corev1.Secret, requiredParameters []str
 
 	return true
 
+}
+
+func validateConfigFiles(client client.Client, namespace string, inputConfigFiles []redhatcopv1alpha1.ConfigFiles) ([]redhatcopv1alpha1.ConfigFiles, error) {
+
+	outputConfigFiles := []redhatcopv1alpha1.ConfigFiles{}
+
+	for _, configFiles := range inputConfigFiles {
+
+		managedConfigFiles := configFiles.DeepCopy()
+
+		if managedConfigFiles.SecretName == "" {
+			return nil, fmt.Errorf("Failed to validate provided config files. `secretName` must not be empty")
+		}
+
+		validConfigFilesSecret, configFilesSecret, err := validateSecret(client, namespace, managedConfigFiles.SecretName, managedConfigFiles.GetKeys())
+
+		if err != nil {
+			return nil, err
+		}
+		if !validConfigFilesSecret {
+			return nil, fmt.Errorf("Failed to validate required provided config file parameters. Invalid Secret Name: %s", managedConfigFiles.SecretName)
+		}
+
+		// If the user did not provide a list of keys, grab all of the files
+		if utils.IsZeroOfUnderlyingType(managedConfigFiles.Files) || len(managedConfigFiles.Files) == 0 {
+			for secretDataFileKey, secretDataFileValue := range configFilesSecret.Data {
+
+				fileType := redhatcopv1alpha1.ConfigConfigFileType
+
+				if !utils.IsZeroOfUnderlyingType(managedConfigFiles.Type) {
+					fileType = configFiles.Type
+				}
+
+				managedConfigFiles.Files = append(managedConfigFiles.Files, redhatcopv1alpha1.ConfigFile{
+					Type:          fileType,
+					Key:           secretDataFileKey,
+					Filename:      secretDataFileKey,
+					SecretContent: secretDataFileValue,
+				})
+			}
+		} else {
+			for _, managedConfigFile := range managedConfigFiles.Files {
+
+				fileType := redhatcopv1alpha1.ConfigConfigFileType
+
+				if !utils.IsZeroOfUnderlyingType(managedConfigFile.Type) {
+					fileType = managedConfigFile.Type
+				} else if !utils.IsZeroOfUnderlyingType(configFiles.Type) {
+					fileType = configFiles.Type
+				}
+
+				managedConfigFile.Type = fileType
+				managedConfigFile.SecretContent = configFilesSecret.Data[managedConfigFile.Key]
+			}
+		}
+
+		outputConfigFiles = append(outputConfigFiles, *managedConfigFiles)
+
+	}
+
+	return outputConfigFiles, nil
 }
