@@ -173,9 +173,7 @@ func InvalidTestClairDeployment(t *testing.T) {
 		Image:               constants.ClairImage,
 	}
 	// Dont try to spin down the config after the completed
-	quayEcosystem.Spec.Quay = &redhatcopv1alpha1.Quay{
-		KeepConfigDeployment: true,
-	}
+	quayEcosystem.Spec.Quay = &redhatcopv1alpha1.Quay{}
 
 	// Objects to track in the fake client.
 	objs := []runtime.Object{

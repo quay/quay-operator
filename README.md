@@ -544,7 +544,7 @@ The example above is the default configuration applied to Quay. Alternate option
 
 ### Configuration Deployment After Initial Setup
 
-In order to conserve resources, the configuration deployment of Quay is removed after the initial setup. In certain cases, there may be a need to further configure the quay environment. To specify that the configuration deployment should be retained, the `keepConfigDeployment` property within the _Quay_ object can can be set as `true` as shown below:
+By default, the Quay Configuration pod is left running even after the initial setup process. To configure the Quay Configuration pod to be removed after setup, the `keepConfigDeployment` property within the _Quay_ object can can be set as `false` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -554,7 +554,7 @@ metadata:
 spec:
   quay:
     imagePullSecretName: redhat-pull-secret
-    keepConfigDeployment: true
+    keepConfigDeployment: false
 ```
 
 ### Superusers

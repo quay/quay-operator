@@ -302,6 +302,11 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 		*out = new(v1.Probe)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.KeepConfigDeployment != nil {
+		in, out := &in.KeepConfigDeployment, &out.KeepConfigDeployment
+		*out = new(bool)
+		**out = **in
+	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = make(map[string]string, len(*in))
