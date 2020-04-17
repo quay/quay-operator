@@ -98,6 +98,10 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 			Value: string(quayConfiguration.QuayEcosystem.Spec.Quay.MigrationPhase),
 		},
 		{
+			Name:  constants.QuayConfigReadOnlyEnvName,
+			Value: constants.QuayConfigReadOnlyValues,
+		},
+		{
 			Name:  constants.QuayEntryName,
 			Value: constants.QuayEntryConfigValue,
 		},

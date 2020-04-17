@@ -154,6 +154,13 @@ const (
 	InitialQuaySuperuserDefaultEmail = "changeme@example.com"
 	// EncryptedRobotTokenMigrationPhase represents the name of a envirnment variable required or quay containers
 	EncryptedRobotTokenMigrationPhase = "EncryptedRobotTokenMigrationPhase"
+	// QuayConfigReadOnlyEnvName represents the environment variable used to
+	//     mark fields in the Quay Config App as read only.
+	QuayConfigReadOnlyEnvName = "CONFIG_READ_ONLY_FIELDS"
+	// QuayConfigReadOnlyValues specifies which values should be marked as
+	//     read-only in the Quay Config App. These should be managed and
+	//     reconciled by the Operator.
+	QuayConfigReadOnlyValues = "hostname,redis"
 
 	// RegistryStorageDefaultName is the name of the default storage
 	RegistryStorageDefaultName = "default"
