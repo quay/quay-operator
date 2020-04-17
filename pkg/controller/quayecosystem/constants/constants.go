@@ -308,6 +308,8 @@ const (
 var (
 	OneInt int32 = 1
 
+	FalseValue bool = false
+
 	// DefaultQuaySuperuserCredentials represents a map containing the default values for the Quay Superuser
 	DefaultQuaySuperuserCredentials = map[string]string{
 		InitialQuaySuperuserUsernameKey: InitialQuaySuperuserDefaultUsername,

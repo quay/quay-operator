@@ -374,7 +374,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	// Determine if Config pod should be spun down
 	// Reset the Config Deployment flag to the default value after successful setup
-	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) || !quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment {
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) && quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment == &constants.FalseValue {
 		quayConfiguration.DeployQuayConfiguration = false
 	}
 

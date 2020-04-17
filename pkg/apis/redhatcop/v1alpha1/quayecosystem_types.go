@@ -161,7 +161,7 @@ type Quay struct {
 	Image                string            `json:"image,omitempty"`
 	ImagePullSecretName  string            `json:"imagePullSecretName,omitempty"`
 	LivenessProbe        *corev1.Probe     `json:"livenessProbe,omitempty"`
-	KeepConfigDeployment bool              `json:"keepConfigDeployment,omitempty"`
+	KeepConfigDeployment *bool             `json:"keepConfigDeployment,omitempty"`
 	NodeSelector         map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
 	MirrorReplicas       *int32            `json:"mirrorReplicas,omitempty"`
 	ReadinessProbe       *corev1.Probe     `json:"readinessProbe,omitempty"`

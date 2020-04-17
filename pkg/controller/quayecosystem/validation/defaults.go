@@ -1,6 +1,8 @@
 package validation
 
 import (
+	"reflect"
+
 	"github.com/redhat-cop/operator-utils/pkg/util"
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
@@ -35,6 +37,7 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.ClairDatabase.Database = constants.ClairDatabaseCredentialsDefaultDatabaseName
 	quayConfiguration.ClairDatabase.RootPassword = constants.ClairDatabaseCredentialsDefaultRootPassword
 	quayConfiguration.ClairUpdateInterval = constants.ClairDefaultUpdateInterval
+	quayConfiguration.DeployQuayConfiguration = true
 	if quayConfiguration.QuayEcosystem.Spec.DisableFinalizers == true {
 		if util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
 			util.RemoveFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
@@ -269,8 +272,8 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 
 	}
 
-	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) && quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment {
-		quayConfiguration.DeployQuayConfiguration = true
+	if reflect.DeepEqual(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment, &constants.FalseValue) {
+		quayConfiguration.DeployQuayConfiguration = false
 	}
 
 	if !quayConfiguration.QuayEcosystem.Status.SetupComplete {
