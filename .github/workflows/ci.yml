@@ -21,26 +21,11 @@ jobs:
         run: make native-test
 
       - name: Helm Test
-        env:
-          HELM_VERSION: v3.0.3
-          CT_VERSION: 3.0.0-beta.1
-          CHART_DIRECTORY: "./charts/quay-operator"
-        run: |
-          sudo apt-get -y install yamllint
-          wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz
-          tar zxf helm-${HELM_VERSION}-linux-amd64.tar.gz
-          sudo mv linux-amd64/helm /usr/local/bin
-          rm -rf linux-amd64
-          pip install wheel
-          sudo pip install yamale
-          wget https://github.com/helm/chart-testing/releases/download/v${CT_VERSION}/chart-testing_${CT_VERSION}_linux_amd64.tar.gz
-          tar zxf chart-testing_${CT_VERSION}_linux_amd64.tar.gz
-          mkdir $HOME/.ct
-          mv etc/* $HOME/.ct/
-          sudo mv ct /usr/local/bin/
-          helm template ${CHART_DIRECTORY} > quay-operator-yamllint.yml
-          yamllint quay-operator-yamllint.yml
-          ct lint
+        id: lint
+        uses: helm/chart-testing-action@v1.0.0-rc.2
+        with:
+          command: lint
+          config: ct.yaml
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v1
@@ -55,7 +40,7 @@ jobs:
     needs: ["build"]
     steps:
       - name: Check out code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Download Artifact
         uses: actions/download-artifact@v1
@@ -80,7 +65,7 @@ jobs:
     needs: ["build"]
     steps:
       - name: Check Out Code
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Download Artifact
         uses: actions/download-artifact@v1
@@ -97,3 +82,51 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.DockerPassword }}
           REPOSITORY: ${{ secrets.Repository }}
         run: "make ci-release-deploy"
+
+  release-github:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    if: "github.repository == 'redhat-cop/quay-operator' && startsWith(github.ref, 'refs/tags')"
+    needs: ["release-image"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - run: |
+          git fetch --prune --unshallow
+
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v1
+        with:
+          name: quay-operator
+          path: build/_output/bin
+
+      - name: Compress Archive
+        run: |
+          tar -czf build/_output/bin/quay-operator-${{ steps.get_version.outputs.VERSION }}.tar.gz build/_output/bin/quay-operator
+
+      - name: Generate Changelog
+        run: |
+          LATEST_TAG=$(git tag --sort=creatordate | sed '$!d')
+          PREVIOUS_TAG=$(git tag --sort=creatordate | sed 'x;$!d')
+          if [ -z "${PREVIOUS_TAG}" ]; then
+            REV_RANGE=${LATEST_TAG}
+          else
+            REV_RANGE=${PREVIOUS_TAG}..${LATEST_TAG}
+          fi
+          git log --pretty=format:"- %s %H (%aN)" --no-merges ${REV_RANGE} > ${{ steps.get_version.outputs.VERSION }}-CHANGELOG.txt
+          cat ${{ steps.get_version.outputs.VERSION }}-CHANGELOG.txt
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: ${{ steps.get_version.outputs.VERSION }}-CHANGELOG.txt
+          draft: false
+          prerelease: false
+          files: |
+            build/_output/bin/quay-operator-${{ steps.get_version.outputs.VERSION }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
