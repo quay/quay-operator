@@ -1,0 +1,7 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: quay-operator
+spec:
+  sourceType: grpc
+  image: quay.io/quay/quay-operator-catalog@sha256:6200544610fb763be0960f4d8eacb7b2c3dfebe4be11f3ce2e4f55c3019778d7

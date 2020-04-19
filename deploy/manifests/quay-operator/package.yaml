@@ -1,0 +1,5 @@
+channels:
+- currentCSV: quay-operator.v1.1.0
+  name: alpha
+defaultChannel: alpha
+packageName: quay-operator
