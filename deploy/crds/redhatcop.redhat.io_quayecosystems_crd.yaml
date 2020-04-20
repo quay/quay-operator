@@ -34,15 +34,6 @@ spec:
             clair:
               description: Clair defines the properties of a deployment of Clair
               properties:
-                databaseConnectionOptions:
-                  enum:
-                  - disable
-                  - require
-                  - verify-ca
-                  - verify-full
-                  type: string
-                  description: databaseConnectionOptions sets the sslmode for Clair connection to the Postgresql database. 
-                    If not set, defaults to sslmode=disable
                 configFiles:
                   items:
                     description: ConfigFiles defines configuration files that are
@@ -81,6 +72,15 @@ spec:
                     - secretName
                     type: object
                   type: array
+                databaseConnectionOptions:
+                  enum:
+                  - disable
+                  - require
+                  - verify-ca
+                  - verify-full
+                  type: string
+                  description: databaseConnectionOptions sets the sslmode for Clair connection to the Postgresql database. 
+                    If not set, defaults to sslmode=disable
                 database:
                   description: Database defines a database that will be deployed to
                     support a particular component
