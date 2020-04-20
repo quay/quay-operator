@@ -278,8 +278,8 @@ const (
 	RedisPasswordKey = "password"
 	// RedisPasswordEnvVar represents the name of the environment variable that contains the Redis password
 	RedisPasswordEnvVar = "REDIS_PASSWORD"
-	// ClairDatabaseConSslModeDefault is the default Clair database connection ssl mode
-	ClairDatabaseConSslModeDefault = "disable"
+	// DatabaseConnectionOptionsDefault is the default Clair database connection ssl mode
+	DatabaseConnectionOptionsDefault = "disable"
 )
 
 var (
