@@ -43,6 +43,44 @@ spec:
                   type: string
                   description: databaseConnectionOptions sets the sslmode for Clair connection to the Postgresql database. 
                     If not set, defaults to sslmode=disable
+                configFiles:
+                  items:
+                    description: ConfigFiles defines configuration files that are
+                      injected into the Quay resources
+                    properties:
+                      files:
+                        items:
+                          description: ConfigFile defines configuration files that
+                            are injected into the Quay resources
+                          properties:
+                            filename:
+                              type: string
+                            key:
+                              type: string
+                            secretContent:
+                              format: byte
+                              type: string
+                            type:
+                              description: ConfigFileType defines the type of configuration
+                                file
+                              enum:
+                              - config
+                              - extraCaCert
+                              type: string
+                          required:
+                          - key
+                          type: object
+                        type: array
+                      secretName:
+                        type: string
+                      type:
+                        description: ConfigFileType defines the type of configuration
+                          file
+                        type: string
+                    required:
+                    - secretName
+                    type: object
+                  type: array
                 database:
                   description: Database defines a database that will be deployed to
                     support a particular component

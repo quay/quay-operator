@@ -254,6 +254,11 @@ type Clair struct {
 	SslCertificatesSecretName string                      `json:"sslCertificatesSecretName,omitempty"`
 	UpdateInterval            string                      `json:"updateInterval,omitempty"`
 	DatabaseConnectionOptions string                      `json:"databaseConnectionOptions,omitempty"`
+	// +optional
+	// +patchMergeKey=secretName
+	// +patchStrategy=merge
+	// +listType=atomic
+	ConfigFiles []ConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry

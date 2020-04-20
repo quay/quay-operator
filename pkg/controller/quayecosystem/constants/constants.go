@@ -280,6 +280,14 @@ const (
 	RedisPasswordEnvVar = "REDIS_PASSWORD"
 	// DatabaseConnectionOptionsDefault is the default Clair database connection ssl mode
 	DatabaseConnectionOptionsDefault = "disable"
+	// ExtraCaCertsFilenamePrefix is the prefix for Extra Ca Certificates
+	ExtraCaCertsFilenamePrefix = "extra_ca_certs_"
+	// OperationAdd signifies that an operation requires an addition
+	OperationAdd = "add"
+	// OperationRemove signifies that an operation requires a removal
+	OperationRemove = "remove"
+	// OperatorFinalizer is the name of the finalizer attached to the QuayEcosystem resource
+	OperatorFinalizer = "quayecosystem.redhatcop.redhat.io"
 )
 
 var (
