@@ -1009,10 +1009,6 @@ spec:
                       type: string
                     credentialsSecretName:
                       type: string
-                    databaseConnectionParameters:
-                      type: object
-                      description: "Sets the Postgresql connection string parameters. Has to be provided as 'key: value' pairs. 
-                        If not set, 'sslmode: prefer' parameter is used by default. Available parameters: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING"
                     deploymentStrategy:
                       enum:
                       - Recreate
