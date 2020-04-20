@@ -9,6 +9,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const (
+	ServiceAccountUsernamePrefix    = "system:serviceaccount:"
+	ServiceAccountUsernameSeparator = ":"
+)
+
 func IsZeroOfUnderlyingType(x interface{}) bool {
 	return reflect.DeepEqual(x, reflect.Zero(reflect.TypeOf(x)).Interface())
 }
@@ -66,6 +71,24 @@ func checkExistingKey(envVar corev1.EnvVar, envVars []corev1.EnvVar) (bool, int)
 
 	return false, 0
 
+}
+
+// MakeServiceAccountUsername generates a username from the given namespace and ServiceAccount name.
+// The resulting username can be passed to SplitUsername to extract the original namespace and ServiceAccount name.
+func MakeServiceAccountUsername(namespace, name string) string {
+	return ServiceAccountUsernamePrefix + namespace + ServiceAccountUsernameSeparator + name
+}
+
+// MakeServiceAccountUsername generates a username from the given namespace and ServiceAccount name.
+// The resulting username can be passed to SplitUsername to extract the original namespace and ServiceAccount name.
+func MakeServiceAccountsUsername(namespace string, names []string) []string {
+
+	updatedServiceAccountUsernames := []string{}
+
+	for _, val := range names {
+		updatedServiceAccountUsernames = append(updatedServiceAccountUsernames, MakeServiceAccountUsername(namespace, val))
+	}
+	return updatedServiceAccountUsernames
 }
 
 func GetHostFromHostname(hostname string) string {

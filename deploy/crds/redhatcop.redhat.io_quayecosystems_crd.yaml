@@ -841,6 +841,8 @@ spec:
                 updateInterval:
                   type: string
               type: object
+            disableFinalizers:
+              type: boolean
             quay:
               description: Quay defines the properies of a deployment of Quay
               properties:
@@ -947,21 +949,24 @@ spec:
                   type: array
                 configFiles:
                   items:
-                    description: QuayConfigFiles defines configuration files that
-                      are injected into the Quay resources
+                    description: ConfigFiles defines configuration files that are
+                      injected into the Quay resources
                     properties:
                       files:
                         items:
-                          description: QuayConfigFile defines configuration files
-                            that are injected into the Quay resources
+                          description: ConfigFile defines configuration files that
+                            are injected into the Quay resources
                           properties:
                             filename:
                               type: string
                             key:
                               type: string
+                            secretContent:
+                              format: byte
+                              type: string
                             type:
-                              description: QuayConfigFileType defines the type of
-                                configuration file
+                              description: ConfigFileType defines the type of configuration
+                                file
                               enum:
                               - config
                               - extraCaCert
@@ -973,7 +978,7 @@ spec:
                       secretName:
                         type: string
                       type:
-                        description: QuayConfigFileType defines the type of configuration
+                        description: ConfigFileType defines the type of configuration
                           file
                         type: string
                     required:
@@ -1672,6 +1677,9 @@ spec:
                   - backfill-then-read-only-new
                   - remove-old-field
                   type: string
+                mirrorReplicas:
+                  format: int32
+                  type: integer
                 nodeSelector:
                   additionalProperties:
                     type: string
@@ -2104,6 +2112,10 @@ spec:
                   type: boolean
                 superuserCredentialsSecretName:
                   type: string
+                superusers:
+                  items:
+                    type: string
+                  type: array
               type: object
             redis:
               description: Redis defines the properies of a deployment of Redis

@@ -153,6 +153,8 @@ spec:
     imagePullSecretName: redhat-pull-secret
 ```
 
+_Note:_ It is recommended that you also set the `superusers` field of the `quay` property in the `QuayEcosystem` object so as to ensure consistency between the the various properties. See the _Superusers_ section below.
+
 #### Quay Configuration
 
 A dedicated deployment of Quay Enterprise is used to manage the configuration of Quay. Access to the configuration interface is secured and requires authentication in order for access. By default, the following values are used:
@@ -287,14 +289,25 @@ The following additional options are also available:
 
 ### Configuration Files
 
-Files related to the configuration of Quay are located in the `/conf/stack` directory. There are situations for which additional user defined configuration files need to be added to this directory (such as certificates and private keys). The Quay Operator supports the injection of these assets within the `configFiles` property in the `quay` property of the `QuayEcosystem` object where one or more assets can be specified.
+Files related to the configuration of Quay and Clair can be provided to be injected at runtime. Common examples include certificates, private keys and configuration files. The Quay Operator supports the injection of these assets within the `configFiles` property in the `quay` or `clair` property of the `QuayEcosystem` object where one or more assets can be specified.
 
 Two types of configuration files can be specified by the `type` property:
 
-1. `config` - Configuration files that will be added to the `/conf/stack` directory
-2. `extraCaCerts` - Certificates to be trusted container
+1. `config` - Configuration files
+2. `extraCaCert` - Certificates to be trusted by the container
 
-Configuration files are stored as values within _Secrets_. The first step is to create a secret containing these files. The following command illustrates how a private key can be added: 
+The following table illustrates the location for which `configFiles` are injected:
+
+| Component | Type | Injection Location |
+| --------- | ---- | ----------- |
+| Quay | `config` | Mounted within the `/conf/stack` directory in Quay components |
+| Quay | `extraCaCert` | Added to the `quay-enterprise-config-secret` which is automatically processed as an additional CA certificate |
+| Clair | `config` | Added to the `/clair/config` directory
+| Clair | `extraCaCert` | Added to the `/etc/pki/ca-trust/source/anchors` directory |
+
+Configuration files are stored as values within _Secrets_. The following describes several of the ways that this feature can be leveraged.
+
+The first step is to create a secret containing these files. The following command illustrates how a private key can be added: 
 
 ```
 oc create secret generic quayconfigfile --from-file=<path_to_file>
@@ -313,7 +326,7 @@ spec:
       - secretName: quayconfigfile
   ```
 
-By default, the `config` type is assumed. If the contents of the secret contains certificates that should be added to the `extra_ca_certs` directory, specify the type as `extraCaCert` as shown below:
+By default, the `config` type is assumed.  If the contents of the secret contains certificates that should be added as a trusted certificate, specify the type as `extraCaCert` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -531,7 +544,7 @@ The example above is the default configuration applied to Quay. Alternate option
 
 ### Configuration Deployment After Initial Setup
 
-In order to conserve resources, the configuration deployment of Quay is removed after the initial setup. In certain cases, there may be a need to further configure the quay environment. To specify that the configuration deployment should be retained, the `keepConfigDeployment` property within the _Quay_ object can can be set as `true` as shown below:
+By default, the Quay Configuration pod is left running even after the initial setup process. To configure the Quay Configuration pod to be removed after setup, the `keepConfigDeployment` property within the _Quay_ object can can be set as `false` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -541,8 +554,27 @@ metadata:
 spec:
   quay:
     imagePullSecretName: redhat-pull-secret
-    keepConfigDeployment: true
+    keepConfigDeployment: false
 ```
+
+### Superusers
+
+Superusers in Quay have elevated rights and the ability to administer the server. By default, a superuser with the username `quay` wil be created. Additional superusers may be desired in order to aid in managing the server. The full list of superusers can be specifed in the `superusers` field of the _Quay_ object as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+    superusers:
+      - jim
+      - joe
+```
+
+If multiple superusers are specified, during the initial setup of Quay, the first user specified will be configured unless specified within a secret as described earlier. After the initial setup, passwords are managed witihn Quay itself and not using either the default value or the value provided in the secret.
 
 ### Redis Password
 
@@ -803,3 +835,26 @@ image: quay.io/redhat/quay:vX.X.X
 Once saved, the operator will automatically apply the upgrade.
 
 _Note_: If you used a different name than `QuayEcosystem` for the custom resource to deploy your Quay ecosystem, you will have to replace the name to fit the proper value
+
+## QuayEcosystem Resource Cleanup
+
+In most cases, the resources that are created within the cluster when creating a `QuayEcosystem` resource are removed automatically. When running in certain environments, such OpenShift, additional resources are created and/or modified that would not be removed as part of the typical garbage collection process. A [Finalizer](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#advanced-topics) are automatically applied to the `QuayEcosystem` object by default which will allow the operator to manage the cleanup process of all necessary resources when a `QuayEcosystem` resource is deleted.
+
+To disable automatically applying a finalizer to the `QuayEcosystem` resource, you can specify `disableFinalizers: true` as shown below:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  disableFinalizers: false
+  quay:
+    imagePullSecretName: redhat-pull-secret
+```
+
+If the operator has been stopped and a finalizer has been applied, attempting to delete the `QuayEcosystem` resource will hang as it is waiting for the finalizer to be removed (as would occur once the operator has finished its processing). To remove the finalizer manually and unblock the deletion process, execute the following command:
+
+```
+kubectl patch quayecosystem example-quayecosystem --type=merge -p '{"metadata":{"finalizers":null}}'
+```

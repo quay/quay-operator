@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"fmt"
 	"net/url"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 
 func GenerateDefaultClairConfigFile() client.ClairFile {
 
-	verifierProxy, _ := url.Parse("http://localhost:6062")
+	verifierProxy, _ := url.Parse(fmt.Sprintf("http://localhost:%d", constants.ClairAPIPort))
 
 	return client.ClairFile{
 		Clair: &client.ClairConfig{
@@ -25,7 +26,7 @@ func GenerateDefaultClairConfigFile() client.ClairFile {
 				RenotifyInterval: time.Hour * 1,
 				Params: map[string]interface{}{
 					"http": &client.ClairHttpNotifier{
-						Proxy: "http://localhost:6063",
+						Proxy: fmt.Sprintf("http://localhost:%d", constants.ClairProxyPort),
 					},
 				},
 			},
@@ -33,8 +34,8 @@ func GenerateDefaultClairConfigFile() client.ClairFile {
 				Interval: constants.ClairDefaultUpdateInterval,
 			},
 			API: &client.ClairAPI{
-				Port:          6062,
-				HealthPort:    6061,
+				Port:          constants.ClairAPIPort,
+				HealthPort:    constants.ClairHealthPort,
 				Timeout:       time.Second * 900,
 				PaginationKey: constants.ClairDefaultPaginationKey,
 			},
@@ -42,7 +43,7 @@ func GenerateDefaultClairConfigFile() client.ClairFile {
 		JwtProxy: &client.ClairJwtProxy{
 			SignerProxy: client.SignerProxyConfig{
 				Enabled:    true,
-				ListenAddr: ":6063",
+				ListenAddr: fmt.Sprintf(":%d", constants.ClairProxyPort),
 				CAKeyFile:  constants.ClairMITMPrivateKey,
 				CACrtFile:  constants.ClairMITMCertificate,
 				Signer: client.SignerConfig{
@@ -63,7 +64,7 @@ func GenerateDefaultClairConfigFile() client.ClairFile {
 					CrtFile:    constants.ClairSSLCertPath,
 					KeyFile:    constants.ClairSSLKeyPath,
 					Enabled:    true,
-					ListenAddr: ":6060",
+					ListenAddr: fmt.Sprintf(":%d", constants.ClairPort),
 					Verifier: client.VerifierConfig{
 						Upstream: client.URL{
 							URL: verifierProxy,

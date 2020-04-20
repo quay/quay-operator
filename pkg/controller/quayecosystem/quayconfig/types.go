@@ -10,6 +10,7 @@ type ConfigFile struct {
 	DatabaseURI          string          `yaml:"DB_URI"`
 	Redis                ConfigFileRedis `yaml:"USER_EVENTS_REDIS"`
 	Hostname             string          `yaml:"SERVER_HOSTNAME"`
+	Superusers           []string        `yaml:"SUPER_USERS"`
 	NotManagedByOperator map[string]interface{}
 }
 
@@ -31,7 +32,8 @@ type RedisConfig struct {
 }
 
 type InfrastructureConfig struct {
-	Database DatabaseConfig
-	Redis    RedisConfig
-	Hostname string
+	Database   DatabaseConfig
+	Redis      RedisConfig
+	Hostname   string
+	Superusers []string
 }

@@ -119,10 +119,10 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 	}
 
 	_, _, err = quaySetupInstance.setupClient.CreateSuperuser(client.QuayCreateSuperuserRequest{
-		Username:        quaySetupInstance.quayConfiguration.QuaySuperuserUsername,
-		Email:           quaySetupInstance.quayConfiguration.QuaySuperuserEmail,
-		Password:        quaySetupInstance.quayConfiguration.QuaySuperuserPassword,
-		ConfirmPassword: quaySetupInstance.quayConfiguration.QuaySuperuserPassword,
+		Username:        quaySetupInstance.quayConfiguration.InitialQuaySuperuserUsername,
+		Email:           quaySetupInstance.quayConfiguration.InitialQuaySuperuserEmail,
+		Password:        quaySetupInstance.quayConfiguration.InitialQuaySuperuserPassword,
+		ConfirmPassword: quaySetupInstance.quayConfiguration.InitialQuaySuperuserPassword,
 	})
 
 	if err != nil {
@@ -249,6 +249,10 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 	} else {
 		quayConfig.Config["PREFERRED_URL_SCHEME"] = "https"
 
+	}
+
+	if !utils.IsZeroOfUnderlyingType(quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) && len(quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) > 0 {
+		quayConfig.Config["SUPER_USERS"] = quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.Superusers
 	}
 
 	quayConfig.Config["SETUP_COMPLETE"] = true

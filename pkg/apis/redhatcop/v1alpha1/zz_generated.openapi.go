@@ -14,13 +14,13 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_AzureRegistryBackendSource(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair":                             schema_pkg_apis_redhatcop_v1alpha1_Clair(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource": schema_pkg_apis_redhatcop_v1alpha1_CloudfrontS3RegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile":                        schema_pkg_apis_redhatcop_v1alpha1_ConfigFile(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles":                       schema_pkg_apis_redhatcop_v1alpha1_ConfigFiles(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database":                          schema_pkg_apis_redhatcop_v1alpha1_Database(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess":                    schema_pkg_apis_redhatcop_v1alpha1_ExternalAccess(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource":  schema_pkg_apis_redhatcop_v1alpha1_GoogleCloudRegistryBackendSource(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_LocalRegistryBackendSource(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay":                              schema_pkg_apis_redhatcop_v1alpha1_Quay(ref),
-		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFile":                    schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFile(ref),
-		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles":                   schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFiles(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystem":                     schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition":            schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemCondition(ref),
 		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec":                 schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref),
@@ -180,11 +180,30 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 							Format: "",
 						},
 					},
+					"configFiles": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type":       "atomic",
+								"x-kubernetes-patch-merge-key": "secretName",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -252,6 +271,94 @@ func schema_pkg_apis_redhatcop_v1alpha1_CloudfrontS3RegistryBackendSource(ref co
 				},
 			},
 		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_ConfigFile(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConfigFile defines configuration files that are injected into the Quay resources",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"filename": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"secretContent": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "byte",
+						},
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_redhatcop_v1alpha1_ConfigFiles(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ConfigFiles defines configuration files that are injected into the Quay resources",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"secretName": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+					"files": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile"),
+									},
+								},
+							},
+						},
+					},
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"secretName"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile"},
 	}
 }
 
@@ -644,6 +751,12 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							},
 						},
 					},
+					"mirrorReplicas": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"integer"},
+							Format: "int32",
+						},
+					},
 					"readinessProbe": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/api/core/v1.Probe"),
@@ -713,7 +826,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles"),
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles"),
 									},
 								},
 							},
@@ -730,63 +843,10 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess"),
 						},
 					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
-	}
-}
-
-func schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFile(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "QuayConfigFile defines configuration files that are injected into the Quay resources",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"key": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"filename": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-				},
-				Required: []string{"key"},
-			},
-		},
-	}
-}
-
-func schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFiles(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "QuayConfigFiles defines configuration files that are injected into the Quay resources",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"secretName": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"files": {
+					"superusers": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
+								"x-kubernetes-list-type": "set",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
@@ -794,24 +854,18 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayConfigFiles(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFile"),
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
 						},
 					},
-					"type": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
 				},
-				Required: []string{"secretName"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayConfigFile"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -929,6 +983,12 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref common.ReferenceCa
 					"clair": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair"),
+						},
+					},
+					"disableFinalizers": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
 						},
 					},
 				},

@@ -2,6 +2,7 @@ package resources
 
 import (
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -93,7 +94,7 @@ func GetQuayConfigServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redha
 				{
 					Port:       443,
 					Protocol:   "TCP",
-					TargetPort: intstr.FromInt(8443),
+					TargetPort: intstr.FromInt(constants.QuayHTTPSContainerPort),
 				},
 			},
 		},
@@ -134,15 +135,15 @@ func GetClairServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "clair-api",
-					Port:       6060,
+					Port:       constants.ClairPort,
 					Protocol:   "TCP",
-					TargetPort: intstr.FromInt(6060),
+					TargetPort: intstr.FromInt(constants.ClairPort),
 				},
 				{
 					Name:       "clair-health",
-					Port:       6061,
+					Port:       constants.ClairHealthPort,
 					Protocol:   "TCP",
-					TargetPort: intstr.FromInt(6061),
+					TargetPort: intstr.FromInt(constants.ClairHealthPort),
 				},
 			},
 		},

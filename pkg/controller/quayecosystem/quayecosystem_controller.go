@@ -3,12 +3,14 @@ package quayecosystem
 import (
 	"context"
 	"math"
+	"reflect"
 	"time"
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"gopkg.in/yaml.v3"
 
 	"github.com/redhat-cop/operator-utils/pkg/util"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/externalaccess"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/provisioning"
@@ -113,16 +115,44 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	// Initialize a new Quay Configuration Resource
 	quayConfiguration := resources.QuayConfiguration{
-		QuayEcosystem: quayEcosystem,
-		IsOpenShift:   r.isOpenShift,
+		QuayEcosystem:              quayEcosystem,
+		IsOpenShift:                r.isOpenShift,
+		RequiredSCCServiceAccounts: []string{utils.MakeServiceAccountUsername(quayEcosystem.Namespace, constants.QuayServiceAccount)},
 	}
 
 	// Initialize Configuration
 	configuration := provisioning.New(r.reconcilerBase, r.k8sclient, &quayConfiguration)
 	metaObject := resources.NewResourceObjectMeta(quayConfiguration.QuayEcosystem)
 
+	// QuayEcosystem object is being deleted
+	if util.IsBeingDeleted(quayEcosystem) {
+		logging.Log.Info("QuayEcosystem Object Being Deleted. Cleaning up")
+
+		if r.isOpenShift == true {
+			if err := configuration.ConfigureAnyUIDSCCs(metaObject, utils.MakeServiceAccountsUsername(quayEcosystem.Namespace, constants.QuayEcosystemServiceAccounts), constants.OperationRemove); err != nil {
+				logging.Log.Error(err, "Failed to Remove Users from SCCs")
+				return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemUpdateDefaultConfigurationConditionFailure, err)
+			}
+		}
+
+		if util.HasFinalizer(quayEcosystem, constants.OperatorFinalizer) {
+
+			util.RemoveFinalizer(quayEcosystem, constants.OperatorFinalizer)
+
+			err := r.reconcilerBase.GetClient().Update(context.TODO(), quayConfiguration.QuayEcosystem)
+
+			if err != nil {
+				logging.Log.Error(err, "Failed to update QuayEcosystem after finalizer removal")
+				return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemCleanupFailure, err)
+			}
+		}
+
+		return reconcile.Result{}, nil
+	}
+
 	// Set default values
 	changed := validation.SetDefaults(r.reconcilerBase.GetClient(), &quayConfiguration)
+
 	if changed {
 
 		err := r.reconcilerBase.GetClient().Update(context.TODO(), quayConfiguration.QuayEcosystem)
@@ -254,6 +284,14 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	}
 
+	// Manage Config Secret
+
+	_, err = configuration.SyncQuayConfigSecret(metaObject)
+	if err != nil {
+		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Synchronize the Quay Config Secret", err.Error())
+		return reconcile.Result{}, err
+	}
+
 	deployQuayResult, err := configuration.DeployQuay(metaObject)
 	if err != nil {
 		r.reconcilerBase.GetRecorder().Event(quayConfiguration.QuayEcosystem, "Warning", "Failed to Deploy Quay", err.Error())
@@ -336,7 +374,7 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 	// Determine if Config pod should be spun down
 	// Reset the Config Deployment flag to the default value after successful setup
-	if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) || !quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment {
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment) && quayConfiguration.QuayEcosystem.Spec.Quay.KeepConfigDeployment == &constants.FalseValue {
 		quayConfiguration.DeployQuayConfiguration = false
 	}
 
@@ -380,9 +418,10 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 		}
 
 		desiredConfig := quayconfig.InfrastructureConfig{
-			Database: db,
-			Redis:    redis,
-			Hostname: quayConfiguration.QuayHostname,
+			Database:   db,
+			Redis:      redis,
+			Hostname:   quayConfiguration.QuayHostname,
+			Superusers: quayConfiguration.QuayEcosystem.Spec.Quay.Superusers,
 		}
 
 		// Fetch Quay's `config.yaml` from its configuration secret
@@ -453,6 +492,33 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 
 			} else {
 				logging.Log.Info("Quay's Hostname is correct. No changes needed.")
+			}
+
+			// Reconcile Superusers
+			if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) && len(quayConfiguration.QuayEcosystem.Spec.Quay.Superusers) > 0 && !reflect.DeepEqual(persistedConfig.Superusers, desiredConfig.Superusers) {
+				logging.Log.Info("Superusers have changed. Reconciling.")
+
+				configFileKey := "SUPER_USERS"
+
+				// Update the Hostname in the internal config.yaml representation
+				persistedConfig.NotManagedByOperator[configFileKey] = desiredConfig.Superusers
+				data, err := yaml.Marshal(persistedConfig.NotManagedByOperator)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Quay's Superusers.")
+					return reconcile.Result{}, err
+				}
+
+				// Update the `config.yaml` stored in the secret used by Quay
+				secret.Data["config.yaml"] = data
+				err = r.reconcilerBase.GetClient().Update(context.Background(), secret)
+				if err != nil {
+					logging.Log.Error(err, "Unable to reconcile Quay's superuser configuration.")
+					return reconcile.Result{}, err
+				}
+
+				logging.Log.Info("Updated Quay's superuser configuration.")
+			} else {
+				logging.Log.Info("Superusers are correct. No changes needed.")
 			}
 
 			// Reconcile Redis Changes
