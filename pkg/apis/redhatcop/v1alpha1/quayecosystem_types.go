@@ -225,17 +225,18 @@ type Database struct {
 	// +kubebuilder:validation:Enum=Recreate;RollingUpdate
 	DeploymentStrategy appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
 	// +listType=atomic
-	EnvVars             []corev1.EnvVar             `json:"envVars,omitempty"`
-	Image               string                      `json:"image,omitempty"`
-	ImagePullSecretName string                      `json:"imagePullSecretName,omitempty"`
-	LivenessProbe       *corev1.Probe               `json:"livenessProbe,omitempty"`
-	Memory              string                      `json:"memory,omitempty"`
-	NodeSelector        map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	ReadinessProbe      *corev1.Probe               `json:"readinessProbe,omitempty"`
-	Replicas            *int32                      `json:"replicas,omitempty"`
-	Resources           corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-	Server              string                      `json:"server,omitempty"`
-	VolumeSize          string                      `json:"volumeSize,omitempty"`
+	EnvVars                      []corev1.EnvVar             `json:"envVars,omitempty"`
+	Image                        string                      `json:"image,omitempty"`
+	ImagePullSecretName          string                      `json:"imagePullSecretName,omitempty"`
+	LivenessProbe                *corev1.Probe               `json:"livenessProbe,omitempty"`
+	Memory                       string                      `json:"memory,omitempty"`
+	NodeSelector                 map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe               *corev1.Probe               `json:"readinessProbe,omitempty"`
+	Replicas                     *int32                      `json:"replicas,omitempty"`
+	Resources                    corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	Server                       string                      `json:"server,omitempty"`
+	VolumeSize                   string                      `json:"volumeSize,omitempty"`
+	DatabaseConnectionParameters map[string]interface{}      `json:"databaseConnectionParameters,omitempty" protobuf:"bytes,7,rep,name=databaseConnectionParameters"`
 }
 
 // Clair defines the properties of a deployment of Clair
@@ -262,8 +263,7 @@ type Clair struct {
 	// +patchMergeKey=secretName
 	// +patchStrategy=merge
 	// +listType=atomic
-	ConfigFiles               []ConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
-	DatabaseConnectionOptions string        `json:"databaseConnectionOptions,omitempty"`
+	ConfigFiles []ConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry

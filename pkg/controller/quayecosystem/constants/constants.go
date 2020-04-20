@@ -303,8 +303,6 @@ const (
 	OperationRemove = "remove"
 	// OperatorFinalizer is the name of the finalizer attached to the QuayEcosystem resource
 	OperatorFinalizer = "quayecosystem.redhatcop.redhat.io"
-	// DatabaseConnectionOptionsDefault is the default Clair database connection ssl mode
-	DatabaseConnectionOptionsDefault = "disable"
 )
 
 var (

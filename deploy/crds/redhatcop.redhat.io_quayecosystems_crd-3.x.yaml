@@ -72,15 +72,6 @@ spec:
                     - secretName
                     type: object
                   type: array
-                databaseConnectionOptions:
-                  enum:
-                  - disable
-                  - require
-                  - verify-ca
-                  - verify-full
-                  type: string
-                  description: databaseConnectionOptions sets the sslmode for Clair connection to the Postgresql database. 
-                    If not set, defaults to sslmode=disable
                 database:
                   description: Database defines a database that will be deployed to
                     support a particular component
@@ -89,6 +80,10 @@ spec:
                       type: string
                     credentialsSecretName:
                       type: string
+                    databaseConnectionParameters:
+                      type: object
+                      description: "Sets the Postgresql connection string parameters. Has to be provided as 'key: value' pairs. 
+                        If not set, 'sslmode: disable' parameter is used by default. Available parameters: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING"
                     deploymentStrategy:
                       enum:
                       - Recreate
@@ -1014,6 +1009,10 @@ spec:
                       type: string
                     credentialsSecretName:
                       type: string
+                    databaseConnectionParameters:
+                      type: object
+                      description: "Sets the Postgresql connection string parameters. Has to be provided as 'key: value' pairs. 
+                        If not set, 'sslmode: prefer' parameter is used by default. Available parameters: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING"
                     deploymentStrategy:
                       enum:
                       - Recreate
