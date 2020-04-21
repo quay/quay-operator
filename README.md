@@ -615,7 +615,7 @@ spec:
     imagePullSecretName: redhat-pull-secret
 ```
 
-Operator sets the Clair database connection string with parameter `sslmode=disable` if no parameters are specified in QuayEcosystem custom resource. In case you have SSL enabled Postgres database, or want to add other parameters, provide `key: value` pairs. Available parameters: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING"
+Operator sets the Clair database connection string with parameter `sslmode=disable` if no parameters are specified in QuayEcosystem custom resource. In case you have SSL enabled Postgres database, or want to add other parameters, provide `key: value` pairs under `databaseConnectionParameters` object. Available parameters: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING"
 
 .An example:
 ```
@@ -630,7 +630,7 @@ spec:
     enabled: true
     imagePullSecretName: redhat-pull-secret
     database:
-      databaseConnectionOptions:
+      databaseConnectionParameters:
         sslmode: require
         key2: value2
 ```
