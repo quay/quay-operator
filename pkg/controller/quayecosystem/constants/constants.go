@@ -251,8 +251,6 @@ const (
 	QuayHTTPContainerPort = 8080
 	// QuayHTTPSContainerPort is the HTTPS container port for Quay
 	QuayHTTPSContainerPort = 8443
-	// QuayRepoMirrorContainerPort is the port for the Quay Repo Mirror
-	QuayRepoMirrorContainerPort = 9091
 	// QuayMetricsServicePort is the port for the Quay metrics
 	QuayMetricsServicePort = 9091
 	// SecurityScannerService is the name of the security scanner service
