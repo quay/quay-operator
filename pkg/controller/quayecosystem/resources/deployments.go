@@ -354,6 +354,9 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 			}, {
 				ContainerPort: constants.QuayHTTPSContainerPort,
 				Name:          "https",
+			}, {
+				ContainerPort: constants.QuayMetricsServicePort,
+				Name:          "metrics",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
 				Name:      constants.QuayConfigVolumeName,
