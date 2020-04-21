@@ -675,16 +675,8 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 	//	} else {
 	clairConfigFile = resources.GenerateDefaultClairConfigFile()
 	//	}
-	var dbConnectionParams string
-	if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.DatabaseConnectionParameters) {
-		dbConnectionParams = "sslmode=disable"
-	} else {
-		for dbConnKey, dbConnValue := range r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.DatabaseConnectionParameters {
-			dbConnectionParams = dbConnectionParams + "&" + dbConnKey + "=" + fmt.Sprintf("%v", dbConnValue)
-		}
-	}
 
-	clairConfigFile.Clair.Database.Options["source"] = fmt.Sprintf("postgres://%s:%s@%s/%s?%s", r.quayConfiguration.ClairDatabase.Username, r.quayConfiguration.ClairDatabase.Password, r.quayConfiguration.ClairDatabase.Server, r.quayConfiguration.ClairDatabase.Database, strings.Replace(dbConnectionParams, "&", "", 1))
+	clairConfigFile.Clair.Database.Options["source"] = fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", r.quayConfiguration.ClairDatabase.Username, r.quayConfiguration.ClairDatabase.Password, r.quayConfiguration.ClairDatabase.Server, r.quayConfiguration.ClairDatabase.Database)
 
 	clairAudience, _ := url.Parse(resources.GetClairEndpointAddress(r.quayConfiguration.QuayEcosystem))
 
