@@ -615,26 +615,6 @@ spec:
     imagePullSecretName: redhat-pull-secret
 ```
 
-Operator sets the Clair database connection string with parameter `sslmode=disable` if no parameters are specified in QuayEcosystem custom resource. In case you have SSL enabled Postgres database, or want to add other parameters, provide `key: value` pairs under `databaseConnectionParameters` object. Available parameters: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING"
-
-.An example:
-```
-apiVersion: redhatcop.redhat.io/v1alpha1
-kind: QuayEcosystem
-metadata:
-  name: example-quayecosystem
-spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
-  clair:
-    enabled: true
-    imagePullSecretName: redhat-pull-secret
-    database:
-      databaseConnectionParameters:
-        sslmode: require
-        key2: value2
-```
-
 #### Update Interval
 
 Clair routinely queries CVE databases in order to build its own internal database. By default, this value is set at 500m. You can modify the time interval between checks by setting the `updateInterval` property as shown below:
