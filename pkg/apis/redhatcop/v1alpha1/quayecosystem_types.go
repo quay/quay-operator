@@ -236,7 +236,7 @@ type Database struct {
 	Resources                    corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	Server                       string                      `json:"server,omitempty"`
 	VolumeSize                   string                      `json:"volumeSize,omitempty"`
-	DatabaseConnectionParameters map[string]interface{}      `json:"databaseConnectionParameters,omitempty" protobuf:"bytes,7,rep,name=databaseConnectionParameters"`
+	DatabaseConnectionParameters map[string]string           `json:"databaseConnectionParameters,omitempty" protobuf:"bytes,7,rep,name=databaseConnectionParameters"`
 }
 
 // Clair defines the properties of a deployment of Clair

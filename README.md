@@ -615,7 +615,7 @@ spec:
     imagePullSecretName: redhat-pull-secret
 ```
 
-Operator sets the Clair database connection string with parameter `sslmode=disable` if no parameters are specified in QuayEcosystem custom resource. In case you have SSL enabled Postgres database, or want to add other parameters, provide `key: value` pairs under `databaseConnectionParameters` object. Available parameters: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING"
+Operator sets the Clair database connection string with parameter `sslmode=disable` if no parameters are specified in QuayEcosystem custom resource. In case you have SSL enabled Postgres database, or want to add other parameters, provide `key: value` pairs as strings (e.g. `connect_timeout: '10'`) under `databaseConnectionParameters` object.
 
 .An example:
 ```
@@ -632,8 +632,27 @@ spec:
     database:
       databaseConnectionParameters:
         sslmode: require
-        key2: value2
+        connect_timeout: '10'
 ```
+
+Supported connection string parameters:
+* sslmode - Whether or not to use SSL (default is require, this is not
+  the default for libpq)
+* connect_timeout - Maximum wait for connection, in seconds. Zero or
+  not specified means wait indefinitely.
+* sslcert - Cert file location. The file must contain PEM encoded data.
+* sslkey - Key file location. The file must contain PEM encoded data.
+* sslrootcert - The location of the root certificate file. The file
+  must contain PEM encoded data.
+
+Valid values for `sslmode` are:
+* disable - No SSL
+* require - Always SSL (skip verification)
+* verify-ca - Always SSL (verify that the certificate presented by the
+  server was signed by a trusted CA)
+* verify-full - Always SSL (verify that the certification presented by
+  the server was signed by a trusted CA and the server host name
+  matches the one in the certificate)
 
 #### Update Interval
 

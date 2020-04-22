@@ -680,7 +680,7 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 		dbConnectionParams = "sslmode=disable"
 	} else {
 		for dbConnKey, dbConnValue := range r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.DatabaseConnectionParameters {
-			dbConnectionParams = dbConnectionParams + "&" + dbConnKey + "=" + fmt.Sprintf("%v", dbConnValue)
+			dbConnectionParams = dbConnectionParams + "&" + dbConnKey + "=" + dbConnValue
 		}
 	}
 
