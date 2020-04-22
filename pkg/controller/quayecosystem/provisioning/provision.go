@@ -676,10 +676,10 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 	clairConfigFile = resources.GenerateDefaultClairConfigFile()
 	//	}
 	var dbConnectionParams string
-	if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.DatabaseConnectionParameters) {
+	if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.ConnectionParameters) {
 		dbConnectionParams = "sslmode=disable"
 	} else {
-		for dbConnKey, dbConnValue := range r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.DatabaseConnectionParameters {
+		for dbConnKey, dbConnValue := range r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.ConnectionParameters {
 			dbConnectionParams = dbConnectionParams + "&" + dbConnKey + "=" + dbConnValue
 		}
 	}

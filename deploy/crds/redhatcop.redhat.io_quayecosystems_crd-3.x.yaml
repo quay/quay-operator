@@ -80,7 +80,7 @@ spec:
                       type: string
                     credentialsSecretName:
                       type: string
-                    databaseConnectionParameters:
+                    connectionParameters:
                       additionalProperties:
                         type: string
                       type: object
