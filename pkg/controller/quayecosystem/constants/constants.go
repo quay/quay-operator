@@ -54,7 +54,7 @@ const (
 	// PostgresqlName is the name used to represent PostgreSQL
 	PostgresqlName = "postgresql"
 	// PostgresqlImage is the Postgresql image
-	PostgresqlImage = "registry.redhat.io/rhel8/postgresql-10@sha256:088748dcf05eb435fcab50fb8336e7fb54668922a22d334957bd8558beef3d2e"
+	PostgresqlImage = "registry.redhat.io/rhel8/postgresql-96"
 	// PostgreSQLPort is the database port for PostgreSQL
 	PostgreSQLPort = 5432
 	// PostgresDataVolumeName is the name given to the  is the database volume
