@@ -14,13 +14,13 @@ const (
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
 	// QuayImage is the Quay image
-	QuayImage = "quay.io/projectquay/quay:latest"
+	QuayImage = "quay.io/quay/quay@sha256:9f74944dfc66f159b509307d2d9d6e0aeaf4419a2742c3720dca2235da5dbce0"
 	// ImagePullSecret is the name of the image pull secret for retrieving images from a protected image registry
 	ImagePullSecret = "redhat-pull-secret"
 	// RedisImage is the name of the Redis Image
-	RedisImage = "registry.access.redhat.com/rhscl/redis-32-rhel7:latest"
+	RedisImage = "registry.redhat.io/rhel8/redis-5@sha256:bc195eeacce950ff0a7fe131742153a5b4f256d847e9b0a51e04930d5df62919"
 	// ClairImage is the Clair image
-	ClairImage = "quay.io/redhat/clair-jwt:v3.2.0"
+	ClairImage = "quay.io/quay/clair-jwt@sha256:3b317e1bc2d71b28c9cbd0302877c1172daa943fa0204768ca1d1115c4c98a6c"
 	// LabelAppKey is the name of the label key
 	LabelAppKey = "app"
 	// LabelAppValue is the name of the label
@@ -54,7 +54,7 @@ const (
 	// PostgresqlName is the name used to represent PostgreSQL
 	PostgresqlName = "postgresql"
 	// PostgresqlImage is the Postgresql image
-	PostgresqlImage = "registry.access.redhat.com/rhscl/postgresql-96-rhel7:1"
+	PostgresqlImage = "registry.redhat.io/rhel8/postgresql-10@sha256:088748dcf05eb435fcab50fb8336e7fb54668922a22d334957bd8558beef3d2e"
 	// PostgreSQLPort is the database port for PostgreSQL
 	PostgreSQLPort = 5432
 	// PostgresDataVolumeName is the name given to the  is the database volume
