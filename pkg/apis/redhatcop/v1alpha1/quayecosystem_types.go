@@ -225,17 +225,18 @@ type Database struct {
 	// +kubebuilder:validation:Enum=Recreate;RollingUpdate
 	DeploymentStrategy appsv1.DeploymentStrategyType `json:"deploymentStrategy,omitempty"`
 	// +listType=atomic
-	EnvVars             []corev1.EnvVar             `json:"envVars,omitempty"`
-	Image               string                      `json:"image,omitempty"`
-	ImagePullSecretName string                      `json:"imagePullSecretName,omitempty"`
-	LivenessProbe       *corev1.Probe               `json:"livenessProbe,omitempty"`
-	Memory              string                      `json:"memory,omitempty"`
-	NodeSelector        map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
-	ReadinessProbe      *corev1.Probe               `json:"readinessProbe,omitempty"`
-	Replicas            *int32                      `json:"replicas,omitempty"`
-	Resources           corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
-	Server              string                      `json:"server,omitempty"`
-	VolumeSize          string                      `json:"volumeSize,omitempty"`
+	EnvVars              []corev1.EnvVar             `json:"envVars,omitempty"`
+	Image                string                      `json:"image,omitempty"`
+	ImagePullSecretName  string                      `json:"imagePullSecretName,omitempty"`
+	LivenessProbe        *corev1.Probe               `json:"livenessProbe,omitempty"`
+	Memory               string                      `json:"memory,omitempty"`
+	NodeSelector         map[string]string           `json:"nodeSelector,omitempty" protobuf:"bytes,7,rep,name=nodeSelector"`
+	ReadinessProbe       *corev1.Probe               `json:"readinessProbe,omitempty"`
+	Replicas             *int32                      `json:"replicas,omitempty"`
+	Resources            corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	Server               string                      `json:"server,omitempty"`
+	VolumeSize           string                      `json:"volumeSize,omitempty"`
+	ConnectionParameters map[string]string           `json:"connectionParameters,omitempty" protobuf:"bytes,7,rep,name=connectionParameters"`
 }
 
 // Clair defines the properties of a deployment of Clair

@@ -615,6 +615,45 @@ spec:
     imagePullSecretName: redhat-pull-secret
 ```
 
+Operator sets the Clair database connection string with parameter `sslmode=disable` if no parameters are specified in QuayEcosystem custom resource. In case you have SSL enabled Postgres database, or want to add other parameters, provide `key: value` pairs as strings (e.g. `connect_timeout: '10'`) under `connectionParameters` object.
+
+.An example:
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+  clair:
+    enabled: true
+    imagePullSecretName: redhat-pull-secret
+    database:
+      connectionParameters:
+        sslmode: require
+        connect_timeout: '10'
+```
+
+Supported connection string parameters:
+* sslmode - Whether or not to use SSL (default is require, this is not
+  the default for libpq)
+* connect_timeout - Maximum wait for connection, in seconds. Zero or
+  not specified means wait indefinitely.
+* sslcert - Cert file location. The file must contain PEM encoded data.
+* sslkey - Key file location. The file must contain PEM encoded data.
+* sslrootcert - The location of the root certificate file. The file
+  must contain PEM encoded data.
+
+Valid values for `sslmode` are:
+* disable - No SSL
+* require - Always SSL (skip verification)
+* verify-ca - Always SSL (verify that the certificate presented by the
+  server was signed by a trusted CA)
+* verify-full - Always SSL (verify that the certification presented by
+  the server was signed by a trusted CA and the server host name
+  matches the one in the certificate)
+
 #### Update Interval
 
 Clair routinely queries CVE databases in order to build its own internal database. By default, this value is set at 500m. You can modify the time interval between checks by setting the `updateInterval` property as shown below:

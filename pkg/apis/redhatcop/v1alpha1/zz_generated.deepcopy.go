@@ -176,6 +176,13 @@ func (in *Database) DeepCopyInto(out *Database) {
 		**out = **in
 	}
 	in.Resources.DeepCopyInto(&out.Resources)
+	if in.ConnectionParameters != nil {
+		in, out := &in.ConnectionParameters, &out.ConnectionParameters
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
