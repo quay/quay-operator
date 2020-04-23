@@ -422,7 +422,10 @@ spec:
       type: NodePort
       nodePort: 30100
       configNodePort: 30101
+      hostname: quay.example.com
 ```
+
+The `hostname` field must be specified to refer to the location (DNS or IP) for which the Quay server will be available. The port number allocated to tke service will be added automatically as necessary.
 
 #### Ingress
 
@@ -443,9 +446,12 @@ spec:
       annotations:
         nginx.ingress.kubernetes.io/ssl-passthrough: "true"
         nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+      hostname: quay.example.com
 ```
 
 Annotations can also be applied for the Config ingress by using the `configAnnotations` property
+
+The `hostname` field must be specified to refer to the location for which the Quay server will be available
 
 ### Specifying the Quay Route
 
