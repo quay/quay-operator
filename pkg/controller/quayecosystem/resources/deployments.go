@@ -239,7 +239,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 			Name:  constants.QuayContainerRepoMirrorName,
 			Env:   envVars,
 			Ports: []corev1.ContainerPort{{
-				ContainerPort: constants.QuayRepoMirrorContainerPort,
+				ContainerPort: constants.QuayMetricsServicePort,
 				Name:          "http",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
@@ -253,7 +253,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				InitialDelaySeconds: 10,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: constants.QuayRepoMirrorContainerPort},
+						Port: intstr.IntOrString{IntVal: constants.QuayMetricsServicePort},
 					},
 				},
 			},
@@ -262,7 +262,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				InitialDelaySeconds: 30,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: constants.QuayRepoMirrorContainerPort},
+						Port: intstr.IntOrString{IntVal: constants.QuayMetricsServicePort},
 					},
 				},
 			},
@@ -354,6 +354,9 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 			}, {
 				ContainerPort: constants.QuayHTTPSContainerPort,
 				Name:          "https",
+			}, {
+				ContainerPort: constants.QuayMetricsServicePort,
+				Name:          "metrics",
 			}},
 			VolumeMounts: []corev1.VolumeMount{corev1.VolumeMount{
 				Name:      constants.QuayConfigVolumeName,
