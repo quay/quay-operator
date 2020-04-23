@@ -16,7 +16,7 @@ spec:
     deploymentStrategy: RollingUpdate
     skipSetup: false
     externalAccess:
-      hostname: example-quayecosystem-quay-enterprise.apps
+      configHostname: example-quayecosystem-quay-enterprise.apps
     registryStorage:
       persistentVolumeAccessModes:
         - ReadWriteOnce
