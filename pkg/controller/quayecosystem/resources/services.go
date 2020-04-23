@@ -51,9 +51,16 @@ func GetQuayServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1
 			Selector:  meta.Labels,
 			Ports: []corev1.ServicePort{
 				{
+					Name:       "quay-service",
 					Port:       GetQuayServicePort(*quayEcosystem),
 					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(int(quayEcosystem.GetQuayPort())),
+				},
+				{
+					Name:       "metrics",
+					Port:       9091,
+					Protocol:   "TCP",
+					TargetPort: intstr.FromInt(constants.QuayMetricsServicePort),
 				},
 			},
 		},
