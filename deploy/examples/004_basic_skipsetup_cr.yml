@@ -9,7 +9,7 @@ spec:
     skipSetup: true
     keepConfigDeployment: true
     externalAccess:
-      routeHost: quay.app.example.com
+      hostname: quay.app.example.com
   clair:
     enabled: true
     imagePullSecretName: redhat-pull-secret
