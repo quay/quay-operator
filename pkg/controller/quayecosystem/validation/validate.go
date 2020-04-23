@@ -421,6 +421,14 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 
 	}
 
+	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFileProperties) {
+		for configfileKey, configFileValue := range quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFileProperties {
+			if utils.IsZeroOfUnderlyingType(configFileValue) || len(configFileValue) == 0 {
+				return false, fmt.Errorf("Provided ConfigFile Property with key '%s' not specified", configfileKey)
+			}
+		}
+	}
+
 	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled {
 
 		// Validate Clair ImagePullSecret

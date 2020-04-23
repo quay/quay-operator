@@ -699,6 +699,20 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							},
 						},
 					},
+					"configFileProperties": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Type:   []string{"string"},
+										Format: "",
+									},
+								},
+							},
+						},
+					},
 					"configResources": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),

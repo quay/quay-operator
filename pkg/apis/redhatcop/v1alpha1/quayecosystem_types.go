@@ -142,9 +142,10 @@ type QuayEcosystemList struct {
 // +k8s:openapi-gen=true
 type Quay struct {
 	// +listType=atomic
-	ConfigEnvVars    []corev1.EnvVar             `json:"configEnvVars,omitempty"`
-	ConfigResources  corev1.ResourceRequirements `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
-	ConfigSecretName string                      `json:"configSecretName,omitempty"`
+	ConfigEnvVars        []corev1.EnvVar             `json:"configEnvVars,omitempty"`
+	ConfigFileProperties map[string]string           `json:"configFileProperties,omitempty" protobuf:"bytes,7,rep,name=configFileProperties"`
+	ConfigResources      corev1.ResourceRequirements `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
+	ConfigSecretName     string                      `json:"configSecretName,omitempty"`
 	// +listType=set
 	ConfigTolerations []corev1.Toleration `json:"configTolerations,omitempty" protobuf:"bytes,22,opt,name=configTolerations"`
 

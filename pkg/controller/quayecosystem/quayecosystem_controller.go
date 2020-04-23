@@ -556,6 +556,48 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 				logging.Log.Info("Quay's Database configuration is correct. No changes needed.")
 			}
 
+			// Reconcile Configfile Parameters
+			if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFileProperties) {
+
+				configFilePropertiesChanged := false
+
+				for configFileKey, configFileValue := range quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFileProperties {
+					if existConfigFileValue, found := persistedConfig.NotManagedByOperator[configFileKey]; found {
+						if configFileValue == existConfigFileValue {
+							continue
+						}
+					}
+
+					persistedConfig.NotManagedByOperator[configFileKey] = configFileValue
+					configFilePropertiesChanged = true
+				}
+
+				if configFilePropertiesChanged == true {
+					logging.Log.Info("ConfigFile properties have changed. Reconciling.")
+
+					data, err := yaml.Marshal(persistedConfig.NotManagedByOperator)
+					if err != nil {
+						logging.Log.Error(err, "Unable to reconcile Quay's configFile properties.")
+						return reconcile.Result{}, err
+					}
+
+					// Update the `config.yaml` stored in the secret used by Quay
+					secret.Data["config.yaml"] = data
+					err = r.reconcilerBase.GetClient().Update(context.Background(), secret)
+					if err != nil {
+						logging.Log.Error(err, "Unable to reconcile Quay's configFile properties.")
+						return reconcile.Result{}, err
+					}
+
+					logging.Log.Info("Updated Quay's configFile properties.")
+				} else {
+					logging.Log.Info("Configfile properties unmodified. No changes needed.")
+				}
+
+			} else {
+				logging.Log.Info("Configfile properties unmodified. No changes needed.")
+			}
+
 		} else {
 			msg := "Unable to reconcile Quay configuration. Cannot access `config.yaml`."
 			logging.Log.Error(nil, msg)

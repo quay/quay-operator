@@ -1274,6 +1274,10 @@ spec:
                     - name
                     type: object
                   type: array
+                configFileProperties:
+                  additionalProperties:
+                    type: string
+                  type: object
                 configFiles:
                   items:
                     description: ConfigFiles defines configuration files that are

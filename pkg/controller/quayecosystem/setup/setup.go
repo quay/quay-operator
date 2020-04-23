@@ -255,6 +255,12 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 		quayConfig.Config["SUPER_USERS"] = quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.Superusers
 	}
 
+	if !utils.IsZeroOfUnderlyingType(quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFileProperties) {
+		for configFileKey, configFile := range quaySetupInstance.quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFileProperties {
+			quayConfig.Config[configFileKey] = configFile
+		}
+	}
+
 	quayConfig.Config["SETUP_COMPLETE"] = true
 	_, quayConfig, err = quaySetupInstance.setupClient.UpdateQuayConfiguration(quayConfig)
 

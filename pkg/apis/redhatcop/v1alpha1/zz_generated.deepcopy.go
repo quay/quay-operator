@@ -307,6 +307,13 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ConfigFileProperties != nil {
+		in, out := &in.ConfigFileProperties, &out.ConfigFileProperties
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	in.ConfigResources.DeepCopyInto(&out.ConfigResources)
 	if in.ConfigTolerations != nil {
 		in, out := &in.ConfigTolerations, &out.ConfigTolerations

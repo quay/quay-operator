@@ -225,3 +225,32 @@ func TestValidateQuayDatabaseSecret(t *testing.T) {
 	assert.Equal(t, validQuaySuperuserSecret, true)
 	assert.Equal(t, superuserSecret, secret)
 }
+
+func TestEmptyConfigFileValue(t *testing.T) {
+
+	// Objects to track in the fake client.
+	objs := []runtime.Object{}
+	// Initialize fake client
+	cl := fake.NewFakeClient(objs...)
+	// Stub out object placeholders for test
+	quayEcosystem := &redhatcopv1alpha1.QuayEcosystem{}
+
+	quayConfiguration := resources.QuayConfiguration{
+		IsOpenShift:   true,
+		QuayEcosystem: quayEcosystem,
+	}
+
+	// Set default values
+	defaultConfig := SetDefaults(cl, &quayConfiguration)
+	assert.Equal(t, defaultConfig, true)
+
+	quayConfiguration.QuayEcosystem.Spec.Quay.ConfigFileProperties = map[string]string{
+		"MAIL_DEFAULT_SENDER": "",
+	}
+
+	validate, err := Validate(cl, &quayConfiguration)
+
+	assert.Error(t, err)
+	assert.Equal(t, validate, false)
+
+}
