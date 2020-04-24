@@ -152,7 +152,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				InitialDelaySeconds: 10,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: quayConfiguration.QuayEcosystem.GetQuayPort()},
+						Port: intstr.IntOrString{IntVal: constants.QuayHTTPSContainerPort},
 					},
 				},
 			},
@@ -161,7 +161,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				InitialDelaySeconds: 30,
 				Handler: corev1.Handler{
 					TCPSocket: &corev1.TCPSocketAction{
-						Port: intstr.IntOrString{IntVal: quayConfiguration.QuayEcosystem.GetQuayPort()},
+						Port: intstr.IntOrString{IntVal: constants.QuayHTTPSContainerPort},
 					},
 				},
 			},
