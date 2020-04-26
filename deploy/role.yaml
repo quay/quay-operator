@@ -128,3 +128,15 @@ rules:
   - replicasets
   verbs:
   - get
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - 'create'
+  - 'update'
+  - 'get'
+  - 'list'
+  - 'watch'
+  - 'patch'
+  - 'delete'
