@@ -408,7 +408,7 @@ spec:
 
 #### NodePorts
 
-By default, `NodePort` type Services are allocated a randomly assigned network port between 30000-32767. To support a predictive allocation of resources, the `NodePort` services for Quay and Quay Config can be define using the `nodePort` and `configNodePort` as shown below:
+By default, `NodePort` type Services are allocated a randomly assigned network port between 30000-32767. To support a predictive allocation of resources, the `NodePort` services for Quay and Quay Config can be define using the `nodePort` as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -421,7 +421,6 @@ spec:
     externalAccess:
       type: NodePort
       nodePort: 30100
-      configNodePort: 30101
       hostname: quay.example.com
 ```
 
