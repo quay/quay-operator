@@ -33,8 +33,10 @@ func (r *LoadBalancerExternalAccess) ManageQuayExternalAccess(meta metav1.Object
 		return err
 	}
 
-	if !utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname) {
+	if utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname) {
 		r.QuayConfiguration.QuayHostname = hostname
+	} else {
+		r.QuayConfiguration.QuayHostname = r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname
 	}
 
 	return nil

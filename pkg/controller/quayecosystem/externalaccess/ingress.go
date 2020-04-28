@@ -42,7 +42,6 @@ func (r *IngressExternalAccess) ManageQuayConfigExternalAccess(meta metav1.Objec
 	if !utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname) {
 		r.QuayConfiguration.QuayConfigHostname = r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname
 		return r.configureIngress(meta, r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname, true)
-
 	} else {
 		r.QuayConfiguration.QuayConfigHostname = meta.Name
 		return nil
