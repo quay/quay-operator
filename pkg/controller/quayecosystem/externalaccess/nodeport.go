@@ -7,6 +7,7 @@ import (
 	"github.com/redhat-cop/operator-utils/pkg/util"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +30,11 @@ func (r *NodePortExternalAccess) ManageQuayExternalAccess(meta metav1.ObjectMeta
 		return err
 	}
 
-	r.QuayConfiguration.QuayHostname = r.formatHostname(r.QuayConfiguration.QuayHostname, nodePort)
+	if utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname) {
+		r.QuayConfiguration.QuayHostname = r.formatHostname(r.QuayConfiguration.QuayHostname, nodePort)
+	} else {
+		r.QuayConfiguration.QuayHostname = r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname
+	}
 
 	r.QuayConfiguration.QuayEcosystem.Status.Hostname = r.QuayConfiguration.QuayHostname
 
@@ -45,7 +50,9 @@ func (r *NodePortExternalAccess) ManageQuayConfigExternalAccess(meta metav1.Obje
 		return err
 	}
 
-	r.QuayConfiguration.QuayConfigHostname = r.formatHostname(r.QuayConfiguration.QuayConfigHostname, nodePort)
+	if utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname) {
+		r.QuayConfiguration.QuayConfigHostname = r.formatHostname(r.QuayConfiguration.QuayConfigHostname, nodePort)
+	}
 
 	return nil
 
