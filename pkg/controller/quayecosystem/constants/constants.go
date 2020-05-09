@@ -301,8 +301,6 @@ const (
 	OperationAdd = "add"
 	// OperationRemove signifies that an operation requires a removal
 	OperationRemove = "remove"
-	// OperatorFinalizer is the name of the finalizer attached to the QuayEcosystem resource
-	OperatorFinalizer = "quayecosystem.redhatcop.redhat.io"
 )
 
 var (

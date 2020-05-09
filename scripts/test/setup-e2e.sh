@@ -9,7 +9,6 @@ oc login -u system:admin
 echo "Creating new project $QUAY_NAMESPACE"
 oc new-project $QUAY_NAMESPACE
 oc create serviceaccount quay
-oc adm policy add-scc-to-user anyuid -z quay
 oc adm policy add-cluster-role-to-user cluster-admin admin
 oc login -u admin -p admin
 oc apply -f ./deploy/crds/redhatcop.redhat.io_quayecosystems_crd-3.x.yaml

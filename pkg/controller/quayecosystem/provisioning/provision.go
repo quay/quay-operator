@@ -11,7 +11,6 @@ import (
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 
-	ossecurityv1 "github.com/openshift/api/security/v1"
 	qclient "github.com/redhat-cop/quay-operator/pkg/client"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/externalaccess"
@@ -60,22 +59,22 @@ func (r *ReconcileQuayEcosystemConfiguration) CoreQuayResourceDeployment(metaObj
 		return nil, err
 	}
 
-	if err := r.createRBAC(metaObject); err != nil {
-		logging.Log.Error(err, "Failed to create RBAC")
+	// Configure SCC RBAC
+	if r.quayConfiguration.IsOpenShift {
+		if err := r.createSCCRBAC(metaObject); err != nil {
+			logging.Log.Error(err, "Failed to create SCC RBAC")
+			return nil, err
+		}
+	}
+
+	if err := r.createQuayRBAC(metaObject); err != nil {
+		logging.Log.Error(err, "Failed to create Quay RBAC")
 		return nil, err
 	}
 
 	if err := r.createServiceAccounts(metaObject); err != nil {
 		logging.Log.Error(err, "Failed to create Service Accounts")
 		return nil, err
-	}
-
-	// Configure SCC when running in OpenShift
-	if r.quayConfiguration.IsOpenShift {
-		if err := r.ConfigureAnyUIDSCCs(metaObject, r.quayConfiguration.RequiredSCCServiceAccounts, constants.OperationAdd); err != nil {
-			logging.Log.Error(err, "Failed to configure SCCs")
-			return nil, err
-		}
 	}
 
 	// Redis
@@ -518,19 +517,6 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1
 	return nil
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) ConfigureAnyUIDSCCs(meta metav1.ObjectMeta, sccUsers []string, operation string) error {
-
-	// Configure Quay Service Account for AnyUID SCC
-	err := r.configureAnyUIDSCC(sccUsers, meta, operation)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-
-}
-
 func (r *ReconcileQuayEcosystemConfiguration) createServiceAccounts(meta metav1.ObjectMeta) error {
 	// Create Redis Service Account
 	if utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Redis.Hostname) {
@@ -582,16 +568,36 @@ func (r *ReconcileQuayEcosystemConfiguration) createServiceAccount(serviceAccoun
 
 }
 
-func (r *ReconcileQuayEcosystemConfiguration) createRBAC(meta metav1.ObjectMeta) error {
+func (r *ReconcileQuayEcosystemConfiguration) createSCCRBAC(meta metav1.ObjectMeta) error {
 
-	role := resources.GetRoleDefinition(meta, r.quayConfiguration.QuayEcosystem)
+	role := resources.GetSCCRoleDefinition(meta, r.quayConfiguration.QuayEcosystem)
 
 	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, role)
 	if err != nil {
 		return err
 	}
 
-	roleBinding := resources.GetRoleBindingDefinition(meta, r.quayConfiguration.QuayEcosystem)
+	roleBinding := resources.GetSCCRoleBindingDefinition(meta, r.quayConfiguration.QuayEcosystem, r.quayConfiguration.RequiredSCCServiceAccounts)
+
+	err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, roleBinding)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *ReconcileQuayEcosystemConfiguration) createQuayRBAC(meta metav1.ObjectMeta) error {
+
+	role := resources.GetQuayRoleDefinition(meta, r.quayConfiguration.QuayEcosystem)
+
+	err := r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, role)
+	if err != nil {
+		return err
+	}
+
+	roleBinding := resources.GetQuayRoleBindingDefinition(meta, r.quayConfiguration.QuayEcosystem)
 
 	err = r.reconcilerBase.CreateOrUpdateResource(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, roleBinding)
 	if err != nil {
@@ -718,34 +724,6 @@ func (r *ReconcileQuayEcosystemConfiguration) manageClairConfigMap(meta metav1.O
 	clairConfigMap.Data[constants.ClairConfigFileKey] = string(marshaledConfigFile)
 
 	err = r.reconcilerBase.CreateOrUpdateResource(nil, r.quayConfiguration.QuayEcosystem.Namespace, clairConfigMap)
-	if err != nil {
-		return err
-	}
-
-	return nil
-
-}
-
-func (r *ReconcileQuayEcosystemConfiguration) configureAnyUIDSCC(sccUsers []string, meta metav1.ObjectMeta, operation string) error {
-
-	anyUIDSCC := &ossecurityv1.SecurityContextConstraints{}
-	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: constants.AnyUIDSCC, Namespace: ""}, anyUIDSCC)
-
-	if err != nil {
-		logging.Log.Error(err, "Error occurred retrieving SCC")
-		return err
-	}
-
-	if operation == constants.OperationRemove {
-		_, remainingUsers := diff(sccUsers, anyUIDSCC.Users)
-		anyUIDSCC.Users = remainingUsers
-	} else {
-		usersToAdd, _ := diff(sccUsers, anyUIDSCC.Users)
-		anyUIDSCC.Users = append(anyUIDSCC.Users, usersToAdd...)
-	}
-
-	err = r.reconcilerBase.CreateOrUpdateResource(nil, r.quayConfiguration.QuayEcosystem.Namespace, anyUIDSCC)
-
 	if err != nil {
 		return err
 	}

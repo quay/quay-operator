@@ -117,38 +117,12 @@ func (r *ReconcileQuayEcosystem) Reconcile(request reconcile.Request) (reconcile
 	quayConfiguration := resources.QuayConfiguration{
 		QuayEcosystem:              quayEcosystem,
 		IsOpenShift:                r.isOpenShift,
-		RequiredSCCServiceAccounts: []string{utils.MakeServiceAccountUsername(quayEcosystem.Namespace, constants.QuayServiceAccount)},
+		RequiredSCCServiceAccounts: []string{constants.QuayServiceAccount},
 	}
 
 	// Initialize Configuration
 	configuration := provisioning.New(r.reconcilerBase, r.k8sclient, &quayConfiguration)
 	metaObject := resources.NewResourceObjectMeta(quayConfiguration.QuayEcosystem)
-
-	// QuayEcosystem object is being deleted
-	if util.IsBeingDeleted(quayEcosystem) {
-		logging.Log.Info("QuayEcosystem Object Being Deleted. Cleaning up")
-
-		if r.isOpenShift == true {
-			if err := configuration.ConfigureAnyUIDSCCs(metaObject, utils.MakeServiceAccountsUsername(quayEcosystem.Namespace, constants.QuayEcosystemServiceAccounts), constants.OperationRemove); err != nil {
-				logging.Log.Error(err, "Failed to Remove Users from SCCs")
-				return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemUpdateDefaultConfigurationConditionFailure, err)
-			}
-		}
-
-		if util.HasFinalizer(quayEcosystem, constants.OperatorFinalizer) {
-
-			util.RemoveFinalizer(quayEcosystem, constants.OperatorFinalizer)
-
-			err := r.reconcilerBase.GetClient().Update(context.TODO(), quayConfiguration.QuayEcosystem)
-
-			if err != nil {
-				logging.Log.Error(err, "Failed to update QuayEcosystem after finalizer removal")
-				return r.manageError(quayConfiguration.QuayEcosystem, redhatcopv1alpha1.QuayEcosystemCleanupFailure, err)
-			}
-		}
-
-		return reconcile.Result{}, nil
-	}
 
 	// Set default values
 	changed := validation.SetDefaults(r.reconcilerBase.GetClient(), &quayConfiguration)

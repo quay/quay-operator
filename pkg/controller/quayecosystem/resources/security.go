@@ -8,9 +8,29 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetRoleDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem) *rbacv1.Role {
+func GetSCCRoleDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem) *rbacv1.Role {
+	meta.Name = GetSCCResourcesName(quayEcosystem)
 
-	meta.Name = GetGenericResourcesName(quayEcosystem)
+	return &rbacv1.Role{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Role",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta,
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{"security.openshift.io"},
+				Resources:     []string{"securitycontextconstraints"},
+				ResourceNames: []string{constants.AnyUIDSCC},
+				Verbs:         []string{"use"},
+			},
+		},
+	}
+}
+
+func GetQuayRoleDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem) *rbacv1.Role {
+
+	meta.Name = GetQuayResourcesName(quayEcosystem)
 
 	return &rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
@@ -38,9 +58,9 @@ func GetRoleDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.
 	}
 }
 
-func GetRoleBindingDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem) *rbacv1.RoleBinding {
+func GetQuayRoleBindingDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem) *rbacv1.RoleBinding {
 
-	meta.Name = GetGenericResourcesName(quayEcosystem)
+	meta.Name = GetQuayResourcesName(quayEcosystem)
 
 	return &rbacv1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
@@ -61,5 +81,36 @@ func GetRoleBindingDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1
 			},
 		},
 	}
+
+}
+
+func GetSCCRoleBindingDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1alpha1.QuayEcosystem, sccSAs []string) *rbacv1.RoleBinding {
+
+	meta.Name = GetSCCResourcesName(quayEcosystem)
+
+	roleBinding := &rbacv1.RoleBinding{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RoleBinding",
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: meta,
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     meta.Name,
+		},
+		Subjects: []rbacv1.Subject{},
+	}
+
+	for _, sa := range sccSAs {
+
+		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
+			Kind:      "ServiceAccount",
+			Name:      sa,
+			Namespace: meta.Namespace,
+		})
+	}
+
+	return roleBinding
 
 }

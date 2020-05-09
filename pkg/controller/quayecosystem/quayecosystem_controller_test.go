@@ -59,8 +59,6 @@ func TestDefaultConfiguration(t *testing.T) {
 	// Create the Quay Service Account first
 	err := cl.Create(context.TODO(), testutil.ServiceAccount)
 	assert.NoError(t, err)
-	err = cl.Create(context.TODO(), testutil.SCCAnyUID)
-	assert.NoError(t, err)
 
 	// Initialize the reconicer request
 	nsn := types.NamespacedName{
@@ -125,8 +123,6 @@ func TestRedisDeployment(t *testing.T) {
 
 	// Create the Quay Service Account and Secret
 	err := cl.Create(context.TODO(), testutil.ServiceAccount)
-	assert.NoError(t, err)
-	err = cl.Create(context.TODO(), testutil.SCCAnyUID)
 	assert.NoError(t, err)
 	err = cl.Create(context.TODO(), testutil.Secret)
 	assert.NoError(t, err)
@@ -196,8 +192,6 @@ func InvalidTestClairDeployment(t *testing.T) {
 
 	// Create the Quay Service Account and Secret
 	err := cl.Create(context.TODO(), testutil.ServiceAccount)
-	assert.NoError(t, err)
-	err = cl.Create(context.TODO(), testutil.SCCAnyUID)
 	assert.NoError(t, err)
 	err = cl.Create(context.TODO(), testutil.Secret)
 	assert.NoError(t, err)
