@@ -98,7 +98,7 @@ $ helm install quay-operator quay-operator/quay-operator
 
 ### Deploy a Quay Ecosystem
 
-Create a pull secret to retrieve Quay images from quay.io. If unsure what to use for the pull secret see [Accessing Red Hat Quay (formerly Quay Enterprise) without a CoreOS login](https://access.redhat.com/solutions/3533201).
+If using images for Quay and Clair that require authentication, a pull secret must be created to retrieve the image. If unsure what to use for the pull secret, the following documentation may be helpful for [Accessing Red Hat Quay (formerly Quay Enterprise) without a CoreOS login](https://access.redhat.com/solutions/3533201).
 
 ```
 $ oc create secret generic redhat-pull-secret --from-file=".dockerconfigjson=<location of docker.json file>" --type='kubernetes.io/dockerconfigjson'
@@ -112,8 +112,7 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
+  quay: {}
 ```
 
 You can also run the following command to create the `QuayEnterprise` custom resource
@@ -150,7 +149,6 @@ metadata:
 spec:
   quay:
     superuserCredentialsSecretName: <secret_name>
-    imagePullSecretName: redhat-pull-secret
 ```
 
 _Note:_ It is recommended that you also set the `superusers` field of the `quay` property in the `QuayEcosystem` object so as to ensure consistency between the the various properties. See the _Superusers_ section below.
@@ -178,7 +176,6 @@ metadata:
 spec:
   quay:
     configSecretName: <secret_name>
-    imagePullSecretName: redhat-pull-secret
 ```
 
 _Note: The superuser password must be at least eight characters._
@@ -205,7 +202,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     database:
       volumeSize: 10Gi
 ```
@@ -237,7 +233,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     database:
       credentialsSecretName: <secret_name>
 ```
@@ -253,7 +248,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     database:
       credentialsSecretName: <secret_name>
       server: postgresql.databases.example.com
@@ -276,7 +270,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     enableRepoMirroring: true
 ```
 
@@ -373,7 +366,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     skipSetup: true
 ```
 
@@ -401,7 +393,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     externalAccess:
       type: LoadBalancer
 ```
@@ -417,7 +408,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     externalAccess:
       type: NodePort
       nodePort: 30100
@@ -440,7 +430,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     externalAccess:
       type: Ingress
       annotations:
@@ -464,7 +453,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     externalAccess:
       hostname: example-quayecosystem-quay-quay-enterprise.apps.openshift.example.com
 ```
@@ -483,7 +471,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     externalAccess:
       configHostname: example-quayecosystem-quay-config-quay-enterprise.apps.openshift.example.com
 ```
@@ -516,7 +503,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     externalAccess:
       tls:
         secretName: custom-quay-ssl
@@ -533,7 +519,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     externalAccess:
       tls:
         termination: passthrough
@@ -559,7 +544,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     keepConfigDeployment: false
 ```
 
@@ -574,7 +558,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     superusers:
       - jim
       - joe
@@ -601,7 +584,6 @@ metadata:
 spec:
   redis:
     credentialsSecretName: <secret_name>
-    imagePullSecretName: redhat-pull-secret
 ```
 
 ### Clair
@@ -614,11 +596,9 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
+  quay: {}
   clair:
     enabled: true
-    imagePullSecretName: redhat-pull-secret
 ```
 
 Operator sets the Clair database connection string with parameter `sslmode=disable` if no parameters are specified in QuayEcosystem custom resource. In case you have SSL enabled Postgres database, or want to add other parameters, provide `key: value` pairs as strings (e.g. `connect_timeout: '10'`) under `connectionParameters` object.
@@ -630,8 +610,7 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
+  quay: {}
   clair:
     enabled: true
     imagePullSecretName: redhat-pull-secret
@@ -670,11 +649,9 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
-  quay:
-    imagePullSecretName: redhat-pull-secret
+  quay: {}
   clair:
     enabled: true
-    imagePullSecretName: redhat-pull-secret
     updateInterval: "60m"
 ```
 
@@ -726,7 +703,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     resources:
       requests:
         memory: 512Mi
@@ -745,7 +721,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     livenessProbe:
       initialDelaySeconds: 120
       httpGet:
@@ -773,7 +748,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     nodeSelector:
       node-role.kubernetes.io/infra: true
 ```
@@ -789,7 +763,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     deploymentStrategy: RollingUpdate
 ```
 
@@ -806,7 +779,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     envVars:
       - name: FOO
         value: bar
@@ -876,9 +848,8 @@ kind: QuayEcosystem
 metadata:
   name: example-quayecosystem
 spec:
+  quay: {}
   disableFinalizers: false
-  quay:
-    imagePullSecretName: redhat-pull-secret
 ```
 
 If the operator has been stopped and a finalizer has been applied, attempting to delete the `QuayEcosystem` resource will hang as it is waiting for the finalizer to be removed (as would occur once the operator has finished its processing). To remove the finalizer manually and unblock the deletion process, execute the following command:

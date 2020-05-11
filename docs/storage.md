@@ -103,7 +103,6 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    imagePullSecretName: redhat-pull-secret
     registryStorage:
       persistentVolumeAccessModes:
         - ReadWriteOnce
