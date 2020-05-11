@@ -115,6 +115,18 @@ spec:
   quay: {}
 ```
 
+Alternatively, if access to an authenticated registry, the following `QuayEcosystem` resource can be specified:
+
+```
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: QuayEcosystem
+metadata:
+  name: example-quayecosystem
+spec:
+  quay:
+    imagePullSecretName: redhat-pull-secret
+```
+
 You can also run the following command to create the `QuayEnterprise` custom resource
 
 ```
@@ -613,7 +625,6 @@ spec:
   quay: {}
   clair:
     enabled: true
-    imagePullSecretName: redhat-pull-secret
     database:
       connectionParameters:
         sslmode: require
