@@ -696,7 +696,7 @@ metadata:
   name: example-quayecosystem
 spec:
   quay:
-    image: myregistry.example.com/quay/quay:v3.2.0
+    image: myregistry.example.com/projectquay/quay:padme
 ```
 
 ### Compute Resources
@@ -839,8 +839,8 @@ oc edit quayecosystem/quayecosystem
 Find and update the following entries:
 
 ```
-image: quay.io/redhat/clair-jwt:vX.X.X
-image: quay.io/redhat/quay:vX.X.X
+image: quay.io/projectquay/clair-jwt:vX.X.X
+image: quay.io/projectquay/quay:vX.X.X
 ```
 
 Once saved, the operator will automatically apply the upgrade.
