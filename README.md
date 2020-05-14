@@ -495,18 +495,13 @@ Quay, as a secure registry, makes use of SSL certificates to secure communicatio
 
 SSL certificates can be provided and used instead of having the operator generate certificates. Certificates can be provided in a secret which is then referenced in the _QuayEcosystem_ custom resource. 
 
-The secret containing custom certificates must define the following keys:
-
-* `tls.cert` -  All of the certificates (root, intermediate, certificate) concatinated into a single file
-* `tls.key` - Private key as for the SSL certificate
-
 Create a secret containing the certificate and private key
 
 ```
-oc create secret tls custom-quay-ssl --key=tls.key=<ssl_private_key> --cert=tls.cert=<ssl_certificate>
+oc create secret tls custom-quay-ssl --key=<ssl_private_key> --cert<ssl_certificate>
 ```
 
-The secret containing the certificates are referenced using the `secretName` underneath a property called `tls` as defined within the `externalAccess` proprety as shown below
+The secret containing the certificates are referenced using the `secretName` underneath a property called `tls` as defined within the `externalAccess` property as shown below
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
@@ -518,11 +513,12 @@ spec:
     externalAccess:
       tls:
         secretName: custom-quay-ssl
+        termination: passthrough
 ```
 
 ### TLS Termination
 
-Quay can be configured to protect connections using SSL certificates. By default, SSL communicated is termminated within Quay. There are several different ways that SSL termination can be configured including omitting the use of certificates altogeter. TLS termination is determined by the `termination` property as shown below:
+Quay can be configured to protect connections using SSL certificates. By default, SSL communicated is terminated within Quay. There are several different ways that SSL termination can be configured including omitting the use of certificates altogether. TLS termination is determined by the `termination` property as shown below:
 
 ```
 apiVersion: redhatcop.redhat.io/v1alpha1
