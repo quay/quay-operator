@@ -195,6 +195,22 @@ func (c *QuayClient) UploadFileResource(fileName string, content []byte) (*http.
 	return resp, quayStatusResponse, err
 }
 
+func (c *QuayClient) UploadCustomCertificate(certName string, certFile []byte) (*http.Response, error) {
+	req, err := c.newFileUploadRequest("POST", fmt.Sprintf("/api/v1/superuser/customcerts/%s", certName), certName, certFile)
+	if err != nil {
+		return nil, err
+	}
+	var result interface{}
+	resp, err := c.do(req, &result)
+
+	// Quay returns `HTTP 204` with an empty body on success
+	if err == io.EOF && resp.StatusCode == 204 {
+		return resp, nil
+	}
+
+	return resp, err
+}
+
 func (c *QuayClient) newFileUploadRequest(method, path string, fileName string, content []byte) (*http.Request, error) {
 	rel := &url.URL{Path: path}
 	u := c.BaseURL.ResolveReference(rel)

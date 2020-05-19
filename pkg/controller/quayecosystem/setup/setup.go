@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
@@ -11,6 +12,7 @@ import (
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -109,6 +111,28 @@ func (qm *QuaySetupManager) SetupQuay(quaySetupInstance *QuaySetupInstance) erro
 	if err != nil {
 		logging.Log.Error(err, "Failed to update quay configuration")
 		return fmt.Errorf("Failed to update quay configuration: %s", err.Error())
+	}
+
+	for _, configFile := range quaySetupInstance.quayConfiguration.QuayConfigFiles {
+		if configFile.Type == redhatcopv1alpha1.ExtraCaCertConfigFileType {
+			secret, err := qm.k8sclient.CoreV1().Secrets(quaySetupInstance.quayConfiguration.QuayEcosystem.Namespace).Get(configFile.SecretName, v1.GetOptions{})
+			if err != nil {
+				logging.Log.Error(err, "Failed to fetch Secret for extraCaCert", "secretName", configFile.SecretName)
+				return fmt.Errorf("Failed to fetch Secret for extraCaCert %s: %s", configFile.SecretName, err.Error())
+			}
+
+			for key, certBytes := range secret.Data {
+				var cert []byte
+				base64.RawStdEncoding.Decode(cert, certBytes)
+
+				_, err = quaySetupInstance.setupClient.UploadCustomCertificate(key, certBytes)
+				if err != nil {
+					logging.Log.Error(err, "Failed to upload extraCaCert", "name", key)
+					return fmt.Errorf("Failed to upload extraCaCert %s: %s", key, err.Error())
+				}
+				logging.Log.Info("Successfully added extraCaCert", "name", key)
+			}
+		}
 	}
 
 	_, _, err = quaySetupInstance.setupClient.SetupDatabase()
