@@ -115,7 +115,7 @@ type RADOSRegistryBackendSource struct {
 	AccessKey   string `json:"access_key,omitempty,name=access_key"`
 	SecretKey   string `json:"secret_key,omitempty,name=secret_key"`
 	Hostname    string `json:"hostname,omitempty,name=hostname"`
-	Secure      bool   `json:"is_secure,omitempty,name=is_secure"`
+	Secure      bool   `json:"is_secure,name=is_secure"`
 	Port        int    `json:"port,omitempty,name=port"`
 }
 
@@ -126,7 +126,7 @@ type RHOCSRegistryBackendSource struct {
 	AccessKey   string `json:"access_key,omitempty,name=access_key"`
 	SecretKey   string `json:"secret_key,omitempty,name=access_key"`
 	Hostname    string `json:"hostname,omitempty,name=hostname"`
-	Secure      bool   `json:"is_secure,omitempty,name=is_secure"`
+	Secure      bool   `json:"is_secure,name=is_secure"`
 	Port        int    `json:"port,omitempty,name=port"`
 }
 
