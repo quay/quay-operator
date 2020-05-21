@@ -825,7 +825,7 @@ $ go mod vendor
 Using the [operator-sdk](https://github.com/operator-framework/operator-sdk), run the operator locally
 
 ```
-$ operator-sdk up local --namespace=quay-enterprise
+$ operator-sdk run --local --watch-namespace=quay-enterprise
 ```
 
 ## Upgrading Quay & Clair
