@@ -24,7 +24,7 @@ spec:
         kind:
           description: 'Kind is a string value representing the REST resource this
             object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In camelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
           type: string
         metadata:
           type: object
@@ -76,16 +76,14 @@ spec:
                   description: Database defines a database that will be deployed to
                     support a particular component
                   properties:
-                    cpu:
-                      type: string
-                    credentialsSecretName:
-                      type: string
                     connectionParameters:
                       additionalProperties:
                         type: string
                       type: object
-                      description: "Sets the Postgresql connection string parameters. Has to be provided as 'key: value' pairs. 
-                        If not set, 'sslmode: disable' parameter is used by default. Numbers must be provided as strings e.g. '10'. Available parameters: https://godoc.org/github.com/lib/pq#hdr-Connection_String_Parameters"
+                    cpu:
+                      type: string
+                    credentialsSecretName:
+                      type: string
                     deploymentStrategy:
                       enum:
                       - Recreate
@@ -465,6 +463,8 @@ spec:
                           type: object
                       type: object
                     server:
+                      type: string
+                    storageClass:
                       type: string
                     volumeSize:
                       type: string
@@ -1007,6 +1007,10 @@ spec:
                   description: Database defines a database that will be deployed to
                     support a particular component
                   properties:
+                    connectionParameters:
+                      additionalProperties:
+                        type: string
+                      type: object
                     cpu:
                       type: string
                     credentialsSecretName:
@@ -1390,6 +1394,8 @@ spec:
                           type: object
                       type: object
                     server:
+                      type: string
+                    storageClass:
                       type: string
                     volumeSize:
                       type: string

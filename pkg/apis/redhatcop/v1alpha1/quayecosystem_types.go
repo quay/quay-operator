@@ -237,6 +237,7 @@ type Database struct {
 	Server               string                      `json:"server,omitempty"`
 	VolumeSize           string                      `json:"volumeSize,omitempty"`
 	ConnectionParameters map[string]string           `json:"connectionParameters,omitempty" protobuf:"bytes,7,rep,name=connectionParameters"`
+	StorageClass         string                      `json:"storageClass,omitempty"`
 }
 
 // Clair defines the properties of a deployment of Clair
