@@ -386,7 +386,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayDatabase(meta metav1.Obj
 
 	// Create PVC
 	if !utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Quay.Database.VolumeSize) {
-		databasePvc := resources.GetDatabasePVCDefinition(meta, r.quayConfiguration.QuayEcosystem.Spec.Quay.Database.VolumeSize)
+		databasePvc := resources.GetDatabasePVCDefinition(meta, r.quayConfiguration.QuayEcosystem.Spec.Quay.Database.VolumeSize, &r.quayConfiguration.QuayEcosystem.Spec.Quay.Database.StorageClass)
 		databaseResources = append(databaseResources, databasePvc)
 	}
 
@@ -429,7 +429,7 @@ func (r *ReconcileQuayEcosystemConfiguration) createClairDatabase(meta metav1.Ob
 
 	// Create PVC
 	if !utils.IsZeroOfUnderlyingType(r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.VolumeSize) {
-		databasePvc := resources.GetDatabasePVCDefinition(meta, r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.VolumeSize)
+		databasePvc := resources.GetDatabasePVCDefinition(meta, r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.VolumeSize, &r.quayConfiguration.QuayEcosystem.Spec.Clair.Database.StorageClass)
 		databaseResources = append(databaseResources, databasePvc)
 	}
 

@@ -34,8 +34,9 @@ func GetQuayPVCRegistryStorageDefinition(meta metav1.ObjectMeta, accessModes []c
 
 }
 
-func GetDatabasePVCDefinition(meta metav1.ObjectMeta, volumeSize string) *corev1.PersistentVolumeClaim {
-	return &corev1.PersistentVolumeClaim{
+func GetDatabasePVCDefinition(meta metav1.ObjectMeta, volumeSize string, storageClass *string) *corev1.PersistentVolumeClaim {
+
+	databasePVCDefinition := &corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
 			APIVersion: corev1.SchemeGroupVersion.String(),
@@ -52,4 +53,10 @@ func GetDatabasePVCDefinition(meta metav1.ObjectMeta, volumeSize string) *corev1
 			},
 		},
 	}
+
+	if !utils.IsZeroOfUnderlyingType(storageClass) && len(*storageClass) != 0 {
+		databasePVCDefinition.Spec.StorageClassName = storageClass
+	}
+
+	return databasePVCDefinition
 }
