@@ -99,6 +99,7 @@ func GetQuayConfigServiceDefinition(meta metav1.ObjectMeta, quayEcosystem *redha
 			Selector: meta.Labels,
 			Ports: []corev1.ServicePort{
 				{
+					Name:       "quay-config",
 					Port:       443,
 					Protocol:   "TCP",
 					TargetPort: intstr.FromInt(constants.QuayHTTPSContainerPort),

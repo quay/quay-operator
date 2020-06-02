@@ -24,7 +24,7 @@ func GetQuayConfigRouteDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatc
 				Name: meta.Name,
 			},
 			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromInt(8443),
+				TargetPort: intstr.FromString("quay-config"),
 			},
 			TLS: &routev1.TLSConfig{
 				Termination:                   routev1.TLSTerminationPassthrough,
@@ -56,7 +56,7 @@ func GetQuayRouteDefinition(meta metav1.ObjectMeta, quayEcosystem *redhatcopv1al
 				Name: meta.Name,
 			},
 			Port: &routev1.RoutePort{
-				TargetPort: intstr.FromInt(int(quayEcosystem.GetQuayPort())),
+				TargetPort: intstr.FromString("quay-service"),
 			},
 		},
 	}
