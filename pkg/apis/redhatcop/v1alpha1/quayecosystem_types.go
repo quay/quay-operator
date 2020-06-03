@@ -170,6 +170,7 @@ type Quay struct {
 	RegistryStorage                *RegistryStorage            `json:"registryStorage,omitempty"`
 	Replicas                       *int32                      `json:"replicas,omitempty"`
 	Resources                      corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	SecurityContext                *corev1.SecurityContext     `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 	SkipSetup                      bool                        `json:"skipSetup,omitempty"`
 	SuperuserCredentialsSecretName string                      `json:"superuserCredentialsSecretName,omitempty"`
 	EnableStorageReplication       bool                        `json:"enableStorageReplication,omitempty"`
@@ -214,6 +215,7 @@ type Redis struct {
 	ReadinessProbe      *corev1.Probe               `json:"readinessProbe,omitempty"`
 	Replicas            *int32                      `json:"replicas,omitempty"`
 	Resources           corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
+	SecurityContext     *corev1.SecurityContext     `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 }
 
 // Database defines a database that will be deployed to support a particular component
@@ -238,6 +240,7 @@ type Database struct {
 	VolumeSize           string                      `json:"volumeSize,omitempty"`
 	ConnectionParameters map[string]string           `json:"connectionParameters,omitempty" protobuf:"bytes,7,rep,name=connectionParameters"`
 	StorageClass         string                      `json:"storageClass,omitempty"`
+	SecurityContext      *corev1.SecurityContext     `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 }
 
 // Clair defines the properties of a deployment of Clair
@@ -260,6 +263,7 @@ type Clair struct {
 	Resources                 corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	SslCertificatesSecretName string                      `json:"sslCertificatesSecretName,omitempty"`
 	UpdateInterval            string                      `json:"updateInterval,omitempty"`
+	SecurityContext           *corev1.SecurityContext     `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 	// +optional
 	// +patchMergeKey=secretName
 	// +patchStrategy=merge
