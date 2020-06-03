@@ -49,6 +49,7 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 		}},
 		ServiceAccountName: constants.RedisServiceAccount,
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Redis.NodeSelector,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Redis.SecurityContext,
 	}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.ImagePullSecretName) {
@@ -168,6 +169,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 		}},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
 		ServiceAccountName: constants.QuayServiceAccount,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
 		Volumes: []corev1.Volume{corev1.Volume{
 			Name: constants.QuayConfigVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -269,6 +271,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 		}},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
 		ServiceAccountName: constants.QuayServiceAccount,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
 		Volumes: []corev1.Volume{corev1.Volume{
 			Name: constants.QuayConfigVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -370,6 +373,7 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 		ServiceAccountName: constants.QuayServiceAccount,
 		Volumes:            []corev1.Volume{configVolume},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
 	}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
@@ -584,6 +588,7 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 		}},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Clair.NodeSelector,
 		ServiceAccountName: constants.ClairServiceAccount,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Clair.SecurityContext,
 		Volumes:            clairVolumes,
 	}
 
@@ -679,8 +684,9 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 				ContainerPort: constants.PostgreSQLPort,
 			}},
 		}},
-		NodeSelector: database.NodeSelector,
-		Volumes:      []corev1.Volume{},
+		NodeSelector:    database.NodeSelector,
+		SecurityContext: database.SecurityContext,
+		Volumes:         []corev1.Volume{},
 	}
 
 	if !utils.IsZeroOfUnderlyingType(database.ImagePullSecretName) {

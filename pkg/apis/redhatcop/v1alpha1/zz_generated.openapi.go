@@ -11,29 +11,29 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_AzureRegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair":                             schema_pkg_apis_redhatcop_v1alpha1_Clair(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource": schema_pkg_apis_redhatcop_v1alpha1_CloudfrontS3RegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile":                        schema_pkg_apis_redhatcop_v1alpha1_ConfigFile(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles":                       schema_pkg_apis_redhatcop_v1alpha1_ConfigFiles(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Database":                          schema_pkg_apis_redhatcop_v1alpha1_Database(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess":                    schema_pkg_apis_redhatcop_v1alpha1_ExternalAccess(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource":  schema_pkg_apis_redhatcop_v1alpha1_GoogleCloudRegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_LocalRegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay":                              schema_pkg_apis_redhatcop_v1alpha1_Quay(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystem":                     schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition":            schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemCondition(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec":                 schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemStatus":               schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_RADOSRegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_RHOCSRegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis":                             schema_pkg_apis_redhatcop_v1alpha1_Redis(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend":                   schema_pkg_apis_redhatcop_v1alpha1_RegistryBackend(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackendSource":             schema_pkg_apis_redhatcop_v1alpha1_RegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage":                   schema_pkg_apis_redhatcop_v1alpha1_RegistryStorage(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource":           schema_pkg_apis_redhatcop_v1alpha1_S3RegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_SwiftRegistryBackendSource(ref),
-		"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess":                 schema_pkg_apis_redhatcop_v1alpha1_TLSExternalAccess(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_AzureRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair":                             schema_pkg_apis_redhatcop_v1alpha1_Clair(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource": schema_pkg_apis_redhatcop_v1alpha1_CloudfrontS3RegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile":                        schema_pkg_apis_redhatcop_v1alpha1_ConfigFile(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles":                       schema_pkg_apis_redhatcop_v1alpha1_ConfigFiles(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database":                          schema_pkg_apis_redhatcop_v1alpha1_Database(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess":                    schema_pkg_apis_redhatcop_v1alpha1_ExternalAccess(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource":  schema_pkg_apis_redhatcop_v1alpha1_GoogleCloudRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_LocalRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay":                              schema_pkg_apis_redhatcop_v1alpha1_Quay(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystem":                     schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition":            schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemCondition(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec":                 schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemStatus":               schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_RADOSRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_RHOCSRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis":                             schema_pkg_apis_redhatcop_v1alpha1_Redis(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend":                   schema_pkg_apis_redhatcop_v1alpha1_RegistryBackend(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackendSource":             schema_pkg_apis_redhatcop_v1alpha1_RegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage":                   schema_pkg_apis_redhatcop_v1alpha1_RegistryStorage(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource":           schema_pkg_apis_redhatcop_v1alpha1_S3RegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource":        schema_pkg_apis_redhatcop_v1alpha1_SwiftRegistryBackendSource(ref),
+		"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess":                 schema_pkg_apis_redhatcop_v1alpha1_TLSExternalAccess(ref),
 	}
 }
 
@@ -89,7 +89,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 				Properties: map[string]spec.Schema{
 					"database": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Database"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database"),
 						},
 					},
 					"deploymentStrategy": {
@@ -180,6 +180,11 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 							Format: "",
 						},
 					},
+					"securityContext": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
+						},
+					},
 					"configFiles": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -193,7 +198,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles"),
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles"),
 									},
 								},
 							},
@@ -203,7 +208,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -341,7 +346,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_ConfigFiles(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile"),
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile"),
 									},
 								},
 							},
@@ -358,7 +363,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_ConfigFiles(ref common.ReferenceCallback
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFile"},
 	}
 }
 
@@ -489,11 +494,16 @@ func schema_pkg_apis_redhatcop_v1alpha1_Database(ref common.ReferenceCallback) c
 							Format: "",
 						},
 					},
+					"securityContext": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -558,7 +568,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_ExternalAccess(ref common.ReferenceCallb
 					},
 					"tls": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess"),
 						},
 					},
 					"type": {
@@ -571,7 +581,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_ExternalAccess(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.TLSExternalAccess"},
 	}
 }
 
@@ -702,7 +712,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 					},
 					"database": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Database"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database"),
 						},
 					},
 					"deploymentStrategy": {
@@ -793,7 +803,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend"),
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend"),
 									},
 								},
 							},
@@ -801,7 +811,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 					},
 					"registryStorage": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage"),
 						},
 					},
 					"replicas": {
@@ -813,6 +823,11 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 					"resources": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
+						},
+					},
+					"securityContext": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
 						},
 					},
 					"skipSetup": {
@@ -846,7 +861,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles"),
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles"),
 									},
 								},
 							},
@@ -860,7 +875,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 					},
 					"externalAccess": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess"),
 						},
 					},
 					"superusers": {
@@ -885,7 +900,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -917,19 +932,19 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystem(ref common.ReferenceCallba
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemStatus"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemStatus"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemSpec", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -992,17 +1007,17 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"quay": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay"),
 						},
 					},
 					"redis": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis"),
 						},
 					},
 					"clair": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair"),
 						},
 					},
 					"disableFinalizers": {
@@ -1015,7 +1030,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemSpec(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Clair", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Quay", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Redis"},
 	}
 }
 
@@ -1057,7 +1072,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition"),
+										Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition"),
 									},
 								},
 							},
@@ -1073,7 +1088,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_QuayEcosystemStatus(ref common.Reference
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.QuayEcosystemCondition"},
 	}
 }
 
@@ -1282,11 +1297,16 @@ func schema_pkg_apis_redhatcop_v1alpha1_Redis(ref common.ReferenceCallback) comm
 							Ref: ref("k8s.io/api/core/v1.ResourceRequirements"),
 						},
 					},
+					"securityContext": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -1305,42 +1325,42 @@ func schema_pkg_apis_redhatcop_v1alpha1_RegistryBackend(ref common.ReferenceCall
 					},
 					"local": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource"),
 						},
 					},
 					"s3": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource"),
 						},
 					},
 					"googleCloud": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource"),
 						},
 					},
 					"azure": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource"),
 						},
 					},
 					"rados": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource"),
 						},
 					},
 					"rhocs": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource"),
 						},
 					},
 					"swift": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"),
 						},
 					},
 					"cloudfrontS3": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource"),
 						},
 					},
 					"credentialsSecretName": {
@@ -1360,7 +1380,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_RegistryBackend(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"},
 	}
 }
 
@@ -1373,49 +1393,49 @@ func schema_pkg_apis_redhatcop_v1alpha1_RegistryBackendSource(ref common.Referen
 				Properties: map[string]spec.Schema{
 					"local": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource"),
 						},
 					},
 					"s3": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource"),
 						},
 					},
 					"googleCloud": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource"),
 						},
 					},
 					"azure": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource"),
 						},
 					},
 					"rados": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource"),
 						},
 					},
 					"rhocs": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource"),
 						},
 					},
 					"swift": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"),
 						},
 					},
 					"cloudfrontS3": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource"),
+							Ref: ref("github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource", "github.com/drichtarik/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.AzureRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.CloudfrontS3RegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.GoogleCloudRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.LocalRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RADOSRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RHOCSRegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.S3RegistryBackendSource", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.SwiftRegistryBackendSource"},
 	}
 }
 
