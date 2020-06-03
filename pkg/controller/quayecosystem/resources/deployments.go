@@ -43,13 +43,13 @@ func GetRedisDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: 6379,
 			}},
-			ReadinessProbe:  quayConfiguration.QuayEcosystem.Spec.Redis.ReadinessProbe,
-			LivenessProbe:   quayConfiguration.QuayEcosystem.Spec.Redis.LivenessProbe,
-			Resources:       quayConfiguration.QuayEcosystem.Spec.Redis.Resources,
-			SecurityContext: quayConfiguration.QuayEcosystem.Spec.Redis.SecurityContext,
+			ReadinessProbe: quayConfiguration.QuayEcosystem.Spec.Redis.ReadinessProbe,
+			LivenessProbe:  quayConfiguration.QuayEcosystem.Spec.Redis.LivenessProbe,
+			Resources:      quayConfiguration.QuayEcosystem.Spec.Redis.Resources,
 		}},
 		ServiceAccountName: constants.RedisServiceAccount,
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Redis.NodeSelector,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Redis.SecurityContext,
 	}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.ImagePullSecretName) {
@@ -147,8 +147,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 				MountPath: constants.QuayConfigVolumePath,
 				ReadOnly:  false,
 			}},
-			Resources:       quayConfiguration.QuayEcosystem.Spec.Quay.ConfigResources,
-			SecurityContext: quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
+			Resources: quayConfiguration.QuayEcosystem.Spec.Quay.ConfigResources,
 			ReadinessProbe: &corev1.Probe{
 				FailureThreshold:    3,
 				InitialDelaySeconds: 10,
@@ -170,6 +169,7 @@ func GetQuayConfigDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration
 		}},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
 		ServiceAccountName: constants.QuayServiceAccount,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
 		Volumes: []corev1.Volume{corev1.Volume{
 			Name: constants.QuayConfigVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -249,8 +249,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 				MountPath: constants.QuayConfigVolumePath,
 				ReadOnly:  false,
 			}},
-			Resources:       quayConfiguration.QuayEcosystem.Spec.Quay.RepoMirrorResources,
-			SecurityContext: quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
+			Resources: quayConfiguration.QuayEcosystem.Spec.Quay.RepoMirrorResources,
 			ReadinessProbe: &corev1.Probe{
 				FailureThreshold:    3,
 				InitialDelaySeconds: 10,
@@ -272,6 +271,7 @@ func GetQuayRepoMirrorDeploymentDefinition(meta metav1.ObjectMeta, quayConfigura
 		}},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
 		ServiceAccountName: constants.QuayServiceAccount,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
 		Volumes: []corev1.Volume{corev1.Volume{
 			Name: constants.QuayConfigVolumeName,
 			VolumeSource: corev1.VolumeSource{
@@ -366,14 +366,14 @@ func GetQuayDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Quay
 				MountPath: constants.QuayConfigVolumePath,
 				ReadOnly:  false,
 			}},
-			ReadinessProbe:  quayConfiguration.QuayEcosystem.Spec.Quay.ReadinessProbe,
-			Resources:       quayConfiguration.QuayEcosystem.Spec.Quay.Resources,
-			LivenessProbe:   quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe,
-			SecurityContext: quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
+			ReadinessProbe: quayConfiguration.QuayEcosystem.Spec.Quay.ReadinessProbe,
+			Resources:      quayConfiguration.QuayEcosystem.Spec.Quay.Resources,
+			LivenessProbe:  quayConfiguration.QuayEcosystem.Spec.Quay.LivenessProbe,
 		}},
 		ServiceAccountName: constants.QuayServiceAccount,
 		Volumes:            []corev1.Volume{configVolume},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Quay.NodeSelector,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Quay.SecurityContext,
 	}
 
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Quay.ImagePullSecretName) {
@@ -581,14 +581,14 @@ func GetClairDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *Qua
 				ContainerPort: constants.ClairHealthPort,
 				Name:          "clair-health",
 			}},
-			Resources:       quayConfiguration.QuayEcosystem.Spec.Clair.Resources,
-			VolumeMounts:    clairVolumeMounts,
-			ReadinessProbe:  quayConfiguration.QuayEcosystem.Spec.Clair.ReadinessProbe,
-			LivenessProbe:   quayConfiguration.QuayEcosystem.Spec.Clair.LivenessProbe,
-			SecurityContext: quayConfiguration.QuayEcosystem.Spec.Clair.SecurityContext,
+			Resources:      quayConfiguration.QuayEcosystem.Spec.Clair.Resources,
+			VolumeMounts:   clairVolumeMounts,
+			ReadinessProbe: quayConfiguration.QuayEcosystem.Spec.Clair.ReadinessProbe,
+			LivenessProbe:  quayConfiguration.QuayEcosystem.Spec.Clair.LivenessProbe,
 		}},
 		NodeSelector:       quayConfiguration.QuayEcosystem.Spec.Clair.NodeSelector,
 		ServiceAccountName: constants.ClairServiceAccount,
+		SecurityContext:    quayConfiguration.QuayEcosystem.Spec.Clair.SecurityContext,
 		Volumes:            clairVolumes,
 	}
 
@@ -677,16 +677,16 @@ func GetDatabaseDeploymentDefinition(meta metav1.ObjectMeta, quayConfiguration *
 				Name:      constants.PostgresDataVolumeName,
 				MountPath: constants.PostgresDataVolumePath,
 			}},
-			LivenessProbe:   database.LivenessProbe,
-			ReadinessProbe:  database.ReadinessProbe,
-			SecurityContext: database.SecurityContext,
+			LivenessProbe:  database.LivenessProbe,
+			ReadinessProbe: database.ReadinessProbe,
 
 			Ports: []corev1.ContainerPort{{
 				ContainerPort: constants.PostgreSQLPort,
 			}},
 		}},
-		NodeSelector: database.NodeSelector,
-		Volumes:      []corev1.Volume{},
+		NodeSelector:    database.NodeSelector,
+		SecurityContext: database.SecurityContext,
+		Volumes:         []corev1.Volume{},
 	}
 
 	if !utils.IsZeroOfUnderlyingType(database.ImagePullSecretName) {

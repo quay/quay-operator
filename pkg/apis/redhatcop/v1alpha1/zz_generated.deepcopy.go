@@ -65,7 +65,7 @@ func (in *Clair) DeepCopyInto(out *Clair) {
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.SecurityContext)
+		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ConfigFiles != nil {
@@ -190,7 +190,7 @@ func (in *Database) DeepCopyInto(out *Database) {
 	}
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.SecurityContext)
+		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	return
@@ -361,7 +361,7 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.SecurityContext)
+		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ConfigFiles != nil {
@@ -599,7 +599,7 @@ func (in *Redis) DeepCopyInto(out *Redis) {
 	in.Resources.DeepCopyInto(&out.Resources)
 	if in.SecurityContext != nil {
 		in, out := &in.SecurityContext, &out.SecurityContext
-		*out = new(v1.SecurityContext)
+		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
 	return

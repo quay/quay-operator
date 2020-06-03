@@ -182,7 +182,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 					},
 					"securityContext": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecurityContext"),
+							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
 						},
 					},
 					"configFiles": {
@@ -208,7 +208,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.SecurityContext"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -496,14 +496,14 @@ func schema_pkg_apis_redhatcop_v1alpha1_Database(ref common.ReferenceCallback) c
 					},
 					"securityContext": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecurityContext"),
+							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.SecurityContext"},
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -827,7 +827,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 					},
 					"securityContext": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecurityContext"),
+							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
 						},
 					},
 					"skipSetup": {
@@ -900,7 +900,7 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.SecurityContext"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
@@ -1299,14 +1299,14 @@ func schema_pkg_apis_redhatcop_v1alpha1_Redis(ref common.ReferenceCallback) comm
 					},
 					"securityContext": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecurityContext"),
+							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.SecurityContext"},
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
 	}
 }
 
