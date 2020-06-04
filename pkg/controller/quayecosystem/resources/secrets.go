@@ -13,6 +13,7 @@ func GetSecretDefinition(meta metav1.ObjectMeta) *corev1.Secret {
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: meta,
+		Data:       map[string][]byte{},
 	}
 }
 

@@ -504,12 +504,12 @@ func (r *ReconcileQuayEcosystemConfiguration) createQuayConfigSecret(meta metav1
 
 	meta.Name = configSecretName
 
-	found := &corev1.Secret{}
-	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: configSecretName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, found)
+	err := r.reconcilerBase.GetClient().Get(context.TODO(), types.NamespacedName{Name: configSecretName, Namespace: r.quayConfiguration.QuayEcosystem.ObjectMeta.Namespace}, &corev1.Secret{})
 
 	if err != nil && apierrors.IsNotFound(err) {
+		appConfigSecret, _ := copyConfigFileExtraCaCertToConfigSecret(r.quayConfiguration.QuayConfigFiles, resources.GetSecretDefinition(meta))
 
-		return r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, resources.GetSecretDefinition(meta))
+		return r.reconcilerBase.CreateResourceIfNotExists(r.quayConfiguration.QuayEcosystem, r.quayConfiguration.QuayEcosystem.Namespace, appConfigSecret)
 
 	} else if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -940,11 +940,11 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 		r.quayConfiguration.ClairSslCertificate = clairSslSecret.Data[corev1.TLSCertKey]
 		r.quayConfiguration.ClairSslPrivateKey = clairSslSecret.Data[corev1.TLSPrivateKeyKey]
 
-		// Add Quay Certificate to Extra Certificates Config File
+		// Add Clair Certificate to Extra Certificates Config File
 		r.quayConfiguration.QuayConfigFiles = append(r.quayConfiguration.QuayConfigFiles, redhatcopv1alpha1.ConfigFiles{
 			Type: redhatcopv1alpha1.ExtraCaCertConfigFileType,
 			Files: []redhatcopv1alpha1.ConfigFile{
-				redhatcopv1alpha1.ConfigFile{
+				{
 					Type:          redhatcopv1alpha1.ExtraCaCertConfigFileType,
 					Filename:      constants.ClairSSLCertificateSecretKey,
 					Key:           constants.ClairSSLCertificateSecretKey,
@@ -957,7 +957,7 @@ func (r *ReconcileQuayEcosystemConfiguration) ManageQuayEcosystemCertificates(me
 	return nil, nil
 }
 
-// SyncQuayConfigSecret manages the content of the Quay Config Secret. Thisn
+// SyncQuayConfigSecret manages the content of the Quay Config Secret
 func (r *ReconcileQuayEcosystemConfiguration) SyncQuayConfigSecret(meta metav1.ObjectMeta) (*reconcile.Result, error) {
 
 	configSecretName := resources.GetQuaySecretName(r.quayConfiguration.QuayEcosystem)
