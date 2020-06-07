@@ -140,6 +140,7 @@ spec:
   customresourcedefinitions:
     owned:
     - description: QuayEcosystem is the Schema for the quayecosystems API
+      displayName: Quay Ecosystem
       kind: QuayEcosystem
       name: quayecosystems.redhatcop.redhat.io
       version: v1alpha1
