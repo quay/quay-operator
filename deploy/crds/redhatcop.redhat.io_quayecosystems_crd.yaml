@@ -1090,8 +1090,6 @@ spec:
                 updateInterval:
                   type: string
               type: object
-            disableFinalizers:
-              type: boolean
             quay:
               description: Quay defines the properies of a deployment of Quay
               properties:

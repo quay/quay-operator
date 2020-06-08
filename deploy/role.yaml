@@ -92,11 +92,10 @@ rules:
   - security.openshift.io
   resources:
   - securitycontextconstraints
+  resourceNames:
+    - anyuid
   verbs:
-  - 'update'
-  - 'get'
-  - 'list'
-  - 'watch'
+  - 'use'
 - apiGroups:
   - route.openshift.io
   resources:

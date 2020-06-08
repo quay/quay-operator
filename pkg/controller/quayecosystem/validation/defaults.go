@@ -3,7 +3,6 @@ package validation
 import (
 	"reflect"
 
-	"github.com/redhat-cop/operator-utils/pkg/util"
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
@@ -38,17 +37,6 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	quayConfiguration.ClairDatabase.RootPassword = constants.ClairDatabaseCredentialsDefaultRootPassword
 	quayConfiguration.ClairUpdateInterval = constants.ClairDefaultUpdateInterval
 	quayConfiguration.DeployQuayConfiguration = true
-	if quayConfiguration.QuayEcosystem.Spec.DisableFinalizers == true {
-		if util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
-			util.RemoveFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
-			changed = true
-		}
-	} else {
-		if !util.HasFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer) {
-			util.AddFinalizer(quayConfiguration.QuayEcosystem, constants.OperatorFinalizer)
-			changed = true
-		}
-	}
 
 	if quayConfiguration.QuayEcosystem.Spec.Quay == nil {
 		quayConfiguration.QuayEcosystem.Spec.Quay = &redhatcopv1alpha1.Quay{}
@@ -209,7 +197,7 @@ func SetDefaults(client client.Client, quayConfiguration *resources.QuayConfigur
 	if quayConfiguration.QuayEcosystem.Spec.Clair != nil && quayConfiguration.QuayEcosystem.Spec.Clair.Enabled == true {
 
 		// Add Clair Service Account to List of SCC's
-		quayConfiguration.RequiredSCCServiceAccounts = append(quayConfiguration.RequiredSCCServiceAccounts, utils.MakeServiceAccountUsername(quayConfiguration.QuayEcosystem.Namespace, constants.ClairServiceAccount))
+		quayConfiguration.RequiredSCCServiceAccounts = append(quayConfiguration.RequiredSCCServiceAccounts, constants.ClairServiceAccount)
 
 		if utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Clair.Image) {
 			changed = true

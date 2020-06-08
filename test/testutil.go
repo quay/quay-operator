@@ -5,7 +5,6 @@ import (
 
 	"github.com/redhat-cop/quay-operator/pkg/apis"
 
-	ossecurityv1 "github.com/openshift/api/security/v1"
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	redhatcopv1alpha1 "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1"
 	"github.com/stretchr/testify/assert"
@@ -41,30 +40,6 @@ var Secret = &corev1.Secret{
 		Namespace: "quay",
 	},
 	StringData: map[string]string{".dockerconfigjson": "UmVhbGx5IHJlYWxseSByZWVlZWVlZWVlZWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGx5eXl5eXl5eXl5eXl5eXl5eXl5eSBsbGxsbGxsbGxsbGxsbG9vb29vb29vb29vb29vb29vb29vb29vb29vb25ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubmdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2cgYXV0aCBrZXlzCg"},
-}
-
-var SCCAnyUID = &ossecurityv1.SecurityContextConstraints{
-	TypeMeta: metav1.TypeMeta{
-		Kind:       "SecurityContextConstraints",
-		APIVersion: "security.openshift.io/v1",
-	},
-	ObjectMeta: metav1.ObjectMeta{
-		Name:      "anyuid",
-		Namespace: "quay",
-	},
-	SELinuxContext: ossecurityv1.SELinuxContextStrategyOptions{
-		Type: "MustRunAs",
-	},
-	RunAsUser: ossecurityv1.RunAsUserStrategyOptions{
-		Type: "RunAsAny",
-	},
-	SupplementalGroups: ossecurityv1.SupplementalGroupsStrategyOptions{
-		Type: "RunAsAny",
-	},
-	FSGroup: ossecurityv1.FSGroupStrategyOptions{
-		Type: "RunAsAny",
-	},
-	Users: []string{"system:serviceaccount:quaytest:clair"},
 }
 
 var PostgresPod = &corev1.Pod{

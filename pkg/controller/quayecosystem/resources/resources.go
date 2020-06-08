@@ -102,6 +102,11 @@ func GetQuaySSLSecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string
 	return fmt.Sprintf("%s-quay-ssl", GetGenericResourcesName(quayEcosystem))
 }
 
+// GetSCCResourcesName returns name of resource related to SCC management
+func GetSCCResourcesName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
+	return fmt.Sprintf("%s-scc", GetGenericResourcesName(quayEcosystem))
+}
+
 // GetQuaySecretName returns the name of the Quay config secret
 func GetQuaySecretName(quayEcosystem *redhatcopv1alpha1.QuayEcosystem) string {
 	//configSecretName := fmt.Sprintf("%s-config-secret", GetGenericResourcesName(quayEcosystem))
