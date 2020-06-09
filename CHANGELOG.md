@@ -1,3 +1,22 @@
+1.1.1
+
+Changes:
+
+- Removed omitempty from is_secure
+  [#227](https://github.com/redhat-cop/quay-operator/pull/227)
+- Update `README.md` to point to central Quay docs
+  [#223](https://github.com/redhat-cop/quay-operator/pull/223)
+- Provide ability to define StorageClass for Databases
+  [#229](https://github.com/redhat-cop/quay-operator/pull/229)
+- Support for defining SecurityContext
+  [#238](https://github.com/redhat-cop/quay-operator/pull/238)
+- Populate Quay Config Secret with Extra Certs
+  [#239](https://github.com/redhat-cop/quay-operator/pull/239)
+- Add displayName to owned CRD spec
+  [#224](https://github.com/redhat-cop/quay-operator/pull/224)
+- Migrated directly modifying SCC's and use RBAC instead
+  [#212](https://github.com/redhat-cop/quay-operator/pull/212)
+
 1.1.0
 
 Changes:
