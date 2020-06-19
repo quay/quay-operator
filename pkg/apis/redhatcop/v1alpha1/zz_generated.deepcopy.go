@@ -75,6 +75,13 @@ func (in *Clair) DeepCopyInto(out *Clair) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
@@ -193,6 +200,13 @@ func (in *Database) DeepCopyInto(out *Database) {
 		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
@@ -294,6 +308,13 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 		}
 	}
 	in.ConfigResources.DeepCopyInto(&out.ConfigResources)
+	if in.ConfigTolerations != nil {
+		in, out := &in.ConfigTolerations, &out.ConfigTolerations
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.RepoMirrorEnvVars != nil {
 		in, out := &in.RepoMirrorEnvVars, &out.RepoMirrorEnvVars
 		*out = make([]v1.EnvVar, len(*in))
@@ -302,6 +323,13 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 		}
 	}
 	in.RepoMirrorResources.DeepCopyInto(&out.RepoMirrorResources)
+	if in.RepoMirrorTolerations != nil {
+		in, out := &in.RepoMirrorTolerations, &out.RepoMirrorTolerations
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Database != nil {
 		in, out := &in.Database, &out.Database
 		*out = new(Database)
@@ -380,6 +408,13 @@ func (in *Quay) DeepCopyInto(out *Quay) {
 		in, out := &in.Superusers, &out.Superusers
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	return
 }
@@ -601,6 +636,13 @@ func (in *Redis) DeepCopyInto(out *Redis) {
 		in, out := &in.SecurityContext, &out.SecurityContext
 		*out = new(v1.PodSecurityContext)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]v1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	return
 }

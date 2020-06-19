@@ -145,11 +145,16 @@ type Quay struct {
 	ConfigEnvVars    []corev1.EnvVar             `json:"configEnvVars,omitempty"`
 	ConfigResources  corev1.ResourceRequirements `json:"configResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
 	ConfigSecretName string                      `json:"configSecretName,omitempty"`
+	// +listType=set
+	ConfigTolerations []corev1.Toleration `json:"configTolerations,omitempty" protobuf:"bytes,22,opt,name=configTolerations"`
+
 	// +listType=atomic
 	RepoMirrorEnvVars        []corev1.EnvVar             `json:"repoMirrorEnvVars,omitempty"`
 	RepoMirrorResources      corev1.ResourceRequirements `json:"repoMirrorResources,omitempty" protobuf:"bytes,2,opt,name=configResources"`
 	RepoMirrorServerHostname string                      `json:"repoMirrorServerHostname,omitempty"`
 	RepoMirrorTLSVerify      bool                        `json:"repoMirrorTLSVerify,omitempty"`
+	// +listType=set
+	RepoMirrorTolerations []corev1.Toleration `json:"repoMirrorTolerations,omitempty" protobuf:"bytes,22,opt,name=repoMirrorTolerations"`
 
 	Database *Database `json:"database,omitempty"`
 	// +kubebuilder:validation:Enum=Recreate;RollingUpdate
@@ -184,6 +189,9 @@ type Quay struct {
 	ExternalAccess *ExternalAccess `json:"externalAccess,omitempty"`
 	// +listType=set
 	Superusers []string `json:"superusers,omitempty"`
+
+	// +listType=set
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 }
 
 // QuayEcosystemCondition defines a list of conditions that the object will transiton through
@@ -215,6 +223,8 @@ type Redis struct {
 	Replicas            *int32                      `json:"replicas,omitempty"`
 	Resources           corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	SecurityContext     *corev1.PodSecurityContext  `json:"securityContext,omitempty" protobuf:"bytes,14,opt,name=securityContext"`
+	// +listType=set
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 }
 
 // Database defines a database that will be deployed to support a particular component
@@ -240,6 +250,8 @@ type Database struct {
 	ConnectionParameters map[string]string           `json:"connectionParameters,omitempty" protobuf:"bytes,7,rep,name=connectionParameters"`
 	StorageClass         string                      `json:"storageClass,omitempty"`
 	SecurityContext      *corev1.PodSecurityContext  `json:"securityContext,omitempty" protobuf:"bytes,14,opt,name=securityContext"`
+	// +listType=set
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 }
 
 // Clair defines the properties of a deployment of Clair
@@ -268,6 +280,8 @@ type Clair struct {
 	// +patchStrategy=merge
 	// +listType=atomic
 	ConfigFiles []ConfigFiles `json:"configFiles,omitempty" patchStrategy:"merge" patchMergeKey:"secretName" protobuf:"bytes,2,rep,name=configFiles"`
+	// +listType=set
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,22,opt,name=tolerations"`
 }
 
 // RegistryBackend defines a particular backend supporting the Quay registry
