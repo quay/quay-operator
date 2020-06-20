@@ -204,11 +204,28 @@ func schema_pkg_apis_redhatcop_v1alpha1_Clair(ref common.ReferenceCallback) comm
 							},
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.Toleration"},
 	}
 }
 
@@ -499,11 +516,28 @@ func schema_pkg_apis_redhatcop_v1alpha1_Database(ref common.ReferenceCallback) c
 							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.Toleration"},
 	}
 }
 
@@ -676,6 +710,23 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							Format: "",
 						},
 					},
+					"configTolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
+						},
+					},
 					"repoMirrorEnvVars": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -708,6 +759,23 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 						SchemaProps: spec.SchemaProps{
 							Type:   []string{"boolean"},
 							Format: "",
+						},
+					},
+					"repoMirrorTolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
 						},
 					},
 					"database": {
@@ -896,11 +964,28 @@ func schema_pkg_apis_redhatcop_v1alpha1_Quay(ref common.ReferenceCallback) commo
 							},
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ConfigFiles", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.Database", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.ExternalAccess", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryBackend", "github.com/redhat-cop/quay-operator/pkg/apis/redhatcop/v1alpha1.RegistryStorage", "k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.Toleration"},
 	}
 }
 
@@ -1296,11 +1381,28 @@ func schema_pkg_apis_redhatcop_v1alpha1_Redis(ref common.ReferenceCallback) comm
 							Ref: ref("k8s.io/api/core/v1.PodSecurityContext"),
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/api/core/v1.Toleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements"},
+			"k8s.io/api/core/v1.EnvVar", "k8s.io/api/core/v1.PodSecurityContext", "k8s.io/api/core/v1.Probe", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.Toleration"},
 	}
 }
 
