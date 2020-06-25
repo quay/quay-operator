@@ -125,7 +125,7 @@ metadata:
     capabilities: Basic Install
     categories: Integration & Delivery
     certified: "false"
-    containerImage: registry.redhat.io/quay/quay-rhel8-operator@sha256:XXXXXXXXXXXXXXXXXX
+    containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-setup-operator:v3.3.1
     createdAt: "2020-06-08"
     description: Red Hat Quay is a private container registry that stores, builds,
       and deploys container images.
@@ -227,7 +227,7 @@ spec:
                       fieldPath: metadata.name
                 - name: OPERATOR_NAME
                   value: quay-operator
-                image: quay.io/redhat-cop/quay-operator:v3.3.1
+                image: registry-proxy.engineering.redhat.com/rh-osbs/quay-setup-operator:v3.3.1
                 imagePullPolicy: Always
                 name: quay-operator
                 resources: {}
@@ -393,7 +393,7 @@ spec:
     alm-status-descriptors: quay.v3.3.1
   links:
   - name: Red Hat Quay
-    url: https://www.projectquay.io
+    url: https://www.openshift.com/products/quay
   - name: Documentation
     url: https://access.redhat.com/documentation/en-us/red_hat_quay/3.3/
   maintainers:
