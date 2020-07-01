@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: quay-app
+  labels:
+    quay-component: quay-app
+spec:
+  # type: LoadBalancer
+  ports:
+    - protocol: TCP
+      name: https
+      port: 443
+      targetPort: 8443
+    - name: jwtproxy
+      protocol: TCP
+      port: 8081
+      targetPort: 8081
+  selector:
+    quay-component: quay-app

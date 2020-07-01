@@ -1,0 +1,19 @@
+# Postgres component adds a Postgres database for Quay to use
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: 
+  - ./postgres.persistentvolumeclaim.yaml
+  - ./postgres.deployment.yaml
+  - ./postgres.service.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+secretGenerator:
+  # Add Postgres fields to `config.yaml` (https://github.com/kubernetes-sigs/kustomize/blob/master/examples/combineConfigs.md)
+  - name: quay-config-secret
+    behavior: merge
+    files:
+      - DATABASE_SECRET_KEY=./database-secret-key.yaml
+      - DB_URI=./db-uri.yaml
+  - name: postgres-bootstrap
+    literals:
+      - init.sql=CREATE EXTENSION pg_trgm;

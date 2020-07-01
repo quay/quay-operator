@@ -1,0 +1,22 @@
+# Clair component adds Clair v4 security scanner and its database.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: 
+  - ./clair.deployment.yaml
+  - ./clair.service.yaml
+  - ./postgres.persistentvolumeclaim.yaml
+  - ./postgres.deployment.yaml
+  - ./postgres.service.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+secretGenerator:
+  - name: clair-config-secret
+    files:
+      - config.yaml=./clair-config.yaml
+  # Add Clair fields to `config.yaml` (https://github.com/kubernetes-sigs/kustomize/blob/master/examples/combineConfigs.md)
+  - name: quay-config-secret
+    behavior: merge
+    literals:
+      - FEATURE_SECURITY_SCANNER=true
+      - SECURITY_SCANNER_V4_ENDPOINT=http://clair
+      - SECURITY_SCANNER_V4_NAMESPACE_WHITELIST=[admin]

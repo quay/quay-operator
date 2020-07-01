@@ -1,0 +1,22 @@
+# Base assumes all other services (including database) are externally managed and only includes the Quay app itself.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+commonLabels:
+  app: quay
+resources: 
+  - ./quay.role.yaml
+  - ./quay.rolebinding.yaml
+  - ./quay.deployment.yaml
+  - ./quay.service.yaml
+  - ./quay.persistentvolumeclaim.yaml
+secretGenerator:
+  - name: quay-config-secret
+    literals:
+      - SETUP_COMPLETE=true
+# FIXME(alecmerdler): Using `vars` is kinda ugly because it's basically templating, so don't abuse them
+vars:
+  - name: QE_K8S_CONFIG_SECRET
+    objref:
+      kind: Secret
+      name: quay-config-secret
+      apiVersion: v1

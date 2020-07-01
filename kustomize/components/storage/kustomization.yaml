@@ -1,0 +1,20 @@
+# Storage component adds blob storage for Quay to use
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - ./minio.persistentvolumeclaim.yaml
+  - ./minio.service.yaml
+  - ./minio.deployment.yaml
+secretGenerator:
+  - name: quay-storage
+    # TODO(alecmerdler): Add certs here...
+    literals:
+      - MINIO_ACCESS_KEY=minio
+      - MINIO_SECRET_KEY=minio123
+  # Add storage fields to `config.yaml` (https://github.com/kubernetes-sigs/kustomize/blob/master/examples/combineConfigs.md)
+  - name: quay-config-secret
+    behavior: merge
+    literals:
+      - "DISTRIBUTED_STORAGE_CONFIG={default: [RadosGWStorage, {hostname: quay-datastore, is_secure: false, storage_path: /datastorage/registry, access_key: minio, secret_key: minio123, bucket_name: quay-datastore, port: 9000}]}"
+      - "DISTRIBUTED_STORAGE_PREFERENCE=[default]"
+      - "DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS=[default]"

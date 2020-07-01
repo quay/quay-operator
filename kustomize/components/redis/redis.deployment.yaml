@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quay-redis
+  labels:
+    quay-component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      quay-component: redis
+  template:
+    metadata:
+      labels:
+        quay-component: redis
+    spec:
+      containers:
+        - name: redis-master
+          image: redis:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379

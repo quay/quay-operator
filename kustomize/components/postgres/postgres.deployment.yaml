@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quay-postgres
+  labels:
+    quay-component: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      quay-component: postgres
+  template:
+    metadata:
+      labels:
+        quay-component: postgres
+    spec:
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: quay-postgres
+        - name: postgres-bootstrap
+          secret:
+            secretName: postgres-bootstrap
+            items:
+              - key: init.sql
+                path: init.sql
+      containers:
+        - name: postgres
+          image: postgres:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: quay
+            - name: POSTGRES_PASSWORD
+              value: postgres
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-bootstrap
+              mountPath: /docker-entrypoint-initdb.d

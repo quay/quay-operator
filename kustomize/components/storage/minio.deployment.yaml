@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quay-datastore
+  labels:
+    quay-component: quay-app
+spec:
+  selector:
+    matchLabels:
+      app: quay-datastore
+      quay-component: quay-app
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: quay-datastore
+        quay-component: quay-app
+    spec:
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: minio-pv-claim
+      containers:
+      - name: minio
+        image: minio/minio
+        command: ["minio"]
+        args: ["server", "/storage"]
+        env:
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quay-storage
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quay-storage
+              key: MINIO_SECRET_KEY
+      # Sidecar container which creates `quay-datastore` bucket (https://github.com/minio/minio/issues/4882).
+      - name: minio-mc
+        image: minio/mc
+        command: [
+          "/bin/sh", 
+          "-c",
+          "/usr/bin/mc config host add quay-datastore http://quay-datastore:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY;
+          /usr/bin/mc mb quay-datastore/quay-datastore;
+          while true; do sleep 30; done;"
+        ]
+        env:
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quay-storage
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quay-storage
+              key: MINIO_SECRET_KEY
+        # TODO(alecmerdler): Use SSL certificates
+        ports:
+        - containerPort: 9000
+        volumeMounts:
+        - name: storage 
+          mountPath: /storage
