@@ -1,0 +1,7 @@
+apiVersion: quay.redhat.com.quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: quayregistry-sample
+spec:
+  # Add fields here
+  foo: bar

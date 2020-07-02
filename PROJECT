@@ -1,3 +1,7 @@
 domain: quay.redhat.com
 repo: github.com/quay/quay-operator
+resources:
+- group: quay.redhat.com
+  kind: QuayRegistry
+  version: v1
 version: "2"
