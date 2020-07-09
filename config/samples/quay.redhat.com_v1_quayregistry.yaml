@@ -1,7 +1,11 @@
 apiVersion: quay.redhat.com.quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
-  name: quayregistry-sample
+  name: skynet-quay
 spec:
-  # Add fields here
-  foo: bar
+  configBundleSecret: quay-config-secret-abc123
+  managedComponents:
+    - kind: postgres
+    - kind: clair
+    - kind: redis
+    - kind: storage

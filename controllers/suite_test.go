@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,6 +41,7 @@ import (
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var testLogger logr.Logger
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -50,10 +52,14 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func(done Done) {
-	logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+	testLogger = zap.LoggerTo(GinkgoWriter, true)
+	logf.SetLogger(testLogger)
 
 	By("bootstrapping test environment")
+	// useExistingCluster := true
 	testEnv = &envtest.Environment{
+		// TODO(alecmerdler): Set `UseExistingCluster` env var to test against a real cluster...
+		// UseExistingCluster: &useExistingCluster,
 		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
 	}
 

@@ -5,7 +5,7 @@ metadata:
   labels:
     quay-component: quay-app
 spec:
-  # type: LoadBalancer
+  type: LoadBalancer
   ports:
     - protocol: TCP
       name: https
