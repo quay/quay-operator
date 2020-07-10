@@ -297,6 +297,8 @@ const (
 	RedisPasswordKey = "password"
 	// RedisPasswordEnvVar represents the name of the environment variable that contains the Redis password
 	RedisPasswordEnvVar = "REDIS_PASSWORD"
+	// RedisHostKey represents the host for the redis password
+	RedisHostKey = "hostname"
 	// ExtraCaCertsFilenamePrefix is the prefix for Extra Ca Certificates
 	ExtraCaCertsFilenamePrefix = "extra_ca_certs_"
 	// OperationAdd signifies that an operation requires an addition

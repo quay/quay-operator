@@ -96,7 +96,7 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 	// Validate Redis CredentialsSecret
 	if !utils.IsZeroOfUnderlyingType(quayConfiguration.QuayEcosystem.Spec.Redis.CredentialsSecretName) {
 
-		validRedisCredentialSecret, redisSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Redis.CredentialsSecretName, []string{constants.RedisPasswordKey})
+		validRedisCredentialSecret, redisSecret, err := validateSecret(client, quayConfiguration.QuayEcosystem.Namespace, quayConfiguration.QuayEcosystem.Spec.Redis.CredentialsSecretName, nil)
 
 		if err != nil {
 			return false, err
@@ -106,8 +106,20 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 			return false, fmt.Errorf("Failed to validate provided Redis Credentials Secret")
 		}
 
-		quayConfiguration.RedisPassword = string(redisSecret.Data[constants.RedisPasswordKey])
-		quayConfiguration.ValidProvidedRedisPasswordSecret = true
+		if _, found := redisSecret.Data[constants.RedisPasswordKey]; found {
+			quayConfiguration.RedisPassword = string(redisSecret.Data[constants.RedisPasswordKey])
+			quayConfiguration.ValidProvidedRedisPasswordSecret = true
+
+		}
+
+		if _, found := redisSecret.Data[constants.RedisHostKey]; found {
+			quayConfiguration.QuayEcosystem.Spec.Redis.Hostname = string(redisSecret.Data[constants.RedisHostKey])
+			quayConfiguration.RedisHostname = string(redisSecret.Data[constants.RedisHostKey])
+			quayConfiguration.QuayEcosystem.Spec.Redis.Image = ""
+			quayConfiguration.QuayEcosystem.Spec.Redis.DeploymentStrategy = ""
+			quayConfiguration.QuayEcosystem.Spec.Redis.ReadinessProbe = nil
+			quayConfiguration.QuayEcosystem.Spec.Redis.LivenessProbe = nil
+		}
 	}
 
 	// Validate Quay Database ImagePullSecret
