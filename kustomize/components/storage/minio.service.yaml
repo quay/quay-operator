@@ -5,8 +5,6 @@ metadata:
   labels:
     quay-component: quay-app
 spec:
-  # FIXME(alecmerdler): Does this need to be a `LoadBalancer`...?
-  # type: LoadBalancer
   ports:
     - port: 9000
       targetPort: 9000

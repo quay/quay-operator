@@ -134,6 +134,7 @@ func KustomizationFor(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) (*
 			Kind:       types.KustomizationKind,
 		},
 		Namespace:  quay.GetNamespace(),
+		NamePrefix: quay.GetName() + "-",
 		Resources:  []string{"../base"},
 		Components: components,
 		SecretGenerator: []types.SecretArgs{

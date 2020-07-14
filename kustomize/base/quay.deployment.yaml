@@ -20,10 +20,6 @@ spec:
         - name: configvolume
           secret:
             secretName: quay-config-secret
-        # TODO(alecmerdler): Maybe we have this as a "dev" overlay...?
-        # - name: quay-datastorage
-        #   persistentVolumeClaim:
-        #     claimName: quay-datastorage
       containers:
         - name: quay-app
           image: quay.io/projectquay/quay:qui-gon
@@ -44,5 +40,3 @@ spec:
             - name: configvolume
               readOnly: false
               mountPath: /conf/stack
-            # - name: quay-datastorage
-            #   mountPath: /datastorage
