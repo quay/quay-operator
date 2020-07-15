@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/api/v1"
 )
@@ -53,24 +52,11 @@ var kustomizationForTests = []struct {
 	},
 }
 
-func encode(value interface{}) []byte {
-	yamlified, _ := yaml.Marshal(value)
-
-	return yamlified
-}
-
-func decode(bytes []byte) interface{} {
-	var value interface{}
-	_ = yaml.Unmarshal(bytes, &value)
-
-	return value
-}
-
 func TestKustomizationFor(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range kustomizationForTests {
-		kustomization, err := KustomizationFor(test.quayRegistry, &corev1.Secret{})
+		kustomization, err := KustomizationFor(test.quayRegistry, map[string][]byte{})
 
 		if test.expectedErr != "" {
 			assert.EqualError(err, test.expectedErr)
@@ -92,10 +78,12 @@ func TestFlattenSecret(t *testing.T) {
 
 	secret := &corev1.Secret{
 		Data: map[string][]byte{
-			"config.yaml":                  encode(config),
-			"FEATURE_SECURITY_SCANNER":     encode(true),
-			"SECURITY_SCANNER_V4_ENDPOINT": encode("http://clair"),
-			"ssl.key":                      encode("abcd1234"),
+			"config.yaml": encode(config),
+			"ssl.key":     encode("abcd1234"),
+			"clair.config.yaml": encode(map[string]interface{}{
+				"FEATURE_SECURITY_SCANNER":     true,
+				"SECURITY_SCANNER_V4_ENDPOINT": "http://quay-clair",
+			}),
 		},
 	}
 
@@ -109,8 +97,8 @@ func TestFlattenSecret(t *testing.T) {
 	for key, value := range config {
 		assert.Equal(value, flattenedConfig.(map[string]interface{})[key])
 	}
-	assert.Equal(decode(secret.Data["FEATURE_SECURITY_SCANNER"]), flattenedConfig.(map[string]interface{})["FEATURE_SECURITY_SCANNER"])
-	assert.Equal(decode(secret.Data["SECURITY_SCANNER_V4_ENDPOINT"]), flattenedConfig.(map[string]interface{})["SECURITY_SCANNER_V4_ENDPOINT"])
+	assert.Equal(true, flattenedConfig.(map[string]interface{})["FEATURE_SECURITY_SCANNER"])
+	assert.Equal("http://quay-clair", flattenedConfig.(map[string]interface{})["SECURITY_SCANNER_V4_ENDPOINT"])
 }
 
 var quayComponents = map[string][]runtime.Object{
