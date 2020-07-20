@@ -2,7 +2,6 @@ package kustomize
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -84,16 +83,13 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 
 // generate uses Kustomize as a library to build the runtime objects to be applied to a cluster.
 func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]byte) ([]k8sruntime.Object, error) {
-	// FIXME(alecmerdler): Just load the `kustomize` directory into memory to avoid all these annoying filesystem permissions...
-	fmt.Println("FIXME((alecmerdler): Debugging")
 	fSys := filesys.MakeEmptyDirInMemory()
-	filepath.Walk(kustomizeDir(), func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(kustomizeDir(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
 		if !info.IsDir() {
-			fmt.Println(path)
 			f, err := ioutil.ReadFile(path)
 			if err != nil {
 				return err
@@ -106,6 +102,7 @@ func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]b
 		}
 		return nil
 	})
+	check(err)
 
 	// Write `kustomization.yaml` to filesystem
 	kustomizationFile, err := yaml.Marshal(kustomization)
