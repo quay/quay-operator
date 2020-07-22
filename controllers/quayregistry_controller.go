@@ -23,7 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,14 +55,12 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	var quay v1.QuayRegistry
 	if err := r.Client.Get(ctx, req.NamespacedName, &quay); err != nil {
 		log.Error(err, "unable to retrieve QuayRegistry")
-
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	var configBundle corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.Spec.ConfigBundleSecret}, &configBundle); err != nil {
 		log.Error(err, "unable to retrieve referenced `configBundleSecret`", "configBundleSecret", quay.Spec.ConfigBundleSecret)
-
 		return ctrl.Result{}, err
 	}
 
@@ -95,28 +95,33 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	for _, obj := range deploymentObjects {
-		objectMeta, _ := meta.Accessor(obj)
-		groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
-
-		log.Info("creating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
-
-		err = r.Client.Create(ctx, obj)
-		if err != nil && errors.IsAlreadyExists(err) {
-			log.Info("updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
-			err = r.Client.Update(ctx, obj)
-		}
-		if err != nil {
-			log.Error(err, "failed to create/update object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
-
-			return ctrl.Result{}, err
-		}
-
-		log.Info("successfully created/updated object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+		r.createOrUpdateObject(ctx, obj, quay)
 	}
 
 	log.Info("all objects created/updated successfully")
-
 	return ctrl.Result{}, nil
+}
+
+func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k8sruntime.Object, quay v1.QuayRegistry) error {
+	objectMeta, _ := meta.Accessor(obj)
+	groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
+
+	log := r.Log.WithValues("quayregistry", quay.GetNamespace())
+	log.Info("creating/updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+
+	// managedFields cannot be set on a PATCH.
+	objectMeta.SetManagedFields([]metav1.ManagedFieldsEntry{})
+
+	opts := []client.PatchOption{}
+	opts = append([]client.PatchOption{client.ForceOwnership, client.FieldOwner("quay-operator")}, opts...)
+	err := r.Client.Patch(ctx, obj, client.Apply, opts...)
+	if err != nil {
+		log.Error(err, "failed to create/update object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+		return err
+	}
+
+	log.Info("finished creating/updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+	return nil
 }
 
 func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {

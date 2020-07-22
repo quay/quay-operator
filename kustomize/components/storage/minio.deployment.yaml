@@ -61,6 +61,7 @@ spec:
         # TODO(alecmerdler): Use SSL certificates
         ports:
         - containerPort: 9000
+          protocol: TCP
         volumeMounts:
         - name: storage 
           mountPath: /storage
