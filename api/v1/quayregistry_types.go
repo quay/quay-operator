@@ -20,16 +20,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var allComponents = []string{
+	"postgres",
+	"clair",
+	"redis",
+	"storage",
+}
+
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
 	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace which contains the base Quay config and extra certs.
 	ConfigBundleSecret string `json:"configBundleSecret,omitempty"`
-	// ManagedComponents declare which supplemental services should be included in this Quay deployment.
-	ManagedComponents []ManagedComponent `json:"managedComponents,omitempty"`
+	// Components declare how the Operator should handle backing Quay services.
+	Components []Component `json:"components,omitempty"`
 }
 
-type ManagedComponent struct {
-	Kind string `json:"kind,omitempty"`
+// Component describes how the Operator should handle a backing Quay service.
+type Component struct {
+	// Kind is the unique name of this type of component.
+	Kind string `json:"kind"`
+	// Managed indicates whether or not the Operator is responsible for the lifecycle of this component.
+	// Default is true.
+	Managed bool `json:"managed"`
 }
 
 // QuayRegistryStatus defines the observed state of QuayRegistry.
@@ -55,6 +67,51 @@ type QuayRegistryList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []QuayRegistry `json:"items"`
+}
+
+// EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`
+// and returns a new `QuayRegistry` copy.
+func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
+	updatedQuay := quay.DeepCopy()
+	if updatedQuay.Spec.Components == nil {
+		updatedQuay.Spec.Components = []Component{}
+	}
+
+	for _, component := range allComponents {
+		found := false
+		for _, definedComponent := range quay.Spec.Components {
+			if component == definedComponent.Kind {
+				found = true
+				break
+			}
+		}
+		if !found {
+			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{Kind: component, Managed: true})
+		}
+	}
+
+	return updatedQuay, nil
+}
+
+// ComponentsMatch returns true if both set of components are equivalent, and false otherwise.
+func ComponentsMatch(firstComponents, secondComponents []Component) bool {
+	if len(firstComponents) != len(secondComponents) {
+		return false
+	}
+
+	for _, compA := range firstComponents {
+		equal := false
+		for _, compB := range secondComponents {
+			if compA.Kind == compB.Kind && compA.Managed == compB.Managed {
+				equal = true
+				break
+			}
+		}
+		if !equal {
+			return false
+		}
+	}
+	return true
 }
 
 func init() {

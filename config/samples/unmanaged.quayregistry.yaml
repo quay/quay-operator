@@ -1,0 +1,15 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: unmanaged
+spec:
+  configBundleSecret: quay-config-bundle-abc123
+  components:
+    - kind: postgres
+      managed: false
+    - kind: redis 
+      managed: false
+    - kind: clair
+      managed: false
+    - kind: storage 
+      managed: false

@@ -32,11 +32,11 @@ var kustomizationForTests = []struct {
 		"AllComponents",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
-				ManagedComponents: []v1.ManagedComponent{
-					{Kind: "postgres"},
-					{Kind: "clair"},
-					{Kind: "redis"},
-					{Kind: "storage"},
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "storage", Managed: true},
 				},
 			},
 		},
@@ -45,8 +45,13 @@ var kustomizationForTests = []struct {
 				APIVersion: types.KustomizationVersion,
 				Kind:       types.KustomizationKind,
 			},
-			Resources:       []string{},
-			Components:      []string{},
+			Resources: []string{},
+			Components: []string{
+				"../components/postgres",
+				"../components/clair",
+				"../components/redis",
+				"../components/storage",
+			},
 			SecretGenerator: []types.SecretArgs{},
 		},
 		"",
@@ -61,9 +66,14 @@ func TestKustomizationFor(t *testing.T) {
 
 		if test.expectedErr != "" {
 			assert.EqualError(err, test.expectedErr)
-			assert.Nil(kustomization)
+			assert.Nil(kustomization, test.name)
 		} else {
-			assert.NotNil(kustomization)
+			assert.NotNil(kustomization, test.name)
+
+			assert.Equal(len(test.expected.Components), len(kustomization.Components), test.name)
+			for _, expectedComponent := range test.expected.Components {
+				assert.Contains(kustomization.Components, expectedComponent, test.name)
+			}
 		}
 	}
 }
@@ -154,14 +164,14 @@ var inflateTests = []struct {
 	expectedErr  error
 }{
 	{
-		"AllComponents",
+		"AllComponentsManagedExplicit",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
-				ManagedComponents: []v1.ManagedComponent{
-					{Kind: "postgres"},
-					{Kind: "clair"},
-					{Kind: "redis"},
-					{Kind: "storage"},
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "storage", Managed: true},
 				},
 			},
 		},
@@ -174,14 +184,43 @@ var inflateTests = []struct {
 		nil,
 	},
 	{
-		"OnlyBaseComponent",
-		&v1.QuayRegistry{},
+		"AllComponentsUnmanaged",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: false},
+					{Kind: "clair", Managed: false},
+					{Kind: "redis", Managed: false},
+					{Kind: "storage", Managed: false},
+				},
+			},
+		},
 		&corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
 		withComponents([]string{"base"}),
+		nil,
+	},
+	{
+		"SomeComponentsUnmanaged",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: false},
+					{Kind: "storage", Managed: false},
+				},
+			},
+		},
+		&corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+			},
+		},
+		withComponents([]string{"base", "postgres", "clair"}),
 		nil,
 	},
 }
@@ -194,14 +233,14 @@ func TestInflate(t *testing.T) {
 	for _, test := range inflateTests {
 		pieces, err := Inflate(test.quayRegistry, test.configBundle, nil, log)
 
-		assert.NotNil(pieces)
-		assert.Equal(len(test.expected), len(pieces))
-		assert.Nil(err)
+		assert.NotNil(pieces, test.name)
+		assert.Equal(len(test.expected), len(pieces), test.name)
+		assert.Nil(err, test.name)
 
 		for _, obj := range pieces {
 			objectMeta, _ := meta.Accessor(obj)
 
-			assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-")
+			assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-", test.name)
 		}
 	}
 }

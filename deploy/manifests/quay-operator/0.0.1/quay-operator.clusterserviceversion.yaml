@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:3ee5adbf381a167bf424f43281ff7c753b5a2a8a740ba47bd32f21fc67432454
+    containerImage: quay.io/projectquay/quay-operator@sha256:27e7e052cdf72943d1f27f2d7c8cfbd4e1710a20b6e774eb5f4133be319d2789
     createdAt: 2020-07-20 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -19,11 +19,11 @@ metadata:
           },
           "spec": {
             "configBundleSecret": "example-registry-config-bundle",
-            "managedComponents": [
-              {"kind": "clair"},
-              {"kind": "postgres"},
-              {"kind": "storage"},
-              {"kind": "redis"}
+            "components": [
+              {"kind": "clair", "managed": true},
+              {"kind": "postgres", "managed": true},
+              {"kind": "storage", "managed": true},
+              {"kind": "redis", "managed": true}
             ]
           }
         }
@@ -55,9 +55,15 @@ spec:
           description: Name of the Quay config secret containing base configuration and custom SSL certificates.
           x-descriptors:
             - 'urn:alm:descriptor:io.kubernetes:Secret'
-        - path: managedComponents
-          displayName: ManagedComponents
-          description: Declares which supplemental services should be included in this Quay deployment.
+        - path: components
+          displayName: Components
+          description: Declares how the Operator should handle supplemental Quay services.
+        - path: components[0].kind
+          displayName: Kind
+          description: The unique name of this type of component.
+        - path: components[0].managed
+          displayName: Managed
+          description: Indicates whether lifecycle of this component is managed by the Operator or externally.
   description: Opinionated deployment of Quay on Kubernetes.
   displayName: Quay
   install:
@@ -92,7 +98,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
-                image: quay.io/projectquay/quay-operator@sha256:3ee5adbf381a167bf424f43281ff7c753b5a2a8a740ba47bd32f21fc67432454
+                image: quay.io/projectquay/quay-operator@sha256:27e7e052cdf72943d1f27f2d7c8cfbd4e1710a20b6e774eb5f4133be319d2789
                 name: quay-operator
               serviceAccountName: quay-operator
       permissions:

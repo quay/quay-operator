@@ -168,28 +168,32 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 			},
 		},
 	}
+
 	components := []string{}
-	for _, managedComponent := range quay.Spec.ManagedComponents {
-		components = append(components, filepath.Join("..", "components", managedComponent.Kind))
-		componentConfigFiles, err := componentConfigFilesFor(managedComponent.Kind, quay)
-		if componentConfigFiles == nil || err != nil {
-			continue
-		}
+	for _, component := range quay.Spec.Components {
+		if component.Managed {
+			components = append(components, filepath.Join("..", "components", component.Kind))
 
-		sources := []string{}
-		for filename, fileValue := range componentConfigFiles {
-			sources = append(sources, strings.Join([]string{filename, string(fileValue)}, "="))
-		}
+			componentConfigFiles, err := componentConfigFilesFor(component.Kind, quay)
+			if componentConfigFiles == nil || err != nil {
+				continue
+			}
 
-		generatedSecrets = append(generatedSecrets, types.SecretArgs{
-			GeneratorArgs: types.GeneratorArgs{
-				Name:     managedComponent.Kind + "-config-secret",
-				Behavior: "merge",
-				KvPairSources: types.KvPairSources{
-					LiteralSources: sources,
+			sources := []string{}
+			for filename, fileValue := range componentConfigFiles {
+				sources = append(sources, strings.Join([]string{filename, string(fileValue)}, "="))
+			}
+
+			generatedSecrets = append(generatedSecrets, types.SecretArgs{
+				GeneratorArgs: types.GeneratorArgs{
+					Name:     component.Kind + "-config-secret",
+					Behavior: "merge",
+					KvPairSources: types.KvPairSources{
+						LiteralSources: sources,
+					},
 				},
-			},
-		})
+			})
+		}
 	}
 
 	return &types.Kustomization{
@@ -258,7 +262,7 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 		"SECRET_KEY":          secretKey,
 	})
 
-	for _, component := range quay.Spec.ManagedComponents {
+	for _, component := range quay.Spec.Components {
 		configFile, err := ConfigFileFor(component.Kind, quay)
 		check(err)
 		componentConfigFiles[component.Kind+".config.yaml"] = configFile
