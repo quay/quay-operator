@@ -1,6 +1,7 @@
 package kustomize
 
 import (
+	"strings"
 	"testing"
 
 	testlogr "github.com/go-logr/logr/testing"
@@ -32,6 +33,64 @@ var kustomizationForTests = []struct {
 		"AllComponents",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "storage", Managed: true},
+				},
+			},
+		},
+		&types.Kustomization{
+			TypeMeta: types.TypeMeta{
+				APIVersion: types.KustomizationVersion,
+				Kind:       types.KustomizationKind,
+			},
+			Resources: []string{},
+			Components: []string{
+				"../components/postgres",
+				"../components/clair",
+				"../components/redis",
+				"../components/storage",
+			},
+			SecretGenerator: []types.SecretArgs{},
+		},
+		"",
+	},
+	{
+		"InvalidDesiredVersion",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				DesiredVersion: "not-a-real-version",
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "storage", Managed: true},
+				},
+			},
+		},
+		&types.Kustomization{
+			TypeMeta: types.TypeMeta{
+				APIVersion: types.KustomizationVersion,
+				Kind:       types.KustomizationKind,
+			},
+			Resources: []string{},
+			Components: []string{
+				"../components/postgres",
+				"../components/clair",
+				"../components/redis",
+				"../components/storage",
+			},
+			SecretGenerator: []types.SecretArgs{},
+		},
+		"",
+	},
+	{
+		"ValidDesiredVersion",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				DesiredVersion: v1.QuayVersionPadme,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -117,6 +176,7 @@ var quayComponents = map[string][]runtime.Object{
 		&rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: "quay-serviceaccount"}},
 		&rbac.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "quay-secret-writer"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
+		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-deployment"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-secret"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-registry-managed-secret-keys"}},
@@ -167,6 +227,7 @@ var inflateTests = []struct {
 		"AllComponentsManagedExplicit",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
+				DesiredVersion: v1.QuayVersionPadme,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -187,6 +248,7 @@ var inflateTests = []struct {
 		"AllComponentsUnmanaged",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
+				DesiredVersion: v1.QuayVersionPadme,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: false},
 					{Kind: "clair", Managed: false},
@@ -207,6 +269,7 @@ var inflateTests = []struct {
 		"SomeComponentsUnmanaged",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
+				DesiredVersion: v1.QuayVersionPadme,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -221,6 +284,27 @@ var inflateTests = []struct {
 			},
 		},
 		withComponents([]string{"base", "postgres", "clair"}),
+		nil,
+	},
+	{
+		"DesiredVersion",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				DesiredVersion: v1.QuayVersionQuiGon,
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "storage", Managed: true},
+				},
+			},
+		},
+		&corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+			},
+		},
+		withComponents([]string{"base", "postgres", "clair", "redis", "storage"}),
 		nil,
 	},
 }
@@ -241,6 +325,9 @@ func TestInflate(t *testing.T) {
 			objectMeta, _ := meta.Accessor(obj)
 
 			assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-", test.name)
+			if !strings.Contains(objectMeta.GetName(), "managed-secret-keys") {
+				assert.Equal(string(test.quayRegistry.Spec.DesiredVersion), objectMeta.GetAnnotations()["quay-version"], test.name)
+			}
 		}
 	}
 }

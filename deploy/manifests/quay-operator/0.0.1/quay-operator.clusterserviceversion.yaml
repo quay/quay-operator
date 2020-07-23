@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:27e7e052cdf72943d1f27f2d7c8cfbd4e1710a20b6e774eb5f4133be319d2789
+    containerImage: quay.io/alecmerdler/quay-operator@sha256:eeee608c763a302ef2ac709edb42dcf679c4533b0b27ba5a7ca5bd149a5dcf32
     createdAt: 2020-07-20 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -55,9 +55,18 @@ spec:
           description: Name of the Quay config secret containing base configuration and custom SSL certificates.
           x-descriptors:
             - 'urn:alm:descriptor:io.kubernetes:Secret'
+        - path: desiredVersion
+          displayName: Desired Version
+          description: Declares the version of Quay that should deployed and managed. Defaults to latest version.
+          x-descriptors: 
+            - 'urn:alm:descriptor:com.tectonic.ui:select:padme'
+            - 'urn:alm:descriptor:com.tectonic.ui:select:qui-gon'
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
         - path: components
           displayName: Components
           description: Declares how the Operator should handle supplemental Quay services.
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
         - path: components[0].kind
           displayName: Kind
           description: The unique name of this type of component.
@@ -98,7 +107,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
-                image: quay.io/projectquay/quay-operator@sha256:27e7e052cdf72943d1f27f2d7c8cfbd4e1710a20b6e774eb5f4133be319d2789
+                image: quay.io/alecmerdler/quay-operator@sha256:eeee608c763a302ef2ac709edb42dcf679c4533b0b27ba5a7ca5bd149a5dcf32
                 name: quay-operator
               serviceAccountName: quay-operator
       permissions:

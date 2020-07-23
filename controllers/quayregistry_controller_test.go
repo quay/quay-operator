@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -43,6 +44,7 @@ func newQuayRegistry(name, namespace string) v1.QuayRegistry {
 			Namespace: namespace,
 		},
 		Spec: v1.QuayRegistrySpec{
+			DesiredVersion: v1.QuayVersionQuiGon,
 			Components: []v1.Component{
 				// FIXME(alecmerdler): Test omitting components and marking some as disabled/unmanaged...
 				{Kind: "postgres", Managed: true},
@@ -114,11 +116,30 @@ var _ = Describe("QuayRegistryReconciler", func() {
 		var result reconcile.Result
 		var err error
 
+		// progressUpgradeDeployment sets the `status` manually because `envtest` only runs apiserver, not controllers.
+		progressUpgradeDeployment := func() error {
+			var upgradeDeployment appsv1.Deployment
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: namespace}, &upgradeDeployment)
+			if err != nil {
+				return err
+			}
+
+			upgradeDeployment.Status.Replicas = 1
+			upgradeDeployment.Status.ReadyReplicas = 1
+
+			return k8sClient.Status().Update(context.Background(), &upgradeDeployment)
+		}
+
 		JustBeforeEach(func() {
-			Expect(k8sClient.Create(context.Background(), &quayRegistry)).NotTo(HaveOccurred())
-			Expect(k8sClient.Create(context.Background(), &configBundle)).NotTo(HaveOccurred())
+			Expect(k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), &quayRegistry)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
 
 			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		JustAfterEach(func() {
+			Expect(k8sClient.Delete(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})).Should(Succeed())
 		})
 
 		Context("on a newly created `QuayRegistry`", func() {
@@ -183,14 +204,33 @@ var _ = Describe("QuayRegistryReconciler", func() {
 				})
 
 				It("reports the current version in the `status` block", func() {
+					Expect(progressUpgradeDeployment()).Should(Succeed())
+
 					var updatedQuayRegistry v1.QuayRegistry
 
-					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).NotTo(HaveOccurred())
-					Expect(updatedQuayRegistry.Status.CurrentVersion).To(Equal(v1.QuayVersionQuiGon))
+					Eventually(func() v1.QuayVersion {
+						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
+						return updatedQuayRegistry.Status.CurrentVersion
+					}, time.Second*30).Should(Equal(v1.QuayVersionQuiGon))
 				})
 
-				When("the `components` field is empty", func() {
-					// TODO(alecmerdler)
+				When("the `spec.desiredVersion` field is empty", func() {
+					BeforeEach(func() {
+						quayRegistry.Spec.DesiredVersion = ""
+					})
+
+					It("will populate the `spec.desiredVersion` field with the latest version", func() {
+						var updatedQuayRegistry v1.QuayRegistry
+
+						Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry))
+						Expect(updatedQuayRegistry.Spec.DesiredVersion).To(Equal(v1.QuayVersionQuiGon))
+					})
+				})
+
+				When("the `spec.components` field is empty", func() {
+					It("will add all backing components as managed", func() {
+
+					})
 				})
 			})
 		})
@@ -269,10 +309,14 @@ var _ = Describe("QuayRegistryReconciler", func() {
 				})
 
 				It("reports the current version in the `status` block", func() {
+					Expect(progressUpgradeDeployment()).Should(Succeed())
+
 					var updatedQuayRegistry v1.QuayRegistry
 
-					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).NotTo(HaveOccurred())
-					Expect(updatedQuayRegistry.Status.CurrentVersion).To(Equal(v1.QuayVersionQuiGon))
+					Eventually(func() v1.QuayVersion {
+						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
+						return updatedQuayRegistry.Status.CurrentVersion
+					}, time.Second*30).Should(Equal(v1.QuayVersionQuiGon))
 				})
 			})
 		})

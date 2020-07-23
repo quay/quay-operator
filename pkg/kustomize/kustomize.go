@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/krusty"
+	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/yaml"
 
@@ -38,6 +39,14 @@ func kustomizeDir() string {
 
 func appDir() string {
 	return filepath.Join(kustomizeDir(), "tmp")
+}
+
+func overlayDir(desiredVersion v1.QuayVersion) string {
+	return filepath.Join(kustomizeDir(), "overlays", "upstream", string(desiredVersion))
+}
+
+func upgradeOverlayDir(desiredVersion v1.QuayVersion) string {
+	return filepath.Join(kustomizeDir(), "overlays", "upstream", string(desiredVersion), "upgrade")
 }
 
 func check(err error) {
@@ -83,7 +92,7 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 }
 
 // generate uses Kustomize as a library to build the runtime objects to be applied to a cluster.
-func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]byte) ([]k8sruntime.Object, error) {
+func generate(kustomization *types.Kustomization, overlay string, quayConfigFiles map[string][]byte) ([]k8sruntime.Object, error) {
 	fSys := filesys.MakeEmptyDirInMemory()
 	err := filepath.Walk(kustomizeDir(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -120,7 +129,7 @@ func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]b
 
 	opts := &krusty.Options{}
 	k := krusty.MakeKustomizer(fSys, opts)
-	resMap, err := k.Run(appDir())
+	resMap, err := k.Run(overlay)
 	check(err)
 
 	output := []k8sruntime.Object{}
@@ -161,8 +170,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 	generatedSecrets := []types.SecretArgs{
 		{
 			GeneratorArgs: types.GeneratorArgs{
-				Name:     configSecretPrefix,
-				Behavior: "merge",
+				Name: configSecretPrefix,
 				KvPairSources: types.KvPairSources{
 					FileSources: configFiles,
 				},
@@ -207,6 +215,19 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		Resources:       []string{"../base"},
 		Components:      components,
 		SecretGenerator: generatedSecrets,
+		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
+		Vars: []types.Var{
+			{
+				Name: "QE_K8S_CONFIG_SECRET",
+				ObjRef: types.Target{
+					APIVersion: "v1",
+					Gvk: resid.Gvk{
+						Kind: "Secret",
+					},
+					Name: "quay-config-secret",
+				},
+			},
+		},
 	}, nil
 }
 
@@ -272,7 +293,13 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	kustomization, err := KustomizationFor(quay, componentConfigFiles)
 	check(err)
 
-	resources, err := generate(kustomization, componentConfigFiles)
+	var overlay string
+	if quay.Spec.DesiredVersion == quay.Status.CurrentVersion {
+		overlay = overlayDir(quay.Spec.DesiredVersion)
+	} else {
+		overlay = upgradeOverlayDir(quay.Spec.DesiredVersion)
+	}
+	resources, err := generate(kustomization, overlay, componentConfigFiles)
 	check(err)
 
 	for index, resource := range resources {

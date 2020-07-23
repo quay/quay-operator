@@ -8,12 +8,4 @@ resources:
   - ./quay.rolebinding.yaml
   - ./quay.deployment.yaml
   - ./quay.service.yaml
-secretGenerator:
-  - name: quay-config-secret
-# FIXME(alecmerdler): Using `vars` is kinda ugly because it's basically templating, so don't abuse them
-vars:
-  - name: QE_K8S_CONFIG_SECRET
-    objref:
-      kind: Secret
-      name: quay-config-secret
-      apiVersion: v1
+  - ./upgrade.deployment.yaml

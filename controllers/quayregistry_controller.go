@@ -18,8 +18,10 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-logr/logr"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,6 +37,9 @@ import (
 	v1 "github.com/quay/quay-operator/api/v1"
 	"github.com/quay/quay-operator/pkg/kustomize"
 )
+
+const upgradePollInterval = time.Second * 10
+const upgradePollTimeout = time.Second * 120
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
 type QuayRegistryReconciler struct {
@@ -74,7 +80,22 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
 
-	updatedQuay, err := v1.EnsureDefaultComponents(&quay)
+	updatedQuay, err := v1.EnsureDesiredVersion(&quay)
+	if err != nil {
+		log.Error(err, "could not ensure `spec.desiredVersion`")
+		return ctrl.Result{}, err
+	}
+
+	if quay.Spec.DesiredVersion != updatedQuay.Spec.DesiredVersion {
+		log.Info("updating QuayRegistry `spec.desiredVersion`")
+		if err = r.Client.Update(ctx, updatedQuay); err != nil {
+			log.Error(err, "failed to update `spec.desiredVersion`")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	updatedQuay, err = v1.EnsureDefaultComponents(&quay)
 	if err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
 		return ctrl.Result{}, err
@@ -96,17 +117,40 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	for _, obj := range deploymentObjects {
-		r.createOrUpdateObject(ctx, obj, quay)
+		_ = r.createOrUpdateObject(ctx, obj, quay)
 	}
-
 	log.Info("all objects created/updated successfully")
 
-	updatedQuay.Status.CurrentVersion = v1.QuayVersionQuiGon
-	err = r.Client.Status().Update(ctx, updatedQuay)
-	if err != nil {
-		log.Error(err, "could not update QuayRegistry status with current version")
-		return ctrl.Result{}, err
-	}
+	go func(quayRegistry *v1.QuayRegistry) {
+		err = wait.Poll(upgradePollInterval, upgradePollTimeout, func() (bool, error) {
+			log.Info("checking Quay upgrade deployment readiness")
+
+			var upgradeDeployment appsv1.Deployment
+			err = r.Client.Get(ctx, types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: quayRegistry.GetNamespace()}, &upgradeDeployment)
+			if err != nil {
+				log.Error(err, "could not retrieve Quay upgrade deployment during upgrade")
+				return false, err
+			}
+
+			if upgradeDeployment.Spec.Size() < 1 {
+				log.Info("upgrade deployment scaled down, skipping check")
+				return true, nil
+			}
+
+			if upgradeDeployment.Status.ReadyReplicas > 0 {
+				log.Info("Quay upgrade complete, updating `status.currentVersion`")
+
+				updatedQuay.Status.CurrentVersion = updatedQuay.Spec.DesiredVersion
+				err = r.Client.Status().Update(ctx, updatedQuay)
+				if err != nil {
+					log.Error(err, "could not update QuayRegistry status with current version")
+					return true, err
+				}
+			}
+
+			return upgradeDeployment.Status.ReadyReplicas > 0, nil
+		})
+	}(updatedQuay.DeepCopy())
 
 	return ctrl.Result{}, nil
 }

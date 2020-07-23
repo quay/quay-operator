@@ -17,8 +17,22 @@ limitations under the License.
 package v1
 
 import (
+	"errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type QuayVersion string
+
+const (
+	QuayVersionQuiGon QuayVersion = "qui-gon"
+	QuayVersionPadme  QuayVersion = "padme"
+)
+
+var quayVersions = []QuayVersion{
+	QuayVersionPadme,
+	QuayVersionQuiGon,
+}
 
 var allComponents = []string{
 	"postgres",
@@ -27,17 +41,15 @@ var allComponents = []string{
 	"storage",
 }
 
-type QuayVersion string
-
-const (
-	QuayVersionPadme  QuayVersion = "padme"
-	QuayVersionQuiGon QuayVersion = "qui-gon"
-)
-
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
+	// DesiredVersion declares the version of Quay that should deployed and managed.
+	// Upgrading Quay is accomplished by modifying this field. Runtime validation will prevent upgrading backwards.
+	// If any unmanaged components are incompatible with the value of this field, the Operator will not upgrade.
+	// If omitted, will default to the latest version that the Operator knows how to manage.
+	DesiredVersion QuayVersion `json:"desiredVersion,omitempty"`
 	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace which contains the base Quay config and extra certs.
-	ConfigBundleSecret string `json:"configBundleSecret,omitempty"`
+	ConfigBundleSecret string `json:"configBundleSecret"`
 	// Components declare how the Operator should handle backing Quay services.
 	Components []Component `json:"components,omitempty"`
 }
@@ -121,6 +133,28 @@ func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 		}
 	}
 	return true
+}
+
+// EnsureDesiredVersion validates that the Operator can managed the `Spec.DesiredVersion` indicated,
+// or else sets it to the latest version it can manage if unset.
+func EnsureDesiredVersion(quay *QuayRegistry) (*QuayRegistry, error) {
+	updatedQuay := quay.DeepCopy()
+
+	if updatedQuay.Spec.DesiredVersion == "" {
+		updatedQuay.Spec.DesiredVersion = quayVersions[len(quayVersions)-1]
+
+		return updatedQuay, nil
+	}
+
+	for _, version := range quayVersions {
+		if version == updatedQuay.Spec.DesiredVersion {
+			return updatedQuay, nil
+		}
+	}
+
+	// TODO(alecmerdler): Ensure that `spec.desiredVersion` is not a "downgrade" from `status.currentVersion`
+
+	return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
 }
 
 func init() {
