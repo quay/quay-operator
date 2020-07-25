@@ -33,7 +33,11 @@ func (r *LoadBalancerExternalAccess) ManageQuayExternalAccess(meta metav1.Object
 		return err
 	}
 
-	r.QuayConfiguration.QuayHostname = hostname
+	if utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname) {
+		r.QuayConfiguration.QuayHostname = hostname
+	} else {
+		r.QuayConfiguration.QuayHostname = r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.Hostname
+	}
 
 	return nil
 
@@ -49,7 +53,9 @@ func (r *LoadBalancerExternalAccess) ManageQuayConfigExternalAccess(meta metav1.
 		return err
 	}
 
-	r.QuayConfiguration.QuayConfigHostname = hostname
+	if !utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname) {
+		r.QuayConfiguration.QuayConfigHostname = hostname
+	}
 
 	return nil
 
@@ -74,7 +80,7 @@ func (r *LoadBalancerExternalAccess) getHostnameFromExternalName(serviceName str
 	if service.Status.LoadBalancer.Ingress[0].Hostname != "" {
 		hostname := service.Status.LoadBalancer.Ingress[0].Hostname
 
-		logging.Log.Info(fmt.Sprintf("Waiting for Resolve LoadBalancer Service '%s'", hostname))
+		logging.Log.Info(fmt.Sprintf("Waiting to Resolve LoadBalancer Service '%s'", hostname))
 
 		err := utils.Retry(60, 5*time.Second, func() (err error) {
 			_, err = net.LookupIP(hostname)

@@ -6,6 +6,7 @@ import (
 	"github.com/redhat-cop/operator-utils/pkg/util"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/logging"
 	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/resources"
+	"github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,9 +39,14 @@ func (r *IngressExternalAccess) ManageQuayConfigExternalAccess(meta metav1.Objec
 
 	meta.Name = resources.GetQuayConfigResourcesName(r.QuayConfiguration.QuayEcosystem)
 
-	r.QuayConfiguration.QuayConfigHostname = r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname
+	if !utils.IsZeroOfUnderlyingType(r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname) {
+		r.QuayConfiguration.QuayConfigHostname = r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname
+		return r.configureIngress(meta, r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname, true)
+	} else {
+		r.QuayConfiguration.QuayConfigHostname = meta.Name
+		return nil
+	}
 
-	return r.configureIngress(meta, r.QuayConfiguration.QuayEcosystem.Spec.Quay.ExternalAccess.ConfigHostname, true)
 }
 
 func (r *IngressExternalAccess) RemoveQuayConfigExternalAccess(meta metav1.ObjectMeta) error {
