@@ -145,6 +145,13 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					Expect(k8sClient.List(context.Background(), &persistentVolumeClaims, &listOptions)).NotTo(HaveOccurred())
 					Expect(persistentVolumeClaims.Items).To(HaveLen(0))
 				})
+
+				It("does not set the current version in the `status` block", func() {
+					var updatedQuayRegistry v1.QuayRegistry
+
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry))
+					Expect(len(updatedQuayRegistry.Status.CurrentVersion)).To(Equal(0))
+				})
 			})
 
 			Context("which references a `configBundleSecret` that does exist", func() {
@@ -175,6 +182,13 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					}
 				})
 
+				It("reports the current version in the `status` block", func() {
+					var updatedQuayRegistry v1.QuayRegistry
+
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).NotTo(HaveOccurred())
+					Expect(updatedQuayRegistry.Status.CurrentVersion).To(Equal(v1.QuayVersionQuiGon))
+				})
+
 				When("the `components` field is empty", func() {
 					// TODO(alecmerdler)
 				})
@@ -191,8 +205,9 @@ var _ = Describe("QuayRegistryReconciler", func() {
 
 			Context("which references a `configBundleSecret` that does not exist", func() {
 				JustBeforeEach(func() {
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &quayRegistry))
 					quayRegistry.Spec.ConfigBundleSecret = "does-not-exist"
-					_ = k8sClient.Update(context.Background(), &quayRegistry)
+					Expect(k8sClient.Update(context.Background(), &quayRegistry)).NotTo(HaveOccurred())
 
 					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
 				})
@@ -215,6 +230,13 @@ var _ = Describe("QuayRegistryReconciler", func() {
 							}
 						}
 					}
+				})
+
+				It("does not change the current version in the `status` block", func() {
+					var updatedQuayRegistry v1.QuayRegistry
+
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry))
+					Expect(updatedQuayRegistry.Status.CurrentVersion).To(Equal(quayRegistry.Status.CurrentVersion))
 				})
 			})
 
@@ -244,6 +266,13 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					for _, persistentVolumeClaim := range persistentVolumeClaims.Items {
 						verifyOwnerRefs(persistentVolumeClaim.GetOwnerReferences())
 					}
+				})
+
+				It("reports the current version in the `status` block", func() {
+					var updatedQuayRegistry v1.QuayRegistry
+
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).NotTo(HaveOccurred())
+					Expect(updatedQuayRegistry.Status.CurrentVersion).To(Equal(v1.QuayVersionQuiGon))
 				})
 			})
 		})
