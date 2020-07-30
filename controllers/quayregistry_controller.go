@@ -121,36 +121,38 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	log.Info("all objects created/updated successfully")
 
-	go func(quayRegistry *v1.QuayRegistry) {
-		err = wait.Poll(upgradePollInterval, upgradePollTimeout, func() (bool, error) {
-			log.Info("checking Quay upgrade deployment readiness")
+	if updatedQuay.Spec.DesiredVersion != updatedQuay.Status.CurrentVersion {
+		go func(quayRegistry *v1.QuayRegistry) {
+			err = wait.Poll(upgradePollInterval, upgradePollTimeout, func() (bool, error) {
+				log.Info("checking Quay upgrade deployment readiness")
 
-			var upgradeDeployment appsv1.Deployment
-			err = r.Client.Get(ctx, types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: quayRegistry.GetNamespace()}, &upgradeDeployment)
-			if err != nil {
-				log.Error(err, "could not retrieve Quay upgrade deployment during upgrade")
-				return false, err
-			}
-
-			if upgradeDeployment.Spec.Size() < 1 {
-				log.Info("upgrade deployment scaled down, skipping check")
-				return true, nil
-			}
-
-			if upgradeDeployment.Status.ReadyReplicas > 0 {
-				log.Info("Quay upgrade complete, updating `status.currentVersion`")
-
-				updatedQuay.Status.CurrentVersion = updatedQuay.Spec.DesiredVersion
-				err = r.Client.Status().Update(ctx, updatedQuay)
+				var upgradeDeployment appsv1.Deployment
+				err = r.Client.Get(ctx, types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: quayRegistry.GetNamespace()}, &upgradeDeployment)
 				if err != nil {
-					log.Error(err, "could not update QuayRegistry status with current version")
-					return true, err
+					log.Error(err, "could not retrieve Quay upgrade deployment during upgrade")
+					return false, err
 				}
-			}
 
-			return upgradeDeployment.Status.ReadyReplicas > 0, nil
-		})
-	}(updatedQuay.DeepCopy())
+				if upgradeDeployment.Spec.Size() < 1 {
+					log.Info("upgrade deployment scaled down, skipping check")
+					return true, nil
+				}
+
+				if upgradeDeployment.Status.ReadyReplicas > 0 {
+					log.Info("Quay upgrade complete, updating `status.currentVersion`")
+
+					updatedQuay.Status.CurrentVersion = updatedQuay.Spec.DesiredVersion
+					err = r.Client.Status().Update(ctx, updatedQuay)
+					if err != nil {
+						log.Error(err, "could not update QuayRegistry status with current version")
+						return true, err
+					}
+				}
+
+				return upgradeDeployment.Status.ReadyReplicas > 0, nil
+			})
+		}(updatedQuay.DeepCopy())
+	}
 
 	return ctrl.Result{}, nil
 }
