@@ -75,10 +75,23 @@ USER_EVENTS_REDIS:
   - access_key: minio
     bucket_name: quay-datastore
     hostname: test-quay-datastore
-    is_secure: false
     port: 9000
     secret_key: minio123
     storage_path: /datastorage/registry
+DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+- default
+DISTRIBUTED_STORAGE_PREFERENCE:
+- default
+`),
+	},
+	{
+		"localstorage",
+		"localstorage",
+		quayRegistry("test"),
+		[]byte(`DISTRIBUTED_STORAGE_CONFIG:
+  default:
+  - LocalStorage
+  - storage_path: /datastorage/registry
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
 - default
 DISTRIBUTED_STORAGE_PREFERENCE:

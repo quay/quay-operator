@@ -501,8 +501,8 @@ github.com/quay/alas v1.0.1/go.mod h1:pseepSrG9pwry1joG7RO/RNRFJaWqiqx9qeoomeYwE
 github.com/quay/clair/v4 v4.0.0-alpha.7.0.20200717155243-2238b246a10b h1:o0MmZ8iZq5P6eiI0ZzPW3A3iH6mdVYv7AEAdTjS/tMM=
 github.com/quay/clair/v4 v4.0.0-alpha.7.0.20200717155243-2238b246a10b/go.mod h1:S9FAWidxrQiloMs3SCTMhHgLPWzAS5N665JtZtTa9vs=
 github.com/quay/claircore v0.0.25/go.mod h1:ysm67dybuIT07tJWhmSGgqeWk2sug2DnNjGcesqVQpI=
-github.com/quay/config-tool v0.0.0-20200717172926-23bafd151641 h1:T6lEVWz2dUMMdeP8Xm5MPjoJhE2zY7lfJ8hIcs83E7c=
-github.com/quay/config-tool v0.0.0-20200717172926-23bafd151641/go.mod h1:hwCVXiOmjG4VVnRP5fc8ati86F/s5uvR/+ngU36kssg=
+github.com/quay/config-tool v0.1.2-0.20200803212319-e26fe9918b18 h1:aU+7ZzxohsI6Ahjt1bRGwZ1XBWXSwYsTU6hSpqq/1jw=
+github.com/quay/config-tool v0.1.2-0.20200803212319-e26fe9918b18/go.mod h1:hwCVXiOmjG4VVnRP5fc8ati86F/s5uvR/+ngU36kssg=
 github.com/quay/goval-parser v0.8.1/go.mod h1:Y0NTNfPYOC7yxsYKzJOrscTWUPq1+QbtHw4XpPXWPMc=
 github.com/remind101/migrate v0.0.0-20170729031349-52c1edff7319/go.mod h1:rhSvwcijY9wfmrBYrfCvapX8/xOTV46NAUjBRgUyJqc=
 github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446/go.mod h1:uYEyJGbgTkfkS4+E/PavXkNJcbFIpEtjt2B0KDQ5+9M=

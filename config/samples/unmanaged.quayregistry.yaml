@@ -11,5 +11,5 @@ spec:
       managed: false
     - kind: clair
       managed: false
-    - kind: storage 
+    - kind: localstorage 
       managed: false

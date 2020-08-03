@@ -25,6 +25,7 @@ github.com/evanphx/json-patch
 github.com/go-errors/errors
 # github.com/go-logr/logr v0.1.0
 github.com/go-logr/logr
+github.com/go-logr/logr/testing
 # github.com/go-logr/zapr v0.1.0
 github.com/go-logr/zapr
 # github.com/go-openapi/jsonpointer v0.19.3
@@ -164,7 +165,7 @@ github.com/prometheus/procfs/internal/util
 github.com/qri-io/starlib/util
 # github.com/quay/clair/v4 v4.0.0-alpha.7.0.20200717155243-2238b246a10b
 github.com/quay/clair/v4/config
-# github.com/quay/config-tool v0.0.0-20200717172926-23bafd151641
+# github.com/quay/config-tool v0.1.2-0.20200803212319-e26fe9918b18
 github.com/quay/config-tool/pkg/lib/fieldgroups/database
 github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage
 github.com/quay/config-tool/pkg/lib/fieldgroups/redis

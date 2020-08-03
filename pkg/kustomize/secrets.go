@@ -134,6 +134,22 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s/%s", user, password, host, name)
 
 		return yaml.Marshal(fieldGroup)
+	case "localstorage":
+		fieldGroup := distributedstorage.DistributedStorageFieldGroup{
+			DistributedStoragePreference:       []string{"default"},
+			DistributedStorageDefaultLocations: []string{"default"},
+			DistributedStorageConfig: map[string]distributedstorage.DistributedStorage{
+				"default": {
+					Name: "LocalStorage",
+					Args: distributedstorage.DistributedStorageArgs{
+						StoragePath: "/datastorage/registry",
+					},
+				},
+			},
+		}
+
+		return yaml.Marshal(fieldGroup)
+	// FIXME(alecmerdler): Needs to be just "minio"
 	case "storage":
 		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
 			DistributedStoragePreference:       []string{"default"},
