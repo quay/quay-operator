@@ -21,26 +21,11 @@ jobs:
         run: make native-test
 
       - name: Helm Test
-        env:
-          HELM_VERSION: v3.0.3
-          CT_VERSION: 3.0.0-beta.1
-          CHART_DIRECTORY: "./charts/quay-operator"
-        run: |
-          sudo apt-get -y install yamllint
-          wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz
-          tar zxf helm-${HELM_VERSION}-linux-amd64.tar.gz
-          sudo mv linux-amd64/helm /usr/local/bin
-          rm -rf linux-amd64
-          pip install wheel
-          sudo pip install yamale
-          wget https://github.com/helm/chart-testing/releases/download/v${CT_VERSION}/chart-testing_${CT_VERSION}_linux_amd64.tar.gz
-          tar zxf chart-testing_${CT_VERSION}_linux_amd64.tar.gz
-          mkdir $HOME/.ct
-          mv etc/* $HOME/.ct/
-          sudo mv ct /usr/local/bin/
-          helm template ${CHART_DIRECTORY} > quay-operator-yamllint.yml
-          yamllint quay-operator-yamllint.yml
-          ct lint
+        id: lint
+        uses: helm/chart-testing-action@v1.0.0
+        with:
+          command: lint
+          config: ct.yaml
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v1
