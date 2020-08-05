@@ -135,6 +135,29 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s/%s", user, password, host, name)
 
 		return yaml.Marshal(fieldGroup)
+	case "rhocs":
+		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
+			DistributedStoragePreference:       []string{"default"},
+			DistributedStorageDefaultLocations: []string{"default"},
+			DistributedStorageConfig: map[string]distributedstorage.DistributedStorage{
+				"default": {
+					Name: "RadosGWStorage",
+					Args: distributedstorage.DistributedStorageArgs{
+						Hostname:    "s3.openshift-storage.svc",
+						IsSecure:    true,
+						Port:        443,
+						StoragePath: "/datastorage/registry",
+						// FIXME(alecmerdler): Figure out how to get these from the created `Secret` that the `ObjectBucketClaim` creates...
+						// FIXME(alecmerdler): Maybe we can do something similar to the `upgrade` overlays to wait until components are provisioned...
+						AccessKey:  "Kvy8Ry15GNVv3fz4VHPl",
+						SecretKey:  "cdD7Ie6Ad3N3aXlb+icO7B193s7UqcDB9XMZPQGm",
+						BucketName: quay.GetName() + "-quay-datastore",
+					},
+				},
+			},
+		}
+
+		return yaml.Marshal(fieldGroup)
 	case "localstorage":
 		fieldGroup := distributedstorage.DistributedStorageFieldGroup{
 			DistributedStoragePreference:       []string{"default"},

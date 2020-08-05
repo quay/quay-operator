@@ -117,6 +117,17 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, nil
 	}
 
+	for _, component := range quay.Spec.Components {
+		if component.Kind == "rhocs" && component.Managed {
+			var datastoreSecret corev1.Secret
+			if err = r.Client.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.GetName() + "-quay-datastore"}, &datastoreSecret); err != nil {
+				log.Error(err, "unable to retrieve RHOCS datastore secret")
+				return ctrl.Result{}, err
+			}
+			// TODO(alecmerdler): Pass `datastoreSecret.Data["AWS_ACCESS_KEY_ID"]` and `datastore.Data["AWS_SECRET_ACCESS_KEY"]`
+		}
+	}
+
 	deploymentObjects, err := kustomize.Inflate(updatedQuay, &configBundle, &secretKeysBundle, log)
 	if err != nil {
 		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
