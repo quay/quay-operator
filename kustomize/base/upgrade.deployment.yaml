@@ -45,7 +45,7 @@ spec:
               command:
                 - curl
                 - '-k'
-                - 'https://localhost:8443/health/instance'
+                - 'http://localhost:8080/health/instance'
             initialDelaySeconds: 30
             timeoutSeconds: 20
             periodSeconds: 15

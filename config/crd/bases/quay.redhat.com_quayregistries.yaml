@@ -79,6 +79,10 @@ spec:
               description: CurrentVersion is the actual version of Quay that is actively
                 deployed.
               type: string
+            registryEndpoint:
+              description: RegistryEndpoint is the external access point for the Quay
+                registry.
+              type: string
           type: object
       type: object
   version: v1

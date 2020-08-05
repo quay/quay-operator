@@ -10,6 +10,7 @@ import (
 	"github.com/quay/clair/v4/config"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/redis"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
 	corev1 "k8s.io/api/core/v1"
@@ -169,6 +170,19 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 					},
 				},
 			},
+		}
+
+		return yaml.Marshal(fieldGroup)
+	case "route":
+		clusterHostname := quay.GetAnnotations()[v1.ClusterHostnameAnnotation]
+
+		fieldGroup := hostsettings.HostSettingsFieldGroup{
+			ExternalTlsTermination: true,
+			PreferredUrlScheme:     "https",
+			ServerHostname: strings.Join([]string{
+				strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
+				clusterHostname},
+				"."),
 		}
 
 		return yaml.Marshal(fieldGroup)

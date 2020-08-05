@@ -205,6 +205,9 @@ var quayComponents = map[string][]runtime.Object{
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-datastore"}},
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "minio-pv-claim"}},
 	},
+	"route": {
+		// TODO(alecmerdler): Import OpenShift `Route` API struct
+	},
 }
 
 func withComponents(components []string) []runtime.Object {

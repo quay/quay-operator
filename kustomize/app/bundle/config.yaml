@@ -1,0 +1,7 @@
+ENTERPRISE_LOGO_URL: /static/img/quay-horizontal-color.svg
+FEATURE_MAILING: false
+FEATURE_SUPER_USERS: true
+SUPER_USERS:
+- admin
+REGISTRY_TITLE: Quay
+REGISTRY_TITLE_SHORT: Quay

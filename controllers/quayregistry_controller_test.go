@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -231,6 +232,35 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					It("will add all backing components as managed", func() {
 
 					})
+				})
+			})
+
+			When("running on native Kubernetes", func() {
+				XIt("reports `Service` load balancer endpoint in the `status` block", func() {
+					Expect(progressUpgradeDeployment()).Should(Succeed())
+
+					var updatedQuayRegistry v1.QuayRegistry
+
+					Eventually(func() string {
+						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
+						return updatedQuayRegistry.Status.RegistryEndpoint
+					}, time.Second*30).Should(Equal("16.22.171.225"))
+				})
+			})
+
+			When("running on OpenShift", func() {
+				XIt("reports registry `Route` endpoint in the `status` block", func() {
+					Expect(progressUpgradeDeployment()).Should(Succeed())
+
+					var updatedQuayRegistry v1.QuayRegistry
+
+					Eventually(func() string {
+						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
+						return updatedQuayRegistry.Status.RegistryEndpoint
+					}, time.Second*30).Should(Equal(strings.Join([]string{
+						strings.Join([]string{quayRegistry.GetName(), "quay", quayRegistry.GetNamespace()}, "-"),
+						"example.com"},
+						".")))
 				})
 			})
 		})

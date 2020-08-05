@@ -1,0 +1,31 @@
+{
+  "github.com/adnovum/kustomize-openshift/route.openshift.io.v1.Route": {
+    "Schema": {
+      "description": "This is a fake CRD description to make kustomize fix OpenShift route resources. See: https://github.com/adnovum/kustomize-openshift",
+      "properties": {
+        "apiVersion": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"
+        },
+        "spec": {
+          "$ref": "github.com/adnovum/kustomize-openshift/route.openshift.io.v1.RouteSpec"
+        }
+      }
+    }
+  },
+  "github.com/adnovum/kustomize-openshift/route.openshift.io.v1.RouteSpec": {
+    "Schema": {
+      "properties": {
+        "to": {
+          "x-kubernetes-object-ref-api-version": "v1",
+          "x-kubernetes-object-ref-kind": "Service"
+        }
+      }
+    }
+  }
+}

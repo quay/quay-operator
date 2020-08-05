@@ -1,0 +1,10 @@
+# Route component allows external access to the Quay registry using an OpenShift `Route`.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+crds:
+  - ./route.crd.json
+resources: 
+  - ./quay.route.yaml
+patchesStrategicMerge:
+  # Switch `Service` to `type: ClusterIP`
+  - ./quay.service.patch.yaml

@@ -143,6 +143,12 @@ spec:
           - rolebindings
           verbs:
           - '*'
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          verbs:
+          - '*'
         serviceAccountName: quay-operator
     strategy: deployment
   installModes:

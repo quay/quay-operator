@@ -18,11 +18,14 @@ package v1
 
 import (
 	"errors"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type QuayVersion string
+
+const ClusterHostnameAnnotation = "router-canonical-hostname"
 
 const (
 	QuayVersionQuiGon QuayVersion = "qui-gon"
@@ -39,6 +42,7 @@ var allComponents = []string{
 	"clair",
 	"redis",
 	"localstorage",
+	"route",
 }
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
@@ -67,6 +71,8 @@ type Component struct {
 type QuayRegistryStatus struct {
 	// CurrentVersion is the actual version of Quay that is actively deployed.
 	CurrentVersion QuayVersion `json:"currentVersion,omitempty"`
+	// RegistryEndpoint is the external access point for the Quay registry.
+	RegistryEndpoint string `json:"registryEndpoint,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -98,6 +104,12 @@ func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
 		updatedQuay.Spec.Components = []Component{}
 	}
 
+	for _, component := range quay.Spec.Components {
+		if component.Kind == "route" && component.Managed && !supportsRoutes(quay) {
+			return nil, errors.New("cannot use `route` component when `Route` API not available")
+		}
+	}
+
 	for _, component := range allComponents {
 		found := false
 		for _, definedComponent := range quay.Spec.Components {
@@ -106,7 +118,12 @@ func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
 				break
 			}
 		}
+
 		if !found {
+			if component == "route" && !supportsRoutes(quay) {
+				break
+			}
+
 			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{Kind: component, Managed: true})
 		}
 	}
@@ -155,6 +172,33 @@ func EnsureDesiredVersion(quay *QuayRegistry) (*QuayRegistry, error) {
 	// TODO(alecmerdler): Ensure that `spec.desiredVersion` is not a "downgrade" from `status.currentVersion`
 
 	return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
+}
+
+// EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was changed.
+func EnsureRegistryEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
+	updatedQuay := quay.DeepCopy()
+
+	if supportsRoutes(quay) {
+		clusterHostname := quay.GetAnnotations()[ClusterHostnameAnnotation]
+		updatedQuay.Status.RegistryEndpoint = strings.Join([]string{
+			strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
+			clusterHostname},
+			".")
+	}
+	// TODO(alecmerdler): Retrieve load balancer IP from `Service`
+
+	return updatedQuay, quay.Status.RegistryEndpoint == updatedQuay.Status.RegistryEndpoint
+}
+
+func supportsRoutes(quay *QuayRegistry) bool {
+	annotations := quay.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+
+	_, ok := annotations[ClusterHostnameAnnotation]
+
+	return ok
 }
 
 func init() {
