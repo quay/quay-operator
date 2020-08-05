@@ -285,9 +285,11 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	})
 
 	for _, component := range quay.Spec.Components {
-		configFile, err := ConfigFileFor(component.Kind, quay)
-		check(err)
-		componentConfigFiles[component.Kind+".config.yaml"] = configFile
+		if component.Managed {
+			configFile, err := ConfigFileFor(component.Kind, quay)
+			check(err)
+			componentConfigFiles[component.Kind+".config.yaml"] = configFile
+		}
 	}
 
 	kustomization, err := KustomizationFor(quay, componentConfigFiles)
