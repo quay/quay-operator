@@ -29,6 +29,14 @@ $ kubectl create -n openshift-marketplace -f ./deploy/quay-operator.catalogsourc
 $ kubectl get packagemanifest --all-namespaces | grep quay
 ```
 
+**Create the `OperatorGroup`**:
+
+NOTE: By default, the `targetNamespaces` field is specified to target the _quay-enterprise_ namespace. Update this value if the namespace the operator is deployed within differs. 
+
+```sh
+$ kubectl create -n <your-namespace> -f ./deploy/quay-operator.operatorgroup.yaml
+```
+
 **Create the `Subscription` to install the Operator**:
 ```sh
 $ kubectl create -n <your-namespace> -f ./deploy/quay-operator.subscription.yaml
