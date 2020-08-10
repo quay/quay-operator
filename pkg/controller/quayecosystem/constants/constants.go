@@ -80,6 +80,8 @@ const (
 	DatabaseCredentialsDatabaseKey = "database-name"
 	// DatabaseCredentialsRootPasswordKey represents the key for the database root password
 	DatabaseCredentialsRootPasswordKey = "database-root-password"
+	// DatabaseCredentialsServer represents the key for the database server
+	DatabaseCredentialsServerKey = "database-server"
 	// QuayDatabaseCredentialsDefaultUsername represents the default database username
 	QuayDatabaseCredentialsDefaultUsername = "quay"
 	// QuayDatabaseCredentialsDefaultPassword represents the default database password

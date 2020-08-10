@@ -146,6 +146,15 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 			quayConfiguration.QuayDatabase.Password = string(databaseSecret.Data[constants.DatabaseCredentialsPasswordKey])
 			quayConfiguration.QuayDatabase.Database = string(databaseSecret.Data[constants.DatabaseCredentialsDatabaseKey])
 
+			if _, found := databaseSecret.Data[constants.DatabaseCredentialsServerKey]; found {
+				quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server = string(databaseSecret.Data[constants.DatabaseCredentialsServerKey])
+				quayConfiguration.QuayDatabase.Server = quayConfiguration.QuayEcosystem.Spec.Quay.Database.Server
+				quayConfiguration.QuayEcosystem.Spec.Quay.Database.Image = ""
+				quayConfiguration.QuayEcosystem.Spec.Quay.Database.DeploymentStrategy = ""
+				quayConfiguration.QuayEcosystem.Spec.Quay.Database.ReadinessProbe = nil
+				quayConfiguration.QuayEcosystem.Spec.Quay.Database.LivenessProbe = nil
+			}
+
 			if _, found := databaseSecret.Data[constants.DatabaseCredentialsRootPasswordKey]; found {
 				quayConfiguration.QuayDatabase.RootPassword = string(databaseSecret.Data[constants.DatabaseCredentialsRootPasswordKey])
 			}
@@ -469,6 +478,16 @@ func Validate(client client.Client, quayConfiguration *resources.QuayConfigurati
 			quayConfiguration.ClairDatabase.Username = string(databaseSecret.Data[constants.DatabaseCredentialsUsernameKey])
 			quayConfiguration.ClairDatabase.Password = string(databaseSecret.Data[constants.DatabaseCredentialsPasswordKey])
 			quayConfiguration.ClairDatabase.Database = string(databaseSecret.Data[constants.DatabaseCredentialsDatabaseKey])
+
+			// If the server is provided in the Secret, we override the defaults set in defaults.go
+			if _, found := databaseSecret.Data[constants.DatabaseCredentialsServerKey]; found {
+				quayConfiguration.ClairDatabase.Server = string(databaseSecret.Data[constants.DatabaseCredentialsServerKey])
+				quayConfiguration.QuayEcosystem.Spec.Clair.Database.Server = string(databaseSecret.Data[constants.DatabaseCredentialsServerKey])
+				quayConfiguration.QuayEcosystem.Spec.Clair.Database.ReadinessProbe = nil
+				quayConfiguration.QuayEcosystem.Spec.Clair.Database.LivenessProbe = nil
+				quayConfiguration.QuayEcosystem.Spec.Clair.Database.DeploymentStrategy = ""
+				quayConfiguration.QuayEcosystem.Spec.Clair.Database.Image = ""
+			}
 
 			if _, found := databaseSecret.Data[constants.DatabaseCredentialsRootPasswordKey]; found {
 				quayConfiguration.ClairDatabase.RootPassword = string(databaseSecret.Data[constants.DatabaseCredentialsRootPasswordKey])
