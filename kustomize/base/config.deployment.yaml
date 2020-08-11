@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quay-config-editor
+  labels:
+    quay-component: quay-config-editor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      quay-component: quay-config-editor
+  template:
+    metadata:
+      labels:
+        quay-component: quay-config-editor
+    spec:
+      volumes:
+        - name: config-bundle
+          secret:
+            secretName: quay-config-secret
+      containers:
+        - name: quay-config-editor
+          # FIXME(alecmerdler): Push to `projectquay/config-tool` and change tag here
+          image: quay.io/alecmerdler/config-tool:editor
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          args: ["editor", "--configPath", "$(QUAY_CONFIG_PATH)", "--password", "$(QUAY_PASSWORD)"]
+          env:
+            - name: QUAY_CONFIG_PATH
+              value: /config-bundle
+            - name: QUAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quay-config-editor-credentials
+                  key: password
+          volumeMounts:
+            - name: config-bundle
+              subPath: config.yaml
+              mountPath: /config-bundle

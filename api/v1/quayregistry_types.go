@@ -73,6 +73,7 @@ type QuayRegistryStatus struct {
 	CurrentVersion QuayVersion `json:"currentVersion,omitempty"`
 	// RegistryEndpoint is the external access point for the Quay registry.
 	RegistryEndpoint string `json:"registryEndpoint,omitempty"`
+	// TODO(alecmerdler): Config editor endpoint
 }
 
 // +kubebuilder:object:root=true
