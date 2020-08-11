@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: quay-app
+  name: quay-app-upgrade
   annotations:
-    quay-upgrade: padme
+    quay-upgrade: v3.4.0
 spec:
-  replicas: 0
+  replicas: 1
