@@ -1,0 +1,13 @@
+apiVersion: noobaa.io/v1alpha1
+kind: BucketClass
+metadata:
+  labels:
+    app: noobaa
+  name: quay-datastore
+  namespace: openshift-storage
+spec:
+  placementPolicy:
+    tiers:
+    - backingStores:
+      - quay-datastore
+      placement: Spread

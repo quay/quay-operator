@@ -79,6 +79,10 @@ spec:
               description: CurrentVersion is the actual version of Quay that is actively
                 deployed.
               type: string
+            lastUpdated:
+              description: LastUpdate is the timestamp when the Operator last processed
+                this instance.
+              type: string
             registryEndpoint:
               description: RegistryEndpoint is the external access point for the Quay
                 registry.

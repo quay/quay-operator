@@ -135,7 +135,12 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s/%s", user, password, host, name)
 
 		return yaml.Marshal(fieldGroup)
-	case "rhocs":
+	case "objectstorage":
+		hostname := quay.GetAnnotations()[v1.StorageHostname]
+		bucketName := quay.GetAnnotations()[v1.StorageBucketNameAnnotation]
+		accessKey := quay.GetAnnotations()[v1.StorageAccessKeyAnnotation]
+		secretKey := quay.GetAnnotations()[v1.StorageSecretKeyAnnotation]
+
 		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
 			DistributedStoragePreference:       []string{"default"},
 			DistributedStorageDefaultLocations: []string{"default"},
@@ -143,15 +148,13 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 				"default": {
 					Name: "RadosGWStorage",
 					Args: distributedstorage.DistributedStorageArgs{
-						Hostname:    "s3.openshift-storage.svc",
+						Hostname:    hostname,
 						IsSecure:    true,
 						Port:        443,
 						StoragePath: "/datastorage/registry",
-						// FIXME(alecmerdler): Figure out how to get these from the created `Secret` that the `ObjectBucketClaim` creates...
-						// FIXME(alecmerdler): Maybe we can do something similar to the `upgrade` overlays to wait until components are provisioned...
-						AccessKey:  "Kvy8Ry15GNVv3fz4VHPl",
-						SecretKey:  "cdD7Ie6Ad3N3aXlb+icO7B193s7UqcDB9XMZPQGm",
-						BucketName: quay.GetName() + "-quay-datastore",
+						BucketName:  bucketName,
+						AccessKey:   accessKey,
+						SecretKey:   secretKey,
 					},
 				},
 			},

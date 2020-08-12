@@ -1,0 +1,15 @@
+# FIXME(alecmerdler): Should this be a prerequisite to be created by the user...?
+apiVersion: noobaa.io/v1alpha1
+kind: NooBaa
+metadata:
+  name: noobaa
+  namespace: openshift-storage
+spec:
+ dbResources:
+   requests:
+     cpu: 0.5
+     memory: 1Gi
+ coreResources:
+   requests:
+     cpu: 0.5
+     memory: 1Gi

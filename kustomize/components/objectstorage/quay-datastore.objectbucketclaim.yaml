@@ -1,0 +1,12 @@
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: quay-datastore
+  labels:
+    quay-component: quay-datastore
+spec:
+  generateBucketName: quay-datastore
+  storageClassName: openshift-storage.noobaa.io
+  additionalConfig:
+    bucketclass: noobaa-default-bucket-class
+    # bucketclass: quay-datastore
