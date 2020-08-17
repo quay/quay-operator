@@ -4,13 +4,17 @@
 
 Opinionated deployment of [Quay container registry](https://github.com/quay/quay) on Kubernetes.
 
+## Welcome
+
+The original version of the quay-operator is available on the _v1_ branch. The next generation operator, known as TNG or v2, is developed on _master_ branch.
+
 ## Principles
 
 - Kubernetes is a powerful platform with an abundance of existing and future features. Always prefer to leverage something Kubernetes does better than try to implement it again.
 - Favor declarative application management to improve everyone's sanity and understanding of the state.
 - Make things simple by default, but always allow diving deeper to discover the details of what is going on.
 
-## Getting Started 
+## Getting Started
 
 This Operator can be installed on any Kubernetes cluster running the [Operator Lifecycle Manager](https://github.com/operator-framework/operator-lifecycle-manager). Simply create the provided `CatalogSource` to make the package available on the cluster, then create the `Subscription` to install it.
 
@@ -51,9 +55,9 @@ $ kubectl create -n <your-namespace> -f ./deploy/quay-operator.subscription.yaml
 
 ## Contributing
 
-Pull requests and bug reports are always welcome! 
+Pull requests and bug reports are always welcome!
 
-### Local Development 
+### Local Development
 
 #### Prerequisites
 
