@@ -10,3 +10,12 @@ resources:
   - ./quay.service.yaml
   - ./upgrade.deployment.yaml
   - ./extra-certs.configmap.yaml
+  - ./config.deployment.yaml
+  - ./config.service.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+secretGenerator:
+  - name: quay-config-editor-credentials
+    # FIXME(alecmerdler): Make this more secure...
+    literals:
+      - password=configeditor
