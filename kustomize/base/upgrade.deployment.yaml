@@ -33,6 +33,12 @@ spec:
                   fieldPath: metadata.namespace
             - name: DEBUGLOG
               value: "true"
+            - name: WORKER_COUNT_WEB
+              value: "4"
+            - name: WORKER_COUNT_SECSCAN
+              value: "2"
+            - name: WORKER_COUNT_REGISTRY
+              value: "8"
           ports:
             - containerPort: 8443
               protocol: TCP
@@ -40,6 +46,13 @@ spec:
               protocol: TCP
             - containerPort: 8081
               protocol: TCP
+          resources:
+            requests:
+              cpu: 2000m
+              memory: 8Gi
+            limits:
+              cpu: 2000m
+              memory: 8Gi
           readinessProbe:
             exec:
               command:
