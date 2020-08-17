@@ -10,6 +10,10 @@ spec:
       name: https
       port: 443
       targetPort: 8443
+    - protocol: TCP
+      name: http
+      port: 80
+      targetPort: 8080
     - name: jwtproxy
       protocol: TCP
       port: 8081

@@ -1,0 +1,8 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quay-app
+  annotations:
+    quay-upgrade: qui-gon
+spec:
+  replicas: 0

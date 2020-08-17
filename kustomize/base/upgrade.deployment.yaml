@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: quay-app
+  name: quay-app-upgrade
   labels:
-    quay-component: quay-app
+    quay-component: quay-app-upgrade
 spec:
-  replicas: 3
+  replicas: 0
   selector:
     matchLabels:
-      quay-component: quay-app
+      quay-component: quay-app-upgrade
   template:
     metadata:
       labels:
-        quay-component: quay-app
+        quay-component: quay-app-upgrade
     spec:
       securityContext:
         fsGroup: 1001
@@ -21,7 +21,7 @@ spec:
           secret:
             secretName: quay-config-secret
       containers:
-        - name: quay-app
+        - name: quay-app-upgrade
           image: quay.io/projectquay/quay
           env:
             - name: QE_K8S_CONFIG_SECRET

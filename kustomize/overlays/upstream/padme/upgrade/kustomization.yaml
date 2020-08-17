@@ -1,0 +1,16 @@
+# Overlay variant for upgrading to Project Quay "padme" release.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization	
+commonAnnotations:
+  quay-version: padme
+bases:
+  - ../../../../tmp
+patchesStrategicMerge:
+  # Scale the app deployment to 0 pods in order to run all migrations present in the new container image using the "upgrade" deployment.
+  - ./quay.deployment.patch.yaml
+  - ./upgrade.deployment.patch.yaml
+images:
+  - name: quay.io/projectquay/quay
+    newTag: padme
+  - name: quay.io/projectquay/clair
+    newTag: padme
