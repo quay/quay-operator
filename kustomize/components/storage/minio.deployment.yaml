@@ -43,7 +43,7 @@ spec:
         command: [
           "/bin/sh", 
           "-c",
-          "/usr/bin/mc config host add quay-datastore http://quay-datastore:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY;
+          "/usr/bin/mc config host add quay-datastore http://localhost:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY;
           /usr/bin/mc mb quay-datastore/quay-datastore;
           while true; do sleep 30; done;"
         ]

@@ -4,10 +4,3 @@ kind: Component
 resources: 
   - ./redis.deployment.yaml
   - ./redis.service.yaml
-secretGenerator:
-  # Add Redis fields to `config.yaml` (https://github.com/kubernetes-sigs/kustomize/blob/master/examples/combineConfigs.md)
-  - name: quay-config-secret
-    behavior: merge
-    literals:
-      - "BUILDLOGS_REDIS={host: quay-redis, port: 6379}"
-      - "USER_EVENTS_REDIS={host: quay-redis, port: 6379}"

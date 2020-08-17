@@ -2,7 +2,6 @@ package kustomize
 
 import (
 	"errors"
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -37,6 +36,19 @@ func check(err error) {
 	}
 }
 
+func encode(value interface{}) []byte {
+	yamlified, _ := yaml.Marshal(value)
+
+	return yamlified
+}
+
+func decode(bytes []byte) interface{} {
+	var value interface{}
+	_ = yaml.Unmarshal(bytes, &value)
+
+	return value
+}
+
 // ModelFor returns an empty Kubernetes object instance for the given `GroupVersionKind`.
 // Example: Calling with `core.v1.Secret` GVK returns an empty `corev1.Secret` instance.
 func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
@@ -64,7 +76,6 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]byte) ([]k8sruntime.Object, error) {
 	fSys := filesys.MakeFsOnDisk()
 
-	fmt.Println(appDir())
 	err := fSys.RemoveAll(filepath.Join(appDir()))
 	check(err)
 	err = fSys.MkdirAll(filepath.Join(appDir(), "bundle"))
@@ -114,18 +125,49 @@ func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]b
 }
 
 // KustomizationFor takes a `QuayRegistry` object and generates a Kustomization for it.
-func KustomizationFor(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) (*types.Kustomization, error) {
+func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) (*types.Kustomization, error) {
 	if quay == nil {
 		return nil, errors.New("given QuayRegistry should not be nil")
 	}
 
+	configFiles := []string{}
+	for key := range quayConfigFiles {
+		configFiles = append(configFiles, filepath.Join("bundle", key))
+	}
+
+	generatedSecrets := []types.SecretArgs{
+		{
+			GeneratorArgs: types.GeneratorArgs{
+				Name:     "quay-config-secret",
+				Behavior: "merge",
+				KvPairSources: types.KvPairSources{
+					FileSources: configFiles,
+				},
+			},
+		},
+	}
 	components := []string{}
 	for _, managedComponent := range quay.Spec.ManagedComponents {
 		components = append(components, filepath.Join("..", "components", managedComponent.Kind))
-	}
-	configFiles := []string{}
-	for key := range baseConfigBundle.Data {
-		configFiles = append(configFiles, filepath.Join("bundle", key))
+		componentConfigFiles, err := componentConfigFilesFor(managedComponent.Kind, quay)
+		if componentConfigFiles == nil || err != nil {
+			continue
+		}
+
+		sources := []string{}
+		for filename, fileValue := range componentConfigFiles {
+			sources = append(sources, strings.Join([]string{filename, string(fileValue)}, "="))
+		}
+
+		generatedSecrets = append(generatedSecrets, types.SecretArgs{
+			GeneratorArgs: types.GeneratorArgs{
+				Name:     managedComponent.Kind + "-config-secret",
+				Behavior: "merge",
+				KvPairSources: types.KvPairSources{
+					LiteralSources: sources,
+				},
+			},
+		})
 	}
 
 	return &types.Kustomization{
@@ -133,21 +175,11 @@ func KustomizationFor(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) (*
 			APIVersion: types.KustomizationVersion,
 			Kind:       types.KustomizationKind,
 		},
-		Namespace:  quay.GetNamespace(),
-		NamePrefix: quay.GetName() + "-",
-		Resources:  []string{"../base"},
-		Components: components,
-		SecretGenerator: []types.SecretArgs{
-			{
-				GeneratorArgs: types.GeneratorArgs{
-					Name:     "quay-config-secret",
-					Behavior: "merge",
-					KvPairSources: types.KvPairSources{
-						FileSources: configFiles,
-					},
-				},
-			},
-		},
+		Namespace:       quay.GetNamespace(),
+		NamePrefix:      quay.GetName() + "-",
+		Resources:       []string{"../base"},
+		Components:      components,
+		SecretGenerator: generatedSecrets,
 	}, nil
 }
 
@@ -160,16 +192,18 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 	check(err)
 
 	isConfigField := func(field string) bool {
-		return !strings.Contains(field, ".")
+		return strings.Contains(field, ".config.yaml")
 	}
 
-	for key, value := range configBundle.Data {
+	for key, file := range configBundle.Data {
 		if isConfigField(key) {
-			var valueYAML interface{}
-			err = yaml.Unmarshal(value, &valueYAML)
+			var valueYAML map[string]interface{}
+			err = yaml.Unmarshal(file, &valueYAML)
 			check(err)
 
-			flattenedConfig[key] = valueYAML
+			for configKey, configValue := range valueYAML {
+				flattenedConfig[configKey] = configValue
+			}
 			delete(flattenedSecret.Data, key)
 		}
 	}
@@ -184,10 +218,23 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 
 // Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
 func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) ([]k8sruntime.Object, error) {
-	kustomization, err := KustomizationFor(quay, baseConfigBundle)
-	check(err)
+	// Each `managedComponent` brings in their own generated `config.yaml` fields which are added to the base `Secret`
+	componentConfigFiles := baseConfigBundle.DeepCopy().Data
+	componentConfigFiles["quay.config.yaml"] = encode(map[string]interface{}{
+		"SETUP_COMPLETE": true,
+		// FIXME(alecmerdler): Generate these and back them up in a separate `Secret`...
+		"DATABASE_SECRET_KEY": "databaseSecretKey",
+		"SECRET_KEY":          "secretKey",
+	})
+	for _, component := range quay.Spec.ManagedComponents {
+		configFile, err := ConfigFileFor(component.Kind, quay)
+		check(err)
+		componentConfigFiles[component.Kind+".config.yaml"] = configFile
+	}
 
-	resources, err := generate(kustomization, baseConfigBundle.Data)
+	kustomization, err := KustomizationFor(quay, componentConfigFiles)
+	check(err)
+	resources, err := generate(kustomization, componentConfigFiles)
 	check(err)
 
 	for index, resource := range resources {

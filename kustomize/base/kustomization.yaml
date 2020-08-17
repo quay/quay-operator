@@ -10,8 +10,6 @@ resources:
   - ./quay.service.yaml
 secretGenerator:
   - name: quay-config-secret
-    literals:
-      - SETUP_COMPLETE=true
 # FIXME(alecmerdler): Using `vars` is kinda ugly because it's basically templating, so don't abuse them
 vars:
   - name: QE_K8S_CONFIG_SECRET
