@@ -1,0 +1,13 @@
+# TODO(alecmerdler): Remove this and/or add to `dev` overlay
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quay-datastorage
+  labels:
+    quay-component: quay-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi

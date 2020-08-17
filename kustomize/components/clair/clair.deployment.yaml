@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    quay-component: clair
+  name: clair
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      quay-component: clair
+  template:
+    metadata:
+      labels:
+        quay-component: clair
+    spec:
+      containers:
+        - image: quay.io/projectquay/clair:4.0.0-alpha.4
+          imagePullPolicy: IfNotPresent
+          name: clair
+          env:
+            - name: CLAIR_CONF
+              value: /clair/config.yaml
+            - name: CLAIR_MODE
+              value: combo
+          ports:
+            - containerPort: 8080
+              name: clair-http
+              protocol: TCP
+            - containerPort: 8089
+              name: clair-intro
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /clair/
+              name: config
+      restartPolicy: Always
+      volumes:
+        - name: config
+          secret:
+            secretName: clair-config-secret

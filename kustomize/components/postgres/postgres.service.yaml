@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: quay-postgres
+  labels:
+    quay-component: postgres
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      protocol: TCP
+      name: postgres
+      targetPort: 5432
+  selector:
+    quay-component: postgres
