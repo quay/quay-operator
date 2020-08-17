@@ -20,11 +20,17 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	quayredhatcomv1 "github.com/quay/quay-operator/api/v1"
+	v1 "github.com/quay/quay-operator/api/v1"
+	"github.com/quay/quay-operator/pkg/kustomize"
 )
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
@@ -36,12 +42,58 @@ type QuayRegistryReconciler struct {
 
 // +kubebuilder:rbac:groups=quay.redhat.com.quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com.quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
+// TODO(alecmerdler): Define needed RBAC permissions for all consumed API resources...
 
 func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("quayregistry", req.NamespacedName)
+	ctx := context.Background()
+	log := r.Log.WithValues("quayregistry", req.NamespacedName)
 
-	// your logic here
+	log.Info("begin reconcile")
+
+	var quay v1.QuayRegistry
+	if err := r.Client.Get(ctx, req.NamespacedName, &quay); err != nil {
+		log.Error(err, "unable to retrieve QuayRegistry")
+
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	var configBundle corev1.Secret
+	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.Spec.ConfigBundleSecret}, &configBundle); err != nil {
+		log.Error(err, "unable to retrieve referenced `configBundleSecret`", "configBundleSecret", quay.Spec.ConfigBundleSecret)
+
+		return ctrl.Result{}, err
+	}
+
+	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
+
+	deploymentObjects, err := kustomize.Inflate(&quay, &configBundle)
+	if err != nil {
+		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
+
+		return ctrl.Result{}, err
+	}
+
+	for _, obj := range deploymentObjects {
+		objectMeta, _ := meta.Accessor(obj)
+		groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
+
+		log.Info("creating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+
+		err = r.Client.Create(ctx, obj)
+		if err != nil && errors.IsAlreadyExists(err) {
+			log.Info("updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+			err = r.Client.Update(ctx, obj)
+		}
+		if err != nil {
+			log.Error(err, "failed to create/update object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+
+			return ctrl.Result{}, err
+		}
+
+		log.Info("successfully created/updated object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+	}
+
+	log.Info("all objects created/updated successfully")
 
 	return ctrl.Result{}, nil
 }

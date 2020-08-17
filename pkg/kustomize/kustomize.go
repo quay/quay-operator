@@ -2,7 +2,6 @@ package kustomize
 
 import (
 	"errors"
-	"fmt"
 	"path"
 	"reflect"
 	"strings"
@@ -11,7 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/kustomize/api/filesys"
@@ -22,7 +22,8 @@ import (
 	v1 "github.com/quay/quay-operator/api/v1"
 )
 
-const kustomizeDir = "../../kustomize"
+// FIXME(alecmerdler): Path has to be correct when running binary and tests...
+const kustomizeDir = "/home/alec/work/quay-operator/kustomize"
 
 var appDir = path.Join(kustomizeDir, "tmp")
 
@@ -34,7 +35,7 @@ func check(err error) {
 
 // ModelFor returns an empty Kubernetes object instance for the given `GroupVersionKind`.
 // Example: Calling with `core.v1.Secret` GVK returns an empty `corev1.Secret` instance.
-func ModelFor(gvk schema.GroupVersionKind) runtime.Object {
+func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 	switch gvk.String() {
 	case schema.GroupVersionKind{Version: "v1", Kind: "Secret"}.String():
 		return &corev1.Secret{}
@@ -56,7 +57,7 @@ func ModelFor(gvk schema.GroupVersionKind) runtime.Object {
 }
 
 // generate uses Kustomize as a library to build the runtime objects to be applied to a cluster.
-func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]byte) ([]runtime.Object, error) {
+func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]byte) ([]k8sruntime.Object, error) {
 	fSys := filesys.MakeFsOnDisk()
 
 	err := fSys.RemoveAll(path.Join(appDir))
@@ -83,7 +84,7 @@ func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]b
 	resMap, err := k.Run(appDir)
 	check(err)
 
-	output := []runtime.Object{}
+	output := []k8sruntime.Object{}
 	for _, resource := range resMap.Resources() {
 		resourceJSON, err := resource.MarshalJSON()
 		check(err)
@@ -107,6 +108,7 @@ func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]b
 	return output, nil
 }
 
+// KustomizationFor takes a `QuayRegistry` object and generates a Kustomization for it.
 func KustomizationFor(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) (*types.Kustomization, error) {
 	if quay == nil {
 		return nil, errors.New("given QuayRegistry should not be nil")
@@ -126,6 +128,7 @@ func KustomizationFor(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) (*
 			APIVersion: types.KustomizationVersion,
 			Kind:       types.KustomizationKind,
 		},
+		Namespace:  quay.GetNamespace(),
 		Resources:  []string{"../base"},
 		Components: components,
 		SecretGenerator: []types.SecretArgs{
@@ -174,7 +177,7 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 }
 
 // Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
-func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) ([]runtime.Object, error) {
+func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) ([]k8sruntime.Object, error) {
 	kustomization, err := KustomizationFor(quay, baseConfigBundle)
 	check(err)
 
@@ -182,12 +185,9 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) ([]runtime.
 	check(err)
 
 	for index, resource := range resources {
-		k8sType := reflect.ValueOf(resource).Type()
+		_ = reflect.ValueOf(resource).Type()
 		objectMeta, err := meta.Accessor(resource)
 		check(err)
-
-		// FIXME(alecmerdler): Debugging
-		fmt.Println(k8sType, objectMeta.GetName())
 
 		if strings.Contains(objectMeta.GetName(), "quay-config-secret-") {
 			configBundleSecret, err := flattenSecret(resource.(*corev1.Secret))
@@ -195,6 +195,20 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) ([]runtime.
 
 			resources[index] = configBundleSecret
 		}
+	}
+
+	for _, resource := range resources {
+		objectMeta, err := meta.Accessor(resource)
+		check(err)
+
+		objectMeta.SetOwnerReferences([]metav1.OwnerReference{
+			{
+				APIVersion: v1.GroupVersion.String(),
+				Kind:       "QuayRegistry",
+				Name:       quay.GetName(),
+				UID:        quay.GetUID(),
+			},
+		})
 	}
 
 	return resources, err
