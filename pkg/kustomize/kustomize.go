@@ -2,6 +2,9 @@ package kustomize
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -26,11 +29,15 @@ import (
 
 const configSecretPrefix = "quay-config-secret"
 
-func appDir() string {
+func kustomizeDir() string {
 	_, filename, _, _ := runtime.Caller(0)
 	path := filepath.Join(filepath.Dir(filename))
 
-	return filepath.Join(path, "..", "..", "kustomize", "tmp")
+	return filepath.Join(path, "..", "..", "kustomize")
+}
+
+func appDir() string {
+	return filepath.Join(kustomizeDir(), "tmp")
 }
 
 func check(err error) {
@@ -77,12 +84,28 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 
 // generate uses Kustomize as a library to build the runtime objects to be applied to a cluster.
 func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]byte) ([]k8sruntime.Object, error) {
-	fSys := filesys.MakeFsOnDisk()
+	// FIXME(alecmerdler): Just load the `kustomize` directory into memory to avoid all these annoying filesystem permissions...
+	fmt.Println("FIXME((alecmerdler): Debugging")
+	fSys := filesys.MakeEmptyDirInMemory()
+	filepath.Walk(kustomizeDir(), func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-	err := fSys.RemoveAll(filepath.Join(appDir()))
-	check(err)
-	err = fSys.MkdirAll(filepath.Join(appDir(), "bundle"))
-	check(err)
+		if !info.IsDir() {
+			fmt.Println(path)
+			f, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			err = fSys.WriteFile(path, f)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 
 	// Write `kustomization.yaml` to filesystem
 	kustomizationFile, err := yaml.Marshal(kustomization)
@@ -91,7 +114,6 @@ func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]b
 	check(err)
 
 	// Add all Quay config files to directory to be included in the generated `Secret`
-	check(err)
 	for fileName, file := range quayConfigFiles {
 		check(err)
 		err = fSys.WriteFile(filepath.Join(appDir(), "bundle", fileName), file)
