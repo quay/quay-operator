@@ -1,0 +1,19 @@
+# Scale deployment to 1 (because of shared volume issue) and add `volumeMount`
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quay-app
+spec:
+  replicas: 1
+  template:
+    spec:
+      volumes:
+        - name: datastorage
+          persistentVolumeClaim:
+            claimName: quay-datastore
+      containers:
+        - name: quay-app
+          volumeMounts:
+            - name: datastorage
+              mountPath: /datastorage/
+              readOnly: false

@@ -38,7 +38,7 @@ var allComponents = []string{
 	"postgres",
 	"clair",
 	"redis",
-	"storage",
+	"localstorage",
 }
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.

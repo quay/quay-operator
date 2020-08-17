@@ -50,7 +50,7 @@ func newQuayRegistry(name, namespace string) v1.QuayRegistry {
 				{Kind: "postgres", Managed: true},
 				{Kind: "clair", Managed: true},
 				{Kind: "redis", Managed: true},
-				{Kind: "storage", Managed: true},
+				{Kind: "localstorage", Managed: true},
 			},
 		},
 	}

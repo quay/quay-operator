@@ -40,6 +40,8 @@ spec:
               protocol: TCP
             - containerPort: 8081
               protocol: TCP
+            - containerPort: 9091
+              protocol: TCP
           readinessProbe:
             exec:
               command:
