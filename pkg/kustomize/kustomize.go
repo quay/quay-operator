@@ -20,8 +20,11 @@ import (
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/yaml"
 
+	"github.com/go-logr/logr"
 	v1 "github.com/quay/quay-operator/api/v1"
 )
+
+const configSecretPrefix = "quay-config-secret"
 
 func appDir() string {
 	_, filename, _, _ := runtime.Caller(0)
@@ -138,7 +141,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 	generatedSecrets := []types.SecretArgs{
 		{
 			GeneratorArgs: types.GeneratorArgs{
-				Name:     "quay-config-secret",
+				Name:     configSecretPrefix,
 				Behavior: "merge",
 				KvPairSources: types.KvPairSources{
 					FileSources: configFiles,
@@ -217,15 +220,25 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 }
 
 // Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
-func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) ([]k8sruntime.Object, error) {
+func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysSecret *corev1.Secret, log logr.Logger) ([]k8sruntime.Object, error) {
 	// Each `managedComponent` brings in their own generated `config.yaml` fields which are added to the base `Secret`
 	componentConfigFiles := baseConfigBundle.DeepCopy().Data
+
+	// Parse the user-provided config bundle.
+	var parsedUserConfig map[string]interface{}
+	err := yaml.Unmarshal(componentConfigFiles["config.yaml"], &parsedUserConfig)
+	check(err)
+
+	// Generate or pull out the SECRET_KEY and DATABASE_SECRET_KEY. Since these must be stable across
+	// runs of the same config, we store them (and re-read them) from a specialized Secret.
+	secretKey, databaseSecretKey, secretKeysSecret := handleSecretKeys(parsedUserConfig, secretKeysSecret, quay, log)
+
 	componentConfigFiles["quay.config.yaml"] = encode(map[string]interface{}{
-		"SETUP_COMPLETE": true,
-		// FIXME(alecmerdler): Generate these and back them up in a separate `Secret`...
-		"DATABASE_SECRET_KEY": "databaseSecretKey",
-		"SECRET_KEY":          "secretKey",
+		"SETUP_COMPLETE":      true,
+		"DATABASE_SECRET_KEY": databaseSecretKey,
+		"SECRET_KEY":          secretKey,
 	})
+
 	for _, component := range quay.Spec.ManagedComponents {
 		configFile, err := ConfigFileFor(component.Kind, quay)
 		check(err)
@@ -234,6 +247,7 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) ([]k8srunti
 
 	kustomization, err := KustomizationFor(quay, componentConfigFiles)
 	check(err)
+
 	resources, err := generate(kustomization, componentConfigFiles)
 	check(err)
 
@@ -242,13 +256,15 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) ([]k8srunti
 		objectMeta, err := meta.Accessor(resource)
 		check(err)
 
-		if strings.Contains(objectMeta.GetName(), "quay-config-secret-") {
+		if strings.Contains(objectMeta.GetName(), configSecretPrefix+"-") {
 			configBundleSecret, err := flattenSecret(resource.(*corev1.Secret))
 			check(err)
 
 			resources[index] = configBundleSecret
 		}
 	}
+
+	resources = append(resources, secretKeysSecret)
 
 	for _, resource := range resources {
 		objectMeta, err := meta.Accessor(resource)

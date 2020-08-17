@@ -64,12 +64,19 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, err
 	}
 
+	var secretKeysBundle corev1.Secret
+	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: kustomize.SecretKeySecretName(&quay)}, &secretKeysBundle); err != nil {
+		if !errors.IsNotFound(err) {
+			log.Error(err, "unable to retrieve secret keys bundle")
+			return ctrl.Result{}, err
+		}
+	}
+
 	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
 
-	deploymentObjects, err := kustomize.Inflate(&quay, &configBundle)
+	deploymentObjects, err := kustomize.Inflate(&quay, &configBundle, &secretKeysBundle, log)
 	if err != nil {
 		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
-
 		return ctrl.Result{}, err
 	}
 
