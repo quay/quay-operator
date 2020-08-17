@@ -74,7 +74,21 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
 
-	deploymentObjects, err := kustomize.Inflate(&quay, &configBundle, &secretKeysBundle, log)
+	updatedQuay, err := v1.EnsureDefaultComponents(&quay)
+	if err != nil {
+		log.Error(err, "could not ensure default `spec.components`")
+		return ctrl.Result{}, err
+	}
+	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
+		log.Info("updating QuayRegistry `spec.components` to include defaults")
+		if err = r.Client.Update(ctx, updatedQuay); err != nil {
+			log.Error(err, "failed to update `spec.components` to include defaults")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	deploymentObjects, err := kustomize.Inflate(updatedQuay, &configBundle, &secretKeysBundle, log)
 	if err != nil {
 		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
 		return ctrl.Result{}, err

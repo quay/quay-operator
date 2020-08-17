@@ -15,11 +15,11 @@ func quayRegistry(name string) *v1.QuayRegistry {
 			Name: name,
 		},
 		Spec: v1.QuayRegistrySpec{
-			ManagedComponents: []v1.ManagedComponent{
-				{Kind: "postgres"},
-				{Kind: "clair"},
-				{Kind: "redis"},
-				{Kind: "storage"},
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true},
+				{Kind: "clair", Managed: true},
+				{Kind: "redis", Managed: true},
+				{Kind: "storage", Managed: true},
 			},
 		},
 	}

@@ -43,11 +43,12 @@ func newQuayRegistry(name, namespace string) v1.QuayRegistry {
 			Namespace: namespace,
 		},
 		Spec: v1.QuayRegistrySpec{
-			ManagedComponents: []v1.ManagedComponent{
-				{Kind: "postgres"},
-				{Kind: "clair"},
-				{Kind: "redis"},
-				{Kind: "storage"},
+			Components: []v1.Component{
+				// FIXME(alecmerdler): Test omitting components and marking some as disabled/unmanaged...
+				{Kind: "postgres", Managed: true},
+				{Kind: "clair", Managed: true},
+				{Kind: "redis", Managed: true},
+				{Kind: "storage", Managed: true},
 			},
 		},
 	}
@@ -172,6 +173,10 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					for _, persistentVolumeClaim := range persistentVolumeClaims.Items {
 						verifyOwnerRefs(persistentVolumeClaim.GetOwnerReferences())
 					}
+				})
+
+				When("the `components` field is empty", func() {
+					// TODO(alecmerdler)
 				})
 			})
 		})

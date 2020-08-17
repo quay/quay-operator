@@ -1,0 +1,6 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: skynet
+spec:
+  configBundleSecret: quay-config-bundle-abc123
