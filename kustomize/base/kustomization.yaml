@@ -8,7 +8,6 @@ resources:
   - ./quay.rolebinding.yaml
   - ./quay.deployment.yaml
   - ./quay.service.yaml
-  - ./quay.persistentvolumeclaim.yaml
 secretGenerator:
   - name: quay-config-secret
     literals:

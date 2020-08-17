@@ -7,6 +7,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/kustomize/api/types"
@@ -118,7 +119,6 @@ var quayComponents = map[string][]runtime.Object{
 		&rbac.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "quay-secret-writer"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
-		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-datastorage"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-secret"}},
 	},
 	"clair": {
@@ -205,5 +205,11 @@ func TestInflate(t *testing.T) {
 		assert.NotNil(pieces)
 		assert.Equal(len(test.expected), len(pieces))
 		assert.Nil(err)
+
+		for _, obj := range pieces {
+			objectMeta, _ := meta.Accessor(obj)
+
+			assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-")
+		}
 	}
 }
