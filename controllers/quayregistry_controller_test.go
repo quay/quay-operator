@@ -177,11 +177,11 @@ var _ = Describe("QuayRegistryReconciler", func() {
 		})
 
 		Context("on an existing `QuayRegistry`", func() {
-			var oldDeployments appsv1.DeploymentList
+			var oldPods corev1.PodList
 			listOptions := client.ListOptions{Namespace: namespace}
 
 			JustBeforeEach(func() {
-				_ = k8sClient.List(context.Background(), &oldDeployments, &listOptions)
+				_ = k8sClient.List(context.Background(), &oldPods, &listOptions)
 			})
 
 			Context("which references a `configBundleSecret` that does not exist", func() {
@@ -198,14 +198,15 @@ var _ = Describe("QuayRegistryReconciler", func() {
 				})
 
 				It("will not update any Quay objects on the cluster", func() {
-					var deployments appsv1.DeploymentList
+					var pods corev1.PodList
 					listOptions := client.ListOptions{Namespace: namespace}
 
-					_ = k8sClient.List(context.Background(), &deployments, &listOptions)
-					for _, deployment := range deployments.Items {
-						for _, oldDeployment := range oldDeployments.Items {
-							if deployment.GetName() == oldDeployment.GetName() {
-								Expect(deployment.Spec).To(Equal(oldDeployment.Spec))
+					_ = k8sClient.List(context.Background(), &pods, &listOptions)
+					Expect(len(pods.Items)).To(Equal(len(oldPods.Items)))
+					for _, pod := range pods.Items {
+						for _, oldPod := range oldPods.Items {
+							if pod.GetName() == oldPod.GetName() {
+								Expect(pod.GetResourceVersion()).To(Equal(oldPod.GetResourceVersion()))
 							}
 						}
 					}
