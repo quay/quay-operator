@@ -64,6 +64,11 @@ spec:
           type: object
         status:
           description: QuayRegistryStatus defines the observed state of QuayRegistry.
+          properties:
+            currentVersion:
+              description: CurrentVersion is the actual version of Quay that is actively
+                deployed.
+              type: string
           type: object
       type: object
   version: v1

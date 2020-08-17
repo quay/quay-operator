@@ -27,6 +27,13 @@ var allComponents = []string{
 	"storage",
 }
 
+type QuayVersion string
+
+const (
+	QuayVersionPadme  QuayVersion = "padme"
+	QuayVersionQuiGon QuayVersion = "qui-gon"
+)
+
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
 	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace which contains the base Quay config and extra certs.
@@ -46,6 +53,8 @@ type Component struct {
 
 // QuayRegistryStatus defines the observed state of QuayRegistry.
 type QuayRegistryStatus struct {
+	// CurrentVersion is the actual version of Quay that is actively deployed.
+	CurrentVersion QuayVersion `json:"currentVersion,omitempty"`
 }
 
 // +kubebuilder:object:root=true

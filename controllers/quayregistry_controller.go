@@ -79,6 +79,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		log.Error(err, "could not ensure default `spec.components`")
 		return ctrl.Result{}, err
 	}
+
 	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
 		log.Info("updating QuayRegistry `spec.components` to include defaults")
 		if err = r.Client.Update(ctx, updatedQuay); err != nil {
@@ -99,6 +100,14 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	log.Info("all objects created/updated successfully")
+
+	updatedQuay.Status.CurrentVersion = v1.QuayVersionQuiGon
+	err = r.Client.Status().Update(ctx, updatedQuay)
+	if err != nil {
+		log.Error(err, "could not update QuayRegistry status with current version")
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
