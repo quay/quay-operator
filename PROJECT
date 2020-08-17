@@ -1,0 +1,3 @@
+domain: quay.redhat.com
+repo: github.com/quay/quay-operator
+version: "2"
