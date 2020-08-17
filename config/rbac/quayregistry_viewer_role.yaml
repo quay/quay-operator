@@ -1,0 +1,20 @@
+# permissions for end users to view quayregistries.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: quayregistry-viewer-role
+rules:
+- apiGroups:
+  - quay.redhat.com.quay.redhat.com
+  resources:
+  - quayregistries
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - quay.redhat.com.quay.redhat.com
+  resources:
+  - quayregistries/status
+  verbs:
+  - get
