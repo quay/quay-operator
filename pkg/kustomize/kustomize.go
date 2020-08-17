@@ -2,8 +2,10 @@ package kustomize
 
 import (
 	"errors"
-	"path"
+	"fmt"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -22,10 +24,12 @@ import (
 	v1 "github.com/quay/quay-operator/api/v1"
 )
 
-// FIXME(alecmerdler): Path has to be correct when running binary and tests...
-const kustomizeDir = "/home/alec/work/quay-operator/kustomize"
+func appDir() string {
+	_, filename, _, _ := runtime.Caller(0)
+	path := filepath.Join(filepath.Dir(filename))
 
-var appDir = path.Join(kustomizeDir, "tmp")
+	return filepath.Join(path, "..", "..", "kustomize", "tmp")
+}
 
 func check(err error) {
 	if err != nil {
@@ -60,28 +64,29 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 func generate(kustomization *types.Kustomization, quayConfigFiles map[string][]byte) ([]k8sruntime.Object, error) {
 	fSys := filesys.MakeFsOnDisk()
 
-	err := fSys.RemoveAll(path.Join(appDir))
+	fmt.Println(appDir())
+	err := fSys.RemoveAll(filepath.Join(appDir()))
 	check(err)
-	err = fSys.MkdirAll(path.Join(appDir, "bundle"))
+	err = fSys.MkdirAll(filepath.Join(appDir(), "bundle"))
 	check(err)
 
 	// Write `kustomization.yaml` to filesystem
 	kustomizationFile, err := yaml.Marshal(kustomization)
 	check(err)
-	err = fSys.WriteFile(path.Join(appDir, "kustomization.yaml"), kustomizationFile)
+	err = fSys.WriteFile(filepath.Join(appDir(), "kustomization.yaml"), kustomizationFile)
 	check(err)
 
 	// Add all Quay config files to directory to be included in the generated `Secret`
 	check(err)
 	for fileName, file := range quayConfigFiles {
 		check(err)
-		err = fSys.WriteFile(path.Join(appDir, "bundle", fileName), file)
+		err = fSys.WriteFile(filepath.Join(appDir(), "bundle", fileName), file)
 		check(err)
 	}
 
 	opts := &krusty.Options{}
 	k := krusty.MakeKustomizer(fSys, opts)
-	resMap, err := k.Run(appDir)
+	resMap, err := k.Run(appDir())
 	check(err)
 
 	output := []k8sruntime.Object{}
@@ -116,11 +121,11 @@ func KustomizationFor(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret) (*
 
 	components := []string{}
 	for _, managedComponent := range quay.Spec.ManagedComponents {
-		components = append(components, path.Join("..", "components", managedComponent.Kind))
+		components = append(components, filepath.Join("..", "components", managedComponent.Kind))
 	}
 	configFiles := []string{}
 	for key := range baseConfigBundle.Data {
-		configFiles = append(configFiles, path.Join("bundle", key))
+		configFiles = append(configFiles, filepath.Join("bundle", key))
 	}
 
 	return &types.Kustomization{

@@ -1,0 +1,32 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  tidy:
+    name: Tidy
+    runs-on: ubuntu-latest
+    container: docker.io/library/golang:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Go Tidy
+        run: go mod tidy
+      - name: Git Diff
+        run: git diff --exit-code
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    container: docker.io/library/golang:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: OS Dependencies
+        run: apt-get update && apt-get install -y tar make gcc
+      - name: Install Kubebuilder
+        run: |
+          os=$(go env GOOS)
+          arch=$(go env GOARCH)
+          curl -L https://go.kubebuilder.io/dl/2.3.1/${os}/${arch} | tar -xz -C /tmp/
+          mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
+          export PATH=$PATH:/usr/local/kubebuilder/bin
+      - name: Tests
+        run: go test -v ./...
