@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -95,7 +96,13 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, nil
 	}
 
-	updatedQuay, err = v1.EnsureDefaultComponents(&quay)
+	updatedQuay, err = r.checkRoutesAvailable(updatedQuay.DeepCopy())
+	if err != nil {
+		log.Error(err, "could not check for Routes API")
+		return ctrl.Result{}, err
+	}
+
+	updatedQuay, err = v1.EnsureDefaultComponents(updatedQuay.DeepCopy())
 	if err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
 		return ctrl.Result{}, err
@@ -142,6 +149,8 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 					log.Info("Quay upgrade complete, updating `status.currentVersion`")
 
 					updatedQuay.Status.CurrentVersion = updatedQuay.Spec.DesiredVersion
+
+					updatedQuay, _ := v1.EnsureRegistryEndpoint(updatedQuay)
 					err = r.Client.Status().Update(ctx, updatedQuay)
 					if err != nil {
 						log.Error(err, "could not update QuayRegistry status with current version")
@@ -155,6 +164,21 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *QuayRegistryReconciler) checkRoutesAvailable(quay *v1.QuayRegistry) (*v1.QuayRegistry, error) {
+	var routes routev1.RouteList
+	if err := r.Client.List(context.Background(), &routes); err == nil && len(routes.Items) > 0 {
+		r.Log.Info("cluster supports `Routes` API")
+		existingAnnotations := quay.GetAnnotations()
+		if existingAnnotations == nil {
+			existingAnnotations = map[string]string{}
+		}
+		existingAnnotations[v1.ClusterHostnameAnnotation] = routes.Items[0].Status.Ingress[0].RouterCanonicalHostname
+		quay.SetAnnotations(existingAnnotations)
+	}
+
+	return quay, nil
 }
 
 func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k8sruntime.Object, quay v1.QuayRegistry) error {
@@ -180,7 +204,13 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 }
 
 func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
+		r.Log.Error(err, "Failed to add OpenShift `Route` API to scheme")
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&quayredhatcomv1.QuayRegistry{}).
+		// TODO(alecmerdler): Add `.Owns()` for every resource type we manage...
 		Complete(r)
 }

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
@@ -86,8 +87,10 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 		return &rbac.Role{}
 	case schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}.String():
 		return &rbac.RoleBinding{}
+	case schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}.String():
+		return &routev1.Route{}
 	default:
-		panic(fmt.Sprintf("Missing handler for GVK %s", gvk.String()))
+		panic(fmt.Sprintf("Missing model for GVK %s", gvk.String()))
 	}
 }
 
