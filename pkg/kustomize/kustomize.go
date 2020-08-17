@@ -2,6 +2,7 @@ package kustomize
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -77,7 +78,7 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 	case schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}.String():
 		return &rbac.RoleBinding{}
 	default:
-		return nil
+		panic(fmt.Sprintf("Missing handler for GVK %s", gvk.String()))
 	}
 }
 
@@ -287,6 +288,7 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 		}
 	}
 
+	secretKeysSecret.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "Secret"})
 	resources = append(resources, secretKeysSecret)
 
 	for _, resource := range resources {

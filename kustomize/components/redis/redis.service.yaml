@@ -7,5 +7,6 @@ metadata:
 spec:
   ports:
     - port: 6379
+      protocol: TCP
   selector:
     quay-component: redis
