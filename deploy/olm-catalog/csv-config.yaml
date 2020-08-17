@@ -1,7 +1,0 @@
----
-operator-path: deploy/operator.yaml
-role-path: deploy/role.yaml
-operator-name: project-quay
-crd-cr-paths:
-  - deploy/crds/redhatcop.redhat.io_quayecosystems_crd.yaml
-  - deploy/examples
