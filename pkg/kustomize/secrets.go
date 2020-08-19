@@ -102,6 +102,7 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		}
 
 		fieldGroup.FeatureSecurityScanner = true
+		fieldGroup.SecurityScannerEndpoint = "http://" + quay.GetName() + "-clair-v2"
 		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + "clair"
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 
@@ -183,7 +184,16 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 func BaseConfigBundle() map[string][]byte {
 	return map[string][]byte{
 		"config.yaml": encode(map[string]interface{}{
-			"FEATURE_MAILING": false,
+			"FEATURE_MAILING":                    false,
+			"REGISTRY_TITLE":                     "Quay",
+			"REGISTRY_TITLE_SHORT":               "Quay",
+			"AUTHENTICATION_TYPE":                "Database",
+			"ENTERPRISE_LOGO_URL":                "/static/img/quay-horizontal-color.svg",
+			"DEFAULT_TAG_EXPIRATION":             "2w",
+			"ALLOW_PULLS_WITHOUT_STRICT_LOGGING": false,
+			"TAG_EXPIRATION_OPTIONS":             []string{"2w"},
+			"TEAM_RESYNC_STALE_TIME":             "60m",
+			"FEATURE_DIRECT_LOGIN":               true,
 		}),
 	}
 }

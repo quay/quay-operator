@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/go-logr/logr"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
 	v1 "github.com/quay/quay-operator/api/v1"
 )
 
@@ -271,7 +272,8 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 }
 
 // Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
-func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysSecret *corev1.Secret, log logr.Logger) ([]k8sruntime.Object, error) {
+func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysSecret *corev1.Secret, log logr.Logger) ([]k8sruntime.Object, *v1.QuayRegistry, error) {
+	updatedQuay := quay.DeepCopy()
 	// Each `managedComponent` brings in their own generated `config.yaml` fields which are added to the base `Secret`
 	componentConfigFiles := baseConfigBundle.DeepCopy().Data
 
@@ -290,10 +292,29 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 		"SECRET_KEY":          secretKey,
 	})
 
-	for _, component := range quay.Spec.Components {
-		if component.Managed {
-			configFile, err := ConfigFileFor(component.Kind, quay)
+	for _, component := range updatedQuay.Spec.Components {
+		configFile, err := ConfigFileFor(component.Kind, updatedQuay)
+		check(err)
+
+		switch component.Kind {
+		case "postgres":
+			fieldGroup := &database.DatabaseFieldGroup{}
+			err = yaml.Unmarshal(configFile, &fieldGroup)
 			check(err)
+
+			userFieldGroup, err := database.NewDatabaseFieldGroup(parsedUserConfig)
+			check(err)
+
+			defaultFieldGroup, err := database.NewDatabaseFieldGroup(map[string]interface{}{})
+			check(err)
+
+			if !reflect.DeepEqual(*defaultFieldGroup, *userFieldGroup) && !reflect.DeepEqual(*userFieldGroup, *fieldGroup) {
+				component.Managed = false
+				// TODO(alecmerdler): Validate user-provided unmanaged component config
+			}
+		}
+
+		if component.Managed {
 			componentConfigFiles[component.Kind+".config.yaml"] = configFile
 		}
 	}
@@ -340,5 +361,5 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 		})
 	}
 
-	return resources, err
+	return resources, updatedQuay, err
 }

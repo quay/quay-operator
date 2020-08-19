@@ -237,11 +237,12 @@ func withComponents(components []string) []runtime.Object {
 }
 
 var inflateTests = []struct {
-	name         string
-	quayRegistry *v1.QuayRegistry
-	configBundle *corev1.Secret
-	expected     []runtime.Object
-	expectedErr  error
+	name               string
+	quayRegistry       *v1.QuayRegistry
+	configBundle       *corev1.Secret
+	expected           []runtime.Object
+	expectedComponents map[string]bool
+	expectedErr        error
 }{
 	{
 		"AllComponentsManagedExplicit",
@@ -267,6 +268,7 @@ var inflateTests = []struct {
 			},
 		},
 		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage"}),
+		map[string]bool{"clair": true, "postgres": true, "redis": true, "objectstorage": true},
 		nil,
 	},
 	{
@@ -288,6 +290,7 @@ var inflateTests = []struct {
 			},
 		},
 		withComponents([]string{"base"}),
+		map[string]bool{"clair": false, "postgres": false, "redis": false, "objectstorage": false},
 		nil,
 	},
 	{
@@ -309,6 +312,7 @@ var inflateTests = []struct {
 			},
 		},
 		withComponents([]string{"base", "postgres", "clair"}),
+		map[string]bool{"clair": true, "postgres": true, "redis": false, "objectstorage": false},
 		nil,
 	},
 	{
@@ -335,6 +339,7 @@ var inflateTests = []struct {
 			},
 		},
 		withComponents([]string{"base", "postgres", "clair", "redis", "objectstorage"}),
+		map[string]bool{"clair": true, "postgres": true, "redis": true, "objectstorage": true},
 		nil,
 	},
 }
@@ -345,7 +350,7 @@ func TestInflate(t *testing.T) {
 	log := testlogr.TestLogger{}
 
 	for _, test := range inflateTests {
-		pieces, err := Inflate(test.quayRegistry, test.configBundle, nil, log)
+		pieces, updatedQuay, err := Inflate(test.quayRegistry, test.configBundle, nil, log)
 
 		assert.NotNil(pieces, test.name)
 		assert.Equal(len(test.expected), len(pieces), test.name)
@@ -358,6 +363,10 @@ func TestInflate(t *testing.T) {
 			if !strings.Contains(objectMeta.GetName(), "managed-secret-keys") {
 				assert.Equal(string(test.quayRegistry.Spec.DesiredVersion), objectMeta.GetAnnotations()["quay-version"], test.name)
 			}
+		}
+
+		for _, component := range updatedQuay.Spec.Components {
+			assert.Equal(test.expectedComponents[component.Kind], component.Managed, test.name)
 		}
 	}
 }

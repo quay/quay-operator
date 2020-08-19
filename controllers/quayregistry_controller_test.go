@@ -75,6 +75,13 @@ func newConfigBundle(name, namespace string) corev1.Secret {
 	}
 }
 
+// func configBundleWith(secret corev1.Secret, config map[string]interface{}) corev1.Secret {
+// 	modifiedConfig := decode(secret.Data["config.yaml"])
+// 	for field, value := range config {
+// 		modifiedConfig[field] = value
+// 	}
+// }
+
 func randIdentifier(randomBytes int) string {
 	identBytes := make([]byte, randomBytes)
 	rand.Read(identBytes) // nolint:gosec,errcheck
@@ -205,6 +212,21 @@ var _ = Describe("QuayRegistryReconciler", func() {
 			When("it references a `configBundleSecret` that does exist", func() {
 				It("should not return an error", func() {
 					Expect(err).NotTo(HaveOccurred())
+				})
+
+				// TODO(alecmerdler): Test inferring un-managed components from `configBundleSecret`...
+				Context("config fields for an unmanaged database are present", func() {
+					BeforeEach(func() {
+
+					})
+
+					It("marks `postgres` component as unmanaged", func() {
+
+					})
+
+					It("does not deploy a managed Postgres database", func() {
+
+					})
 				})
 
 				It("will create Quay objects on the cluster with `ownerReferences` back to the `QuayRegistry`", func() {

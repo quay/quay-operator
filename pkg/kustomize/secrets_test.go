@@ -43,7 +43,7 @@ var secretForTests = []struct {
 		"clair",
 		quayRegistry("test"),
 		[]byte(`FEATURE_SECURITY_SCANNER: true
-SECURITY_SCANNER_ENDPOINT: ""
+SECURITY_SCANNER_ENDPOINT: http://test-clair-v2
 SECURITY_SCANNER_INDEXING_INTERVAL: 30
 SECURITY_SCANNER_NOTIFICATIONS: false
 SECURITY_SCANNER_V4_ENDPOINT: http://test-clair

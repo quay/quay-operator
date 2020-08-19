@@ -12,4 +12,5 @@ spec:
       name: postgres
       targetPort: 5432
   selector:
+    # FIXME(alecmerdler): This isn't unique to each `QuayRegistry`...
     quay-component: postgres
