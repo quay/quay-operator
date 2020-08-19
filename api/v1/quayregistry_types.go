@@ -53,7 +53,7 @@ type QuayRegistrySpec struct {
 	// If omitted, will default to the latest version that the Operator knows how to manage.
 	DesiredVersion QuayVersion `json:"desiredVersion,omitempty"`
 	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace which contains the base Quay config and extra certs.
-	ConfigBundleSecret string `json:"configBundleSecret"`
+	ConfigBundleSecret string `json:"configBundleSecret,omitempty"`
 	// Components declare how the Operator should handle backing Quay services.
 	Components []Component `json:"components,omitempty"`
 }

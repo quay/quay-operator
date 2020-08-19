@@ -69,8 +69,6 @@ spec:
                 the Operator will not upgrade. If omitted, will default to the latest
                 version that the Operator knows how to manage.
               type: string
-          required:
-          - configBundleSecret
           type: object
         status:
           description: QuayRegistryStatus defines the observed state of QuayRegistry.
