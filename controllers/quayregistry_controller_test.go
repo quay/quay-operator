@@ -144,7 +144,33 @@ var _ = Describe("QuayRegistryReconciler", func() {
 		})
 
 		Context("on a newly created `QuayRegistry`", func() {
-			Context("which references a `configBundleSecret` that does not exist", func() {
+			When("the `configBundleSecret` field is empty", func() {
+				BeforeEach(func() {
+					quayRegistry.Spec.ConfigBundleSecret = ""
+				})
+
+				It("should not return an error", func() {
+					Expect(err).ShouldNot(HaveOccurred())
+				})
+
+				It("should create a fresh `Secret` and populate `configBundleSecret`", func() {
+					var updatedQuayRegistry v1.QuayRegistry
+					var configBundleSecret corev1.Secret
+
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
+					Expect(updatedQuayRegistry.Spec.ConfigBundleSecret).To(ContainSubstring(quayRegistry.GetName() + "-config-bundle-"))
+
+					Expect(k8sClient.Get(
+						context.Background(),
+						types.NamespacedName{
+							Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
+							Namespace: quayRegistry.GetNamespace()},
+						&configBundleSecret)).
+						Should(Succeed())
+				})
+			})
+
+			When("it references a `configBundleSecret` that does not exist", func() {
 				BeforeEach(func() {
 					quayRegistry.Spec.ConfigBundleSecret = "does-not-exist"
 				})
@@ -171,12 +197,12 @@ var _ = Describe("QuayRegistryReconciler", func() {
 				It("does not set the current version in the `status` block", func() {
 					var updatedQuayRegistry v1.QuayRegistry
 
-					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry))
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
 					Expect(len(updatedQuayRegistry.Status.CurrentVersion)).To(Equal(0))
 				})
 			})
 
-			Context("which references a `configBundleSecret` that does exist", func() {
+			When("it references a `configBundleSecret` that does exist", func() {
 				It("should not return an error", func() {
 					Expect(err).NotTo(HaveOccurred())
 				})
@@ -223,7 +249,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					It("will populate the `spec.desiredVersion` field with the latest version", func() {
 						var updatedQuayRegistry v1.QuayRegistry
 
-						Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry))
+						Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
 						Expect(updatedQuayRegistry.Spec.DesiredVersion).To(Equal(v1.QuayVersionQuiGon))
 					})
 				})
@@ -273,7 +299,33 @@ var _ = Describe("QuayRegistryReconciler", func() {
 				_ = k8sClient.List(context.Background(), &oldPods, &listOptions)
 			})
 
-			Context("which references a `configBundleSecret` that does not exist", func() {
+			When("the `configBundleSecret` field is empty", func() {
+				BeforeEach(func() {
+					quayRegistry.Spec.ConfigBundleSecret = ""
+				})
+
+				It("should not return an error", func() {
+					Expect(err).ShouldNot(HaveOccurred())
+				})
+
+				It("should create a fresh `Secret` and populate `configBundleSecret`", func() {
+					var updatedQuayRegistry v1.QuayRegistry
+					var configBundleSecret corev1.Secret
+
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
+					Expect(updatedQuayRegistry.Spec.ConfigBundleSecret).To(ContainSubstring(quayRegistry.GetName() + "-config-bundle-"))
+
+					Expect(k8sClient.Get(
+						context.Background(),
+						types.NamespacedName{
+							Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
+							Namespace: quayRegistry.GetNamespace()},
+						&configBundleSecret)).
+						Should(Succeed())
+				})
+			})
+
+			When("it references a `configBundleSecret` that does not exist", func() {
 				JustBeforeEach(func() {
 					Expect(k8sClient.Get(context.Background(), quayRegistryName, &quayRegistry))
 					quayRegistry.Spec.ConfigBundleSecret = "does-not-exist"
@@ -310,7 +362,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 				})
 			})
 
-			Context("which references a `configBundleSecret` that does exist", func() {
+			When("it references a `configBundleSecret` that does exist", func() {
 				JustBeforeEach(func() {
 					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
 				})

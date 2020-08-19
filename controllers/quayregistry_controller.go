@@ -65,6 +65,35 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	updatedQuay := quay.DeepCopy()
+
+	if quay.Spec.ConfigBundleSecret == "" {
+		log.Info("`spec.configBundleSecret` is unset. Creating base `Secret`")
+
+		baseConfigBundle := corev1.Secret{
+			// FIXME(alecmerdler): Might need some labels on it...
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: quay.GetName() + "-config-bundle-",
+				Namespace:    quay.GetNamespace(),
+			},
+			Data: kustomize.BaseConfigBundle(),
+		}
+
+		if err := r.Client.Create(ctx, &baseConfigBundle); err != nil {
+			log.Error(err, "unable to create base config bundle `Secret`")
+			return ctrl.Result{}, err
+		}
+
+		updatedQuay.Spec.ConfigBundleSecret = baseConfigBundle.GetName()
+		if err := r.Client.Update(ctx, updatedQuay); err != nil {
+			log.Error(err, "unable to update `spec.configBundleSecret`")
+			return ctrl.Result{}, err
+		}
+
+		log.Info("successfully updated `spec.configBundleSecret`")
+		return ctrl.Result{}, nil
+	}
+
 	var configBundle corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.Spec.ConfigBundleSecret}, &configBundle); err != nil {
 		log.Error(err, "unable to retrieve referenced `configBundleSecret`", "configBundleSecret", quay.Spec.ConfigBundleSecret)

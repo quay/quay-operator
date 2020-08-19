@@ -191,6 +191,15 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 	}
 }
 
+// BaseConfigBundle returns a minimum config bundle with values that Quay doesn't have defaults for.
+func BaseConfigBundle() map[string][]byte {
+	return map[string][]byte{
+		"config.yaml": encode(map[string]interface{}{
+			"FEATURE_MAILING": false,
+		}),
+	}
+}
+
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
 func componentConfigFilesFor(component string, quay *v1.QuayRegistry) (map[string][]byte, error) {
 	switch component {
