@@ -1,0 +1,5 @@
+# Object Storage component adds object storage using the `objectbucket.io` APIs.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: 
+  - ./quay-datastore.objectbucketclaim.yaml

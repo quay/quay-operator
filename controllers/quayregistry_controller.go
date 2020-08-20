@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -131,6 +132,12 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, err
 	}
 
+	updatedQuay, err = r.checkObjectBucketClaimsAvailable(updatedQuay.DeepCopy())
+	if err != nil {
+		log.Error(err, "could not check for `ObjectBucketClaims` API")
+		return ctrl.Result{}, err
+	}
+
 	updatedQuay, err = v1.EnsureDefaultComponents(updatedQuay.DeepCopy())
 	if err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
@@ -156,6 +163,15 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		_ = r.createOrUpdateObject(ctx, obj, quay)
 	}
 	log.Info("all objects created/updated successfully")
+
+	if quay.Status.LastUpdate == "" {
+		updatedQuay.Status.LastUpdate = time.Now().UTC().String()
+
+		if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
+			r.Log.Error(err, "could not update QuayRegistry `status.lastUpdate` after (re)deployment")
+			return ctrl.Result{}, err
+		}
+	}
 
 	if updatedQuay.Spec.DesiredVersion != updatedQuay.Status.CurrentVersion {
 		go func(quayRegistry *v1.QuayRegistry) {
@@ -195,21 +211,6 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	return ctrl.Result{}, nil
 }
 
-func (r *QuayRegistryReconciler) checkRoutesAvailable(quay *v1.QuayRegistry) (*v1.QuayRegistry, error) {
-	var routes routev1.RouteList
-	if err := r.Client.List(context.Background(), &routes); err == nil && len(routes.Items) > 0 {
-		r.Log.Info("cluster supports `Routes` API")
-		existingAnnotations := quay.GetAnnotations()
-		if existingAnnotations == nil {
-			existingAnnotations = map[string]string{}
-		}
-		existingAnnotations[v1.ClusterHostnameAnnotation] = routes.Items[0].Status.Ingress[0].RouterCanonicalHostname
-		quay.SetAnnotations(existingAnnotations)
-	}
-
-	return quay, nil
-}
-
 func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k8sruntime.Object, quay v1.QuayRegistry) error {
 	objectMeta, _ := meta.Accessor(obj)
 	groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
@@ -235,6 +236,10 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add OpenShift `Route` API to scheme")
+		return err
+	}
+	if err := objectbucket.AddToScheme(mgr.GetScheme()); err != nil {
+		r.Log.Error(err, "Failed to add `ObjectBucketClaim` API to scheme")
 		return err
 	}
 

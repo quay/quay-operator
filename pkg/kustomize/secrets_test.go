@@ -13,13 +13,20 @@ func quayRegistry(name string) *v1.QuayRegistry {
 	return &v1.QuayRegistry{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+			Annotations: map[string]string{
+				v1.SupportsObjectStorageAnnotation: "true",
+				v1.StorageHostnameAnnotation:       "s3.noobaa.svc",
+				v1.StorageBucketNameAnnotation:     "quay-datastore",
+				v1.StorageAccessKeyAnnotation:      "abc123",
+				v1.StorageSecretKeyAnnotation:      "super-secret",
+			},
 		},
 		Spec: v1.QuayRegistrySpec{
 			Components: []v1.Component{
 				{Kind: "postgres", Managed: true},
 				{Kind: "clair", Managed: true},
 				{Kind: "redis", Managed: true},
-				{Kind: "storage", Managed: true},
+				{Kind: "objectstorage", Managed: true},
 			},
 		},
 	}
@@ -66,36 +73,23 @@ USER_EVENTS_REDIS:
 `),
 	},
 	{
-		"storage",
-		"storage",
+		"objectstorage",
+		"objectstorage",
 		quayRegistry("test"),
 		[]byte(`DISTRIBUTED_STORAGE_CONFIG:
-  default:
+  local_us:
   - RadosGWStorage
-  - access_key: minio
+  - access_key: abc123
     bucket_name: quay-datastore
-    hostname: test-quay-datastore
-    port: 9000
-    secret_key: minio123
+    hostname: s3.noobaa.svc
+    is_secure: true
+    port: 443
+    secret_key: super-secret
     storage_path: /datastorage/registry
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
-- default
+- local_us
 DISTRIBUTED_STORAGE_PREFERENCE:
-- default
-`),
-	},
-	{
-		"localstorage",
-		"localstorage",
-		quayRegistry("test"),
-		[]byte(`DISTRIBUTED_STORAGE_CONFIG:
-  default:
-  - LocalStorage
-  - storage_path: /datastorage/registry
-DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
-- default
-DISTRIBUTED_STORAGE_PREFERENCE:
-- default
+- local_us
 `),
 	},
 }

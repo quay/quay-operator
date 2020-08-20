@@ -6,7 +6,7 @@ commonLabels:
 resources: 
   - ./quay.role.yaml
   - ./quay.rolebinding.yaml
-  - ./extra-certs.configmap.yaml
   - ./quay.deployment.yaml
   - ./quay.service.yaml
   - ./upgrade.deployment.yaml
+  - ./extra-certs.configmap.yaml

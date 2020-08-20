@@ -135,38 +135,26 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s/%s", user, password, host, name)
 
 		return yaml.Marshal(fieldGroup)
-	case "localstorage":
-		fieldGroup := distributedstorage.DistributedStorageFieldGroup{
-			DistributedStoragePreference:       []string{"default"},
-			DistributedStorageDefaultLocations: []string{"default"},
-			DistributedStorageConfig: map[string]distributedstorage.DistributedStorage{
-				"default": {
-					Name: "LocalStorage",
-					Args: distributedstorage.DistributedStorageArgs{
-						StoragePath: "/datastorage/registry",
-					},
-				},
-			},
-		}
+	case "objectstorage":
+		hostname := quay.GetAnnotations()[v1.StorageHostnameAnnotation]
+		bucketName := quay.GetAnnotations()[v1.StorageBucketNameAnnotation]
+		accessKey := quay.GetAnnotations()[v1.StorageAccessKeyAnnotation]
+		secretKey := quay.GetAnnotations()[v1.StorageSecretKeyAnnotation]
 
-		return yaml.Marshal(fieldGroup)
-	// FIXME(alecmerdler): Needs to be just "minio"
-	case "storage":
 		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
-			DistributedStoragePreference:       []string{"default"},
-			DistributedStorageDefaultLocations: []string{"default"},
+			DistributedStoragePreference:       []string{"local_us"},
+			DistributedStorageDefaultLocations: []string{"local_us"},
 			DistributedStorageConfig: map[string]distributedstorage.DistributedStorage{
-				"default": {
+				"local_us": {
 					Name: "RadosGWStorage",
 					Args: distributedstorage.DistributedStorageArgs{
-						Hostname:    strings.Join([]string{quay.GetName(), "quay-datastore"}, "-"),
-						IsSecure:    false,
-						Port:        9000,
+						Hostname:    hostname,
+						IsSecure:    true,
+						Port:        443,
 						StoragePath: "/datastorage/registry",
-						// FIXME(alecmerdler): Make this more secure...
-						AccessKey:  "minio",
-						SecretKey:  "minio123",
-						BucketName: "quay-datastore",
+						BucketName:  bucketName,
+						AccessKey:   accessKey,
+						SecretKey:   secretKey,
 					},
 				},
 			},

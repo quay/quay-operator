@@ -22,7 +22,7 @@ metadata:
             "components": [
               {"kind": "clair", "managed": true},
               {"kind": "postgres", "managed": true},
-              {"kind": "localstorage", "managed": true},
+              {"kind": "objectstorage", "managed": true},
               {"kind": "redis", "managed": true}
             ]
           }

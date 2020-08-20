@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -89,6 +90,8 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 		return &rbac.RoleBinding{}
 	case schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}.String():
 		return &routev1.Route{}
+	case schema.GroupVersionKind{Group: "objectbucket.io", Version: "v1alpha1", Kind: "ObjectBucketClaim"}.String():
+		return &objectbucket.ObjectBucketClaim{}
 	default:
 		panic(fmt.Sprintf("Missing model for GVK %s", gvk.String()))
 	}
