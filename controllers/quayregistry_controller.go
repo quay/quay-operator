@@ -194,8 +194,8 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 					log.Info("Quay upgrade complete, updating `status.currentVersion`")
 
 					updatedQuay.Status.CurrentVersion = updatedQuay.Spec.DesiredVersion
-
 					updatedQuay, _ := v1.EnsureRegistryEndpoint(updatedQuay)
+					updatedQuay, _ = v1.EnsureConfigEditorEndpoint(updatedQuay)
 					err = r.Client.Status().Update(ctx, updatedQuay)
 					if err != nil {
 						log.Error(err, "could not update QuayRegistry status with current version")

@@ -193,7 +193,6 @@ func componentConfigFilesFor(component string, quay *v1.QuayRegistry) (map[strin
 	switch component {
 	case "clair":
 		return map[string][]byte{"config.yaml": clairConfigFor(quay)}, nil
-	// TODO(alecmerdler): Could add `config-editor` as separate component and generate password here...
 	default:
 		return nil, nil
 	}
