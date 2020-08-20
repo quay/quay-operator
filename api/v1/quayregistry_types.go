@@ -83,6 +83,9 @@ type QuayRegistryStatus struct {
 	RegistryEndpoint string `json:"registryEndpoint,omitempty"`
 	// LastUpdate is the timestamp when the Operator last processed this instance.
 	LastUpdate string `json:"lastUpdated,omitempty"`
+	// ConfigEditorEndpoint is the external access point for a web-based reconfiguration interface
+	// for the Quay registry instance.
+	ConfigEditorEndpoint string `json:"configEditorEndpoint,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -204,6 +207,22 @@ func EnsureRegistryEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
 	// TODO(alecmerdler): Retrieve load balancer IP from `Service`
 
 	return updatedQuay, quay.Status.RegistryEndpoint == updatedQuay.Status.RegistryEndpoint
+}
+
+// EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field and returns `ok` if it was changed.
+func EnsureConfigEditorEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
+	updatedQuay := quay.DeepCopy()
+
+	if supportsRoutes(quay) {
+		clusterHostname := quay.GetAnnotations()[ClusterHostnameAnnotation]
+		updatedQuay.Status.ConfigEditorEndpoint = strings.Join([]string{
+			strings.Join([]string{quay.GetName(), "quay-config-editor", quay.GetNamespace()}, "-"),
+			clusterHostname},
+			".")
+	}
+	// TODO(alecmerdler): Retrieve load balancer IP from `Service`
+
+	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
 }
 
 func supportsRoutes(quay *QuayRegistry) bool {

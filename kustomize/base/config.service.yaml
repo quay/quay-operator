@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: quay-config-editor
+  labels:
+    quay-component: quay-config-editor
+spec:
+  type: LoadBalancer
+  ports:
+    - protocol: TCP
+      name: http
+      port: 80
+      targetPort: 8080
+  selector:
+    quay-component: quay-config-editor
