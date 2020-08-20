@@ -20,6 +20,9 @@ spec:
         - name: configvolume
           secret:
             secretName: quay-config-secret
+        - name: extra-ca-certs
+          configMap:
+            name: quay-extra-certs
       containers:
         - name: quay-app
           image: quay.io/projectquay/quay
@@ -70,3 +73,6 @@ spec:
             - name: configvolume
               readOnly: false
               mountPath: /conf/stack
+            - name: extra-ca-certs
+              readOnly: true
+              mountPath: /conf/kube_extra_certs

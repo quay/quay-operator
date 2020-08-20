@@ -179,6 +179,7 @@ var quayComponents = map[string][]runtime.Object{
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-deployment"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-secret"}},
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-extra-certs"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-registry-managed-secret-keys"}},
 	},
 	"clair": {
