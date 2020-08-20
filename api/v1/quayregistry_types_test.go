@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,12 +17,15 @@ var ensureDefaultComponentsTests = []struct {
 	{
 		"AllComponentsProvided",
 		QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{SupportsObjectStorageAnnotation: "true"},
+			},
 			Spec: QuayRegistrySpec{
 				Components: []Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "clair", Managed: true},
-					{Kind: "localstorage", Managed: true},
+					{Kind: "objectstorage", Managed: true},
 				},
 			},
 		},
@@ -29,16 +33,37 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
-			{Kind: "localstorage", Managed: true},
+			{Kind: "objectstorage", Managed: true},
 		},
 		nil,
+	},
+	{
+		"AllComponentsProvidedWithoutObjectBucketClaims",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+				},
+			},
+		},
+		[]Component{
+			{Kind: "postgres", Managed: true},
+			{Kind: "redis", Managed: true},
+			{Kind: "clair", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		},
+		errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available"),
 	},
 	{
 		"AllComponentsProvidedWithRoutes",
 		QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					ClusterHostnameAnnotation: "apps.example.com",
+					ClusterHostnameAnnotation:       "apps.example.com",
+					SupportsObjectStorageAnnotation: "true",
 				},
 			},
 			Spec: QuayRegistrySpec{
@@ -46,7 +71,7 @@ var ensureDefaultComponentsTests = []struct {
 					{Kind: "postgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "clair", Managed: true},
-					{Kind: "localstorage", Managed: true},
+					{Kind: "objectstorage", Managed: true},
 				},
 			},
 		},
@@ -54,7 +79,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
-			{Kind: "localstorage", Managed: true},
+			{Kind: "objectstorage", Managed: true},
 			{Kind: "route", Managed: true},
 		},
 		nil,
@@ -62,13 +87,16 @@ var ensureDefaultComponentsTests = []struct {
 	{
 		"AllComponentsOmitted",
 		QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{SupportsObjectStorageAnnotation: "true"},
+			},
 			Spec: QuayRegistrySpec{},
 		},
 		[]Component{
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
-			{Kind: "localstorage", Managed: true},
+			{Kind: "objectstorage", Managed: true},
 		},
 		nil,
 	},
@@ -77,7 +105,8 @@ var ensureDefaultComponentsTests = []struct {
 		QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					ClusterHostnameAnnotation: "apps.example.com",
+					ClusterHostnameAnnotation:       "apps.example.com",
+					SupportsObjectStorageAnnotation: "true",
 				},
 			},
 			Spec: QuayRegistrySpec{},
@@ -86,7 +115,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
-			{Kind: "localstorage", Managed: true},
+			{Kind: "objectstorage", Managed: true},
 			{Kind: "route", Managed: true},
 		},
 		nil,
@@ -97,7 +126,7 @@ var ensureDefaultComponentsTests = []struct {
 			Spec: QuayRegistrySpec{
 				Components: []Component{
 					{Kind: "postgres", Managed: false},
-					{Kind: "localstorage", Managed: false},
+					{Kind: "objectstorage", Managed: false},
 				},
 			},
 		},
@@ -105,7 +134,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
-			{Kind: "localstorage", Managed: false},
+			{Kind: "objectstorage", Managed: false},
 		},
 		nil,
 	},
@@ -120,7 +149,7 @@ var ensureDefaultComponentsTests = []struct {
 			Spec: QuayRegistrySpec{
 				Components: []Component{
 					{Kind: "postgres", Managed: false},
-					{Kind: "localstorage", Managed: false},
+					{Kind: "objectstorage", Managed: false},
 					{Kind: "route", Managed: false},
 				},
 			},
@@ -129,7 +158,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
-			{Kind: "localstorage", Managed: false},
+			{Kind: "objectstorage", Managed: false},
 			{Kind: "route", Managed: false},
 		},
 		nil,
@@ -142,11 +171,15 @@ func TestEnsureDefaultComponents(t *testing.T) {
 	for _, test := range ensureDefaultComponentsTests {
 		updatedQuay, err := EnsureDefaultComponents(&test.quay)
 
-		assert.Nil(err, test.name)
-		assert.Equal(len(test.expected), len(updatedQuay.Spec.Components), test.name)
+		if test.expectedErr != nil {
+			assert.NotNil(err, test.name)
+		} else {
+			assert.Nil(err, test.name)
+			assert.Equal(len(test.expected), len(updatedQuay.Spec.Components), test.name)
 
-		for _, expectedComponent := range test.expected {
-			assert.Contains(updatedQuay.Spec.Components, expectedComponent, test.name)
+			for _, expectedComponent := range test.expected {
+				assert.Contains(updatedQuay.Spec.Components, expectedComponent, test.name)
+			}
 		}
 	}
 }
@@ -163,7 +196,7 @@ var componentsMatchTests = []struct {
 		[]Component{
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: false},
-			{Kind: "localstorage", Managed: false},
+			{Kind: "objectstorage", Managed: false},
 		},
 		false,
 	},
@@ -178,12 +211,12 @@ var componentsMatchTests = []struct {
 		[]Component{
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: false},
-			{Kind: "localstorage", Managed: true},
+			{Kind: "objectstorage", Managed: true},
 		},
 		[]Component{
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: false},
-			{Kind: "localstorage", Managed: true},
+			{Kind: "objectstorage", Managed: true},
 		},
 		true,
 	},
@@ -192,12 +225,12 @@ var componentsMatchTests = []struct {
 		[]Component{
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: false},
-			{Kind: "localstorage", Managed: true},
+			{Kind: "objectstorage", Managed: true},
 		},
 		[]Component{
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: false},
-			{Kind: "localstorage", Managed: false},
+			{Kind: "objectstorage", Managed: false},
 		},
 		false,
 	},

@@ -25,7 +25,15 @@ import (
 
 type QuayVersion string
 
-const ClusterHostnameAnnotation = "router-canonical-hostname"
+const (
+	ClusterHostnameAnnotation = "router-canonical-hostname"
+
+	SupportsObjectStorageAnnotation = "supports-object-storage"
+	StorageHostnameAnnotation       = "storage-hostname"
+	StorageBucketNameAnnotation     = "storage-bucketname"
+	StorageAccessKeyAnnotation      = "storage-access-key"
+	StorageSecretKeyAnnotation      = "storage-secret-key"
+)
 
 const (
 	QuayVersionQuiGon QuayVersion = "qui-gon"
@@ -41,7 +49,7 @@ var allComponents = []string{
 	"postgres",
 	"clair",
 	"redis",
-	"localstorage",
+	"objectstorage",
 	"route",
 }
 
@@ -73,6 +81,8 @@ type QuayRegistryStatus struct {
 	CurrentVersion QuayVersion `json:"currentVersion,omitempty"`
 	// RegistryEndpoint is the external access point for the Quay registry.
 	RegistryEndpoint string `json:"registryEndpoint,omitempty"`
+	// LastUpdate is the timestamp when the Operator last processed this instance.
+	LastUpdate string `json:"lastUpdated,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -108,6 +118,9 @@ func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
 		if component.Kind == "route" && component.Managed && !supportsRoutes(quay) {
 			return nil, errors.New("cannot use `route` component when `Route` API not available")
 		}
+		if component.Kind == "objectstorage" && component.Managed && !supportsObjectBucketClaims(quay) {
+			return nil, errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available")
+		}
 	}
 
 	for _, component := range allComponents {
@@ -121,7 +134,10 @@ func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
 
 		if !found {
 			if component == "route" && !supportsRoutes(quay) {
-				break
+				continue
+			}
+			if component == "objectstorage" && !supportsObjectBucketClaims(quay) {
+				continue
 			}
 
 			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{Kind: component, Managed: true})
@@ -197,6 +213,17 @@ func supportsRoutes(quay *QuayRegistry) bool {
 	}
 
 	_, ok := annotations[ClusterHostnameAnnotation]
+
+	return ok
+}
+
+func supportsObjectBucketClaims(quay *QuayRegistry) bool {
+	annotations := quay.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+
+	_, ok := annotations[SupportsObjectStorageAnnotation]
 
 	return ok
 }

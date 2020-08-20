@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	testlogr "github.com/go-logr/logr/testing"
+	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,12 +33,17 @@ var kustomizationForTests = []struct {
 	{
 		"AllComponents",
 		&v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					v1.SupportsObjectStorageAnnotation: "true",
+				},
+			},
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
-					{Kind: "storage", Managed: true},
+					{Kind: "objectstorage", Managed: true},
 				},
 			},
 		},
@@ -51,7 +57,7 @@ var kustomizationForTests = []struct {
 				"../components/postgres",
 				"../components/clair",
 				"../components/redis",
-				"../components/storage",
+				"../components/objectstorage",
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -60,13 +66,18 @@ var kustomizationForTests = []struct {
 	{
 		"InvalidDesiredVersion",
 		&v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					v1.SupportsObjectStorageAnnotation: "true",
+				},
+			},
 			Spec: v1.QuayRegistrySpec{
 				DesiredVersion: "not-a-real-version",
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
-					{Kind: "storage", Managed: true},
+					{Kind: "objectstorage", Managed: true},
 				},
 			},
 		},
@@ -80,7 +91,7 @@ var kustomizationForTests = []struct {
 				"../components/postgres",
 				"../components/clair",
 				"../components/redis",
-				"../components/storage",
+				"../components/objectstorage",
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -89,13 +100,18 @@ var kustomizationForTests = []struct {
 	{
 		"ValidDesiredVersion",
 		&v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					v1.SupportsObjectStorageAnnotation: "true",
+				},
+			},
 			Spec: v1.QuayRegistrySpec{
 				DesiredVersion: v1.QuayVersionPadme,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
-					{Kind: "storage", Managed: true},
+					{Kind: "objectstorage", Managed: true},
 				},
 			},
 		},
@@ -109,7 +125,7 @@ var kustomizationForTests = []struct {
 				"../components/postgres",
 				"../components/clair",
 				"../components/redis",
-				"../components/storage",
+				"../components/objectstorage",
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -200,11 +216,8 @@ var quayComponents = map[string][]runtime.Object{
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
 	},
-	"storage": {
-		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-storage"}},
-		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-datastore"}},
-		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-datastore"}},
-		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "minio-pv-claim"}},
+	"objectstorage": {
+		&objectbucket.ObjectBucketClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-datastorage"}},
 	},
 	"route": {
 		// TODO(alecmerdler): Import OpenShift `Route` API struct
@@ -230,13 +243,18 @@ var inflateTests = []struct {
 	{
 		"AllComponentsManagedExplicit",
 		&v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					v1.SupportsObjectStorageAnnotation: "true",
+				},
+			},
 			Spec: v1.QuayRegistrySpec{
 				DesiredVersion: v1.QuayVersionPadme,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
-					{Kind: "storage", Managed: true},
+					{Kind: "objectstorage", Managed: true},
 				},
 			},
 		},
@@ -245,7 +263,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "clair", "postgres", "redis", "storage"}),
+		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage"}),
 		nil,
 	},
 	{
@@ -257,7 +275,7 @@ var inflateTests = []struct {
 					{Kind: "postgres", Managed: false},
 					{Kind: "clair", Managed: false},
 					{Kind: "redis", Managed: false},
-					{Kind: "storage", Managed: false},
+					{Kind: "objectstorage", Managed: false},
 				},
 			},
 		},
@@ -278,7 +296,7 @@ var inflateTests = []struct {
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: false},
-					{Kind: "storage", Managed: false},
+					{Kind: "objectstorage", Managed: false},
 				},
 			},
 		},
@@ -293,13 +311,18 @@ var inflateTests = []struct {
 	{
 		"DesiredVersion",
 		&v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					v1.SupportsObjectStorageAnnotation: "true",
+				},
+			},
 			Spec: v1.QuayRegistrySpec{
 				DesiredVersion: v1.QuayVersionQuiGon,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
-					{Kind: "storage", Managed: true},
+					{Kind: "objectstorage", Managed: true},
 				},
 			},
 		},
@@ -308,7 +331,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "postgres", "clair", "redis", "storage"}),
+		withComponents([]string{"base", "postgres", "clair", "redis", "objectstorage"}),
 		nil,
 	},
 }

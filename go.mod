@@ -4,6 +4,7 @@ go 1.1
 
 require (
 	github.com/go-logr/logr v0.1.0
+	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20200610144127-e2eec875d6d1
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/openshift/api v3.9.0+incompatible
