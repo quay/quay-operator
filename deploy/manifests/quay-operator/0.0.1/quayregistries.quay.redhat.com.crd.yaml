@@ -67,11 +67,26 @@ spec:
                 the Operator will not upgrade. If omitted, will default to the latest
                 version that the Operator knows how to manage.
               type: string
-          required:
-          - configBundleSecret
           type: object
         status:
           description: QuayRegistryStatus defines the observed state of QuayRegistry.
+          properties:
+            configEditorEndpoint:
+              description: ConfigEditorEndpoint is the external access point for a
+                web-based reconfiguration interface for the Quay registry instance.
+              type: string
+            currentVersion:
+              description: CurrentVersion is the actual version of Quay that is actively
+                deployed.
+              type: string
+            lastUpdated:
+              description: LastUpdate is the timestamp when the Operator last processed
+                this instance.
+              type: string
+            registryEndpoint:
+              description: RegistryEndpoint is the external access point for the Quay
+                registry.
+              type: string
           type: object
       type: object
   version: v1

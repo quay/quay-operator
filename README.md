@@ -42,6 +42,29 @@ $ kubectl create -n <your-namespace> -f ./deploy/quay-operator.operatorgroup.yam
 $ kubectl create -n <your-namespace> -f ./deploy/quay-operator.subscription.yaml
 ```
 
+### Using the Operator
+
+#### Batteries-included, zero-config
+
+**Install RHOCS Operator using OperatorHub:**
+
+**Create `NooBaa` object in `openshift-storage` namespace:**
+```sh
+$ kubectl create -n openshift-storage -f ./kustomize/components/objectstorage/quay-datastore.noobaa.yaml
+```
+
+**Wait a few minutes for Noobaa to be `phase: Ready`:**
+```sh
+$ kubectl get -n openshift-storage noobaas noobaa -w
+NAME     MGMT-ENDPOINTS              S3-ENDPOINTS                IMAGE                                                                                                            PHASE   AGE
+noobaa   [https://10.0.32.3:30318]   [https://10.0.32.3:31958]   registry.redhat.io/ocs4/mcg-core-rhel8@sha256:56624aa7dd4ca178c1887343c7445a9425a841600b1309f6deace37ce6b8678d   Ready   3d18h
+```
+
+**Create `QuayRegistry` instance:**
+```sh
+$ kubectl create -n <your-namespace> -f ./config/samples/managed.quayregistry.yaml
+```
+
 ## Community
 
 - Mailing list: [quay-sig@googlegroups.com](https://groups.google.com/forum/#!forum/quay-sig)

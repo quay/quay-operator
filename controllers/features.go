@@ -20,13 +20,26 @@ const (
 
 func (r *QuayRegistryReconciler) checkRoutesAvailable(quay *v1.QuayRegistry) (*v1.QuayRegistry, error) {
 	var routes routev1.RouteList
-	if err := r.Client.List(context.Background(), &routes); err == nil && len(routes.Items) > 0 {
+	err := r.Client.List(context.Background(), &routes)
+	if err == nil {
 		r.Log.Info("cluster supports `Routes` API")
 		existingAnnotations := quay.GetAnnotations()
 		if existingAnnotations == nil {
 			existingAnnotations = map[string]string{}
 		}
-		existingAnnotations[v1.ClusterHostnameAnnotation] = routes.Items[0].Status.Ingress[0].RouterCanonicalHostname
+
+		existingAnnotations[v1.SupportsRoutesAnnotation] = "true"
+
+		if _, ok := existingAnnotations[v1.ClusterHostnameAnnotation]; !ok && len(routes.Items) > 0 {
+			for _, route := range routes.Items {
+				if len(route.Status.Ingress) > 0 {
+					existingAnnotations[v1.ClusterHostnameAnnotation] = route.Status.Ingress[0].RouterCanonicalHostname
+					r.Log.Info("detected router canonical hostname: " + route.Status.Ingress[0].RouterCanonicalHostname)
+					break
+				}
+			}
+		}
+
 		quay.SetAnnotations(existingAnnotations)
 	}
 
