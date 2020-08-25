@@ -15,7 +15,6 @@ spec:
         quay-component: clair
     spec:
       containers:
-        # - image: quay.io/projectquay/clair:4.0.0-alpha.4
         - image: quay.io/projectquay/clair
           imagePullPolicy: IfNotPresent
           name: clair

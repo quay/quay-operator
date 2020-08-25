@@ -26,6 +26,7 @@ import (
 type QuayVersion string
 
 const (
+	SupportsRoutesAnnotation  = "supports-routes"
 	ClusterHostnameAnnotation = "router-canonical-hostname"
 
 	SupportsObjectStorageAnnotation = "supports-object-storage"
@@ -231,7 +232,7 @@ func supportsRoutes(quay *QuayRegistry) bool {
 		annotations = map[string]string{}
 	}
 
-	_, ok := annotations[ClusterHostnameAnnotation]
+	_, ok := annotations[SupportsRoutesAnnotation]
 
 	return ok
 }

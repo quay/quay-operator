@@ -62,6 +62,7 @@ var ensureDefaultComponentsTests = []struct {
 		QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
+					SupportsRoutesAnnotation:        "true",
 					ClusterHostnameAnnotation:       "apps.example.com",
 					SupportsObjectStorageAnnotation: "true",
 				},
@@ -105,6 +106,7 @@ var ensureDefaultComponentsTests = []struct {
 		QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
+					SupportsRoutesAnnotation:        "true",
 					ClusterHostnameAnnotation:       "apps.example.com",
 					SupportsObjectStorageAnnotation: "true",
 				},
@@ -143,6 +145,7 @@ var ensureDefaultComponentsTests = []struct {
 		QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
+					SupportsRoutesAnnotation:  "true",
 					ClusterHostnameAnnotation: "apps.example.com",
 				},
 			},
@@ -259,6 +262,7 @@ var ensureRegistryEndpointTests = []struct {
 				Name:      "test",
 				Namespace: "ns-1",
 				Annotations: map[string]string{
+					SupportsRoutesAnnotation:  "true",
 					ClusterHostnameAnnotation: "apps.example.com",
 				},
 			},
@@ -273,6 +277,7 @@ var ensureRegistryEndpointTests = []struct {
 				Name:      "test",
 				Namespace: "ns-1",
 				Annotations: map[string]string{
+					SupportsRoutesAnnotation:  "true",
 					ClusterHostnameAnnotation: "apps.example.com",
 				},
 			},
