@@ -37,6 +37,7 @@ const (
 )
 
 const (
+	QuayVersionVader  QuayVersion = "vader"
 	QuayVersionQuiGon QuayVersion = "qui-gon"
 	QuayVersionPadme  QuayVersion = "padme"
 )
@@ -44,6 +45,7 @@ const (
 var quayVersions = []QuayVersion{
 	QuayVersionPadme,
 	QuayVersionQuiGon,
+	QuayVersionVader,
 }
 
 var allComponents = []string{

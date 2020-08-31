@@ -18,6 +18,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"log"
+	"net/http"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,12 +31,17 @@ import (
 
 	quayredhatcomv1 "github.com/quay/quay-operator/api/v1"
 	"github.com/quay/quay-operator/controllers"
+	"github.com/quay/quay-operator/pkg/configure"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+)
+
+const (
+	operatorPort = 7071
 )
 
 func init() {
@@ -79,6 +87,12 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
+
+	setupLog.Info("starting server on port 7071")
+	go func() {
+		http.HandleFunc("/reconfigure", configure.ReconfigureHandler(mgr.GetClient()))
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", operatorPort), nil))
+	}()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

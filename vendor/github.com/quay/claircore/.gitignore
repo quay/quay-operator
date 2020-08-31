@@ -1,0 +1,5 @@
+vendor
+*.swp
+book
+cctool
+!cctool/

@@ -45,7 +45,7 @@ func newQuayRegistry(name, namespace string) v1.QuayRegistry {
 			Namespace: namespace,
 		},
 		Spec: v1.QuayRegistrySpec{
-			DesiredVersion: v1.QuayVersionQuiGon,
+			DesiredVersion: v1.QuayVersionVader,
 			Components: []v1.Component{
 				// FIXME(alecmerdler): Test omitting components and marking some as disabled/unmanaged...
 				{Kind: "postgres", Managed: true},
@@ -238,7 +238,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					Eventually(func() v1.QuayVersion {
 						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
 						return updatedQuayRegistry.Status.CurrentVersion
-					}, time.Second*30).Should(Equal(v1.QuayVersionQuiGon))
+					}, time.Second*30).Should(Equal(v1.QuayVersionVader))
 				})
 
 				When("the `spec.desiredVersion` field is empty", func() {
@@ -250,7 +250,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 						var updatedQuayRegistry v1.QuayRegistry
 
 						Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
-						Expect(updatedQuayRegistry.Spec.DesiredVersion).To(Equal(v1.QuayVersionQuiGon))
+						Expect(updatedQuayRegistry.Spec.DesiredVersion).To(Equal(v1.QuayVersionVader))
 					})
 				})
 
@@ -398,7 +398,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					Eventually(func() v1.QuayVersion {
 						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
 						return updatedQuayRegistry.Status.CurrentVersion
-					}, time.Second*30).Should(Equal(v1.QuayVersionQuiGon))
+					}, time.Second*30).Should(Equal(v1.QuayVersionVader))
 				})
 			})
 		})

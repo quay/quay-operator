@@ -184,10 +184,12 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		},
 	}
 
-	components := []string{}
+	componentPaths := []string{}
+	managedFieldGroups := []string{}
 	for _, component := range quay.Spec.Components {
 		if component.Managed {
-			components = append(components, filepath.Join("..", "components", component.Kind))
+			componentPaths = append(componentPaths, filepath.Join("..", "components", component.Kind))
+			managedFieldGroups = append(managedFieldGroups, fieldGroupFor(component.Kind))
 
 			componentConfigFiles, err := componentConfigFilesFor(component.Kind, quay)
 			if componentConfigFiles == nil || err != nil {
@@ -219,8 +221,11 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		Namespace:       quay.GetNamespace(),
 		NamePrefix:      quay.GetName() + "-",
 		Resources:       []string{"../base"},
-		Components:      components,
+		Components:      componentPaths,
 		SecretGenerator: generatedSecrets,
+		CommonAnnotations: map[string]string{
+			"quay-managed-fieldgroups": strings.Join(managedFieldGroups, ","),
+		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
 		Vars: []types.Var{
 			{

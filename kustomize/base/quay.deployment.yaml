@@ -75,4 +75,4 @@ spec:
               mountPath: /conf/stack
             - name: extra-ca-certs
               readOnly: true
-              mountPath: /conf/kube_extra_certs
+              mountPath: /conf/stack/extra_ca_certs

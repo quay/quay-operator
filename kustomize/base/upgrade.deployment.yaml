@@ -73,4 +73,5 @@ spec:
               mountPath: /conf/stack
             - name: extra-ca-certs
               readOnly: true
-              mountPath: /conf/kube_extra_certs
+              # FIXME(alecmerdler): Cannot mount here because Quay attempts to write to this directory...
+              mountPath: /conf/stack/extra_ca_certs

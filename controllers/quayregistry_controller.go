@@ -236,10 +236,12 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 }
 
 func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// FIXME(alecmerdler): Can we do this in the `init()` function in `main.go`...?
 	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add OpenShift `Route` API to scheme")
 		return err
 	}
+	// FIXME(alecmerdler): Can we do this in the `init()` function in `main.go`...?
 	if err := objectbucket.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add `ObjectBucketClaim` API to scheme")
 		return err

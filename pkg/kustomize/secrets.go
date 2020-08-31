@@ -103,7 +103,7 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		}
 
 		fieldGroup.FeatureSecurityScanner = true
-		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + "clair"
+		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + "clair:80"
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 
 		return yaml.Marshal(fieldGroup)
@@ -132,8 +132,9 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		// FIXME(alecmerdler): Make this more secure...
 		password := "postgres"
 		host := strings.Join([]string{quay.GetName(), "quay-postgres"}, "-")
+		port := "5432"
 		name := "quay"
-		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s/%s", user, password, host, name)
+		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
 
 		return yaml.Marshal(fieldGroup)
 	case "objectstorage":
@@ -185,8 +186,34 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 func BaseConfigBundle() map[string][]byte {
 	return map[string][]byte{
 		"config.yaml": encode(map[string]interface{}{
-			"FEATURE_MAILING": false,
+			"FEATURE_MAILING":                    false,
+			"REGISTRY_TITLE":                     "Quay",
+			"REGISTRY_TITLE_SHORT":               "Quay",
+			"AUTHENTICATION_TYPE":                "Database",
+			"ENTERPRISE_LOGO_URL":                "/static/img/quay-horizontal-color.svg",
+			"DEFAULT_TAG_EXPIRATION":             "2w",
+			"ALLOW_PULLS_WITHOUT_STRICT_LOGGING": false,
+			"TAG_EXPIRATION_OPTIONS":             []string{"2w"},
+			"TEAM_RESYNC_STALE_TIME":             "60m",
+			"FEATURE_DIRECT_LOGIN":               true,
 		}),
+	}
+}
+
+func fieldGroupFor(component string) string {
+	switch component {
+	case "clair":
+		return "SecurityScanner"
+	case "postgres":
+		return "Database"
+	case "redis":
+		return "Redis"
+	case "objectstorage":
+		return "DistributedStorage"
+	case "route":
+		return "HostSettings"
+	default:
+		panic("unknown component: " + component)
 	}
 }
 
@@ -208,20 +235,29 @@ func clairConfigFor(quay *v1.QuayRegistry) []byte {
 	// FIXME(alecmerdler): Make this more secure...
 	password := "postgres"
 
+	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
 	config := config.Config{
 		HTTPListenAddr: ":8080",
 		LogLevel:       "debug",
 		Indexer: config.Indexer{
-			ConnString:           fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password),
+			ConnString:           dbConn,
 			ScanLockRetry:        10,
 			LayerScanConcurrency: 5,
 			Migrations:           true,
 		},
 		Matcher: config.Matcher{
-			ConnString:  fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password),
+			ConnString:  dbConn,
 			MaxConnPool: 100,
 			Migrations:  true,
 			IndexerAddr: "clair-indexer",
+		},
+		Notifier: config.Notifier{
+			ConnString:       dbConn,
+			IndexerAddr:      "clair-indexer",
+			MatcherAddr:      "clair-matcher",
+			Migrations:       true,
+			DeliveryInterval: "1m",
+			PollInterval:     "5m",
 		},
 		Metrics: config.Metrics{
 			Name: "prometheus",
