@@ -357,6 +357,7 @@ github.com/jackc/puddle v1.0.0/go.mod h1:m4B5Dj62Y0fbyuIc15OsIqK0+JU8nkqQjsgx7dv
 github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=
 github.com/jmoiron/sqlx v1.2.0/go.mod h1:1FEQNm3xlJgrMD+FBdI9+xvCksHtbpVBBw5dYhBSsks=
 github.com/joefitzgerald/rainbow-reporter v0.1.0/go.mod h1:481CNgqmVHQZzdIbN52CupLJyoVwB10FQ/IQlF1pdL8=
+github.com/jojomi/go-spew v1.1.1-0.20180323180114-b94c73b27dc1 h1:tB9wM01caN00bZkWAo6r8sniOX59o7E0rHVdelMtCY0=
 github.com/jojomi/go-spew v1.1.1-0.20180323180114-b94c73b27dc1/go.mod h1:/8AXJSDFeVKowsL5GiXhfUy9lT6JtLVxbY3H6qhBXtE=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=
 github.com/json-iterator/go v0.0.0-20180612202835-f2b4162afba3/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
