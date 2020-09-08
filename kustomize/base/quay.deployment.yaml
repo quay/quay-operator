@@ -5,7 +5,7 @@ metadata:
   labels:
     quay-component: quay-app
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       quay-component: quay-app

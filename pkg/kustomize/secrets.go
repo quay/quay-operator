@@ -178,6 +178,8 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 		}
 
 		return fieldGroup, nil
+	case "horizontalpodautoscaler":
+		return nil, nil
 	default:
 		return nil, errors.New("unknown component: " + component)
 	}
@@ -209,6 +211,7 @@ func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[stri
 	case "postgres":
 	case "redis":
 	case "objectstorage":
+	case "horizontalpodautoscaler":
 	case "route":
 		hostSettings := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
 
@@ -245,6 +248,8 @@ func fieldGroupFor(component string) string {
 		return "DistributedStorage"
 	case "route":
 		return "HostSettings"
+	case "horizontalpodautoscaler":
+		return ""
 	default:
 		panic("unknown component: " + component)
 	}

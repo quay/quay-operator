@@ -1,0 +1,5 @@
+# HorizontalPodAutoscalar adds automatic scaling of Quay based on intelligent traffic analysis.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: 
+  - ./quay.horizontalpodautoscalar.yaml
