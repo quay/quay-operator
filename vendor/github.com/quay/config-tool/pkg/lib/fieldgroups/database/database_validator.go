@@ -1,19 +1,24 @@
 package database
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 
-	_ "github.com/go-sql-driver/mysql" //mysql driver
-	_ "github.com/lib/pq"              // postgres driver
+	mysql "github.com/go-sql-driver/mysql" //mysql driver
+	_ "github.com/lib/pq"                  // postgres driver
 	"github.com/quay/config-tool/pkg/lib/shared"
 )
 
 // Validate checks the configuration settings for this field group
-func (fg *DatabaseFieldGroup) Validate() []shared.ValidationError {
+func (fg *DatabaseFieldGroup) Validate(opts shared.Options) []shared.ValidationError {
+
+	fgName := "Database"
 
 	// Make empty errors
 	errors := []shared.ValidationError{}
@@ -21,9 +26,9 @@ func (fg *DatabaseFieldGroup) Validate() []shared.ValidationError {
 	// Check field is not empty
 	if fg.DbUri == "" {
 		newError := shared.ValidationError{
-			Tags:    []string{"DB_URI"},
-			Policy:  "A is Required",
-			Message: "DB_URI is required.",
+			Tags:       []string{"DB_URI"},
+			FieldGroup: fgName,
+			Message:    "DB_URI is required.",
 		}
 		errors = append(errors, newError)
 		return errors
@@ -33,21 +38,25 @@ func (fg *DatabaseFieldGroup) Validate() []shared.ValidationError {
 	uri, err := url.Parse(fg.DbUri)
 	if err != nil {
 		newError := shared.ValidationError{
-			Tags:    []string{"DB_URI"},
-			Policy:  "A incorrect format",
-			Message: "DB_URI has incorrect format. Must be URI.",
+			Tags:       []string{"DB_URI"},
+			FieldGroup: fgName,
+			Message:    "DB_URI has incorrect format. Must be URI.",
 		}
 		errors = append(errors, newError)
 		return errors
 	}
 
+	ca := ""
+	if fg.DbConnectionArgs.Ssl != nil {
+		ca = fg.DbConnectionArgs.Ssl.Ca
+	}
 	// Connect to database
-	err = ValidateDatabaseConnection(uri)
+	err = ValidateDatabaseConnection(opts, uri, ca)
 	if err != nil {
 		newError := shared.ValidationError{
-			Tags:    []string{"DB_URI"},
-			Policy:  "Database Connection",
-			Message: "Could not connect to database.",
+			Tags:       []string{"DB_URI"},
+			FieldGroup: fgName,
+			Message:    "Could not connect to database. Error: " + err.Error(),
 		}
 		errors = append(errors, newError)
 		return errors
@@ -59,7 +68,7 @@ func (fg *DatabaseFieldGroup) Validate() []shared.ValidationError {
 }
 
 // ValidateDatabaseConnection checks that the Bitbucker OAuth credentials are correct
-func ValidateDatabaseConnection(uri *url.URL) error {
+func ValidateDatabaseConnection(opts shared.Options, uri *url.URL, caCert string) error {
 
 	// Declare db and error
 	var db *sql.DB
@@ -82,8 +91,30 @@ func ValidateDatabaseConnection(uri *url.URL) error {
 	// Database is MySQL
 	if scheme == "mysql" {
 
-		// Create db client
+		// Create db connection string
 		dsn := credentials + "@tcp(" + fullHostName + ")/" + dbname
+
+		// Check if CA cert is used
+		if caCert != "" {
+			certBytes, err := ioutil.ReadFile(caCert)
+			if err != nil {
+				return err
+			}
+			caCertPool := x509.NewCertPool()
+			if ok := caCertPool.AppendCertsFromPEM(certBytes); !ok {
+				return errors.New("Could not add CA cert to pool")
+			}
+			tlsConfig := &tls.Config{
+				InsecureSkipVerify: false,
+				RootCAs:            caCertPool,
+			}
+
+			mysql.RegisterTLSConfig("custom-tls", tlsConfig)
+			dsn = fmt.Sprintf("%s?tls=custom-tls", dsn)
+
+		}
+
+		// Open connection
 		db, err = sql.Open("mysql", dsn)
 		if err != nil {
 			return err
@@ -95,13 +126,21 @@ func ValidateDatabaseConnection(uri *url.URL) error {
 		var psqlInfo string
 		host, port, err := net.SplitHostPort(fullHostName)
 		if err != nil {
-			// String if there is no port
-			psqlInfo = fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", host, user, password, dbname)
+			if caCert == "" {
+				psqlInfo = fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", fullHostName, user, password, dbname)
+			} else {
+				psqlInfo = fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=verify-ca sslrootcert=%s", fullHostName, user, password, dbname, caCert)
+			}
 		} else {
-			// String if there is a port
-			psqlInfo = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+			if caCert == "" {
+				psqlInfo = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+			} else {
+				psqlInfo = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=verify-ca sslrootcert=%s", host, port, user, password, dbname, caCert)
+			}
+
 		}
 
+		// Open connection
 		db, err = sql.Open("postgres", psqlInfo)
 		if err != nil {
 			return err

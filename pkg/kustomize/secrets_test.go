@@ -69,7 +69,10 @@ USER_EVENTS_REDIS:
 		"postgres",
 		"postgres",
 		quayRegistry("test"),
-		[]byte(`DB_URI: postgresql://postgres:postgres@test-quay-postgres/quay
+		[]byte(`DB_CONNECTION_ARGS:
+  autorollback: true
+  threadlocals: true
+DB_URI: postgresql://postgres:postgres@test-quay-postgres/quay
 `),
 	},
 	{
@@ -90,6 +93,8 @@ DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
 - local_us
 DISTRIBUTED_STORAGE_PREFERENCE:
 - local_us
+FEATURE_PROXY_STORAGE: true
+FEATURE_STORAGE_REPLICATION: false
 `),
 	},
 }
