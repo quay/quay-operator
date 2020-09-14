@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"strings"
 
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
@@ -74,9 +75,14 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(quay *v1.QuayR
 
 				r.Log.Info("found `ObjectBucketClaim` and credentials `Secret`, `ConfigMap`")
 
+				host := string(datastoreConfig.Data[datastoreBucketHost])
+				if strings.Contains(host, ".svc") && !strings.Contains(host, ".svc.cluster.local") {
+					r.Log.Info("`ObjectBucketClaim` is using in-cluster endpoint, ensuring we use the fully qualified domain name")
+					host = strings.ReplaceAll(host, ".svc", ".svc.cluster.local")
+				}
+
 				existingAnnotations[v1.StorageBucketNameAnnotation] = string(datastoreConfig.Data[datastoreBucketName])
-				// FIXME(alecmerdler): Should we use the external `Route` here...?
-				existingAnnotations[v1.StorageHostnameAnnotation] = string(datastoreConfig.Data[datastoreBucketHost])
+				existingAnnotations[v1.StorageHostnameAnnotation] = host
 				existingAnnotations[v1.StorageAccessKeyAnnotation] = string(datastoreSecret.Data[datastoreAccessKey])
 				existingAnnotations[v1.StorageSecretKeyAnnotation] = string(datastoreSecret.Data[datastoreSecretKey])
 			}

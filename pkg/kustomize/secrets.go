@@ -13,6 +13,7 @@ import (
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/redis"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
+	"github.com/quay/config-tool/pkg/lib/shared"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
@@ -142,12 +143,13 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		secretKey := quay.GetAnnotations()[v1.StorageSecretKeyAnnotation]
 
 		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
+			FeatureProxyStorage:                true,
 			DistributedStoragePreference:       []string{"local_us"},
 			DistributedStorageDefaultLocations: []string{"local_us"},
-			DistributedStorageConfig: map[string]distributedstorage.DistributedStorage{
+			DistributedStorageConfig: map[string]*distributedstorage.DistributedStorageDefinition{
 				"local_us": {
 					Name: "RadosGWStorage",
-					Args: distributedstorage.DistributedStorageArgs{
+					Args: &shared.DistributedStorageArgs{
 						Hostname:    hostname,
 						IsSecure:    true,
 						Port:        443,
