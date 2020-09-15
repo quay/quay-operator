@@ -307,7 +307,7 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	check(err)
 
 	var overlay string
-	if quay.Spec.DesiredVersion == quay.Status.CurrentVersion {
+	if quay.Spec.DesiredVersion == quay.Status.CurrentVersion || quay.Spec.DesiredVersion == v1.QuayVersionDev {
 		overlay = overlayDir(quay.Spec.DesiredVersion)
 	} else {
 		overlay = upgradeOverlayDir(quay.Spec.DesiredVersion)

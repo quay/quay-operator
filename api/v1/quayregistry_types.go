@@ -39,13 +39,27 @@ const (
 const (
 	QuayVersionVader  QuayVersion = "vader"
 	QuayVersionQuiGon QuayVersion = "qui-gon"
-	QuayVersionPadme  QuayVersion = "padme"
+	// QuayVersionDev is used to provide Kustomize overrides.
+	QuayVersionDev QuayVersion = "dev"
 )
 
-var quayVersions = []QuayVersion{
-	QuayVersionPadme,
-	QuayVersionQuiGon,
-	QuayVersionVader,
+var quayVersions = map[QuayVersion]int{
+	QuayVersionDev:    0,
+	QuayVersionQuiGon: 1,
+	QuayVersionVader:  2,
+}
+
+func mostRecentVersion() QuayVersion {
+	var mostRecent QuayVersion
+	mostRecentRank := 0
+	for v, rank := range quayVersions {
+		if rank > mostRecentRank {
+			mostRecent = v
+			mostRecentRank = rank
+		}
+	}
+
+	return mostRecent
 }
 
 var allComponents = []string{
@@ -180,20 +194,20 @@ func EnsureDesiredVersion(quay *QuayRegistry) (*QuayRegistry, error) {
 	updatedQuay := quay.DeepCopy()
 
 	if updatedQuay.Spec.DesiredVersion == "" {
-		updatedQuay.Spec.DesiredVersion = quayVersions[len(quayVersions)-1]
+		updatedQuay.Spec.DesiredVersion = mostRecentVersion()
 
 		return updatedQuay, nil
 	}
 
-	for _, version := range quayVersions {
-		if version == updatedQuay.Spec.DesiredVersion {
-			return updatedQuay, nil
-		}
+	if quay.Status.CurrentVersion != "" && quayVersions[quay.Status.CurrentVersion] > quayVersions[updatedQuay.Spec.DesiredVersion] {
+		return updatedQuay, errors.New("cannot downgrade from `currentVersion`: " + string(quay.Status.CurrentVersion) + " > " + string(updatedQuay.Spec.DesiredVersion))
 	}
 
-	// TODO(alecmerdler): Ensure that `spec.desiredVersion` is not a "downgrade" from `status.currentVersion`
+	if _, ok := quayVersions[updatedQuay.Spec.DesiredVersion]; !ok {
+		return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
+	}
 
-	return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
+	return updatedQuay, nil
 }
 
 // EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was changed.
