@@ -168,6 +168,68 @@ var ensureDefaultComponentsTests = []struct {
 	},
 }
 
+var ensureDesiredVersionTests = []struct {
+	name        string
+	quay        QuayRegistry
+	expected    QuayVersion
+	expectedErr error
+}{
+	{
+		"InvalidDesiredVersion",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				DesiredVersion: "not-a-real-version",
+			},
+		},
+		"",
+		errors.New("invalid `desiredVersion`: not-a-real-version"),
+	},
+	{
+		"EmptyDesiredVersion",
+		QuayRegistry{},
+		QuayVersionVader,
+		nil,
+	},
+	{
+		"DevOverrideDesiredVersion",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				DesiredVersion: QuayVersionDev,
+			},
+		},
+		QuayVersionDev,
+		nil,
+	},
+	{
+		"DowngradeProhibited",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				DesiredVersion: QuayVersionQuiGon,
+			},
+			Status: QuayRegistryStatus{
+				CurrentVersion: QuayVersionVader,
+			},
+		},
+		QuayVersionVader,
+		errors.New("cannot downgrade from `currentVersion`: qui-gon > vader"),
+	},
+}
+
+func TestEnsureDesiredVersion(t *testing.T) {
+	assert := assert.New(t)
+
+	for _, test := range ensureDesiredVersionTests {
+		updatedQuay, err := EnsureDesiredVersion(&test.quay)
+
+		if test.expectedErr != nil {
+			assert.NotNil(err, test.name)
+		} else {
+			assert.Nil(err, test.name)
+			assert.Equal(test.expected, updatedQuay.Spec.DesiredVersion)
+		}
+	}
+}
+
 func TestEnsureDefaultComponents(t *testing.T) {
 	assert := assert.New(t)
 

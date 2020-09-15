@@ -106,7 +106,7 @@ var kustomizationForTests = []struct {
 				},
 			},
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionPadme,
+				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -252,7 +252,7 @@ var inflateTests = []struct {
 				},
 			},
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionPadme,
+				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -273,7 +273,7 @@ var inflateTests = []struct {
 		"AllComponentsUnmanaged",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionPadme,
+				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: false},
 					{Kind: "clair", Managed: false},
@@ -294,7 +294,7 @@ var inflateTests = []struct {
 		"SomeComponentsUnmanaged",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionPadme,
+				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
