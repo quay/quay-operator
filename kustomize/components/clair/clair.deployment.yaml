@@ -33,8 +33,10 @@ spec:
           volumeMounts:
             - mountPath: /clair/
               name: config
+          # TODO(alecmerdler): Define `readinessProbe` which waits until indexer/matcher services are ready.
       restartPolicy: Always
       volumes:
         - name: config
           secret:
             secretName: clair-config-secret
+          

@@ -32,7 +32,7 @@ func quayRegistry(name string) *v1.QuayRegistry {
 	}
 }
 
-var secretForTests = []struct {
+var configFileForTests = []struct {
 	name      string
 	component string
 	quay      *v1.QuayRegistry
@@ -46,7 +46,7 @@ var secretForTests = []struct {
 SECURITY_SCANNER_ENDPOINT: ""
 SECURITY_SCANNER_INDEXING_INTERVAL: 30
 SECURITY_SCANNER_NOTIFICATIONS: false
-SECURITY_SCANNER_V4_ENDPOINT: http://test-clair
+SECURITY_SCANNER_V4_ENDPOINT: http://test-clair:80
 SECURITY_SCANNER_V4_NAMESPACE_WHITELIST:
 - admin
 `),
@@ -72,7 +72,7 @@ USER_EVENTS_REDIS:
 		[]byte(`DB_CONNECTION_ARGS:
   autorollback: true
   threadlocals: true
-DB_URI: postgresql://postgres:postgres@test-quay-postgres/quay
+DB_URI: postgresql://postgres:postgres@test-quay-postgres:5432/quay
 `),
 	},
 	{
@@ -102,10 +102,10 @@ FEATURE_STORAGE_REPLICATION: false
 func TestConfigFileFor(t *testing.T) {
 	assert := assert.New(t)
 
-	for _, test := range secretForTests {
+	for _, test := range configFileForTests {
 		result, err := ConfigFileFor(test.component, test.quay)
 
 		assert.Nil(err)
-		assert.Equal(string(test.expected), string(result))
+		assert.Equal(string(test.expected), string(result), test.name)
 	}
 }

@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:c04ce75a4eb63362f534dfbc0f9cd2268b848ce362d58b6de93c487228e0e6f6
+    containerImage: quay.io/alecmerdler/quay-operator@sha256:c0a121bb5aa6fd91cc462e1755b9f000dd4c773ff3ef8e14ecf6c54025ba3b7e
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -107,11 +107,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
-<<<<<<< HEAD
-                image: quay.io/projectquay/quay-operator@sha256:f06423ab54a16b12edcb187388e72c2462e4802da4623cd0bd71f0305df4e6f7
-=======
-                image: quay.io/projectquay/quay-operator@sha256:c04ce75a4eb63362f534dfbc0f9cd2268b848ce362d58b6de93c487228e0e6f6
->>>>>>> 15ba934... update latest CatalogSource images
+                image: quay.io/alecmerdler/quay-operator@sha256:c0a121bb5aa6fd91cc462e1755b9f000dd4c773ff3ef8e14ecf6c54025ba3b7e
                 name: quay-operator
               serviceAccountName: quay-operator
       permissions:
