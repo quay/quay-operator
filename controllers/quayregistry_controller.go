@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
+	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -79,7 +80,9 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 				GenerateName: quay.GetName() + "-config-bundle-",
 				Namespace:    quay.GetNamespace(),
 			},
-			Data: kustomize.BaseConfigBundle(),
+			Data: map[string][]byte{
+				"config.yaml": encode(kustomize.BaseConfig()),
+			},
 		}
 
 		if err := r.Client.Create(ctx, &baseConfigBundle); err != nil {
@@ -211,6 +214,19 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func encode(value interface{}) []byte {
+	yamlified, _ := yaml.Marshal(value)
+
+	return yamlified
+}
+
+func decode(bytes []byte) interface{} {
+	var value interface{}
+	_ = yaml.Unmarshal(bytes, &value)
+
+	return value
 }
 
 func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k8sruntime.Object, quay v1.QuayRegistry) error {

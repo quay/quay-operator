@@ -10,3 +10,28 @@ patchesStrategicMerge:
   # Switch `Service` to `type: ClusterIP`
   - ./quay.service.patch.yaml
   - ./config.service.patch.yaml
+configurations:
+  - ./route.varreferences.yaml
+# NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
+vars:
+  - name: SERVER_HOSTNAME
+    objref:
+      kind: Service
+      apiVersion: v1
+      name: quay-app
+    fieldref:
+      fieldpath: metadata.annotations["quay-registry-hostname"]
+  - name: QUAY_TLS_TERMINATION
+    objref:
+      kind: Service
+      apiVersion: v1
+      name: quay-app
+    fieldref:
+      fieldpath: metadata.annotations["quay-registry-tls-termination"]
+  - name: QUAY_TARGET_PORT
+    objref:
+      kind: Service
+      apiVersion: v1
+      name: quay-app
+    fieldref:
+      fieldpath: metadata.annotations["quay-registry-target-port"]

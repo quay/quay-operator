@@ -9,7 +9,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,19 +19,6 @@ import (
 
 	v1 "github.com/quay/quay-operator/api/v1"
 )
-
-func encode(value interface{}) []byte {
-	yamlified, _ := yaml.Marshal(value)
-
-	return yamlified
-}
-
-func decode(bytes []byte) interface{} {
-	var value interface{}
-	_ = yaml.Unmarshal(bytes, &value)
-
-	return value
-}
 
 func newQuayRegistry(name, namespace string) v1.QuayRegistry {
 	return v1.QuayRegistry{

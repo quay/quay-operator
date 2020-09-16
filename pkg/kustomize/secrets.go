@@ -93,8 +93,8 @@ func handleSecretKeys(parsedConfig map[string]interface{}, secretKeysSecret *cor
 	return secretKey, databaseSecretKey, secretKeysSecret
 }
 
-// ConfigFileFor generates and returns the correct config YAML file data for the given component.
-func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
+// FieldGroupFor generates and returns the correct config field group for the given component.
+func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, error) {
 	switch component {
 	case "clair":
 		fieldGroup, err := securityscanner.NewSecurityScannerFieldGroup(map[string]interface{}{})
@@ -106,7 +106,7 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + "clair:80"
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 
-		return yaml.Marshal(fieldGroup)
+		return fieldGroup, nil
 	case "redis":
 		fieldGroup, err := redis.NewRedisFieldGroup(map[string]interface{}{})
 		if err != nil {
@@ -122,7 +122,7 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 			Port: 6379,
 		}
 
-		return yaml.Marshal(fieldGroup)
+		return fieldGroup, nil
 	case "postgres":
 		fieldGroup, err := database.NewDatabaseFieldGroup(map[string]interface{}{})
 		if err != nil {
@@ -136,7 +136,7 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 		name := "quay"
 		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
 
-		return yaml.Marshal(fieldGroup)
+		return fieldGroup, nil
 	case "objectstorage":
 		hostname := quay.GetAnnotations()[v1.StorageHostnameAnnotation]
 		bucketName := quay.GetAnnotations()[v1.StorageBucketNameAnnotation]
@@ -163,12 +163,13 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 			},
 		}
 
-		return yaml.Marshal(fieldGroup)
+		return fieldGroup, nil
 	case "route":
+		// FIXME(alecmerdler): See if `SERVER_HOSTNAME` field exists in user-provided config
 		clusterHostname := quay.GetAnnotations()[v1.ClusterHostnameAnnotation]
 
-		fieldGroup := hostsettings.HostSettingsFieldGroup{
-			ExternalTlsTermination: true,
+		fieldGroup := &hostsettings.HostSettingsFieldGroup{
+			ExternalTlsTermination: false,
 			PreferredUrlScheme:     "https",
 			ServerHostname: strings.Join([]string{
 				strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
@@ -176,28 +177,57 @@ func ConfigFileFor(component string, quay *v1.QuayRegistry) ([]byte, error) {
 				"."),
 		}
 
-		return yaml.Marshal(fieldGroup)
+		return fieldGroup, nil
 	default:
 		return nil, errors.New("unknown component: " + component)
 	}
 }
 
-// BaseConfigBundle returns a minimum config bundle with values that Quay doesn't have defaults for.
-func BaseConfigBundle() map[string][]byte {
-	return map[string][]byte{
-		"config.yaml": encode(map[string]interface{}{
-			"FEATURE_MAILING":                    false,
-			"REGISTRY_TITLE":                     "Quay",
-			"REGISTRY_TITLE_SHORT":               "Quay",
-			"AUTHENTICATION_TYPE":                "Database",
-			"ENTERPRISE_LOGO_URL":                "/static/img/quay-horizontal-color.svg",
-			"DEFAULT_TAG_EXPIRATION":             "2w",
-			"ALLOW_PULLS_WITHOUT_STRICT_LOGGING": false,
-			"TAG_EXPIRATION_OPTIONS":             []string{"2w"},
-			"TEAM_RESYNC_STALE_TIME":             "60m",
-			"FEATURE_DIRECT_LOGIN":               true,
-		}),
+// BaseConfig returns a minimum config bundle with values that Quay doesn't have defaults for.
+func BaseConfig() map[string]interface{} {
+	return map[string]interface{}{
+		"FEATURE_MAILING":                    false,
+		"REGISTRY_TITLE":                     "Quay",
+		"REGISTRY_TITLE_SHORT":               "Quay",
+		"AUTHENTICATION_TYPE":                "Database",
+		"ENTERPRISE_LOGO_URL":                "/static/img/quay-horizontal-color.svg",
+		"DEFAULT_TAG_EXPIRATION":             "2w",
+		"ALLOW_PULLS_WITHOUT_STRICT_LOGGING": false,
+		"TAG_EXPIRATION_OPTIONS":             []string{"2w"},
+		"TEAM_RESYNC_STALE_TIME":             "60m",
+		"FEATURE_DIRECT_LOGIN":               true,
 	}
+}
+
+func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[string]interface{}) map[string][]byte {
+	configFiles := map[string][]byte{}
+	fieldGroup, err := FieldGroupFor(component, quay)
+	check(err)
+
+	switch component {
+	case "clair":
+	case "postgres":
+	case "redis":
+	case "objectstorage":
+	case "route":
+		if hostname, ok := baseConfig["SERVER_HOSTNAME"]; ok {
+			configFiles[registryHostnameKey] = []byte(hostname.(string))
+			configFiles[tlsTerminationKey] = []byte("passthrough")
+			configFiles[targetPortKey] = []byte("https")
+
+			hostSettings := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
+			hostSettings.ServerHostname = hostname.(string)
+		} else {
+			configFiles[tlsTerminationKey] = []byte("edge")
+			configFiles[targetPortKey] = []byte("http")
+		}
+	default:
+		panic("unknown component: " + component)
+	}
+
+	configFiles[component+".config.yaml"] = encode(fieldGroup)
+
+	return configFiles
 }
 
 func fieldGroupFor(component string) string {
