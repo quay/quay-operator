@@ -30,7 +30,13 @@ import (
 	v1 "github.com/quay/quay-operator/api/v1"
 )
 
-const configSecretPrefix = "quay-config-secret"
+const (
+	configSecretPrefix    = "quay-config-secret"
+	registryHostnameKey   = "quay-registry-hostname"
+	tlsTerminationKey     = "quay-registry-tls-termination"
+	targetPortKey         = "quay-registry-target-port"
+	managedFieldGroupsKey = "quay-managed-fieldgroups"
+)
 
 func kustomizeDir() string {
 	_, filename, _, _ := runtime.Caller(0)
@@ -170,7 +176,9 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 
 	configFiles := []string{}
 	for key := range quayConfigFiles {
-		configFiles = append(configFiles, filepath.Join("bundle", key))
+		if key != registryHostnameKey && key != tlsTerminationKey && key != targetPortKey {
+			configFiles = append(configFiles, filepath.Join("bundle", key))
+		}
 	}
 
 	generatedSecrets := []types.SecretArgs{
@@ -224,7 +232,10 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		Components:      componentPaths,
 		SecretGenerator: generatedSecrets,
 		CommonAnnotations: map[string]string{
-			"quay-managed-fieldgroups": strings.Join(managedFieldGroups, ","),
+			managedFieldGroupsKey: strings.Join(managedFieldGroups, ","),
+			registryHostnameKey:   string(quayConfigFiles[registryHostnameKey]),
+			tlsTerminationKey:     string(quayConfigFiles[tlsTerminationKey]),
+			targetPortKey:         string(quayConfigFiles[targetPortKey]),
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
 		Vars: []types.Var{
@@ -289,17 +300,23 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	// runs of the same config, we store them (and re-read them) from a specialized Secret.
 	secretKey, databaseSecretKey, secretKeysSecret := handleSecretKeys(parsedUserConfig, secretKeysSecret, quay, log)
 
-	componentConfigFiles["quay.config.yaml"] = encode(map[string]interface{}{
+	quayConfig := map[string]interface{}{
 		"SETUP_COMPLETE":      true,
 		"DATABASE_SECRET_KEY": databaseSecretKey,
 		"SECRET_KEY":          secretKey,
-	})
+	}
+	for field, value := range BaseConfig() {
+		if _, ok := parsedUserConfig[field]; !ok {
+			quayConfig[field] = value
+		}
+	}
+	componentConfigFiles["quay.config.yaml"] = encode(quayConfig)
 
 	for _, component := range quay.Spec.Components {
 		if component.Managed {
-			configFile, err := ConfigFileFor(component.Kind, quay)
-			check(err)
-			componentConfigFiles[component.Kind+".config.yaml"] = configFile
+			for name, contents := range configFilesFor(component.Kind, quay, parsedUserConfig) {
+				componentConfigFiles[name] = contents
+			}
 		}
 	}
 

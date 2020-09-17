@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/api/v1"
 )
@@ -32,7 +33,7 @@ func quayRegistry(name string) *v1.QuayRegistry {
 	}
 }
 
-var configFileForTests = []struct {
+var fieldGroupForTests = []struct {
 	name      string
 	component string
 	quay      *v1.QuayRegistry
@@ -99,13 +100,17 @@ FEATURE_STORAGE_REPLICATION: false
 	},
 }
 
-func TestConfigFileFor(t *testing.T) {
+func TestFieldGroupFor(t *testing.T) {
 	assert := assert.New(t)
 
-	for _, test := range configFileForTests {
-		result, err := ConfigFileFor(test.component, test.quay)
+	for _, test := range fieldGroupForTests {
+		fieldGroup, err := FieldGroupFor(test.component, test.quay)
 
 		assert.Nil(err)
-		assert.Equal(string(test.expected), string(result), test.name)
+
+		configFields, err := yaml.Marshal(fieldGroup)
+
+		assert.Nil(err)
+		assert.Equal(string(test.expected), string(configFields), test.name)
 	}
 }
