@@ -87,13 +87,13 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		if err := r.Client.Create(ctx, &baseConfigBundle); err != nil {
 			log.Error(err, "unable to create base config bundle `Secret`")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, nil
 		}
 
 		updatedQuay.Spec.ConfigBundleSecret = baseConfigBundle.GetName()
 		if err := r.Client.Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "unable to update `spec.configBundleSecret`")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, nil
 		}
 
 		log.Info("successfully updated `spec.configBundleSecret`")
@@ -103,14 +103,14 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	var configBundle corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.Spec.ConfigBundleSecret}, &configBundle); err != nil {
 		log.Error(err, "unable to retrieve referenced `configBundleSecret`", "configBundleSecret", quay.Spec.ConfigBundleSecret)
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	var secretKeysBundle corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: kustomize.SecretKeySecretName(&quay)}, &secretKeysBundle); err != nil {
 		if !errors.IsNotFound(err) {
 			log.Error(err, "unable to retrieve secret keys bundle")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, nil
 		}
 	}
 
@@ -119,14 +119,14 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	updatedQuay, err := v1.EnsureDesiredVersion(&quay)
 	if err != nil {
 		log.Error(err, "could not ensure `spec.desiredVersion`")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	if quay.Spec.DesiredVersion != updatedQuay.Spec.DesiredVersion {
 		log.Info("updating QuayRegistry `spec.desiredVersion`")
 		if err = r.Client.Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `spec.desiredVersion`")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, nil
 	}
@@ -134,26 +134,26 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	updatedQuay, err = r.checkRoutesAvailable(updatedQuay.DeepCopy())
 	if err != nil {
 		log.Error(err, "could not check for Routes API")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	updatedQuay, err = r.checkObjectBucketClaimsAvailable(updatedQuay.DeepCopy())
 	if err != nil {
 		log.Error(err, "could not check for `ObjectBucketClaims` API")
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: time.Millisecond * 1000}, nil
 	}
 
 	updatedQuay, err = v1.EnsureDefaultComponents(updatedQuay.DeepCopy())
 	if err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
 		log.Info("updating QuayRegistry `spec.components` to include defaults")
 		if err = r.Client.Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `spec.components` to include defaults")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, nil
 	}
@@ -161,7 +161,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	deploymentObjects, err := kustomize.Inflate(updatedQuay, &configBundle, &secretKeysBundle, log)
 	if err != nil {
 		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	for _, obj := range deploymentObjects {
@@ -174,7 +174,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
 			r.Log.Error(err, "could not update QuayRegistry `status.lastUpdate` after (re)deployment")
-			return ctrl.Result{}, err
+			return ctrl.Result{}, nil
 		}
 	}
 

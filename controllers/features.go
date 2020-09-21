@@ -88,6 +88,8 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(quay *v1.QuayR
 			}
 		}
 		quay.SetAnnotations(existingAnnotations)
+	} else if err != nil {
+		r.Log.Info("cluster does not support `ObjectBucketClaim` API")
 	}
 
 	return quay, nil

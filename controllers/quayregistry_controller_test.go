@@ -161,8 +161,8 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					quayRegistry.Spec.ConfigBundleSecret = "does-not-exist"
 				})
 
-				It("should return an error", func() {
-					Expect(err).To(HaveOccurred())
+				It("should not return an error", func() {
+					Expect(err).NotTo(HaveOccurred())
 					Expect(result.Requeue).To(BeFalse())
 				})
 
@@ -191,6 +191,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 			When("it references a `configBundleSecret` that does exist", func() {
 				It("should not return an error", func() {
 					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Requeue).To(BeFalse())
 				})
 
 				It("will create Quay objects on the cluster with `ownerReferences` back to the `QuayRegistry`", func() {
@@ -292,6 +293,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 
 				It("should not return an error", func() {
 					Expect(err).ShouldNot(HaveOccurred())
+					Expect(result.Requeue).To(BeFalse())
 				})
 
 				It("should create a fresh `Secret` and populate `configBundleSecret`", func() {
@@ -320,8 +322,8 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
 				})
 
-				It("should return an error", func() {
-					Expect(err).To(HaveOccurred())
+				It("should not return an error", func() {
+					Expect(err).NotTo(HaveOccurred())
 					Expect(result.Requeue).To(BeFalse())
 				})
 
@@ -397,6 +399,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 
 			It("should not return an error", func() {
 				Expect(err).NotTo(HaveOccurred())
+				Expect(result.Requeue).To(BeFalse())
 			})
 		})
 	})
