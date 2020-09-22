@@ -21,14 +21,13 @@ import (
 	v1 "github.com/quay/quay-operator/api/v1"
 )
 
-const secretKeyLength = 80
+const (
+	// secretKeySecretName is the name of the Secret in which generated secret keys are stored.
+	secretKeySecretName = "quay-registry-managed-secret-keys"
+	secretKeyLength     = 80
+)
 
-// secretKeySecretName is the name of the Secret in which generated secret keys are
-// stored.
-const secretKeySecretName = "quay-registry-managed-secret-keys"
-
-// SecretKeySecretName returns the name of the Secret in which generated secret keys are
-// stored.
+// SecretKeySecretName returns the name of the Secret in which generated secret keys are stored.
 func SecretKeySecretName(quay *v1.QuayRegistry) string {
 	return quay.GetName() + "-" + secretKeySecretName
 }
@@ -169,6 +168,7 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 		clusterHostname := quay.GetAnnotations()[v1.ClusterHostnameAnnotation]
 
 		fieldGroup := &hostsettings.HostSettingsFieldGroup{
+			// FIXME(alecmerdler): This should need to change based on whether `configBundleSecret` contains `ssl.key` + `ssl.cert`...
 			ExternalTlsTermination: false,
 			PreferredUrlScheme:     "https",
 			ServerHostname: strings.Join([]string{
@@ -210,16 +210,19 @@ func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[stri
 	case "redis":
 	case "objectstorage":
 	case "route":
+		hostSettings := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
+
 		if hostname, ok := baseConfig["SERVER_HOSTNAME"]; ok {
 			configFiles[registryHostnameKey] = []byte(hostname.(string))
 			configFiles[tlsTerminationKey] = []byte("passthrough")
 			configFiles[targetPortKey] = []byte("https")
 
-			hostSettings := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
 			hostSettings.ServerHostname = hostname.(string)
 		} else {
 			configFiles[tlsTerminationKey] = []byte("edge")
 			configFiles[targetPortKey] = []byte("http")
+
+			hostSettings.ExternalTlsTermination = true
 		}
 	default:
 		panic("unknown component: " + component)
