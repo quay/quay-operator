@@ -3,6 +3,6 @@ kind: Deployment
 metadata:
   name: quay-app-upgrade
   annotations:
-    quay-upgrade: qui-gon
+    quay-upgrade: v3.4.0
 spec:
   replicas: 1

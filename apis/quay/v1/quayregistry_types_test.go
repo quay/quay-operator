@@ -195,6 +195,22 @@ var ensureDesiredVersionTests = []struct {
 	expectedErr error
 }{
 	{
+		"DesiredVersionEmptyCurrentVersionEmpty",
+		QuayRegistry{},
+		QuayVersionVader,
+		nil,
+	},
+	{
+		"DesiredVersionEmptyCurrentVersionSet",
+		QuayRegistry{
+			Status: QuayRegistryStatus{
+				CurrentVersion: QuayVersionVader,
+			},
+		},
+		QuayVersionVader,
+		nil,
+	},
+	{
 		"InvalidDesiredVersion",
 		QuayRegistry{
 			Spec: QuayRegistrySpec{
@@ -205,13 +221,7 @@ var ensureDesiredVersionTests = []struct {
 		errors.New("invalid `desiredVersion`: not-a-real-version"),
 	},
 	{
-		"EmptyDesiredVersion",
-		QuayRegistry{},
-		QuayVersionVader,
-		nil,
-	},
-	{
-		"DevOverrideDesiredVersion",
+		"DevOverrideDesiredVersionCurrentVersionEmpty",
 		QuayRegistry{
 			Spec: QuayRegistrySpec{
 				DesiredVersion: QuayVersionDev,
@@ -221,17 +231,30 @@ var ensureDesiredVersionTests = []struct {
 		nil,
 	},
 	{
-		"DowngradeProhibited",
+		"DevOverrideDesiredVersionCurrentVersionSet",
 		QuayRegistry{
 			Spec: QuayRegistrySpec{
-				DesiredVersion: QuayVersionQuiGon,
+				DesiredVersion: QuayVersionDev,
 			},
 			Status: QuayRegistryStatus{
 				CurrentVersion: QuayVersionVader,
 			},
 		},
 		QuayVersionVader,
-		errors.New("cannot downgrade from `currentVersion`: qui-gon > vader"),
+		errors.New("cannot downgrade from `currentVersion`: vader > dev"),
+	},
+	{
+		"DowngradeProhibited",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				DesiredVersion: QuayVersionDev,
+			},
+			Status: QuayRegistryStatus{
+				CurrentVersion: QuayVersionVader,
+			},
+		},
+		QuayVersionVader,
+		errors.New("cannot downgrade from `currentVersion`: vader > dev"),
 	},
 }
 

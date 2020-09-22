@@ -13,6 +13,7 @@ import (
 	route "github.com/openshift/api/route/v1"
 	apps "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,11 +48,11 @@ func appDir() string {
 }
 
 func overlayDir(desiredVersion v1.QuayVersion) string {
-	return filepath.Join(kustomizeDir(), "overlays", "upstream", string(desiredVersion))
+	return filepath.Join(kustomizeDir(), "overlays", string(desiredVersion.Stream()), string(desiredVersion))
 }
 
 func upgradeOverlayDir(desiredVersion v1.QuayVersion) string {
-	return filepath.Join(kustomizeDir(), "overlays", "upstream", string(desiredVersion), "upgrade")
+	return filepath.Join(kustomizeDir(), "overlays", string(desiredVersion.Stream()), string(desiredVersion), "upgrade")
 }
 
 func check(err error) {
@@ -97,6 +98,8 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 		return &objectbucket.ObjectBucketClaim{}
 	case schema.GroupVersionKind{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscaler"}.String():
 		return &autoscaling.HorizontalPodAutoscaler{}
+	case schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String():
+		return &batchv1.Job{}
 	default:
 		panic(fmt.Sprintf("Missing model for GVK %s", gvk.String()))
 	}

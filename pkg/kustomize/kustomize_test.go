@@ -8,6 +8,7 @@ import (
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -220,6 +221,7 @@ var quayComponents = map[string][]runtime.Object{
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
+		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-database-init"}},
 	},
 	"redis": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
@@ -332,7 +334,7 @@ var inflateTests = []struct {
 				},
 			},
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionQuiGon,
+				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
