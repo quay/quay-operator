@@ -14,8 +14,6 @@ spec:
       labels:
         quay-component: quay-app-upgrade
     spec:
-      securityContext:
-        fsGroup: 1001
       volumes:
         - name: configvolume
           secret:

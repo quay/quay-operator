@@ -14,11 +14,6 @@ Opinionated deployment of [Quay container registry](https://github.com/quay/quay
 
 This Operator can be installed on any Kubernetes cluster running the [Operator Lifecycle Manager](https://github.com/operator-framework/operator-lifecycle-manager). Simply create the provided `CatalogSource` to make the package available on the cluster, then create the `Subscription` to install it.
 
-**If running on OpenShift**:
-```sh
-$ oc adm policy add-scc-to-user anyuid system:serviceaccount:<your-namespace>:default
-```
-
 **Create the `CatalogSource`**:
 ```sh
 $ kubectl create -n openshift-marketplace -f ./deploy/quay-operator.catalogsource.yaml
