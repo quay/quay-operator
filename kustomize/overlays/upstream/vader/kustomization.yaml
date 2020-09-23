@@ -9,4 +9,5 @@ images:
   - name: quay.io/projectquay/quay
     newTag: vader
   - name: quay.io/projectquay/clair
-    newTag: vader
+    # newTag: vader
+    newTag: 4.0.0-rc.3

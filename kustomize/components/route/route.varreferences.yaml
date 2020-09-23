@@ -1,7 +1,3 @@
 varReference:
   - kind: Route
     path: spec/host
-  - kind: Route
-    path: spec/tls/termination
-  - kind: Route
-    path: spec/port/targetPort
