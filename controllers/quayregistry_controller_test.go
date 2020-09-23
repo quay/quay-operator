@@ -189,11 +189,16 @@ var _ = Describe("QuayRegistryReconciler", func() {
 			})
 
 			When("it references a `configBundleSecret` that does exist", func() {
+				JustBeforeEach(func() {
+					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+				})
+
 				It("should not return an error", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(result.Requeue).To(BeFalse())
 				})
 
+				// FIXME(alecmerdler): This test is failing because there are zero `Deployments` being created...
 				It("will create Quay objects on the cluster with `ownerReferences` back to the `QuayRegistry`", func() {
 					var deployments appsv1.DeploymentList
 					var services corev1.ServiceList
@@ -217,6 +222,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					}
 				})
 
+				// FIXME(alecmerdler): This test is failing because there are zero `Deployments` being created...
 				It("reports the current version in the `status` block", func() {
 					Expect(progressUpgradeDeployment()).Should(Succeed())
 

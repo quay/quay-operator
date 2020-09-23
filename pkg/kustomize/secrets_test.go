@@ -98,6 +98,12 @@ FEATURE_PROXY_STORAGE: true
 FEATURE_STORAGE_REPLICATION: false
 `),
 	},
+	{
+		"horizontalpodautoscaler",
+		"horizontalpodautoscaler",
+		quayRegistry("test"),
+		[]byte("null\n"),
+	},
 }
 
 func TestFieldGroupFor(t *testing.T) {

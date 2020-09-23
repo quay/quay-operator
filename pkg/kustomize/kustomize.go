@@ -11,8 +11,9 @@ import (
 	"strings"
 
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
-	routev1 "github.com/openshift/api/route/v1"
-	appsv1 "k8s.io/api/apps/v1"
+	route "github.com/openshift/api/route/v1"
+	apps "k8s.io/api/apps/v1"
+	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -89,15 +90,17 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 	case schema.GroupVersionKind{Version: "v1", Kind: "PersistentVolumeClaim"}.String():
 		return &corev1.PersistentVolumeClaim{}
 	case schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}.String():
-		return &appsv1.Deployment{}
+		return &apps.Deployment{}
 	case schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "Role"}.String():
 		return &rbac.Role{}
 	case schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}.String():
 		return &rbac.RoleBinding{}
 	case schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}.String():
-		return &routev1.Route{}
+		return &route.Route{}
 	case schema.GroupVersionKind{Group: "objectbucket.io", Version: "v1alpha1", Kind: "ObjectBucketClaim"}.String():
 		return &objectbucket.ObjectBucketClaim{}
+	case schema.GroupVersionKind{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscaler"}.String():
+		return &autoscaling.HorizontalPodAutoscaler{}
 	default:
 		panic(fmt.Sprintf("Missing model for GVK %s", gvk.String()))
 	}

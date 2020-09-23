@@ -66,6 +66,7 @@ var allComponents = []string{
 	"postgres",
 	"clair",
 	"redis",
+	"horizontalpodautoscaler",
 	"objectstorage",
 	"route",
 }

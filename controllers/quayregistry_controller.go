@@ -158,6 +158,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, nil
 	}
 
+	log.Info("inflating QuayRegistry into Kubernetes objects using Kustomize")
 	deploymentObjects, err := kustomize.Inflate(updatedQuay, &configBundle, &secretKeysBundle, log)
 	if err != nil {
 		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
@@ -165,7 +166,11 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	for _, obj := range deploymentObjects {
-		_ = r.createOrUpdateObject(ctx, obj, quay)
+		err = r.createOrUpdateObject(ctx, obj, quay)
+		if err != nil {
+			log.Error(err, "all Kubernetes objects not created/updated successfully")
+			return ctrl.Result{Requeue: true}, nil
+		}
 	}
 	log.Info("all objects created/updated successfully")
 
