@@ -9,7 +9,7 @@ resources:
   - ./quay.deployment.yaml
   - ./quay.service.yaml
   - ./upgrade.deployment.yaml
-  - ./extra-certs.configmap.yaml
+  - ./cluster-service-ca.configmap.yaml
   - ./config.deployment.yaml
   - ./config.service.yaml
 generatorOptions:

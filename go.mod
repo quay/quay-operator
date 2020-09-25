@@ -8,7 +8,8 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
 	github.com/openshift/api v3.9.0+incompatible
-	github.com/quay/clair/v4 v4.0.0-rc.2
+	github.com/quay/clair/v4 v4.0.0-rc.3
+	github.com/quay/claircore v1.0.5 // indirect
 	github.com/quay/config-tool v0.1.2-0.20200914221214-89ccb1fec55a
 	github.com/stretchr/testify v1.6.1
 	gopkg.in/yaml.v2 v2.3.0

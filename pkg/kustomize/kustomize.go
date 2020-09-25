@@ -34,8 +34,6 @@ import (
 const (
 	configSecretPrefix    = "quay-config-secret"
 	registryHostnameKey   = "quay-registry-hostname"
-	tlsTerminationKey     = "quay-registry-tls-termination"
-	targetPortKey         = "quay-registry-target-port"
 	managedFieldGroupsKey = "quay-managed-fieldgroups"
 )
 
@@ -179,7 +177,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 
 	configFiles := []string{}
 	for key := range quayConfigFiles {
-		if key != registryHostnameKey && key != tlsTerminationKey && key != targetPortKey {
+		if key != registryHostnameKey {
 			configFiles = append(configFiles, filepath.Join("bundle", key))
 		}
 	}
@@ -237,8 +235,6 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		CommonAnnotations: map[string]string{
 			managedFieldGroupsKey: strings.Join(managedFieldGroups, ","),
 			registryHostnameKey:   string(quayConfigFiles[registryHostnameKey]),
-			tlsTerminationKey:     string(quayConfigFiles[tlsTerminationKey]),
-			targetPortKey:         string(quayConfigFiles[targetPortKey]),
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
 		Vars: []types.Var{
@@ -321,6 +317,18 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 				componentConfigFiles[name] = contents
 			}
 		}
+	}
+
+	_, quayCertExists := componentConfigFiles["ssl.cert"]
+	_, quayKeyExists := componentConfigFiles["ssl.key"]
+	if !quayCertExists || !quayKeyExists {
+		log.Info("Generating missing `ssl.cert` and `ssl.key` pair for Quay app TLS")
+
+		cert, key, err := CustomTLSFor(quay, parsedUserConfig)
+		check(err)
+
+		componentConfigFiles["ssl.cert"] = cert
+		componentConfigFiles["ssl.key"] = key
 	}
 
 	kustomization, err := KustomizationFor(quay, componentConfigFiles)

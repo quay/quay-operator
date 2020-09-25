@@ -33,10 +33,18 @@ spec:
           volumeMounts:
             - mountPath: /clair/
               name: config
+            - mountPath: /var/run/certs
+              name: certs
           # TODO(alecmerdler): Define `readinessProbe` which waits until indexer/matcher services are ready.
       restartPolicy: Always
       volumes:
         - name: config
           secret:
             secretName: clair-config-secret
-          
+        - name: certs
+          secret:
+            secretName: quay-config-secret
+            # Mount just the public certificate because we are using storage proxying.
+            items:
+              - key: ssl.cert
+                path: quay-ssl.cert

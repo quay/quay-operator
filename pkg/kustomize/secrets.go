@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/quay/clair/v4/config"
+	"github.com/quay/clair/v4/notifier/webhook"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
@@ -16,6 +18,7 @@ import (
 	"github.com/quay/config-tool/pkg/lib/shared"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/api/v1"
@@ -164,11 +167,9 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 
 		return fieldGroup, nil
 	case "route":
-		// FIXME(alecmerdler): See if `SERVER_HOSTNAME` field exists in user-provided config
 		clusterHostname := quay.GetAnnotations()[v1.ClusterHostnameAnnotation]
 
 		fieldGroup := &hostsettings.HostSettingsFieldGroup{
-			// FIXME(alecmerdler): This should need to change based on whether `configBundleSecret` contains `ssl.key` + `ssl.cert`...
 			ExternalTlsTermination: false,
 			PreferredUrlScheme:     "https",
 			ServerHostname: strings.Join([]string{
@@ -201,6 +202,17 @@ func BaseConfig() map[string]interface{} {
 	}
 }
 
+// CustomTLSFor generates a TLS certificate/key pair for the Quay registry to use for secure communication with clients.
+func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]byte, []byte, error) {
+	routeConfigFiles := configFilesFor("route", quay, baseConfig)
+	var fieldGroup hostsettings.HostSettingsFieldGroup
+	if err := yaml.Unmarshal(routeConfigFiles["route.config.yaml"], &fieldGroup); err != nil {
+		return nil, nil, err
+	}
+
+	return cert.GenerateSelfSignedCertKey(fieldGroup.ServerHostname, []net.IP{}, []string{})
+}
+
 func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[string]interface{}) map[string][]byte {
 	configFiles := map[string][]byte{}
 	fieldGroup, err := FieldGroupFor(component, quay)
@@ -217,15 +229,7 @@ func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[stri
 
 		if hostname, ok := baseConfig["SERVER_HOSTNAME"]; ok {
 			configFiles[registryHostnameKey] = []byte(hostname.(string))
-			configFiles[tlsTerminationKey] = []byte("passthrough")
-			configFiles[targetPortKey] = []byte("https")
-
 			hostSettings.ServerHostname = hostname.(string)
-		} else {
-			configFiles[tlsTerminationKey] = []byte("edge")
-			configFiles[targetPortKey] = []byte("http")
-
-			hostSettings.ExternalTlsTermination = true
 		}
 	default:
 		panic("unknown component: " + component)
@@ -287,16 +291,20 @@ func clairConfigFor(quay *v1.QuayRegistry) []byte {
 			ConnString:  dbConn,
 			MaxConnPool: 100,
 			Migrations:  true,
-			IndexerAddr: "clair-indexer",
 		},
 		Notifier: config.Notifier{
 			ConnString:       dbConn,
-			IndexerAddr:      "clair-indexer",
-			MatcherAddr:      "clair-matcher",
 			Migrations:       true,
 			DeliveryInterval: "1m",
 			PollInterval:     "5m",
+			Webhook: &webhook.Config{
+				// FIXME(alecmerdler): Need to use HTTPS when Quay has a custom hostname + SSL cert/keys...
+				Target:   "http://" + quay.GetName() + "-quay-app/secscan/notification",
+				Callback: "http://" + quay.GetName() + "-clair/notifier/api/v1/notifications",
+			},
 		},
+		// FIXME(alecmerdler): Create pre-shared key for JWT auth between Quay/Clair...
+		// Auth: config.Auth{},
 		Metrics: config.Metrics{
 			Name: "prometheus",
 		},

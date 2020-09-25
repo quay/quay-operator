@@ -25,7 +25,7 @@ status:
 
 ### Default Hostname and TLS
 
-By default, a `Route` will be created with the default generated hostname and TLS edge termination using the cluster TLS.
+By default, a `Route` will be created with the default generated hostname and a certificate/key pair will be generated for TLS.
 
 ### Custom Hostname and TLS
 

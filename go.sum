@@ -630,8 +630,9 @@ github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d h1:K6eOUihrFLdZjZ
 github.com/qri-io/starlib v0.4.2-0.20200213133954-ff2e8cd5ef8d/go.mod h1:7DPO4domFU579Ga6E61sB9VFNaniPVwJP5C4bBCu3wA=
 github.com/quasilyte/go-consistent v0.0.0-20190521200055-c6f3937de18c/go.mod h1:5STLWrekHfjyYwxBRVRXNOSewLJ3PWfDJd1VyTS21fI=
 github.com/quay/alas v1.0.1/go.mod h1:pseepSrG9pwry1joG7RO/RNRFJaWqiqx9qeoomeYwEk=
-github.com/quay/clair/v4 v4.0.0-rc.2 h1:rVK0Axr6LStM1Wby4OOSUWcsumXQQ4oUv8KACpapK+Y=
-github.com/quay/clair/v4 v4.0.0-rc.2/go.mod h1:wRXR+KLKlLoI0bWXnshtsBCJzMIBAePmDSa/ChJcW2g=
+github.com/quay/clair/v4 v4.0.0-rc.3 h1:jrNePecowIHTEjjK0UoNEerz2CS9EGgif28y3Mm9X1c=
+github.com/quay/clair/v4 v4.0.0-rc.3/go.mod h1:05hmwvDxXCf81woZWUoWxBU7qLrlElar3RJ5lzHiT7E=
+github.com/quay/claircore v0.1.8/go.mod h1:1VYiPH3IWZLwNhPrzuV5gEz5yXIm2xflFCYN4EtNod8=
 github.com/quay/claircore v1.0.5 h1:Q7zz0MedTefnHEv8rB8gxJJENT76NEHdAx/XL4mBMp0=
 github.com/quay/claircore v1.0.5/go.mod h1:1VYiPH3IWZLwNhPrzuV5gEz5yXIm2xflFCYN4EtNod8=
 github.com/quay/config-tool v0.1.2-0.20200914221214-89ccb1fec55a h1:D50nwrhJabDMH/I6JeCWp2U5TZGsuMg5nvlOGYS7coQ=
@@ -987,8 +988,8 @@ golang.org/x/tools v0.0.0-20191205215504-7b8c8591a921/go.mod h1:b+2E5dAYhXwXZwtn
 golang.org/x/tools v0.0.0-20200207183749-b753a1ba74fa/go.mod h1:TB2adYChydJhpapKDTa4BR/hXlZSLoq2Wpct/0txZ28=
 golang.org/x/tools v0.0.0-20200612220849-54c614fe050c/go.mod h1:EkVYQZoAsY45+roYkvgYkIh4xh/qjgUK9TdY2XT94GE=
 golang.org/x/tools v0.0.0-20200811032001-fd80f4dbb3ea/go.mod h1:njjCfa9FT2d7l9Bc6FUM5FLjQPp3cFF28FI3qnDFljA=
-golang.org/x/tools v0.0.0-20200911153331-7ad463ce66dd h1:EsTBWdirTvPYbomEwlpq2y7Z3qqsNm6BkseJHhdOvYM=
-golang.org/x/tools v0.0.0-20200911153331-7ad463ce66dd/go.mod h1:Cj7w3i3Rnn0Xh82ur9kSqwfTHTeVxaDqrfMjpcNT6bE=
+golang.org/x/tools v0.0.0-20200923053713-ba800b16d873 h1:Q5Sq7Lt0bkn6Ax1NAraQhKRN7xxxy1LV4guxsyFHZx4=
+golang.org/x/tools v0.0.0-20200923053713-ba800b16d873/go.mod h1:z6u4i615ZeAfBE4XtMziQW1fSVJXACjjbWkB/mvPzlU=
 golang.org/x/xerrors v0.0.0-20190410155217-1f06c39b4373/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20190513163551-3ee3066db522/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 h1:9zdDQZ7Thm29KFXgAX/+yaf3eVbP7djjWp/dXAppNCc=

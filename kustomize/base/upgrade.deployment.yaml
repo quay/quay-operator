@@ -20,7 +20,7 @@ spec:
             secretName: quay-config-secret
         - name: extra-ca-certs
           configMap:
-            name: quay-extra-certs
+            name: cluster-service-ca
       containers:
         - name: quay-app-upgrade
           image: quay.io/projectquay/quay
