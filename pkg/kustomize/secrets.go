@@ -199,6 +199,7 @@ func BaseConfig() map[string]interface{} {
 		"TAG_EXPIRATION_OPTIONS":             []string{"2w"},
 		"TEAM_RESYNC_STALE_TIME":             "60m",
 		"FEATURE_DIRECT_LOGIN":               true,
+		"FEATURE_BUILD_SUPPORT":              false,
 	}
 }
 
