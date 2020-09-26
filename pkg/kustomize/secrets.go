@@ -2,6 +2,7 @@ package kustomize
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -17,13 +18,16 @@ import (
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/repomirror"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
 	"github.com/quay/config-tool/pkg/lib/shared"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/cert"
-	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 )
+
+// underTest can be switched on/off to ensure deterministic random string generation for testing output.
+var underTest = false
 
 const (
 	// secretKeySecretName is the name of the Secret in which generated secret keys are stored.
@@ -106,9 +110,17 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 			return nil, err
 		}
 
+		preSharedKey, err := generateRandomString(32)
+		if err != nil {
+			return nil, err
+		}
+		psk := base64.StdEncoding.EncodeToString([]byte(preSharedKey))
+
 		fieldGroup.FeatureSecurityScanner = true
 		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + "clair:80"
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
+		fieldGroup.SecurityScannerNotifications = true
+		fieldGroup.SecurityScannerV4PSK = psk
 
 		return fieldGroup, nil
 	case "redis":
@@ -133,7 +145,7 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 			return nil, err
 		}
 		user := quay.GetName() + "-quay-database"
-		// FIXME(alecmerdler): Make this more secure...
+		// FIXME(alecmerdler): Make this more secure using `generateRandomString()`...
 		password := "postgres"
 		host := strings.Join([]string{quay.GetName(), "quay-database"}, "-")
 		port := "5432"
@@ -155,13 +167,12 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 				"local_us": {
 					Name: "RadosGWStorage",
 					Args: &shared.DistributedStorageArgs{
-						Hostname:    hostname,
-						IsSecure:    true,
-						Port:        443,
-						StoragePath: "/datastorage/registry",
-						BucketName:  bucketName,
-						AccessKey:   accessKey,
-						SecretKey:   secretKey,
+						Hostname:   hostname,
+						IsSecure:   true,
+						Port:       443,
+						BucketName: bucketName,
+						AccessKey:  accessKey,
+						SecretKey:  secretKey,
 					},
 				},
 			},
@@ -286,22 +297,47 @@ func fieldGroupFor(component string) string {
 }
 
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
-func componentConfigFilesFor(component string, quay *v1.QuayRegistry) (map[string][]byte, error) {
+func componentConfigFilesFor(component string, quay *v1.QuayRegistry, configFiles map[string][]byte) (map[string][]byte, error) {
 	switch component {
 	case "clair":
-		return map[string][]byte{"config.yaml": clairConfigFor(quay)}, nil
+		var quayHostname string
+		for _, component := range quay.Spec.Components {
+			if component.Kind == "route" && component.Managed {
+				config := decode(configFiles["route.config.yaml"])
+				quayHostname = config.(map[string]interface{})["SERVER_HOSTNAME"].(string)
+			}
+		}
+		if _, ok := configFiles["config.yaml"]; ok && quayHostname == "" {
+			config := decode(configFiles["config.yaml"])
+			quayHostname = config.(map[string]interface{})["SERVER_HOSTNAME"].(string)
+		}
+
+		if quayHostname == "" {
+			return nil, errors.New("cannot configure managed security scanner, `SERVER_HOSTNAME` is not set anywhere")
+		}
+
+		var preSharedKey string
+		if _, ok := configFiles["clair.config.yaml"]; ok {
+			config := decode(configFiles["clair.config.yaml"])
+			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
+		}
+
+		return map[string][]byte{"config.yaml": clairConfigFor(quay, quayHostname, preSharedKey)}, nil
 	default:
 		return nil, nil
 	}
 }
 
 // clairConfigFor returns a Clair v4 config with the correct values.
-func clairConfigFor(quay *v1.QuayRegistry) []byte {
+func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []byte {
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
 	dbname := "postgres"
 	user := "postgres"
 	// FIXME(alecmerdler): Make this more secure...
 	password := "postgres"
+
+	psk, err := base64.StdEncoding.DecodeString(preSharedKey)
+	check(err)
 
 	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
 	config := config.Config{
@@ -324,13 +360,17 @@ func clairConfigFor(quay *v1.QuayRegistry) []byte {
 			DeliveryInterval: "1m",
 			PollInterval:     "5m",
 			Webhook: &webhook.Config{
-				// FIXME(alecmerdler): Need to use HTTPS when Quay has a custom hostname + SSL cert/keys...
-				Target:   "http://" + quay.GetName() + "-quay-app/secscan/notification",
+				// NOTE: This can't be the in-cluster service hostname because the `passthrough` TLS certs are only valid for external `SERVER_HOSTNAME`.
+				Target:   "https://" + quayHostname + "/secscan/notification",
 				Callback: "http://" + quay.GetName() + "-clair/notifier/api/v1/notifications",
 			},
 		},
-		// FIXME(alecmerdler): Create pre-shared key for JWT auth between Quay/Clair...
-		// Auth: config.Auth{},
+		Auth: config.Auth{
+			PSK: &config.AuthPSK{
+				Key:    psk,
+				Issuer: []string{"quay"},
+			},
+		},
 		Metrics: config.Metrics{
 			Name: "prometheus",
 		},

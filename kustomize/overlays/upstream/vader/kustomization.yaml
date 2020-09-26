@@ -7,10 +7,8 @@ bases:
   - ../../../tmp
 images:
   - name: quay.io/projectquay/quay
-    # newTag: vader
-    digest: sha256:b05c0c8b419396307a54bef0b25fa51ea0e7b034e4c676f4cbdf48b7b2739e5b
+    digest: sha256:eff8e0278802f802d1b2158e7dd1059b3cf2be856b64823861a6eb8ae769f947
   - name: quay.io/projectquay/config-tool
-    newTag: vader
+    digest: sha256:a187237fd000b371d6f33f582607208058ff5080cb45684f8345fc894d31b260
   - name: quay.io/projectquay/clair
-    # newTag: vader
-    newTag: 4.0.0-rc.3
+    newTag: 4.0.0-rc.16

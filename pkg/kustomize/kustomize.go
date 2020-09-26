@@ -201,7 +201,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 			componentPaths = append(componentPaths, filepath.Join("..", "components", component.Kind))
 			managedFieldGroups = append(managedFieldGroups, fieldGroupFor(component.Kind))
 
-			componentConfigFiles, err := componentConfigFilesFor(component.Kind, quay)
+			componentConfigFiles, err := componentConfigFilesFor(component.Kind, quay, quayConfigFiles)
 			if componentConfigFiles == nil || err != nil {
 				continue
 			}

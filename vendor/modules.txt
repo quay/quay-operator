@@ -208,7 +208,7 @@ github.com/quay/claircore
 github.com/quay/claircore/libvuln/driver
 github.com/quay/claircore/pkg/cpe
 github.com/quay/claircore/pkg/distlock
-# github.com/quay/config-tool v0.1.2-0.20200914221214-89ccb1fec55a
+# github.com/quay/config-tool v0.1.2-0.20201013214416-e1ea29372174
 github.com/quay/config-tool/pkg/lib/fieldgroups/database
 github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage
 github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings

@@ -4,27 +4,26 @@ import (
 	"errors"
 
 	"github.com/creasty/defaults"
-	"github.com/quay/config-tool/pkg/lib/shared"
 )
 
 // RedisFieldGroup represents the RedisFieldGroup config fields
 type RedisFieldGroup struct {
-	BuildlogsRedis  *BuildlogsRedisStruct  `default:"" validate:"" json:"BUILDLOGS_REDIS" yaml:"BUILDLOGS_REDIS"`
-	UserEventsRedis *UserEventsRedisStruct `default:"" validate:"" json:"USER_EVENTS_REDIS" yaml:"USER_EVENTS_REDIS"`
+	BuildlogsRedis  *BuildlogsRedisStruct  `default:"" validate:"" json:"BUILDLOGS_REDIS,omitempty" yaml:"BUILDLOGS_REDIS,omitempty"`
+	UserEventsRedis *UserEventsRedisStruct `default:"" validate:"" json:"USER_EVENTS_REDIS,omitempty" yaml:"USER_EVENTS_REDIS,omitempty"`
 }
 
 // UserEventsRedisStruct represents the UserEventsRedisStruct config fields
 type UserEventsRedisStruct struct {
-	Password string `default:"" validate:"" json:"password" yaml:"password"`
-	Port     int    `default:"" validate:"" json:"port" yaml:"port"`
-	Host     string `default:"" validate:"" json:"host" yaml:"host"`
+	Password string `default:"" validate:"" json:"password,omitempty" yaml:"password,omitempty"`
+	Port     int    `default:"" validate:"" json:"port,omitempty" yaml:"port,omitempty"`
+	Host     string `default:"" validate:"" json:"host,omitempty" yaml:"host,omitempty"`
 }
 
 // BuildlogsRedisStruct represents the BuildlogsRedisStruct config fields
 type BuildlogsRedisStruct struct {
-	Password string `default:"" validate:"" json:"password" yaml:"password"`
-	Port     int    `default:"" validate:"" json:"port" yaml:"port"`
-	Host     string `default:"" validate:"" json:"host" yaml:"host"`
+	Password string `default:"" validate:"" json:"password,omitempty" yaml:"password,omitempty"`
+	Port     int    `default:"" validate:"" json:"port,omitempty" yaml:"port,omitempty"`
+	Host     string `default:"" validate:"" json:"host,omitempty" yaml:"host,omitempty"`
 }
 
 // NewRedisFieldGroup creates a new RedisFieldGroup
@@ -34,7 +33,7 @@ func NewRedisFieldGroup(fullConfig map[string]interface{}) (*RedisFieldGroup, er
 
 	if value, ok := fullConfig["BUILDLOGS_REDIS"]; ok {
 		var err error
-		value := shared.FixInterface(value.(map[interface{}]interface{}))
+		value := value.(map[string]interface{})
 		newRedisFieldGroup.BuildlogsRedis, err = NewBuildlogsRedisStruct(value)
 		if err != nil {
 			return newRedisFieldGroup, err
@@ -42,7 +41,7 @@ func NewRedisFieldGroup(fullConfig map[string]interface{}) (*RedisFieldGroup, er
 	}
 	if value, ok := fullConfig["USER_EVENTS_REDIS"]; ok {
 		var err error
-		value := shared.FixInterface(value.(map[interface{}]interface{}))
+		value := value.(map[string]interface{})
 		newRedisFieldGroup.UserEventsRedis, err = NewUserEventsRedisStruct(value)
 		if err != nil {
 			return newRedisFieldGroup, err

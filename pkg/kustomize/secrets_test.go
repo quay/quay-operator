@@ -7,6 +7,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/redis"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/repomirror"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
+	"github.com/quay/config-tool/pkg/lib/shared"
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
@@ -37,82 +43,86 @@ var fieldGroupForTests = []struct {
 	name      string
 	component string
 	quay      *v1.QuayRegistry
-	expected  []byte
+	expected  shared.FieldGroup
 }{
 	{
 		"clair",
 		"clair",
 		quayRegistry("test"),
-		[]byte(`FEATURE_SECURITY_SCANNER: true
-SECURITY_SCANNER_ENDPOINT: ""
-SECURITY_SCANNER_INDEXING_INTERVAL: 30
-SECURITY_SCANNER_NOTIFICATIONS: false
-SECURITY_SCANNER_V4_ENDPOINT: http://test-clair:80
-SECURITY_SCANNER_V4_NAMESPACE_WHITELIST:
-- admin
-`),
+		&securityscanner.SecurityScannerFieldGroup{
+			FeatureSecurityScanner:              true,
+			SecurityScannerIndexingInterval:     30,
+			SecurityScannerNotifications:        true,
+			SecurityScannerV4Endpoint:           "http://test-clair:80",
+			SecurityScannerV4NamespaceWhitelist: []string{"admin"},
+			SecurityScannerV4PSK:                "abc123",
+		},
 	},
 	{
 		"redis",
 		"redis",
 		quayRegistry("test"),
-		[]byte(`BUILDLOGS_REDIS:
-  host: test-quay-redis
-  password: ""
-  port: 6379
-USER_EVENTS_REDIS:
-  host: test-quay-redis
-  password: ""
-  port: 6379
-`),
+		&redis.RedisFieldGroup{
+			BuildlogsRedis: &redis.BuildlogsRedisStruct{
+				Host: "test-quay-redis",
+				Port: 6379,
+			},
+			UserEventsRedis: &redis.UserEventsRedisStruct{
+				Host: "test-quay-redis",
+				Port: 6379,
+			},
+		},
 	},
 	{
 		"postgres",
 		"postgres",
 		quayRegistry("test"),
-		[]byte(`DB_CONNECTION_ARGS:
-  autorollback: true
-  threadlocals: true
-DB_URI: postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database
-`),
+		&database.DatabaseFieldGroup{
+			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
+			DbConnectionArgs: &database.DbConnectionArgsStruct{
+				Autorollback: true,
+				Threadlocals: true,
+			},
+		},
 	},
 	{
 		"objectstorage",
 		"objectstorage",
 		quayRegistry("test"),
-		[]byte(`DISTRIBUTED_STORAGE_CONFIG:
-  local_us:
-  - RadosGWStorage
-  - access_key: abc123
-    bucket_name: quay-datastore
-    hostname: s3.noobaa.svc
-    is_secure: true
-    port: 443
-    secret_key: super-secret
-    storage_path: /datastorage/registry
-DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
-- local_us
-DISTRIBUTED_STORAGE_PREFERENCE:
-- local_us
-FEATURE_PROXY_STORAGE: true
-FEATURE_STORAGE_REPLICATION: false
-`),
+		&distributedstorage.DistributedStorageFieldGroup{
+			FeatureProxyStorage:                true,
+			DistributedStoragePreference:       []string{"local_us"},
+			DistributedStorageDefaultLocations: []string{"local_us"},
+			DistributedStorageConfig: map[string]*distributedstorage.DistributedStorageDefinition{
+				"local_us": {
+					Name: "RadosGWStorage",
+					Args: &shared.DistributedStorageArgs{
+						AccessKey:  "abc123",
+						BucketName: "quay-datastore",
+						Hostname:   "s3.noobaa.svc",
+						IsSecure:   true,
+						Port:       443,
+						SecretKey:  "super-secret",
+					},
+				},
+			},
+		},
 	},
 	{
 		"horizontalpodautoscaler",
 		"horizontalpodautoscaler",
 		quayRegistry("test"),
-		[]byte("null\n"),
+		nil,
 	},
 	{
 		"mirror",
 		"mirror",
 		quayRegistry("test"),
-		[]byte(`FEATURE_REPO_MIRROR: true
-REPO_MIRROR_INTERVAL: 30
-REPO_MIRROR_SERVER_HOSTNAME: ""
-REPO_MIRROR_TLS_VERIFY: true
-`),
+		&repomirror.RepoMirrorFieldGroup{
+			FeatureRepoMirror:   true,
+			RepoMirrorInterval:  30,
+			RepoMirrorTlsVerify: true,
+		},
 	},
 }
 
@@ -121,12 +131,21 @@ func TestFieldGroupFor(t *testing.T) {
 
 	for _, test := range fieldGroupForTests {
 		fieldGroup, err := FieldGroupFor(test.component, test.quay)
+		assert.Nil(err, test.name)
 
-		assert.Nil(err)
+		// TODO(alecmerdler): Make this more generic for other randomly-generated fields.
+		if test.name == "clair" {
+			secscanFieldGroup := fieldGroup.(*securityscanner.SecurityScannerFieldGroup)
 
+			assert.True(len(secscanFieldGroup.SecurityScannerV4PSK) > 0, test.name)
+			secscanFieldGroup.SecurityScannerV4PSK = "abc123"
+		}
+
+		expected, err := yaml.Marshal(test.expected)
+		assert.Nil(err, test.name)
 		configFields, err := yaml.Marshal(fieldGroup)
+		assert.Nil(err, test.name)
 
-		assert.Nil(err)
-		assert.Equal(string(test.expected), string(configFields), test.name)
+		assert.Equal(string(expected), string(configFields), test.name)
 	}
 }
