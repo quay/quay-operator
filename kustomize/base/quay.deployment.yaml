@@ -61,7 +61,7 @@ spec:
               command:
                 - curl
                 - '-k'
-                - 'http://localhost:8080/health/instance'
+                - 'https://localhost:8080/health/instance'
             initialDelaySeconds: 30
             timeoutSeconds: 20
             periodSeconds: 15

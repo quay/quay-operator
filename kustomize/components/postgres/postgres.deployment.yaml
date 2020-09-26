@@ -28,6 +28,10 @@ spec:
         - name: postgres
           image: postgres:latest
           imagePullPolicy: IfNotPresent
+          args: [
+            "-c", "shared_buffers=256MB",
+            "-c", "max_connections=2000",
+          ]
           ports:
             - containerPort: 5432
               protocol: TCP
