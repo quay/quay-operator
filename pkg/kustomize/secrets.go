@@ -204,6 +204,8 @@ func BaseConfig() map[string]interface{} {
 }
 
 // CustomTLSFor generates a TLS certificate/key pair for the Quay registry to use for secure communication with clients.
+// In addition to `SERVER_HOSTNAME`, it sets certificate subject alternative names
+// for the internal k8s service hostnames (i.e. `registry-quay-app.quay-enterprise.svc`).
 func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]byte, []byte, error) {
 	routeConfigFiles := configFilesFor("route", quay, baseConfig)
 	var fieldGroup hostsettings.HostSettingsFieldGroup
@@ -211,7 +213,17 @@ func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]b
 		return nil, nil, err
 	}
 
-	return cert.GenerateSelfSignedCertKey(fieldGroup.ServerHostname, []net.IP{}, []string{})
+	svc := quay.GetName() + "-quay-app"
+
+	return cert.GenerateSelfSignedCertKey(
+		fieldGroup.ServerHostname,
+		[]net.IP{},
+		[]string{
+			svc,
+			strings.Join([]string{svc, quay.GetNamespace(), "svc"}, "."),
+			strings.Join([]string{svc, quay.GetNamespace(), "svc", "cluster", "local"}, "."),
+		},
+	)
 }
 
 func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[string]interface{}) map[string][]byte {

@@ -99,3 +99,30 @@ $ go run main.go
 ```sh
 $ go test -v ./...
 ```
+
+**Building custom `CatalogSource`**:
+
+1. Build and push the Quay Operator container:
+
+```sh
+$ docker build -t quay.io/<namespace>/quay-operator:dev .
+$ docker push quay.io/<namespace>/quay-operator:dev
+```
+
+2. Replace the `image` field in `deploy/manifests/quay-operator/0.0.1/quay-operator.clusterserviceversion.yaml` with the image above.
+
+3. Build and push the Quay Operator `CatalogSource` container:
+
+```sh
+$ cd deploy
+$ docker build -t quay.io/<namespace>/quay-operator-catalog:dev .
+$ docker push quay.io/<namespace>/quay-operator-catalog:dev
+```
+
+4. Replace the `spec.image` field in `deploy/quay-operator.catalogsource.yaml` with the image above.
+
+5. Create the custom `CatalogSource`:
+
+```sh
+$ kubectl create -n openshift-marketplace -f ./deploy/quay-operator.catalogsource.yaml
+```

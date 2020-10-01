@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:a80a19cdf70e37a0c4e4a1ee0434098cceaaddf43825d2c6d9b202300531b74f
+    containerImage: quay.io/projectquay/quay-operator@sha256:4f88b7231dcac284893e7c6371ee631fccf592b553d0df76e624068bc9bb7553
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -23,7 +23,9 @@ metadata:
               {"kind": "clair", "managed": true},
               {"kind": "postgres", "managed": true},
               {"kind": "objectstorage", "managed": true},
-              {"kind": "redis", "managed": true}
+              {"kind": "redis", "managed": true},
+              {"kind": "horizontalpodautoscaler", "managed": true},
+              {"kind": "route", "managed": true}
             ]
           }
         }
@@ -49,6 +51,7 @@ spec:
         - kind: Route
         - kind: Role
         - kind: Rolebinding
+        - kind: HorizontalPodAutoscaler
       specDescriptors:
         - path: configBundleSecret
           displayName: Config Bundle Secret
@@ -107,9 +110,18 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
-                image: quay.io/projectquay/quay-operator@sha256:a80a19cdf70e37a0c4e4a1ee0434098cceaaddf43825d2c6d9b202300531b74f
+                image: quay.io/projectquay/quay-operator@sha256:4f88b7231dcac284893e7c6371ee631fccf592b553d0df76e624068bc9bb7553
                 name: quay-operator
+                # FIXME(alecmerdler): Kustomize panics because of the extra "magic" `..data/` directories that k8s adds to mounted volumes...
+                # volumeMounts:
+                # - mountPath: /workspace/kustomize/overlays/upstream/dev
+                #   name: quay-dev-kustomize
               serviceAccountName: quay-operator
+              # volumes:
+              # - name: quay-dev-kustomize
+              #   configMap:
+              #     name: quay-dev-kustomize
+              #     optional: true
       permissions:
       - rules:
         - apiGroups:
@@ -147,6 +159,12 @@ spec:
           - route.openshift.io
           resources:
           - routes
+          verbs:
+          - '*'
+        - apiGroups:
+          - autoscaling
+          resources:
+          - horizontalpodautoscalers
           verbs:
           - '*'
         - apiGroups:
