@@ -11,6 +11,10 @@ patchesStrategicMerge:
   - ./upgrade.deployment.patch.yaml
 images:
   - name: quay.io/projectquay/quay
+    # newTag: vader
+    digest: sha256:b05c0c8b419396307a54bef0b25fa51ea0e7b034e4c676f4cbdf48b7b2739e5b
+  - name: quay.io/projectquay/config-tool
     newTag: vader
   - name: quay.io/projectquay/clair
-    newTag: vader
+    # newTag: vader
+    newTag: 4.0.0-rc.3
