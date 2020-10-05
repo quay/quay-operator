@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 
-	v1 "github.com/quay/quay-operator/api/v1"
+	v1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
 func quayRegistry(name string) *v1.QuayRegistry {

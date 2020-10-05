@@ -1,4 +1,5 @@
 domain: quay.redhat.com
+multigroup: true
 repo: github.com/quay/quay-operator
 resources:
 - group: quay.redhat.com

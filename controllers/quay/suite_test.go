@@ -31,7 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	quayredhatcomv1 "github.com/quay/quay-operator/api/v1"
+	quayredhatcomv1 "github.com/quay/quay-operator/apis/quay/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -60,7 +60,7 @@ var _ = BeforeSuite(func(done Done) {
 	testEnv = &envtest.Environment{
 		// TODO(alecmerdler): Set `UseExistingCluster` env var to test against a real cluster...
 		// UseExistingCluster: &useExistingCluster,
-		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
 	}
 
 	var err error

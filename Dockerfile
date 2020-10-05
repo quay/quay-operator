@@ -6,7 +6,7 @@ COPY go.sum go.sum
 COPY vendor vendor
 
 COPY main.go main.go
-COPY api/ api/
+COPY apis/ apis/
 COPY controllers/ controllers/
 COPY pkg/ pkg/
 
