@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 
@@ -17,7 +16,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -344,7 +342,6 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	check(err)
 
 	for index, resource := range resources {
-		_ = reflect.ValueOf(resource).Type()
 		objectMeta, err := meta.Accessor(resource)
 		check(err)
 
@@ -356,21 +353,15 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 		}
 	}
 
-	secretKeysSecret.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "Secret"})
-	resources = append(resources, secretKeysSecret)
+	if secretKeysSecret.Data != nil {
+		secretKeysSecret.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "Secret"})
+		secretKeysSecret.SetName(SecretKeySecretName(quay))
+		resources = append(resources, secretKeysSecret)
+	}
 
 	for _, resource := range resources {
-		objectMeta, err := meta.Accessor(resource)
+		resource, err = v1.EnsureOwnerReference(quay, resource)
 		check(err)
-
-		objectMeta.SetOwnerReferences([]metav1.OwnerReference{
-			{
-				APIVersion: v1.GroupVersion.String(),
-				Kind:       "QuayRegistry",
-				Name:       quay.GetName(),
-				UID:        quay.GetUID(),
-			},
-		})
 	}
 
 	return resources, err

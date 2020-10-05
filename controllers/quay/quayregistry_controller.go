@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -50,6 +51,7 @@ type QuayRegistryReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+	// FIXME(alecmerdler): Can we get rid of this...?
 	Config *rest.Config
 }
 
@@ -169,7 +171,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		err = r.createOrUpdateObject(ctx, obj, quay)
 		if err != nil {
 			log.Error(err, "all Kubernetes objects not created/updated successfully")
-			return ctrl.Result{Requeue: true}, nil
+			return ctrl.Result{}, nil
 		}
 	}
 	log.Info("all objects created/updated successfully")
@@ -241,14 +243,21 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 	log := r.Log.WithValues("quayregistry", quay.GetNamespace())
 	log.Info("creating/updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
 
+	obj, err := v1.EnsureOwnerReference(&quay, obj)
+	if err != nil {
+		log.Error(err, "could not ensure `ownerReferences` before creating object", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+		return err
+	}
+
 	// managedFields cannot be set on a PATCH.
 	objectMeta.SetManagedFields([]metav1.ManagedFieldsEntry{})
 
 	opts := []client.PatchOption{}
 	opts = append([]client.PatchOption{client.ForceOwnership, client.FieldOwner("quay-operator")}, opts...)
-	err := r.Client.Patch(ctx, obj, client.Apply, opts...)
+	err = r.Client.Patch(ctx, obj, client.Apply, opts...)
 	if err != nil {
-		log.Error(err, "failed to create/update object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+		o, _ := json.Marshal(obj)
+		log.Error(err, "failed to create/update object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind, "object", string(o))
 		return err
 	}
 

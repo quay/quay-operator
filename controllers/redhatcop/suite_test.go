@@ -31,7 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	quay "github.com/quay/quay-operator/apis/quay/v1"
+	redhatcop "github.com/quay/quay-operator/apis/redhatcop/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -68,7 +68,7 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
-	err = quay.AddToScheme(scheme.Scheme)
+	err = redhatcop.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

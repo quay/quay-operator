@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: quay-postgres
+  name: quay-database
   labels:
     quay-component: postgres
 spec:
@@ -17,13 +17,15 @@ spec:
       volumes:
         - name: postgres-data
           persistentVolumeClaim:
-            claimName: quay-postgres
+            claimName: quay-database
         - name: postgres-bootstrap
           secret:
             secretName: postgres-bootstrap
             items:
-              - key: init.sql
-                path: init.sql
+              - key: create-extensions.sql
+                path: create-extensions.sql
+              - key: restore.sh
+                path: restore.sh
       containers:
         - name: postgres
           image: postgres:latest
@@ -37,9 +39,9 @@ spec:
               protocol: TCP
           env:
             - name: POSTGRES_USER
-              value: postgres
+              value: $(POSTGRES_DEPLOYMENT_NAME)
             - name: POSTGRES_DB
-              value: quay
+              value: $(POSTGRES_DEPLOYMENT_NAME)
             - name: POSTGRES_PASSWORD
               value: postgres
             - name: PGDATA

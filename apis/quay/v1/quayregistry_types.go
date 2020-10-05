@@ -20,7 +20,9 @@ import (
 	"errors"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 type QuayVersion string
@@ -242,6 +244,35 @@ func EnsureConfigEditorEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
 	// TODO(alecmerdler): Retrieve load balancer IP from `Service`
 
 	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
+}
+
+// EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
+func EnsureOwnerReference(quay *QuayRegistry, obj runtime.Object) (runtime.Object, error) {
+	objectMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	hasOwnerRef := false
+	for _, ownerRef := range objectMeta.GetOwnerReferences() {
+		if ownerRef.Name == quay.GetName() &&
+			ownerRef.Kind == "QuayRegistry" &&
+			ownerRef.APIVersion == GroupVersion.String() &&
+			ownerRef.UID == quay.UID {
+			hasOwnerRef = true
+		}
+	}
+
+	if !hasOwnerRef {
+		objectMeta.SetOwnerReferences(append(objectMeta.GetOwnerReferences(), metav1.OwnerReference{
+			APIVersion: GroupVersion.String(),
+			Kind:       "QuayRegistry",
+			Name:       quay.GetName(),
+			UID:        quay.GetUID(),
+		}))
+	}
+
+	return obj, nil
 }
 
 func supportsRoutes(quay *QuayRegistry) bool {

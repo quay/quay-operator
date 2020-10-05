@@ -80,14 +80,15 @@ func generateKeyIfMissing(parsedConfig map[string]interface{}, secretKeysSecret 
 			Data:       secretKeysSecret.Data,
 			StringData: stringData,
 		}
-
 		secretKeysSecret.StringData[keyName] = generatedSecretKey
+
 		return generatedSecretKey, secretKeysSecret
 	}
 }
 
 // handleSecretKeys generates any secret keys not already present in the config bundle and adds them
 // to the specialized secretKeysSecret.
+// TODO(alecmerdler): Refactor and test this more thoroughly.
 func handleSecretKeys(parsedConfig map[string]interface{}, secretKeysSecret *corev1.Secret, quay *v1.QuayRegistry, log logr.Logger) (string, string, *corev1.Secret) {
 	// Check for SECRET_KEY and DATABASE_SECRET_KEY. If not present, generate them
 	// and place them into their own Secret.
@@ -131,12 +132,12 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 		if err != nil {
 			return nil, err
 		}
-		user := "postgres"
+		user := quay.GetName() + "-quay-database"
 		// FIXME(alecmerdler): Make this more secure...
 		password := "postgres"
-		host := strings.Join([]string{quay.GetName(), "quay-postgres"}, "-")
+		host := strings.Join([]string{quay.GetName(), "quay-database"}, "-")
 		port := "5432"
-		name := "quay"
+		name := quay.GetName() + "-quay-database"
 		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
 
 		return fieldGroup, nil
