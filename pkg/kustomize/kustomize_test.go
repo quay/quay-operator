@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/kustomize/api/types"
 
-	v1 "github.com/quay/quay-operator/api/v1"
+	v1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
 var kustomizationForTests = []struct {
