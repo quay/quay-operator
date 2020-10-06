@@ -69,6 +69,7 @@ var allComponents = []string{
 	"horizontalpodautoscaler",
 	"objectstorage",
 	"route",
+	"mirror",
 }
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quay-mirror
+  labels:
+    quay-component: quay-mirror
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      quay-component: quay-mirror
+  template:
+    metadata:
+      labels:
+        quay-component: quay-mirror
+    spec:
+      volumes:
+        - name: configvolume
+          secret:
+            secretName: quay-config-secret
+        - name: extra-ca-certs
+          projected:
+            sources:
+              - configMap:
+                  name: cluster-service-ca
+              - secret:
+                  name: quay-config-secret
+                  items:
+                    - key: ssl.cert
+                      path: quay-ssl.cert
+      containers:
+        - name: quay-mirror
+          image: quay.io/projectquay/quay
+          command: ["/quay-registry/quay-entrypoint.sh"]
+          args: ["repomirror"]
+          env:
+            - name: QE_K8S_CONFIG_SECRET
+              # FIXME(alecmerdler): Using `vars` is kinda ugly because it's basically templating, but this needs to be the generated `Secret` name...
+              value: $(QE_K8S_CONFIG_SECRET)
+            - name: QE_K8S_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: DEBUGLOG
+              value: "true"
+            - name: ENSURE_NO_MIGRATION
+              value: "true"
+          # TODO: Determine if we need to set resource requirements
+          volumeMounts:
+            - name: configvolume
+              readOnly: false
+              mountPath: /conf/stack
+            - name: extra-ca-certs
+              readOnly: true
+              mountPath: /conf/stack/extra_ca_certs
