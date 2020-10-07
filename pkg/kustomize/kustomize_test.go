@@ -44,6 +44,7 @@ var kustomizationForTests = []struct {
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
+					{Kind: "mirror", Managed: true},
 				},
 			},
 		},
@@ -58,6 +59,7 @@ var kustomizationForTests = []struct {
 				"../components/clair",
 				"../components/redis",
 				"../components/objectstorage",
+				"../components/mirror",
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -78,6 +80,7 @@ var kustomizationForTests = []struct {
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
+					{Kind: "mirror", Managed: true},
 				},
 			},
 		},
@@ -92,6 +95,7 @@ var kustomizationForTests = []struct {
 				"../components/clair",
 				"../components/redis",
 				"../components/objectstorage",
+				"../components/mirror",
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -112,6 +116,7 @@ var kustomizationForTests = []struct {
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
+					{Kind: "mirror", Managed: true},
 				},
 			},
 		},
@@ -126,6 +131,7 @@ var kustomizationForTests = []struct {
 				"../components/clair",
 				"../components/redis",
 				"../components/objectstorage",
+				"../components/mirror",
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -225,6 +231,9 @@ var quayComponents = map[string][]runtime.Object{
 	"route": {
 		// TODO(alecmerdler): Import OpenShift `Route` API struct
 	},
+	"mirror": {
+		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror"}},
+	},
 }
 
 func withComponents(components []string) []runtime.Object {
@@ -258,6 +267,7 @@ var inflateTests = []struct {
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
+					{Kind: "mirror", Managed: true},
 				},
 			},
 		},
@@ -266,7 +276,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage"}),
+		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
 		nil,
 	},
 	{
@@ -279,6 +289,7 @@ var inflateTests = []struct {
 					{Kind: "clair", Managed: false},
 					{Kind: "redis", Managed: false},
 					{Kind: "objectstorage", Managed: false},
+					{Kind: "mirror", Managed: false},
 				},
 			},
 		},
@@ -300,6 +311,7 @@ var inflateTests = []struct {
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: false},
 					{Kind: "objectstorage", Managed: false},
+					{Kind: "mirror", Managed: true},
 				},
 			},
 		},
@@ -308,7 +320,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "postgres", "clair"}),
+		withComponents([]string{"base", "postgres", "clair", "mirror"}),
 		nil,
 	},
 	{
@@ -326,6 +338,7 @@ var inflateTests = []struct {
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
+					{Kind: "mirror", Managed: true},
 				},
 			},
 		},
@@ -334,7 +347,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "postgres", "clair", "redis", "objectstorage"}),
+		withComponents([]string{"base", "postgres", "clair", "redis", "objectstorage", "mirror"}),
 		nil,
 	},
 }

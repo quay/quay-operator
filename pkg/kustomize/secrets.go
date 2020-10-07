@@ -14,6 +14,7 @@ import (
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/redis"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/repomirror"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
 	"github.com/quay/config-tool/pkg/lib/shared"
 	corev1 "k8s.io/api/core/v1"
@@ -179,6 +180,14 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 		}
 
 		return fieldGroup, nil
+	case "mirror":
+		fieldGroup := &repomirror.RepoMirrorFieldGroup{
+			FeatureRepoMirror:   true,
+			RepoMirrorInterval:  30,
+			RepoMirrorTlsVerify: true,
+		}
+
+		return fieldGroup, nil
 	case "horizontalpodautoscaler":
 		return nil, nil
 	default:
@@ -237,6 +246,7 @@ func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[stri
 	case "redis":
 	case "objectstorage":
 	case "horizontalpodautoscaler":
+	case "mirror":
 	case "route":
 		hostSettings := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
 
@@ -265,6 +275,8 @@ func fieldGroupFor(component string) string {
 		return "DistributedStorage"
 	case "route":
 		return "HostSettings"
+	case "mirror":
+		return "RepoMirror"
 	case "horizontalpodautoscaler":
 		return ""
 	default:

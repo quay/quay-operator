@@ -104,6 +104,16 @@ FEATURE_STORAGE_REPLICATION: false
 		quayRegistry("test"),
 		[]byte("null\n"),
 	},
+	{
+		"mirror",
+		"mirror",
+		quayRegistry("test"),
+		[]byte(`FEATURE_REPO_MIRROR: true
+REPO_MIRROR_INTERVAL: 30
+REPO_MIRROR_SERVER_HOSTNAME: ""
+REPO_MIRROR_TLS_VERIFY: true
+`),
+	},
 }
 
 func TestFieldGroupFor(t *testing.T) {
