@@ -43,6 +43,10 @@ $ kubectl create -n <your-namespace> -f ./deploy/quay-operator.subscription.yaml
 
 ### Using the Operator
 
+#### Component Container Images
+
+When using a downstream build or container image overrides which are hosted in private repositories, you can provide pull secrets by [adding them to the default `ServiceAccount` in the namespace](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account).
+
 #### Batteries-included, zero-config
 
 **Install RHOCS Operator using OperatorHub:**
