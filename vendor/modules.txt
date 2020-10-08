@@ -213,6 +213,7 @@ github.com/quay/config-tool/pkg/lib/fieldgroups/database
 github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage
 github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings
 github.com/quay/config-tool/pkg/lib/fieldgroups/redis
+github.com/quay/config-tool/pkg/lib/fieldgroups/repomirror
 github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner
 github.com/quay/config-tool/pkg/lib/shared
 # github.com/rs/xid v1.2.1
