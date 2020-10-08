@@ -112,16 +112,16 @@ spec:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
                 image: quay.io/projectquay/quay-operator@sha256:4f88b7231dcac284893e7c6371ee631fccf592b553d0df76e624068bc9bb7553
                 name: quay-operator
-                # FIXME(alecmerdler): Kustomize panics because of the extra "magic" `..data/` directories that k8s adds to mounted volumes...
-                # volumeMounts:
-                # - mountPath: /workspace/kustomize/overlays/upstream/dev
-                #   name: quay-dev-kustomize
+                volumeMounts:
+                - mountPath: /workspace/kustomize/overlays/upstream/dev/kustomization.yaml
+                  subPath: kustomization.yaml
+                  name: quay-dev-kustomize
               serviceAccountName: quay-operator
-              # volumes:
-              # - name: quay-dev-kustomize
-              #   configMap:
-              #     name: quay-dev-kustomize
-              #     optional: true
+              volumes:
+              - name: quay-dev-kustomize
+                configMap:
+                  name: quay-dev-kustomize
+                  optional: true
       permissions:
       - rules:
         - apiGroups:
