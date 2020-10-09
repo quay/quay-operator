@@ -73,7 +73,7 @@ USER_EVENTS_REDIS:
 		[]byte(`DB_CONNECTION_ARGS:
   autorollback: true
   threadlocals: true
-DB_URI: postgresql://postgres:postgres@test-quay-postgres:5432/quay
+DB_URI: postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database
 `),
 	},
 	{

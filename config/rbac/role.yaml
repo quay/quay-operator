@@ -26,3 +26,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - redhatcop.redhat.io.quay.redhat.com
+  resources:
+  - quayecosystems
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - redhatcop.redhat.io.quay.redhat.com
+  resources:
+  - quayecosystems/status
+  verbs:
+  - get
+  - patch
+  - update

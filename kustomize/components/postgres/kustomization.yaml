@@ -10,4 +10,12 @@ generatorOptions:
 secretGenerator:
   - name: postgres-bootstrap
     literals:
-      - init.sql=CREATE EXTENSION pg_trgm;
+      - create-extensions.sql=CREATE EXTENSION pg_trgm;
+    files:
+      - restore.sh=./restore.sh
+vars:
+  - name: POSTGRES_DEPLOYMENT_NAME
+    objref:
+      kind: Deployment
+      apiVersion: apps/v1
+      name: quay-database

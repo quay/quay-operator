@@ -76,6 +76,12 @@ spec:
         - path: components[0].managed
           displayName: Managed
           description: Indicates whether lifecycle of this component is managed by the Operator or externally.
+    # TODO(alecmerdler): Do we include this...?
+    # - kind: QuayEcosystem
+    #   name: quayecosystems.redhatcop.redhat.io
+    #   version: v1alpha1
+    #   displayName: Quay Ecosystem
+    #   description: DEPRECATED
   description: Opinionated deployment of Quay on Kubernetes.
   displayName: Quay
   install:
@@ -129,6 +135,13 @@ spec:
           resources:
           - quayregistries
           - quayregistries/status
+          verbs:
+          - '*'
+        - apiGroups:
+          - redhatcop.redhat.io
+          resources:
+          - quayecosystems
+          - quayecosystems/status
           verbs:
           - '*'
         - apiGroups:
