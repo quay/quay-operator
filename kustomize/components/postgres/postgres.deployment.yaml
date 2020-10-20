@@ -18,36 +18,29 @@ spec:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: quay-database
-        - name: postgres-bootstrap
-          secret:
-            secretName: postgres-bootstrap
-            items:
-              - key: create-extensions.sql
-                path: create-extensions.sql
-              - key: restore.sh
-                path: restore.sh
+      securityContext:
+        fsGroup: 0
       containers:
         - name: postgres
-          image: postgres:latest
+          image: centos/postgresql-10-centos7
           imagePullPolicy: IfNotPresent
-          args: [
-            "-c", "shared_buffers=256MB",
-            "-c", "max_connections=2000",
-          ]
           ports:
             - containerPort: 5432
               protocol: TCP
+          # TODO(alecmerdler): Readiness/liveliness probes which execute `psql` command to check if database is created.
           env:
-            - name: POSTGRES_USER
+            - name: POSTGRESQL_USER
               value: $(POSTGRES_DEPLOYMENT_NAME)
-            - name: POSTGRES_DB
+            - name: POSTGRESQL_DATABASE
               value: $(POSTGRES_DEPLOYMENT_NAME)
-            - name: POSTGRES_PASSWORD
+            - name: POSTGRESQL_ADMIN_PASSWORD
               value: postgres
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRESQL_PASSWORD
+              value: postgres
+            - name: POSTGRESQL_SHARED_BUFFERS
+              value: 256MB
+            - name: POSTGRESQL_MAX_CONNECTIONS
+              value: "2000"
           volumeMounts:
             - name: postgres-data
-              mountPath: /var/lib/postgresql/data
-            - name: postgres-bootstrap
-              mountPath: /docker-entrypoint-initdb.d
+              mountPath: /var/lib/pgsql/data

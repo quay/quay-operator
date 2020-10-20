@@ -298,7 +298,7 @@ func componentConfigFilesFor(component string, quay *v1.QuayRegistry) (map[strin
 // clairConfigFor returns a Clair v4 config with the correct values.
 func clairConfigFor(quay *v1.QuayRegistry) []byte {
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
-	dbname := "clair"
+	dbname := "postgres"
 	user := "postgres"
 	// FIXME(alecmerdler): Make this more secure...
 	password := "postgres"

@@ -1,6 +1,8 @@
 #!/bin/sh
 
-# NOTE: The Postgres container will not run this init script if `$PGDATA` is populated, so no need to have extra checks here to prevent re-restoring.
+# FIXME(alecmerdler): Ensure this only runs once...
+
+# FIXME(alecmerdler): This file path is wrong for SCL Postgres...
 RESTORE_FILE=/var/lib/postgresql/data/dump.sql
 
 if [ -f "$RESTORE_FILE" ]; then

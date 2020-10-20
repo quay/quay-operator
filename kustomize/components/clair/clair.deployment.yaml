@@ -35,7 +35,10 @@ spec:
               name: config
             - mountPath: /var/run/certs
               name: certs
-          # TODO(alecmerdler): Define `readinessProbe` which waits until indexer/matcher services are ready.
+          readinessProbe:
+            httpGet:
+              path: /indexer/api/v1/index_state
+              port: 8080
       restartPolicy: Always
       volumes:
         - name: config

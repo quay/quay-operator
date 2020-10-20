@@ -44,7 +44,7 @@ import (
 )
 
 const upgradePollInterval = time.Second * 10
-const upgradePollTimeout = time.Second * 120
+const upgradePollTimeout = time.Second * 360
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
 type QuayRegistryReconciler struct {
@@ -217,6 +217,11 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 				return upgradeDeployment.Status.ReadyReplicas > 0, nil
 			})
+
+			if err != nil {
+				log.Error(err, "Quay upgrade deployment never reached ready phase")
+				// TODO(alecmerdler): Update `status` block with failure condition.
+			}
 		}(updatedQuay.DeepCopy())
 	}
 

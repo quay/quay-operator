@@ -18,6 +18,7 @@ metadata:
             "name": "example-registry"
           },
           "spec": {
+            "desiredVersion": "v3.4.0",
             "configBundleSecret": "example-registry-config-bundle",
             "components": [
               {"kind": "clair", "managed": true},
@@ -25,7 +26,8 @@ metadata:
               {"kind": "objectstorage", "managed": true},
               {"kind": "redis", "managed": true},
               {"kind": "horizontalpodautoscaler", "managed": true},
-              {"kind": "route", "managed": true}
+              {"kind": "route", "managed": true},
+              {"kind": "mirror", "managed": true}
             ]
           }
         }
@@ -62,8 +64,7 @@ spec:
           displayName: Desired Version
           description: Declares the version of Quay that should deployed and managed. Defaults to latest version.
           x-descriptors: 
-            - 'urn:alm:descriptor:com.tectonic.ui:select:padme'
-            - 'urn:alm:descriptor:com.tectonic.ui:select:qui-gon'
+            - 'urn:alm:descriptor:com.tectonic.ui:select:v3.4.0'
             - 'urn:alm:descriptor:com.tectonic.ui:advanced'
         - path: components
           displayName: Components
@@ -116,6 +117,9 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
+                # NOTE: This controls the default value for `desiredVersion` if left blank.
+                - name: DEFAULT_STREAM
+                  value: downstream
                 image: quay.io/projectquay/quay-operator@sha256:4f88b7231dcac284893e7c6371ee631fccf592b553d0df76e624068bc9bb7553
                 name: quay-operator
                 volumeMounts:

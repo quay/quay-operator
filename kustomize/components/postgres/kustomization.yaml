@@ -5,14 +5,14 @@ resources:
   - ./postgres.persistentvolumeclaim.yaml
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
+  - ./init.job.yaml
 generatorOptions:
   disableNameSuffixHash: true
 secretGenerator:
   - name: postgres-bootstrap
-    literals:
-      - create-extensions.sql=CREATE EXTENSION pg_trgm;
     files:
-      - restore.sh=./restore.sh
+      - ./restore.sh
+      - ./create-extensions.sh
 vars:
   - name: POSTGRES_DEPLOYMENT_NAME
     objref:

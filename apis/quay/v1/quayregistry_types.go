@@ -18,14 +18,13 @@ package v1
 
 import (
 	"errors"
+	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
-
-type QuayVersion string
 
 const (
 	SupportsRoutesAnnotation  = "supports-routes"
@@ -36,28 +35,76 @@ const (
 	StorageBucketNameAnnotation     = "storage-bucketname"
 	StorageAccessKeyAnnotation      = "storage-access-key"
 	StorageSecretKeyAnnotation      = "storage-secret-key"
+
+	defaultVersionStreamKey = "DEFAULT_STREAM"
 )
+
+type QuayStream string
 
 const (
-	QuayVersionVader  QuayVersion = "vader"
-	QuayVersionQuiGon QuayVersion = "qui-gon"
-	// QuayVersionDev is used to provide Kustomize overrides.
-	QuayVersionDev QuayVersion = "dev"
+	QuayUpstream   QuayStream = "upstream"
+	QuayDownstream QuayStream = "downstream"
+
+	QuayStreamNone QuayStream = ""
 )
 
-var quayVersions = map[QuayVersion]int{
-	QuayVersionDev:    0,
-	QuayVersionQuiGon: 1,
-	QuayVersionVader:  2,
+type QuayVersion string
+
+const (
+	// Upstream versions
+	QuayVersionVader QuayVersion = "vader"
+
+	// Downstream versions
+	QuayVersion340 QuayVersion = "v3.4.0"
+
+	// QuayVersionDev is used to provide Kustomize overrides.
+	QuayVersionDev QuayVersion = "dev"
+
+	QuayVersionNone QuayVersion = ""
+)
+
+var quayVersions = map[QuayVersion]struct {
+	Next   QuayVersion
+	Stream QuayStream
+}{
+	QuayVersionVader: {
+		Next:   "",
+		Stream: QuayUpstream,
+	},
+	QuayVersion340: {
+		Next:   "",
+		Stream: QuayDownstream,
+	},
+	QuayVersionDev: {
+		Next:   QuayVersionDev,
+		Stream: QuayStreamNone,
+	},
+	QuayVersionNone: {
+		Next:   QuayVersionNone,
+		Stream: QuayStreamNone,
+	},
+}
+
+// Next returns the version that succeeds this version.
+func (version QuayVersion) Next() QuayVersion {
+	return quayVersions[version].Next
+}
+
+// Stream returns the source for this version.
+func (version QuayVersion) Stream() QuayStream {
+	return quayVersions[version].Stream
 }
 
 func mostRecentVersion() QuayVersion {
-	var mostRecent QuayVersion
-	mostRecentRank := 0
-	for v, rank := range quayVersions {
-		if rank > mostRecentRank {
-			mostRecent = v
-			mostRecentRank = rank
+	defaultVersionStream := QuayUpstream
+	if os.Getenv(defaultVersionStreamKey) == string(QuayDownstream) {
+		defaultVersionStream = QuayDownstream
+	}
+
+	mostRecent := QuayVersionNone
+	for version, info := range quayVersions {
+		if info.Stream == defaultVersionStream && info.Next == QuayVersionNone {
+			mostRecent = version
 		}
 	}
 
@@ -197,18 +244,32 @@ func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 func EnsureDesiredVersion(quay *QuayRegistry) (*QuayRegistry, error) {
 	updatedQuay := quay.DeepCopy()
 
-	if updatedQuay.Spec.DesiredVersion == "" {
-		updatedQuay.Spec.DesiredVersion = mostRecentVersion()
+	if quay.Status.CurrentVersion == QuayVersionNone {
+		if updatedQuay.Spec.DesiredVersion == QuayVersionNone {
+			updatedQuay.Spec.DesiredVersion = mostRecentVersion()
+			return updatedQuay, nil
+		}
 
-		return updatedQuay, nil
-	}
+		if _, ok := quayVersions[updatedQuay.Spec.DesiredVersion]; !ok {
+			return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
+		}
+	} else {
+		if updatedQuay.Spec.DesiredVersion == QuayVersionNone {
+			updatedQuay.Spec.DesiredVersion = quay.Status.CurrentVersion
+			return updatedQuay, nil
+		}
 
-	if quay.Status.CurrentVersion != "" && quayVersions[quay.Status.CurrentVersion] > quayVersions[updatedQuay.Spec.DesiredVersion] {
-		return updatedQuay, errors.New("cannot downgrade from `currentVersion`: " + string(quay.Status.CurrentVersion) + " > " + string(updatedQuay.Spec.DesiredVersion))
-	}
+		if quay.Spec.DesiredVersion == quay.Status.CurrentVersion {
+			return updatedQuay, nil
+		}
 
-	if _, ok := quayVersions[updatedQuay.Spec.DesiredVersion]; !ok {
-		return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
+		if _, ok := quayVersions[updatedQuay.Spec.DesiredVersion]; !ok {
+			return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
+		}
+
+		if updatedQuay.Spec.DesiredVersion != quay.Status.CurrentVersion.Next() {
+			return updatedQuay, errors.New("cannot downgrade from `currentVersion`: " + string(quay.Status.CurrentVersion) + " > " + string(updatedQuay.Spec.DesiredVersion))
+		}
 	}
 
 	return updatedQuay, nil

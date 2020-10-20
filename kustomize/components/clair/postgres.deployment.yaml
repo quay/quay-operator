@@ -18,22 +18,24 @@ spec:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: clair-postgres
+      securityContext:
+        fsGroup: 0
       containers:
         - name: postgres
-          image: postgres:latest
+          image: centos/postgresql-10-centos7
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 5432
               protocol: TCP
           env:
-            - name: POSTGRES_USER
+            - name: POSTGRESQL_USER
               value: postgres
-            - name: POSTGRES_DB
-              value: clair
-            - name: POSTGRES_PASSWORD
+            - name: POSTGRESQL_DATABASE
               value: postgres
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRESQL_PASSWORD
+              value: postgres
+            - name: POSTGRESQL_ADMIN_PASSWORD
+              value: postgres
           volumeMounts:
             - name: postgres-data
-              mountPath: /var/lib/postgresql/data
+              mountPath: /var/lib/pgsql/data
