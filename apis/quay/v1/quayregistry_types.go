@@ -281,6 +281,7 @@ func EnsureRegistryEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
 
 	if supportsRoutes(quay) {
 		clusterHostname := quay.GetAnnotations()[ClusterHostnameAnnotation]
+		// FIXME(alecmerdler): This is incorrect if `SERVER_HOSTNAME` is set...
 		updatedQuay.Status.RegistryEndpoint = strings.Join([]string{
 			strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
 			clusterHostname},

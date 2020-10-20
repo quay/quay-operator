@@ -4,20 +4,19 @@ import (
 	"errors"
 
 	"github.com/creasty/defaults"
-	"github.com/quay/config-tool/pkg/lib/shared"
 )
 
 // DatabaseFieldGroup represents the DatabaseFieldGroup config fields
 type DatabaseFieldGroup struct {
 	DbConnectionArgs *DbConnectionArgsStruct `default:"{}" validate:"" json:"DB_CONNECTION_ARGS,omitempty" yaml:"DB_CONNECTION_ARGS,omitempty"`
-	DbUri            string                  `default:"" validate:"" json:"DB_URI" yaml:"DB_URI"`
+	DbUri            string                  `default:"" validate:"" json:"DB_URI,omitempty" yaml:"DB_URI,omitempty"`
 }
 
 // DbConnectionArgsStruct represents the DbConnectionArgsStruct config fields
 type DbConnectionArgsStruct struct {
 	Ssl          *SslStruct `default:"" validate:"" json:"ssl,omitempty" yaml:"ssl,omitempty"`
-	Threadlocals bool       `default:"true" validate:"" json:"threadlocals" yaml:"threadlocals"`
-	Autorollback bool       `default:"true" validate:"" json:"autorollback" yaml:"autorollback"`
+	Threadlocals bool       `default:"true" validate:"" json:"threadlocals,omitempty" yaml:"threadlocals,omitempty"`
+	Autorollback bool       `default:"true" validate:"" json:"autorollback,omitempty" yaml:"autorollback,omitempty"`
 }
 
 // SslStruct represents the SslStruct config fields
@@ -32,7 +31,7 @@ func NewDatabaseFieldGroup(fullConfig map[string]interface{}) (*DatabaseFieldGro
 
 	if value, ok := fullConfig["DB_CONNECTION_ARGS"]; ok {
 		var err error
-		value := shared.FixInterface(value.(map[interface{}]interface{}))
+		value := value.(map[string]interface{})
 		newDatabaseFieldGroup.DbConnectionArgs, err = NewDbConnectionArgsStruct(value)
 		if err != nil {
 			return newDatabaseFieldGroup, err
@@ -55,7 +54,7 @@ func NewDbConnectionArgsStruct(fullConfig map[string]interface{}) (*DbConnection
 
 	if value, ok := fullConfig["ssl"]; ok {
 		var err error
-		value := shared.FixInterface(value.(map[interface{}]interface{}))
+		value := value.(map[string]interface{})
 		newDbConnectionArgsStruct.Ssl, err = NewSslStruct(value)
 		if err != nil {
 			return newDbConnectionArgsStruct, err

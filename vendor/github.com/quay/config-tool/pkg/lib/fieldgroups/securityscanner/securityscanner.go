@@ -8,12 +8,13 @@ import (
 
 // SecurityScannerFieldGroup represents the SecurityScannerFieldGroup config fields
 type SecurityScannerFieldGroup struct {
-	FeatureSecurityScanner              bool     `default:"false" validate:"" json:"FEATURE_SECURITY_SCANNER" yaml:"FEATURE_SECURITY_SCANNER"`
-	SecurityScannerEndpoint             string   `default:"" validate:"" json:"SECURITY_SCANNER_ENDPOINT" yaml:"SECURITY_SCANNER_ENDPOINT"`
-	SecurityScannerIndexingInterval     int      `default:"30" validate:"" json:"SECURITY_SCANNER_INDEXING_INTERVAL" yaml:"SECURITY_SCANNER_INDEXING_INTERVAL"`
-	SecurityScannerNotifications        bool     `default:"false" validate:"" json:"SECURITY_SCANNER_NOTIFICATIONS" yaml:"SECURITY_SCANNER_NOTIFICATIONS"`
-	SecurityScannerV4Endpoint           string   `default:"" validate:"" json:"SECURITY_SCANNER_V4_ENDPOINT" yaml:"SECURITY_SCANNER_V4_ENDPOINT"`
-	SecurityScannerV4NamespaceWhitelist []string `default:"[]" validate:"" json:"SECURITY_SCANNER_V4_NAMESPACE_WHITELIST" yaml:"SECURITY_SCANNER_V4_NAMESPACE_WHITELIST"`
+	FeatureSecurityScanner              bool     `default:"false" validate:"" json:"FEATURE_SECURITY_SCANNER,omitempty" yaml:"FEATURE_SECURITY_SCANNER,omitempty"`
+	SecurityScannerEndpoint             string   `default:"" validate:"" json:"SECURITY_SCANNER_ENDPOINT,omitempty" yaml:"SECURITY_SCANNER_ENDPOINT,omitempty"`
+	SecurityScannerIndexingInterval     int      `default:"30" validate:"" json:"SECURITY_SCANNER_INDEXING_INTERVAL,omitempty" yaml:"SECURITY_SCANNER_INDEXING_INTERVAL,omitempty"`
+	SecurityScannerNotifications        bool     `default:"false" validate:"" json:"FEATURE_SECURITY_NOTIFICATIONS,omitempty" yaml:"FEATURE_SECURITY_NOTIFICATIONS,omitempty"`
+	SecurityScannerV4Endpoint           string   `default:"" validate:"" json:"SECURITY_SCANNER_V4_ENDPOINT,omitempty" yaml:"SECURITY_SCANNER_V4_ENDPOINT,omitempty"`
+	SecurityScannerV4NamespaceWhitelist []string `default:"[]" validate:"" json:"SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,omitempty" yaml:"SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,omitempty"`
+	SecurityScannerV4PSK                string   `default:"" json:"SECURITY_SCANNER_V4_PSK,omitempty" yaml:"SECURITY_SCANNER_V4_PSK,omitempty"`
 }
 
 // NewSecurityScannerFieldGroup creates a new SecurityScannerFieldGroup
@@ -49,6 +50,12 @@ func NewSecurityScannerFieldGroup(fullConfig map[string]interface{}) (*SecurityS
 		newSecurityScannerFieldGroup.SecurityScannerV4Endpoint, ok = value.(string)
 		if !ok {
 			return newSecurityScannerFieldGroup, errors.New("SECURITY_SCANNER_V4_ENDPOINT must be of type string")
+		}
+	}
+	if value, ok := fullConfig["SECURITY_SCANNER_V4_PSK"]; ok {
+		newSecurityScannerFieldGroup.SecurityScannerV4PSK, ok = value.(string)
+		if !ok {
+			return newSecurityScannerFieldGroup, errors.New("SECURITY_SCANNER_V4_PSK must be of type string")
 		}
 	}
 
