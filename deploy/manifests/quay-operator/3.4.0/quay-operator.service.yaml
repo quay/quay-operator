@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: quay-operator
+spec:
+  ports:
+    - protocol: TCP
+      name: http
+      port: 7071
+      targetPort: 7071
+  selector:
+    name: quay-operator-alm-owned
