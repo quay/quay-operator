@@ -23,7 +23,7 @@ spec:
             name: cluster-service-ca
       containers:
         - name: quay-app
-          image: quay.io/projectquay/quay@sha256:c35f5af964431673f4ff5c9e90bdf45f19e38b8742b5903d41c10cc7f6339a6d
+          image: quay.io/projectquay/quay@sha256:6fe0cfe3ecb544f273d775d16f03e6dff7313775af982dbbd546bf976e3c97e3
           env:
             - name: QE_K8S_CONFIG_SECRET
               # FIXME(alecmerdler): Using `vars` is kinda ugly because it's basically templating, but this needs to be the generated `Secret` name...

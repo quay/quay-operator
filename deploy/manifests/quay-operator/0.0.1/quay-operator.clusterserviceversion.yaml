@@ -76,6 +76,11 @@ spec:
         - path: currentVersion
           displayName: CurrentVersion
           description: The currently installed version of all Quay components.
+        - path: conditions
+          displayName: Conditions
+          description: Observed conditions of Quay components.
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes.conditions'
     - kind: QuayEcosystem
       version: v1alpha1
       name: quayecosystems.redhatcop.redhat.io
@@ -118,7 +123,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
                 - name: RELATED_IMAGE_COMPONENT_QUAY
-                  value: quay.io/projectquay/quay@sha256:c35f5af964431673f4ff5c9e90bdf45f19e38b8742b5903d41c10cc7f6339a6d
+                  value: quay.io/projectquay/quay@sha256:6fe0cfe3ecb544f273d775d16f03e6dff7313775af982dbbd546bf976e3c97e3
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
                   value: quay.io/projectquay/clair@sha256:70c99feceb4c0973540d22e740659cd8d616775d3ad1c1698ddf71d0221f3ce6
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES

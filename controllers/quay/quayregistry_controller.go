@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -33,10 +32,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	quayredhatcomv1 "github.com/quay/quay-operator/apis/quay/v1"
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -49,13 +51,13 @@ const upgradePollTimeout = time.Second * 360
 // QuayRegistryReconciler reconciles a QuayRegistry object
 type QuayRegistryReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	EventRecorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=quay.redhat.com.quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=quay.redhat.com.quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
-// TODO(alecmerdler): Define needed RBAC permissions for all consumed API resources...
+// +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
 
 func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -65,16 +67,26 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	var quay v1.QuayRegistry
 	if err := r.Client.Get(ctx, req.NamespacedName, &quay); err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("`QuayRegistry` deleted")
+		}
 		log.Error(err, "unable to retrieve QuayRegistry")
+
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	updatedQuay := quay.DeepCopy()
 
+	if available := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeAvailable); available != nil && available.Reason == v1.ConditionReasonMigrationsInProgress {
+		log.Info("migrations in progress, skipping reconcile")
+
+		return ctrl.Result{}, nil
+	}
+
 	if !v1.CanUpgrade(quay.Status.CurrentVersion) {
 		err := fmt.Errorf("cannot upgrade %s => %s", quay.Status.CurrentVersion, v1.QuayVersionCurrent)
-		log.Error(err, "failed to upgrade QuayRegistry")
-		return ctrl.Result{Requeue: false}, nil
+
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonUpgradeUnsupported, err.Error())
 	}
 
 	if quay.Spec.ConfigBundleSecret == "" {
@@ -92,8 +104,9 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 
 		if err := r.Client.Create(ctx, &baseConfigBundle); err != nil {
-			log.Error(err, "unable to create base config bundle `Secret`")
-			return ctrl.Result{}, nil
+			msg := fmt.Sprintf("unable to create base config bundle `Secret`: %s", err)
+
+			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 		}
 
 		updatedQuay.Spec.ConfigBundleSecret = baseConfigBundle.GetName()
@@ -108,35 +121,41 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	var configBundle corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.Spec.ConfigBundleSecret}, &configBundle); err != nil {
-		log.Error(err, "unable to retrieve referenced `configBundleSecret`", "configBundleSecret", quay.Spec.ConfigBundleSecret)
-		return ctrl.Result{}, nil
-	}
+		msg := fmt.Sprintf("unable to retrieve referenced `configBundleSecret`: %s, error: %s", quay.Spec.ConfigBundleSecret, err)
 
-	var secretKeysBundle corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: kustomize.SecretKeySecretName(&quay)}, &secretKeysBundle); err != nil {
-		if !errors.IsNotFound(err) {
-			log.Error(err, "unable to retrieve secret keys bundle")
-			return ctrl.Result{}, nil
-		}
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 	}
 
 	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
 
+	var secretKeysBundle corev1.Secret
+	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: kustomize.SecretKeySecretName(&quay)}, &secretKeysBundle); err != nil {
+		if !errors.IsNotFound(err) {
+			msg := fmt.Sprintf("unable to retrieve secret keys bundle: %s", err)
+
+			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
+		}
+	}
+
 	updatedQuay, err := r.checkRoutesAvailable(updatedQuay.DeepCopy())
 	if err != nil {
-		log.Error(err, "could not check for Routes API")
-		return ctrl.Result{}, nil
+		msg := fmt.Sprintf("could not check for `Routes` API: %s", err)
+
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonRouteComponentDependencyError, msg)
 	}
 
 	updatedQuay, err = r.checkObjectBucketClaimsAvailable(updatedQuay.DeepCopy())
 	if err != nil {
-		log.Error(err, "could not check for `ObjectBucketClaims` API")
+		msg := fmt.Sprintf("could not check for `ObjectBucketClaims` API: %s", err)
+		r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg)
+
 		return ctrl.Result{RequeueAfter: time.Millisecond * 1000}, nil
 	}
 
 	updatedQuay, err = v1.EnsureDefaultComponents(updatedQuay.DeepCopy())
 	if err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
+
 		return ctrl.Result{}, nil
 	}
 
@@ -144,8 +163,10 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		log.Info("updating QuayRegistry `spec.components` to include defaults")
 		if err = r.Client.Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `spec.components` to include defaults")
+
 			return ctrl.Result{}, nil
 		}
+
 		return ctrl.Result{}, nil
 	}
 
@@ -153,28 +174,39 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	deploymentObjects, err := kustomize.Inflate(updatedQuay, &configBundle, &secretKeysBundle, log)
 	if err != nil {
 		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
+
 		return ctrl.Result{}, nil
 	}
+
+	updatedQuay = stripObjectBucketClaimAnnotations(updatedQuay)
 
 	for _, obj := range deploymentObjects {
 		err = r.createOrUpdateObject(ctx, obj, quay)
 		if err != nil {
-			log.Error(err, "all Kubernetes objects not created/updated successfully")
-			return ctrl.Result{}, nil
+			msg := fmt.Sprintf("all Kubernetes objects not created/updated successfully: %s", err)
+
+			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonComponentCreationFailed, msg)
 		}
 	}
+
 	log.Info("all objects created/updated successfully")
+	updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionFalse, v1.ConditionReasonComponentsCreationSuccess, "all objects created/updated successfully")
+	if err != nil {
+		panic(err)
+	}
 
-	if quay.Status.LastUpdate == "" {
-		updatedQuay.Status.LastUpdate = time.Now().UTC().String()
+	if _, ok := updatedQuay.GetAnnotations()[v1.ObjectStorageInitializedAnnotation]; !ok && v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") {
+		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
 
-		if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
-			r.Log.Error(err, "could not update QuayRegistry `status.lastUpdate` after (re)deployment")
-			return ctrl.Result{}, nil
-		}
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	if updatedQuay.Status.CurrentVersion != v1.QuayVersionCurrent {
+		updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionTypeAvailable, metav1.ConditionFalse, v1.ConditionReasonMigrationsInProgress, "running database migrations")
+		if err != nil {
+			panic(err)
+		}
+
 		go func(quayRegistry *v1.QuayRegistry) {
 			err = wait.Poll(upgradePollInterval, upgradePollTimeout, func() (bool, error) {
 				log.Info("checking Quay upgrade deployment readiness")
@@ -183,33 +215,57 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 				err = r.Client.Get(ctx, types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: quayRegistry.GetNamespace()}, &upgradeDeployment)
 				if err != nil {
 					log.Error(err, "could not retrieve Quay upgrade deployment during upgrade")
+
 					return false, err
 				}
 
 				if upgradeDeployment.Spec.Size() < 1 {
 					log.Info("upgrade deployment scaled down, skipping check")
+
 					return true, nil
 				}
 
 				if upgradeDeployment.Status.ReadyReplicas > 0 {
 					log.Info("Quay upgrade complete, updating `status.currentVersion`")
 
-					updatedQuay.Status.CurrentVersion = v1.QuayVersionCurrent
 					updatedQuay, _ := v1.EnsureRegistryEndpoint(updatedQuay)
 					updatedQuay, _ = v1.EnsureConfigEditorEndpoint(updatedQuay)
-					err = r.Client.Status().Update(ctx, updatedQuay)
-					if err != nil {
+					msg := "all registry component healthchecks passing"
+					condition := v1.Condition{
+						Type:               v1.ConditionTypeAvailable,
+						Status:             metav1.ConditionTrue,
+						Reason:             v1.ConditionReasonHealthChecksPassing,
+						Message:            msg,
+						LastUpdateTime:     metav1.Now(),
+						LastTransitionTime: metav1.Now(),
+					}
+					updatedQuay.Status.Conditions = v1.SetCondition(updatedQuay.Status.Conditions, condition)
+					updatedQuay.Status.CurrentVersion = v1.QuayVersionCurrent
+					r.EventRecorder.Event(updatedQuay, corev1.EventTypeNormal, string(v1.ConditionReasonHealthChecksPassing), msg)
+
+					if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
 						log.Error(err, "could not update QuayRegistry status with current version")
+
 						return true, err
 					}
+
+					updatedQuay.Spec.Components = v1.EnsureComponents(updatedQuay.Spec.Components)
+					if err = r.Client.Update(ctx, updatedQuay); err != nil {
+						log.Error(err, "could not update QuayRegistry spec to complete upgrade")
+
+						return true, err
+					}
+
+					log.Info("successfully updated `status` after Quay upgrade")
+
+					return true, nil
 				}
 
-				return upgradeDeployment.Status.ReadyReplicas > 0, nil
+				return false, nil
 			})
 
 			if err != nil {
 				log.Error(err, "Quay upgrade deployment never reached ready phase")
-				// TODO(alecmerdler): Update `status` block with failure condition.
 			}
 		}(updatedQuay.DeepCopy())
 	}
@@ -234,6 +290,13 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 	objectMeta, _ := meta.Accessor(obj)
 	groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
 
+	shouldIgnoreError := func(e error) bool {
+		// Jobs are immutable after creation, so ignore the error.
+		jobGVK := schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}
+
+		return groupVersionKind == jobGVK.String()
+	}
+
 	log := r.Log.WithValues("quayregistry", quay.GetNamespace())
 	log.Info("creating/updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
 
@@ -249,30 +312,67 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 	opts := []client.PatchOption{}
 	opts = append([]client.PatchOption{client.ForceOwnership, client.FieldOwner("quay-operator")}, opts...)
 	err = r.Client.Patch(ctx, obj, client.Apply, opts...)
-	if err != nil {
-		o, _ := json.Marshal(obj)
-		log.Error(err, "failed to create/update object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind, "object", string(o))
+
+	if err != nil && !shouldIgnoreError(err) {
+		log.Error(err, "failed to create/update object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+
 		return err
 	}
 
 	log.Info("finished creating/updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+
 	return nil
+}
+
+func (r *QuayRegistryReconciler) updateWithCondition(q *v1.QuayRegistry, t v1.ConditionType, s metav1.ConditionStatus, reason v1.ConditionReason, msg string) (*v1.QuayRegistry, error) {
+	updatedQuay := q.DeepCopy()
+
+	condition := v1.Condition{
+		Type:               t,
+		Status:             s,
+		Reason:             reason,
+		Message:            msg,
+		LastUpdateTime:     metav1.Now(),
+		LastTransitionTime: metav1.Now(),
+	}
+	updatedQuay.Status.Conditions = v1.SetCondition(q.Status.Conditions, condition)
+	updatedQuay.Status.LastUpdate = time.Now().UTC().String()
+
+	eventType := corev1.EventTypeNormal
+	if s == metav1.ConditionTrue {
+		eventType = corev1.EventTypeWarning
+	}
+	r.EventRecorder.Event(updatedQuay, eventType, string(reason), msg)
+
+	err := r.Client.Status().Update(context.Background(), updatedQuay)
+
+	return updatedQuay, err
+}
+
+// reconcileWithCondition sets the given condition on the `QuayRegistry` and returns a reconcile result.
+func (r *QuayRegistryReconciler) reconcileWithCondition(q *v1.QuayRegistry, t v1.ConditionType, s metav1.ConditionStatus, reason v1.ConditionReason, msg string) (ctrl.Result, error) {
+	_, err := r.updateWithCondition(q, t, s, reason, msg)
+
+	return ctrl.Result{}, err
 }
 
 func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// FIXME(alecmerdler): Can we do this in the `init()` function in `main.go`...?
 	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add OpenShift `Route` API to scheme")
+
 		return err
 	}
 	// FIXME(alecmerdler): Can we do this in the `init()` function in `main.go`...?
 	if err := objectbucket.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add `ObjectBucketClaim` API to scheme")
+
 		return err
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&quayredhatcomv1.QuayRegistry{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		// TODO(alecmerdler): Add `.Owns()` for every resource type we manage...
 		Complete(r)
 }

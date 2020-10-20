@@ -76,6 +76,11 @@ spec:
         - path: currentVersion
           displayName: CurrentVersion
           description: The currently installed version of all Quay components.
+        - path: conditions
+          displayName: Conditions
+          description: Observed conditions of Quay components.
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes.conditions'
     - kind: QuayEcosystem
       version: v1alpha1
       name: quayecosystems.redhatcop.redhat.io
