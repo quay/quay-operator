@@ -47,6 +47,7 @@ spec:
         - kind: ReplicaSet
         - kind: Pod
         - kind: Secret
+        - Kind: Job
         - kind: ConfigMap
         - kind: PersistentVolumeClaim
         - kind: Ingress
@@ -188,6 +189,12 @@ spec:
           - objectbucket.io
           resources:
           - objectbucketclaims
+          verbs:
+          - '*'
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
           verbs:
           - '*'
         serviceAccountName: quay-operator
