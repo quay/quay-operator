@@ -7,8 +7,6 @@ bases:
   - ../../../tmp
 images:
   - name: quay.io/projectquay/quay
-    digest: sha256:eff8e0278802f802d1b2158e7dd1059b3cf2be856b64823861a6eb8ae769f947
-  - name: quay.io/projectquay/config-tool
-    digest: sha256:a187237fd000b371d6f33f582607208058ff5080cb45684f8345fc894d31b260
+    digest: sha256:93e183982e405782733a520ebfb5cf815b90ae38a4695973d420cda46eea6c8a
   - name: quay.io/projectquay/clair
     newTag: 4.0.0-rc.16

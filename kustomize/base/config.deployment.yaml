@@ -23,20 +23,14 @@ spec:
             name: cluster-service-ca
       containers:
         - name: quay-config-editor
-          image: quay.io/projectquay/config-tool
+          image: quay.io/projectquay/quay
           ports:
             - containerPort: 8080
               protocol: TCP
-          args: [
-            "editor", 
-            "--config-dir", "$(QUAY_CONFIG_PATH)", 
-            "--password", "$(QUAY_PASSWORD)", 
-            "--operator-endpoint", "$(QUAY_OPERATOR_ENDPOINT)", 
-            "--readonly-fieldgroups", "$(QUAY_CONFIG_READ_ONLY_FIELD_GROUPS)"
-          ]
+          args: ["editor", "$(QUAY_PASSWORD)", "$(QUAY_OPERATOR_ENDPOINT)"]
           env:
             - name: QUAY_CONFIG_PATH
-              value: /config-bundle
+              value: /conf/stack
             - name: QUAY_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -58,6 +52,6 @@ spec:
                   fieldPath: metadata.annotations['quay-managed-fieldgroups']
           volumeMounts:
             - name: config-bundle
-              mountPath: /config-bundle
+              mountPath: /conf/stack
             - name: extra-ca-certs
-              mountPath: /config-bundle/extra_ca_certs
+              mountPath: /conf/stack/extra_ca_certs
