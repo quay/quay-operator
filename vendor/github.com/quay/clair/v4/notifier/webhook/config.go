@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // Config provides configuration for an Webhook deliverer.
@@ -20,7 +21,7 @@ type Config struct {
 	// whether the webhook deliverer will sign out going.
 	// if true webhooks will be sent with a jwt signed by
 	// the notifier's private key.
-	Signed bool
+	Signed bool `yaml:"signed" json:"signed"`
 }
 
 // Validate will return a copy of the Config on success.
@@ -33,10 +34,22 @@ func (c *Config) Validate() (Config, error) {
 	}
 	conf.target = target
 
+	// require trailing slash so url.Parse() can easily
+	// append notification id.
+	if !strings.HasSuffix(c.Callback, "/") {
+		c.Callback = c.Callback + "/"
+	}
+
 	callback, err := url.Parse(c.Callback)
 	if err != nil {
 		return conf, fmt.Errorf("failed to parse callback url")
 	}
 	conf.callback = callback
+
+	if conf.Headers == nil {
+		conf.Headers = map[string][]string{}
+	}
+	conf.Headers.Set("Content-Type", "application/json")
+
 	return conf, nil
 }
