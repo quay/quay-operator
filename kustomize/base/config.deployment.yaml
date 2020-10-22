@@ -27,7 +27,7 @@ spec:
           ports:
             - containerPort: 8080
               protocol: TCP
-          args: ["editor", "$(QUAY_PASSWORD)", "$(QUAY_OPERATOR_ENDPOINT)"]
+          args: ["config", "$(QUAY_PASSWORD)", "$(QUAY_OPERATOR_ENDPOINT)"]
           env:
             - name: QUAY_CONFIG_PATH
               value: /conf/stack
