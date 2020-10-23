@@ -10,6 +10,7 @@ import (
 	"github.com/quay/clair/v4/indexer"
 	"github.com/quay/clair/v4/matcher"
 	"github.com/quay/claircore"
+	"github.com/quay/claircore/libvuln/driver"
 	"github.com/quay/claircore/pkg/distlock"
 	"github.com/rs/zerolog"
 )
@@ -127,7 +128,18 @@ func (p *Processor) create(ctx context.Context, e Event, prev uuid.UUID) error {
 	log.Debug().Int("added", len(added.VulnerableManifests)).Int("removed", len(removed.VulnerableManifests)).Msg("affected manifest counts")
 
 	if len(added.VulnerableManifests) == 0 && len(removed.VulnerableManifests) == 0 {
-		log.Debug().Msg("0 affected manifests. will not create notifications.")
+		// directly add a "delivered" receipt, this will stop subsequent processing
+		// of this update operation and also avoid delivery attempts.
+		r := Receipt{
+			NotificationID: uuid.New(),
+			UOID:           e.uo.Ref,
+			Status:         Delivered,
+		}
+		log.Debug().Str("update_operation", e.uo.Ref.String()).Msg("no affected manifests for update operation, setting to delivered.")
+		err := p.store.PutReceipt(ctx, e.uo.Updater, r)
+		if err != nil {
+			return fmt.Errorf("failed to put receipt: %v", err)
+		}
 		return nil
 	}
 
@@ -188,6 +200,7 @@ func (p *Processor) safe(ctx context.Context, e Event) (bool, uuid.UUID) {
 		Str("updater", e.updater).
 		Str("UOID", uoid).
 		Logger()
+
 	// confirm we are not making duplicate notifications
 	var errNoReceipt clairerror.ErrNoReceipt
 	_, err := p.store.ReceiptByUOID(ctx, e.uo.Ref)
@@ -217,13 +230,17 @@ func (p *Processor) safe(ctx context.Context, e Event) (bool, uuid.UUID) {
 	}
 
 	uos := all[e.updater]
-	n := len(uos)
-	if n < 2 {
-		log.Info().Msg("encountered first update operation. will not process notifications")
-		return false, uuid.Nil
+
+	var current driver.UpdateOperation
+	var prev driver.UpdateOperation
+
+	if len(uos) == 1 {
+		current = uos[0]
+		prev.Ref = uuid.Nil
+	} else {
+		current, prev = uos[0], uos[1]
 	}
 
-	current, prev := uos[0], uos[1]
 	if current.Ref.String() != e.uo.Ref.String() {
 		log.Info().Str("new", current.Ref.String()).Msg("newer update operation is present, will not process notifications")
 		return false, uuid.Nil

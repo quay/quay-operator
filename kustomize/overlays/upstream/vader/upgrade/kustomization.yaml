@@ -13,4 +13,4 @@ images:
   - name: quay.io/projectquay/quay
     digest: sha256:93e183982e405782733a520ebfb5cf815b90ae38a4695973d420cda46eea6c8a
   - name: quay.io/projectquay/clair
-    newTag: 4.0.0-rc.16
+    newTag: 4.0.0-rc.18
