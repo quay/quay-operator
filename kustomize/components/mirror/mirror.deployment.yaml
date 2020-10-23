@@ -28,11 +28,12 @@ spec:
                   items:
                     - key: ssl.cert
                       path: quay-ssl.cert
+      # FIXME(alecmerdler): May need an `initContainer` which blocks until Quay app is running...
       containers:
         - name: quay-mirror
           image: quay.io/projectquay/quay
           command: ["/quay-registry/quay-entrypoint.sh"]
-          args: ["repomirror"]
+          args: ["repomirror-nomigrate"]
           env:
             - name: QE_K8S_CONFIG_SECRET
               # FIXME(alecmerdler): Using `vars` is kinda ugly because it's basically templating, but this needs to be the generated `Secret` name...

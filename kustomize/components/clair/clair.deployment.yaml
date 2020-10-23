@@ -35,11 +35,12 @@ spec:
               name: config
             - mountPath: /var/run/certs
               name: certs
-          # FIXME: This fails because there is no JWT header.
-          # readinessProbe:
-          #   httpGet:
-          #     path: /indexer/api/v1/index_state
-          #     port: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          livelinessProbe:
+            tcpSocket:
+              port: 8080
       restartPolicy: Always
       volumes:
         - name: config
