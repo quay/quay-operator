@@ -36,8 +36,10 @@ spec:
             - mountPath: /var/run/certs
               name: certs
           readinessProbe:
-            httpGet:
-              path: /indexer/api/v1/index_state
+            tcpSocket:
+              port: 8080
+          livelinessProbe:
+            tcpSocket:
               port: 8080
       restartPolicy: Always
       volumes:
