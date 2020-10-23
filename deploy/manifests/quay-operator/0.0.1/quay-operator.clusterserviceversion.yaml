@@ -177,6 +177,7 @@ spec:
           - route.openshift.io
           resources:
           - routes
+          - routes/custom-host
           verbs:
           - '*'
         - apiGroups:
