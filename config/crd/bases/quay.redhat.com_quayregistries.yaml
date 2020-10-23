@@ -61,14 +61,6 @@ spec:
                 in the same namespace which contains the base Quay config and extra
                 certs.
               type: string
-            desiredVersion:
-              description: DesiredVersion declares the version of Quay that should
-                deployed and managed. Upgrading Quay is accomplished by modifying
-                this field. Runtime validation will prevent upgrading backwards. If
-                any unmanaged components are incompatible with the value of this field,
-                the Operator will not upgrade. If omitted, will default to the latest
-                version that the Operator knows how to manage.
-              type: string
           type: object
         status:
           description: QuayRegistryStatus defines the observed state of QuayRegistry.

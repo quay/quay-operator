@@ -18,7 +18,6 @@ package v1
 
 import (
 	"errors"
-	"os"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -35,80 +34,18 @@ const (
 	StorageBucketNameAnnotation     = "storage-bucketname"
 	StorageAccessKeyAnnotation      = "storage-access-key"
 	StorageSecretKeyAnnotation      = "storage-secret-key"
-
-	defaultVersionStreamKey = "DEFAULT_STREAM"
-)
-
-type QuayStream string
-
-const (
-	QuayUpstream   QuayStream = "upstream"
-	QuayDownstream QuayStream = "downstream"
-
-	QuayStreamNone QuayStream = ""
 )
 
 type QuayVersion string
 
 const (
-	// Upstream versions
-	QuayVersionVader QuayVersion = "vader"
-
-	// Downstream versions
-	QuayVersion340 QuayVersion = "v3.4.0"
-
-	// QuayVersionDev is used to provide Kustomize overrides.
-	QuayVersionDev QuayVersion = "dev"
-
-	QuayVersionNone QuayVersion = ""
+	QuayVersionCurrent  QuayVersion = "vader"
+	QuayVersionPrevious QuayVersion = ""
 )
 
-var quayVersions = map[QuayVersion]struct {
-	Next   QuayVersion
-	Stream QuayStream
-}{
-	QuayVersionVader: {
-		Next:   "",
-		Stream: QuayUpstream,
-	},
-	QuayVersion340: {
-		Next:   "",
-		Stream: QuayDownstream,
-	},
-	QuayVersionDev: {
-		Next:   QuayVersionDev,
-		Stream: QuayStreamNone,
-	},
-	QuayVersionNone: {
-		Next:   QuayVersionNone,
-		Stream: QuayStreamNone,
-	},
-}
-
-// Next returns the version that succeeds this version.
-func (version QuayVersion) Next() QuayVersion {
-	return quayVersions[version].Next
-}
-
-// Stream returns the source for this version.
-func (version QuayVersion) Stream() QuayStream {
-	return quayVersions[version].Stream
-}
-
-func mostRecentVersion() QuayVersion {
-	defaultVersionStream := QuayUpstream
-	if os.Getenv(defaultVersionStreamKey) == string(QuayDownstream) {
-		defaultVersionStream = QuayDownstream
-	}
-
-	mostRecent := QuayVersionNone
-	for version, info := range quayVersions {
-		if info.Stream == defaultVersionStream && info.Next == QuayVersionNone {
-			mostRecent = version
-		}
-	}
-
-	return mostRecent
+// CanUpgrade returns true if the given version can be upgraded to this Operator's synchronized Quay version.
+func CanUpgrade(fromVersion QuayVersion) bool {
+	return fromVersion == QuayVersionCurrent || fromVersion == QuayVersionPrevious
 }
 
 var allComponents = []string{
@@ -123,11 +60,6 @@ var allComponents = []string{
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
-	// DesiredVersion declares the version of Quay that should deployed and managed.
-	// Upgrading Quay is accomplished by modifying this field. Runtime validation will prevent upgrading backwards.
-	// If any unmanaged components are incompatible with the value of this field, the Operator will not upgrade.
-	// If omitted, will default to the latest version that the Operator knows how to manage.
-	DesiredVersion QuayVersion `json:"desiredVersion,omitempty"`
 	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace which contains the base Quay config and extra certs.
 	ConfigBundleSecret string `json:"configBundleSecret,omitempty"`
 	// Components declare how the Operator should handle backing Quay services.
@@ -237,42 +169,6 @@ func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 		}
 	}
 	return true
-}
-
-// EnsureDesiredVersion validates that the Operator can managed the `Spec.DesiredVersion` indicated,
-// or else sets it to the latest version it can manage if unset.
-func EnsureDesiredVersion(quay *QuayRegistry) (*QuayRegistry, error) {
-	updatedQuay := quay.DeepCopy()
-
-	if quay.Status.CurrentVersion == QuayVersionNone {
-		if updatedQuay.Spec.DesiredVersion == QuayVersionNone {
-			updatedQuay.Spec.DesiredVersion = mostRecentVersion()
-			return updatedQuay, nil
-		}
-
-		if _, ok := quayVersions[updatedQuay.Spec.DesiredVersion]; !ok {
-			return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
-		}
-	} else {
-		if updatedQuay.Spec.DesiredVersion == QuayVersionNone {
-			updatedQuay.Spec.DesiredVersion = quay.Status.CurrentVersion
-			return updatedQuay, nil
-		}
-
-		if quay.Spec.DesiredVersion == quay.Status.CurrentVersion {
-			return updatedQuay, nil
-		}
-
-		if _, ok := quayVersions[updatedQuay.Spec.DesiredVersion]; !ok {
-			return updatedQuay, errors.New("invalid `desiredVersion`: " + string(updatedQuay.Spec.DesiredVersion))
-		}
-
-		if updatedQuay.Spec.DesiredVersion != quay.Status.CurrentVersion.Next() {
-			return updatedQuay, errors.New("cannot downgrade from `currentVersion`: " + string(quay.Status.CurrentVersion) + " > " + string(updatedQuay.Spec.DesiredVersion))
-		}
-	}
-
-	return updatedQuay, nil
 }
 
 // EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was changed.

@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -34,7 +35,6 @@ import (
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -51,8 +51,6 @@ type QuayRegistryReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
-	// FIXME(alecmerdler): Can we get rid of this...?
-	Config *rest.Config
 }
 
 // +kubebuilder:rbac:groups=quay.redhat.com.quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
@@ -72,6 +70,12 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	updatedQuay := quay.DeepCopy()
+
+	if !v1.CanUpgrade(quay.Status.CurrentVersion) {
+		err := fmt.Errorf("cannot upgrade %s => %s", quay.Status.CurrentVersion, v1.QuayVersionCurrent)
+		log.Error(err, "failed to upgrade QuayRegistry")
+		return ctrl.Result{Requeue: false}, nil
+	}
 
 	if quay.Spec.ConfigBundleSecret == "" {
 		log.Info("`spec.configBundleSecret` is unset. Creating base `Secret`")
@@ -118,22 +122,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
 
-	updatedQuay, err := v1.EnsureDesiredVersion(&quay)
-	if err != nil {
-		log.Error(err, "could not ensure `spec.desiredVersion`")
-		return ctrl.Result{}, nil
-	}
-
-	if quay.Spec.DesiredVersion != updatedQuay.Spec.DesiredVersion {
-		log.Info("updating QuayRegistry `spec.desiredVersion`")
-		if err = r.Client.Update(ctx, updatedQuay); err != nil {
-			log.Error(err, "failed to update `spec.desiredVersion`")
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, nil
-	}
-
-	updatedQuay, err = r.checkRoutesAvailable(updatedQuay.DeepCopy())
+	updatedQuay, err := r.checkRoutesAvailable(updatedQuay.DeepCopy())
 	if err != nil {
 		log.Error(err, "could not check for Routes API")
 		return ctrl.Result{}, nil
@@ -185,7 +174,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 	}
 
-	if updatedQuay.Spec.DesiredVersion != updatedQuay.Status.CurrentVersion {
+	if updatedQuay.Status.CurrentVersion != v1.QuayVersionCurrent {
 		go func(quayRegistry *v1.QuayRegistry) {
 			err = wait.Poll(upgradePollInterval, upgradePollTimeout, func() (bool, error) {
 				log.Info("checking Quay upgrade deployment readiness")
@@ -205,7 +194,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 				if upgradeDeployment.Status.ReadyReplicas > 0 {
 					log.Info("Quay upgrade complete, updating `status.currentVersion`")
 
-					updatedQuay.Status.CurrentVersion = updatedQuay.Spec.DesiredVersion
+					updatedQuay.Status.CurrentVersion = v1.QuayVersionCurrent
 					updatedQuay, _ := v1.EnsureRegistryEndpoint(updatedQuay)
 					updatedQuay, _ = v1.EnsureConfigEditorEndpoint(updatedQuay)
 					err = r.Client.Status().Update(ctx, updatedQuay)

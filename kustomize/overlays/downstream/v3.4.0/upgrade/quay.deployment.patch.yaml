@@ -1,8 +1,0 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: quay-app
-  annotations:
-    quay-upgrade: v3.4.0
-spec:
-  replicas: 0

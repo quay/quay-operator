@@ -31,7 +31,6 @@ func newQuayRegistry(name, namespace string) v1.QuayRegistry {
 			Namespace: namespace,
 		},
 		Spec: v1.QuayRegistrySpec{
-			DesiredVersion: v1.QuayVersionVader,
 			Components: []v1.Component{
 				// FIXME(alecmerdler): Test omitting components and marking some as disabled/unmanaged...
 				{Kind: "postgres", Managed: true},
@@ -231,20 +230,7 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					Eventually(func() v1.QuayVersion {
 						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
 						return updatedQuayRegistry.Status.CurrentVersion
-					}, time.Second*30).Should(Equal(v1.QuayVersionVader))
-				})
-
-				When("the `spec.desiredVersion` field is empty", func() {
-					BeforeEach(func() {
-						quayRegistry.Spec.DesiredVersion = ""
-					})
-
-					It("will populate the `spec.desiredVersion` field with the latest version", func() {
-						var updatedQuayRegistry v1.QuayRegistry
-
-						Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
-						Expect(updatedQuayRegistry.Spec.DesiredVersion).To(Equal(v1.QuayVersionVader))
-					})
+					}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
 				})
 
 				When("the `spec.components` field is empty", func() {
@@ -392,7 +378,53 @@ var _ = Describe("QuayRegistryReconciler", func() {
 					Eventually(func() v1.QuayVersion {
 						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
 						return updatedQuayRegistry.Status.CurrentVersion
-					}, time.Second*30).Should(Equal(v1.QuayVersionVader))
+					}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
+				})
+			})
+
+			When("the current version in the `status` block is the same as the Operator", func() {
+				JustBeforeEach(func() {
+					quayRegistry.Status.CurrentVersion = v1.QuayVersionCurrent
+					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+				})
+
+				It("does not attempt an upgrade", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Requeue).To(BeFalse())
+					Expect(quayRegistry.Status.CurrentVersion).To(Equal(v1.QuayVersionCurrent))
+				})
+			})
+
+			When("the current version in the `status` block is upgradable", func() {
+				JustBeforeEach(func() {
+					quayRegistry.Status.CurrentVersion = v1.QuayVersionPrevious
+					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+				})
+
+				It("successfully performs an upgrade", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Requeue).To(BeFalse())
+					Expect(progressUpgradeDeployment()).Should(Succeed())
+
+					var updatedQuayRegistry v1.QuayRegistry
+
+					Eventually(func() v1.QuayVersion {
+						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
+						return updatedQuayRegistry.Status.CurrentVersion
+					}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
+				})
+			})
+
+			When("the current version in the `status` block is not upgradable", func() {
+				JustBeforeEach(func() {
+					quayRegistry.Status.CurrentVersion = "not-a-real-version"
+					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+				})
+
+				It("does not attempt an upgrade", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Requeue).To(BeFalse())
+					Expect(string(quayRegistry.Status.CurrentVersion)).To(Equal("not-a-real-version"))
 				})
 			})
 		})

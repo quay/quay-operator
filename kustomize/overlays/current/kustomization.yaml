@@ -4,9 +4,13 @@ kind: Kustomization
 commonAnnotations:
   quay-version: vader
 bases:
-  - ../../../tmp
+  - ../../tmp
 images:
   - name: quay.io/projectquay/quay
     digest: sha256:b32a593575fa3330da879409b17698db94e29b18fc7a7a0bd3a0f13a984d56cd
   - name: quay.io/projectquay/clair
     newTag: 4.0.0-rc.18
+  - name: redis
+    newName: redis
+  - name: centos/postgresql-10-centos7
+    newName: centos/postgresql-10-centos7

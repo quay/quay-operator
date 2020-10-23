@@ -188,88 +188,38 @@ var ensureDefaultComponentsTests = []struct {
 	},
 }
 
-var ensureDesiredVersionTests = []struct {
+var canUpgradeTests = []struct {
 	name        string
-	quay        QuayRegistry
-	expected    QuayVersion
-	expectedErr error
+	fromVersion QuayVersion
+	expected    bool
 }{
 	{
-		"DesiredVersionEmptyCurrentVersionEmpty",
-		QuayRegistry{},
-		QuayVersionVader,
-		nil,
-	},
-	{
-		"DesiredVersionEmptyCurrentVersionSet",
-		QuayRegistry{
-			Status: QuayRegistryStatus{
-				CurrentVersion: QuayVersionVader,
-			},
-		},
-		QuayVersionVader,
-		nil,
-	},
-	{
-		"InvalidDesiredVersion",
-		QuayRegistry{
-			Spec: QuayRegistrySpec{
-				DesiredVersion: "not-a-real-version",
-			},
-		},
+		"none",
 		"",
-		errors.New("invalid `desiredVersion`: not-a-real-version"),
+		true,
 	},
 	{
-		"DevOverrideDesiredVersionCurrentVersionEmpty",
-		QuayRegistry{
-			Spec: QuayRegistrySpec{
-				DesiredVersion: QuayVersionDev,
-			},
-		},
-		QuayVersionDev,
-		nil,
+		"nonexistent",
+		"not-a-real-version",
+		false,
 	},
 	{
-		"DevOverrideDesiredVersionCurrentVersionSet",
-		QuayRegistry{
-			Spec: QuayRegistrySpec{
-				DesiredVersion: QuayVersionDev,
-			},
-			Status: QuayRegistryStatus{
-				CurrentVersion: QuayVersionVader,
-			},
-		},
-		QuayVersionVader,
-		errors.New("cannot downgrade from `currentVersion`: vader > dev"),
+		"current",
+		QuayVersionCurrent,
+		true,
 	},
 	{
-		"DowngradeProhibited",
-		QuayRegistry{
-			Spec: QuayRegistrySpec{
-				DesiredVersion: QuayVersionDev,
-			},
-			Status: QuayRegistryStatus{
-				CurrentVersion: QuayVersionVader,
-			},
-		},
-		QuayVersionVader,
-		errors.New("cannot downgrade from `currentVersion`: vader > dev"),
+		"previous",
+		QuayVersionPrevious,
+		true,
 	},
 }
 
-func TestEnsureDesiredVersion(t *testing.T) {
+func TestCanUpgrade(t *testing.T) {
 	assert := assert.New(t)
 
-	for _, test := range ensureDesiredVersionTests {
-		updatedQuay, err := EnsureDesiredVersion(&test.quay)
-
-		if test.expectedErr != nil {
-			assert.NotNil(err, test.name)
-		} else {
-			assert.Nil(err, test.name)
-			assert.Equal(test.expected, updatedQuay.Spec.DesiredVersion)
-		}
+	for _, test := range canUpgradeTests {
+		assert.Equal(test.expected, CanUpgrade(test.fromVersion), test.name)
 	}
 }
 
