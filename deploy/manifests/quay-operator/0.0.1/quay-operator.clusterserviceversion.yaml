@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:4f88b7231dcac284893e7c6371ee631fccf592b553d0df76e624068bc9bb7553
+    containerImage: quay.io/projectquay/quay-operator@sha256:3c9a130c3149deadb3f2269cf5f6ee432d8a217ec90b4f420cbdfcce7051f832
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -18,8 +18,6 @@ metadata:
             "name": "example-registry"
           },
           "spec": {
-            "desiredVersion": "v3.4.0",
-            "configBundleSecret": "example-registry-config-bundle",
             "components": [
               {"kind": "clair", "managed": true},
               {"kind": "postgres", "managed": true},
@@ -61,12 +59,6 @@ spec:
           description: Name of the Quay config secret containing base configuration and custom SSL certificates.
           x-descriptors:
             - 'urn:alm:descriptor:io.kubernetes:Secret'
-        - path: desiredVersion
-          displayName: Desired Version
-          description: Declares the version of Quay that should deployed and managed. Defaults to latest version.
-          x-descriptors: 
-            - 'urn:alm:descriptor:com.tectonic.ui:select:v3.4.0'
-            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
         - path: components
           displayName: Components
           description: Declares how the Operator should handle supplemental Quay services.
@@ -78,12 +70,10 @@ spec:
         - path: components[0].managed
           displayName: Managed
           description: Indicates whether lifecycle of this component is managed by the Operator or externally.
-    # TODO(alecmerdler): Do we include this...?
-    # - kind: QuayEcosystem
-    #   name: quayecosystems.redhatcop.redhat.io
-    #   version: v1alpha1
-    #   displayName: Quay Ecosystem
-    #   description: DEPRECATED
+      statusDescriptors:
+        - path: currentVersion
+          displayName: CurrentVersion
+          description: The currently installed version of all Quay components.
   description: Opinionated deployment of Quay on Kubernetes.
   displayName: Quay
   install:
@@ -118,21 +108,9 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
-                # NOTE: This controls the default value for `desiredVersion` if left blank.
-                - name: DEFAULT_STREAM
-                  value: downstream
-                image: quay.io/projectquay/quay-operator@sha256:4f88b7231dcac284893e7c6371ee631fccf592b553d0df76e624068bc9bb7553
+                image: quay.io/projectquay/quay-operator@sha256:3c9a130c3149deadb3f2269cf5f6ee432d8a217ec90b4f420cbdfcce7051f832
                 name: quay-operator
-                volumeMounts:
-                - mountPath: /workspace/kustomize/overlays/upstream/dev/kustomization.yaml
-                  subPath: kustomization.yaml
-                  name: quay-dev-kustomize
               serviceAccountName: quay-operator
-              volumes:
-              - name: quay-dev-kustomize
-                configMap:
-                  name: quay-dev-kustomize
-                  optional: true
       permissions:
       - rules:
         - apiGroups:

@@ -1,6 +1,7 @@
 package kustomize
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -67,21 +68,13 @@ var kustomizationForTests = []struct {
 		"",
 	},
 	{
-		"InvalidDesiredVersion",
+		"ComponentImageOverrides",
 		&v1.QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					v1.SupportsObjectStorageAnnotation: "true",
-				},
-			},
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: "not-a-real-version",
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
-					{Kind: "objectstorage", Managed: true},
-					{Kind: "mirror", Managed: true},
 				},
 			},
 		},
@@ -95,44 +88,12 @@ var kustomizationForTests = []struct {
 				"../components/postgres",
 				"../components/clair",
 				"../components/redis",
-				"../components/objectstorage",
-				"../components/mirror",
 			},
-			SecretGenerator: []types.SecretArgs{},
-		},
-		"",
-	},
-	{
-		"ValidDesiredVersion",
-		&v1.QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					v1.SupportsObjectStorageAnnotation: "true",
-				},
-			},
-			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionVader,
-				Components: []v1.Component{
-					{Kind: "postgres", Managed: true},
-					{Kind: "clair", Managed: true},
-					{Kind: "redis", Managed: true},
-					{Kind: "objectstorage", Managed: true},
-					{Kind: "mirror", Managed: true},
-				},
-			},
-		},
-		&types.Kustomization{
-			TypeMeta: types.TypeMeta{
-				APIVersion: types.KustomizationVersion,
-				Kind:       types.KustomizationKind,
-			},
-			Resources: []string{},
-			Components: []string{
-				"../components/postgres",
-				"../components/clair",
-				"../components/redis",
-				"../components/objectstorage",
-				"../components/mirror",
+			Images: []types.Image{
+				{Name: "quay.io/projectquay/quay", NewName: "quay", Digest: "sha256:abc123"},
+				{Name: "quay.io/projectquay/clair", NewName: "clair", Digest: "sha256:abc123"},
+				{Name: "redis", NewName: "redis", Digest: "sha256:abc123"},
+				{Name: "centos/postgresql-10-centos7", NewName: "postgres", Digest: "sha256:abc123"},
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -144,6 +105,12 @@ func TestKustomizationFor(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range kustomizationForTests {
+		if test.expected != nil {
+			for _, img := range test.expected.Images {
+				os.Setenv("RELATED_IMAGE_COMPONENT_"+strings.ToUpper(img.NewName), img.NewName+"@"+img.Digest)
+			}
+		}
+
 		kustomization, err := KustomizationFor(test.quayRegistry, map[string][]byte{})
 
 		if test.expectedErr != "" {
@@ -155,6 +122,11 @@ func TestKustomizationFor(t *testing.T) {
 			assert.Equal(len(test.expected.Components), len(kustomization.Components), test.name)
 			for _, expectedComponent := range test.expected.Components {
 				assert.Contains(kustomization.Components, expectedComponent, test.name)
+			}
+
+			assert.Equal(len(test.expected.Images), len(kustomization.Images), test.name)
+			for _, img := range test.expected.Images {
+				assert.Contains(kustomization.Images, img, test.name)
 			}
 		}
 	}
@@ -263,7 +235,6 @@ var inflateTests = []struct {
 				},
 			},
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -285,7 +256,6 @@ var inflateTests = []struct {
 		"AllComponentsUnmanaged",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: false},
 					{Kind: "clair", Managed: false},
@@ -307,7 +277,6 @@ var inflateTests = []struct {
 		"SomeComponentsUnmanaged",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -326,7 +295,7 @@ var inflateTests = []struct {
 		nil,
 	},
 	{
-		"DesiredVersion",
+		"CurrentVersion",
 		&v1.QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
@@ -334,7 +303,6 @@ var inflateTests = []struct {
 				},
 			},
 			Spec: v1.QuayRegistrySpec{
-				DesiredVersion: v1.QuayVersionVader,
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -343,13 +311,16 @@ var inflateTests = []struct {
 					{Kind: "mirror", Managed: true},
 				},
 			},
+			Status: v1.QuayRegistryStatus{
+				CurrentVersion: v1.QuayVersionCurrent,
+			},
 		},
 		&corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "postgres", "clair", "redis", "objectstorage", "mirror"}),
+		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
 		nil,
 	},
 }
@@ -371,7 +342,7 @@ func TestInflate(t *testing.T) {
 
 			assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-", test.name)
 			if !strings.Contains(objectMeta.GetName(), "managed-secret-keys") {
-				assert.Equal(string(test.quayRegistry.Spec.DesiredVersion), objectMeta.GetAnnotations()["quay-version"], test.name)
+				assert.Equal(string(v1.QuayVersionCurrent), objectMeta.GetAnnotations()["quay-version"], test.name)
 			}
 		}
 	}

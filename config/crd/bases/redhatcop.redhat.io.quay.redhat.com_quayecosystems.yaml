@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.5
   creationTimestamp: null
-  name: quayecosystems.redhatcop.redhat.io
+  name: quayecosystems.redhatcop.redhat.io.quay.redhat.com
 spec:
-  group: redhatcop.redhat.io
+  group: redhatcop.redhat.io.quay.redhat.com
   names:
     kind: QuayEcosystem
     listKind: QuayEcosystemList
