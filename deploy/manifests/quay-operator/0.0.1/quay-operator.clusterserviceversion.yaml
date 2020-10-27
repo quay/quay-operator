@@ -30,6 +30,8 @@ metadata:
           }
         }
       ]
+    operators.operatorframework.io/internal-objects: |-
+      ["quayecosystems.redhatcop.redhat.io"]
   name: quay-operator.v0.0.1
   namespace: placeholder
 spec:
@@ -74,6 +76,11 @@ spec:
         - path: currentVersion
           displayName: CurrentVersion
           description: The currently installed version of all Quay components.
+    - kind: QuayEcosystem
+      version: v1alpha1
+      name: quayecosystems.redhatcop.redhat.io
+      displayName: Quay Ecosystem
+      description: "[DEPRECATED] Old representation of a full Quay installation."
   description: Opinionated deployment of Quay on Kubernetes.
   displayName: Quay
   install:
