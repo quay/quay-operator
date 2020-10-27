@@ -92,7 +92,7 @@ var kustomizationForTests = []struct {
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", Digest: "sha256:abc123"},
 				{Name: "quay.io/projectquay/clair", NewName: "clair", Digest: "sha256:abc123"},
-				{Name: "redis", NewName: "redis", Digest: "sha256:abc123"},
+				{Name: "centos/redis-32-centos7", NewName: "redis", Digest: "sha256:abc123"},
 				{Name: "centos/postgresql-10-centos7", NewName: "postgres", Digest: "sha256:abc123"},
 			},
 			SecretGenerator: []types.SecretArgs{},

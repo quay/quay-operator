@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:3c9a130c3149deadb3f2269cf5f6ee432d8a217ec90b4f420cbdfcce7051f832
+    containerImage: quay.io/projectquay/quay-operator@sha256:4cf12a770d040dac36a6d876c797afc233dd6969b595bdd19399e10ccb86154c
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -99,7 +99,9 @@ spec:
               name: quay-operator-alm-owned
             spec:
               containers:
-              - command:
+              - name: quay-operator
+                image: quay.io/projectquay/quay-operator@sha256:4cf12a770d040dac36a6d876c797afc233dd6969b595bdd19399e10ccb86154c
+                command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'
                 env:
@@ -115,8 +117,14 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
-                image: quay.io/projectquay/quay-operator@sha256:3c9a130c3149deadb3f2269cf5f6ee432d8a217ec90b4f420cbdfcce7051f832
-                name: quay-operator
+                - name: RELATED_IMAGE_COMPONENT_QUAY
+                  value: quay.io/projectquay/quay@sha256:c35f5af964431673f4ff5c9e90bdf45f19e38b8742b5903d41c10cc7f6339a6d
+                - name: RELATED_IMAGE_COMPONENT_CLAIR
+                  value: quay.io/projectquay/clair@sha256:70c99feceb4c0973540d22e740659cd8d616775d3ad1c1698ddf71d0221f3ce6
+                - name: RELATED_IMAGE_COMPONENT_POSTGRES
+                  value: centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33
+                - name: RELATED_IMAGE_COMPONENT_REDIS
+                  value: centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542
               serviceAccountName: quay-operator
       permissions:
       - rules:
