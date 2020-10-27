@@ -50,7 +50,7 @@ func componentImageFor(component string) types.Image {
 	defaultImagesFor := map[string]string{
 		"base":     "quay.io/projectquay/quay",
 		"clair":    "quay.io/projectquay/clair",
-		"redis":    "redis",
+		"redis":    "centos/redis-32-centos7",
 		"postgres": "centos/postgresql-10-centos7",
 	}
 

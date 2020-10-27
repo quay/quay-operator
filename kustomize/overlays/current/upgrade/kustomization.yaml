@@ -1,4 +1,4 @@
-# Overlay variant for upgrading to Project Quay "vader" release.
+# Overlay variant for upgrading to current Project Quay release.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 commonAnnotations:
@@ -9,12 +9,3 @@ patchesStrategicMerge:
   # Scale the app deployment to 0 pods in order to run all migrations present in the new container image using the "upgrade" deployment.
   - ./quay.deployment.patch.yaml
   - ./upgrade.deployment.patch.yaml
-images:
-  - name: quay.io/projectquay/quay
-    digest: sha256:b32a593575fa3330da879409b17698db94e29b18fc7a7a0bd3a0f13a984d56cd
-  - name: quay.io/projectquay/clair
-    newTag: 4.0.0-rc.18
-  - name: redis
-    newName: redis
-  - name: centos/postgresql-10-centos7
-    newName: centos/postgresql-10-centos7

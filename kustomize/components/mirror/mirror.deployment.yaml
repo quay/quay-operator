@@ -31,7 +31,7 @@ spec:
       # FIXME(alecmerdler): May need an `initContainer` which blocks until Quay app is running...
       containers:
         - name: quay-mirror
-          image: quay.io/projectquay/quay
+          image: quay.io/projectquay/quay@sha256:c35f5af964431673f4ff5c9e90bdf45f19e38b8742b5903d41c10cc7f6339a6d
           command: ["/quay-registry/quay-entrypoint.sh"]
           args: ["repomirror-nomigrate"]
           env:

@@ -22,7 +22,7 @@ spec:
         fsGroup: 0
       containers:
         - name: postgres
-          image: centos/postgresql-10-centos7
+          image: centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 5432
