@@ -19,16 +19,24 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"time"
+
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/signingengine"
 
 	"github.com/go-logr/logr"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/redis"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/repomirror"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
 	"gopkg.in/yaml.v2"
-	batchv1 "k8s.io/api/batch/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -40,10 +48,11 @@ import (
 )
 
 const (
-	migrateLabel               = "quay-operator/migrate"
-	migrationCompleteLabel     = "quay-operator/migration-complete"
-	quayEnterpriseConfigSecret = "quay-enterprise-config-secret"
-	migratedFromAnnotation     = "quay-operator/migrated-from"
+	migrateLabel                   = "quay-operator/migrate"
+	migrationCompleteLabel         = "quay-operator/migration-complete"
+	migrationComponentLabel        = "quay-operator/migration-component"
+	quayEnterpriseConfigSecretName = "quay-enterprise-config-secret"
+	migratedFromAnnotation         = "quay-operator/migrated-from"
 )
 
 // QuayEcosystemReconciler reconciles a QuayEcosystem object
@@ -53,8 +62,8 @@ type QuayEcosystemReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=redhatcop.redhat.io.quay.redhat.com,resources=quayecosystems,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=redhatcop.redhat.io.quay.redhat.com,resources=quayecosystems/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=redhatcop.redhat.io,resources=quayecosystems,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=redhatcop.redhat.io,resources=quayecosystems/status,verbs=get;update;patch
 
 func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
@@ -70,12 +79,14 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 	updatedQuayEcosystem := quayEcosystem.DeepCopy()
 
-	labels := quayEcosystem.GetLabels()
-	if shouldMigrate, ok := labels[migrateLabel]; !ok || shouldMigrate != "true" {
+	quayEcosystemLabels := quayEcosystem.GetLabels()
+	if shouldMigrate, ok := quayEcosystemLabels[migrateLabel]; !ok || shouldMigrate != "true" {
 		log.Info("`QuayEcosystem` not marked for migration, skipping")
+
 		return ctrl.Result{}, nil
-	} else if migrationComplete, ok := labels[migrationCompleteLabel]; ok && migrationComplete == "true" {
+	} else if migrationComplete, ok := quayEcosystemLabels[migrationCompleteLabel]; ok && migrationComplete == "true" {
 		log.Info("`QuayEcosystem` migration already completed, skipping")
+
 		return ctrl.Result{}, nil
 	}
 
@@ -98,14 +109,16 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	}
 
 	var configBundle corev1.Secret
-	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: quayEcosystem.GetNamespace(), Name: quayEnterpriseConfigSecret}, &configBundle); err != nil {
+	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: quayEcosystem.GetNamespace(), Name: quayEnterpriseConfigSecretName}, &configBundle); err != nil {
 		log.Error(err, "failed to retrieve `quay-enterprise-config-secret`")
+
 		return ctrl.Result{}, nil
 	}
 
 	var baseConfig map[string]interface{}
 	if err := yaml.Unmarshal(configBundle.Data["config.yaml"], &baseConfig); err != nil {
 		log.Error(err, "failed to unmarshal config.yaml")
+
 		return ctrl.Result{}, nil
 	}
 
@@ -120,14 +133,16 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 		log.Info("successfully migrated managed object storage")
 	} else {
 		log.Error(errors.New("cannot migrate local object storage"), "failed to migrate object storage")
+
 		return ctrl.Result{}, nil
 	}
 
 	if canHandleDatabase(quayEcosystem) {
 		log.Info("attempting to migrate managed database")
-		fieldGroup, err := database.NewDatabaseFieldGroup(baseConfig)
-		if err != nil {
-			log.Error(err, "failed to parse existing database fieldgroup from base config")
+
+		if quayEcosystem.Spec.Quay.Database.CredentialsSecretName == "" {
+			log.Error(fmt.Errorf("database config missing `credentialsSecretName` containing password for `postgres` user"), "failed to migrate database")
+
 			return ctrl.Result{}, nil
 		}
 
@@ -148,19 +163,26 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 		if err := r.Client.Create(ctx, &postgresPVC); err != nil {
 			log.Error(err, "failed to create `PersistentVolumeClaim` for database migration")
+
 			return ctrl.Result{}, nil
 		}
 
 		log.Info("successfully created `PersistentVolumeClaim` for database migration")
 
-		log.Info("attempting to create `Job` for database migration")
+		log.Info("attempting to create `Deployment` for database migration")
 
-		ttl := new(int32)
-		*ttl = 1
-		migrationJob := batchv1.Job{
+		pgImage := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES")
+		if pgImage == "" {
+			pgImage = "centos/postgresql-10-centos7"
+		}
+
+		migrationDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      quayRegistry.GetName() + "-quay-postgres-migration",
 				Namespace: quayRegistry.GetNamespace(),
+				Labels: map[string]string{
+					migrationComponentLabel: quayRegistry.GetName() + "-quay-postgres-migration",
+				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
 						Kind:       "QuayEcosystem",
@@ -170,13 +192,19 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 					},
 				},
 			},
-			Spec: batchv1.JobSpec{
+			Spec: appsv1.DeploymentSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						migrationComponentLabel: quayRegistry.GetName() + "-quay-postgres-migration",
+					},
+				},
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "quay-postgres-migration",
+						Labels: map[string]string{
+							migrationComponentLabel: quayRegistry.GetName() + "-quay-postgres-migration",
+						},
 					},
 					Spec: corev1.PodSpec{
-						RestartPolicy: corev1.RestartPolicyNever,
 						Volumes: []corev1.Volume{
 							{
 								Name: "postgres-data",
@@ -187,28 +215,61 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 								},
 							},
 						},
-						Containers: []corev1.Container{
+						InitContainers: []corev1.Container{
 							{
-								Name:  "quay-postgres-migration",
-								Image: "postgres",
+								Name:  "quay-postgres-migration-init",
+								Image: pgImage,
 								Command: []string{
-									"pg_dump",
-									"$(DB_URI)",
-									"--format",
-									"c",
-									"--file",
-									"/var/lib/postgresql/data/dump.sql",
+									"psql",
+									"-U",
+									"postgres",
+									"-h",
+									quayEcosystem.GetName() + "-quay-postgresql",
 								},
 								Env: []corev1.EnvVar{
 									{
-										Name:  "DB_URI",
-										Value: fieldGroup.DbUri,
+										Name: "PGPASSWORD",
+										ValueFrom: &corev1.EnvVarSource{
+											SecretKeyRef: &corev1.SecretKeySelector{
+												LocalObjectReference: corev1.LocalObjectReference{Name: quayEcosystem.Spec.Quay.Database.CredentialsSecretName},
+												Key:                  "database-root-password",
+											},
+										},
+									},
+								},
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name:  "quay-postgres-migration",
+								Image: pgImage,
+								Env: []corev1.EnvVar{
+									{
+										Name:  "POSTGRESQL_MIGRATION_REMOTE_HOST",
+										Value: quayEcosystem.GetName() + "-quay-postgresql",
+									},
+									{
+										Name: "POSTGRESQL_MIGRATION_ADMIN_PASSWORD",
+										// NOTE: By default, `QuayEcosystems` will not have a password set for `postgres` user, preventing remote connections. Users must SSH into Postgres pod and use `\password` before beginning migration.
+										ValueFrom: &corev1.EnvVarSource{
+											SecretKeyRef: &corev1.SecretKeySelector{
+												LocalObjectReference: corev1.LocalObjectReference{Name: quayEcosystem.Spec.Quay.Database.CredentialsSecretName},
+												Key:                  "database-root-password",
+											},
+										},
+									},
+								},
+								ReadinessProbe: &corev1.Probe{
+									Handler: corev1.Handler{
+										Exec: &corev1.ExecAction{
+											Command: []string{"/usr/libexec/check-container"},
+										},
 									},
 								},
 								VolumeMounts: []corev1.VolumeMount{
 									{
 										Name:      "postgres-data",
-										MountPath: "/var/lib/postgresql/data",
+										MountPath: "/var/lib/pgsql/data",
 									},
 								},
 							},
@@ -218,26 +279,57 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 			},
 		}
 
-		if err := r.Client.Create(ctx, &migrationJob); err != nil {
-			log.Error(err, "failed to create `Job` for database migration")
+		if err := r.Client.Create(ctx, migrationDeployment); err != nil {
+			log.Error(err, "failed to create `Deployment` for database migration")
+
 			return ctrl.Result{}, nil
 		}
 
-		log.Info("successfully created `Job` for database migration")
+		log.Info("successfully created `Deployment` for database migration", "deployment", migrationDeployment.GetNamespace()+"/"+migrationDeployment.GetName())
 
-		err = wait.Poll(time.Second*10, time.Second*60, func() (bool, error) {
-			log.Info("checking if database migration `Job` completed")
+		err := wait.Poll(time.Second*15, time.Second*120, func() (bool, error) {
+			log.Info("checking if database migration `Deployment` completed")
 
-			err = r.Client.Get(ctx, types.NamespacedName{Namespace: migrationJob.GetNamespace(), Name: migrationJob.GetName()}, &migrationJob)
-			if err != nil {
+			if err := r.Client.Get(ctx, types.NamespacedName{Namespace: migrationDeployment.GetNamespace(), Name: migrationDeployment.GetName()}, migrationDeployment); err != nil {
+				log.Error(err, "failed to fetch database migration `Deployment`")
+
 				return false, nil
 			}
 
-			return migrationJob.Status.Succeeded > 0, nil
+			if migrationDeployment.Status.ReadyReplicas > 0 {
+				return true, nil
+			}
+
+			var migrationPods corev1.PodList
+			if err := r.Client.List(ctx, &migrationPods, &client.ListOptions{
+				Namespace:     quayEcosystem.GetNamespace(),
+				LabelSelector: labels.SelectorFromSet(migrationDeployment.Spec.Selector.MatchLabels),
+			}); err != nil {
+				log.Error(err, "failed to fetch database migration pods")
+
+				return false, nil
+			}
+
+			for _, migrationPod := range migrationPods.Items {
+				if !migrationPod.Status.InitContainerStatuses[0].Ready {
+					log.Info("database migration pod blocked, ensure that the `postgres` user has a password set")
+
+					return false, nil
+				}
+			}
+
+			return true, nil
 		})
 
 		if err != nil {
-			log.Error(err, "failed to check status of database migration `Job`")
+			log.Error(err, "failed to check status of database migration `Deployment`")
+
+			return ctrl.Result{}, nil
+		}
+
+		if err := r.Client.Delete(ctx, migrationDeployment); err != nil {
+			log.Error(err, "failed to delete `Deployment` after database migration")
+
 			return ctrl.Result{}, nil
 		}
 
@@ -255,10 +347,16 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 	if canHandleExternalAccess(quayEcosystem) {
 		log.Info("attempting to migrate external access", "type", quayEcosystem.Spec.Quay.ExternalAccess.Type)
-		// NOTE: Don't strip out `hostsettings` fieldgroup from base `config.yaml` because we use them when configuring the `Route`.
+
+		for _, field := range (&hostsettings.HostSettingsFieldGroup{}).Fields() {
+			if field != "SERVER_HOSTNAME" {
+				delete(baseConfig, field)
+			}
+		}
+
 		log.Info("successfully migrated managed external access", "type", quayEcosystem.Spec.Quay.ExternalAccess.Type)
 	} else {
-		log.Info("skipping unsupported external access type", "type", quayEcosystem.Spec.Quay.ExternalAccess.Type)
+		log.Info("skipping unsupported external access type")
 
 		quayRegistry.Spec.Components = append(quayRegistry.Spec.Components, quay.Component{
 			Kind:    "route",
@@ -282,6 +380,40 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 			Managed: false,
 		})
 	}
+
+	if canHandleMirror(quayEcosystem) {
+		log.Info("attempting to migrate managed repo mirroring")
+
+		for _, field := range (&repomirror.RepoMirrorFieldGroup{}).Fields() {
+			delete(baseConfig, field)
+		}
+	} else {
+		log.Info("skipping unmanaged repo mirroring")
+
+		quayRegistry.Spec.Components = append(quayRegistry.Spec.Components, quay.Component{
+			Kind:    "mirror",
+			Managed: false,
+		})
+	}
+
+	if canHandleClair(quayEcosystem) {
+		log.Info("attempting to migrate managed security scanner")
+
+		for _, field := range (&securityscanner.SecurityScannerFieldGroup{}).Fields() {
+			delete(baseConfig, field)
+		}
+
+		log.Info("successfully migrated managed security scanner")
+	} else {
+		log.Info("skipping unmanaged security scanner")
+
+		quayRegistry.Spec.Components = append(quayRegistry.Spec.Components, quay.Component{
+			Kind:    "clair",
+			Managed: false,
+		})
+	}
+
+	baseConfig = clean(baseConfig)
 
 	configBundleSecret := corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -346,17 +478,36 @@ func canHandleRedis(q redhatcop.QuayEcosystem) bool {
 }
 
 func canHandleObjectStorage(q redhatcop.QuayEcosystem) bool {
-	if q.Spec.Quay.RegistryBackends == nil || len(q.Spec.Quay.RegistryBackends) == 0 {
+	if q.Spec.Quay.RegistryStorage != nil ||
+		q.Spec.Quay.RegistryBackends == nil ||
+		len(q.Spec.Quay.RegistryBackends) == 0 {
 		return false
 	}
 
 	for _, backend := range q.Spec.Quay.RegistryBackends {
-		if backend.Name == "local" {
+		if backend.Local != nil {
 			return false
 		}
 	}
 
 	return true
+}
+
+func canHandleMirror(q redhatcop.QuayEcosystem) bool {
+	return q.Spec.Quay.EnableRepoMirroring
+}
+
+func canHandleClair(q redhatcop.QuayEcosystem) bool {
+	return q.Spec.Clair != nil && q.Spec.Clair.Enabled
+}
+
+func clean(config map[string]interface{}) map[string]interface{} {
+	// NOTE: Signing engine code has been removed from Quay.
+	for _, field := range (&signingengine.SigningEngineFieldGroup{}).Fields() {
+		delete(config, field)
+	}
+
+	return config
 }
 
 func (r *QuayEcosystemReconciler) SetupWithManager(mgr ctrl.Manager) error {

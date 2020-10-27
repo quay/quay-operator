@@ -16,8 +16,6 @@ spec:
             items:
               - key: create-extensions.sh
                 path: create-extensions.sh
-              - key: restore.sh
-                path: restore.sh
       containers:
         - name: quay-postgres-init
           image: centos/postgresql-10-centos7

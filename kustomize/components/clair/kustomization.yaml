@@ -14,7 +14,7 @@ vars:
     objref:
       kind: Service
       apiVersion: v1
-      name: clair
+      name: clair-app
 patchesStrategicMerge:
   - ./upgrade.deployment.patch.yaml
 secretGenerator:
