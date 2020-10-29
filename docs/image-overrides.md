@@ -30,7 +30,7 @@ Using the UI, `kubectl edit`, or any other method, modify the Quay `ClusterServi
 **JSONPath**: `spec.install.spec.deployments[0].spec.template.spec.containers[0].env`
 ```yaml
 - name: RELATED_IMAGE_COMPONENT_QUAY
-  value: quay.io/projectquay/quay@sha256:c35f5af964431673f4ff5c9e90bdf45f19e38b8742b5903d41c10cc7f6339a6d
+  value: <override-image>@sha256:c35f5af964431673f4ff5c9e90bdf45f19e38b8742b5903d41c10cc7f6339a6d
 - name: RELATED_IMAGE_COMPONENT_CLAIR
   value: quay.io/projectquay/clair@sha256:70c99feceb4c0973540d22e740659cd8d616775d3ad1c1698ddf71d0221f3ce6
 - name: RELATED_IMAGE_COMPONENT_POSTGRES
