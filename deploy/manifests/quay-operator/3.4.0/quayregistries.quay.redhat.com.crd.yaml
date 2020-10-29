@@ -1,0 +1,94 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.5
+  creationTimestamp: null
+  name: quayregistries.quay.redhat.com
+spec:
+  group: quay.redhat.com
+  names:
+    kind: QuayRegistry
+    listKind: QuayRegistryList
+    plural: quayregistries
+    singular: quayregistry
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: QuayRegistry is the Schema for the quayregistries API.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: QuayRegistrySpec defines the desired state of QuayRegistry.
+          properties:
+            components:
+              description: Components declare how the Operator should handle backing
+                Quay services.
+              items:
+                description: Component describes how the Operator should handle a
+                  backing Quay service.
+                properties:
+                  kind:
+                    description: Kind is the unique name of this type of component.
+                    type: string
+                  managed:
+                    description: Managed indicates whether or not the Operator is
+                      responsible for the lifecycle of this component. Default is
+                      true.
+                    type: boolean
+                required:
+                - kind
+                - managed
+                type: object
+              type: array
+            configBundleSecret:
+              description: ConfigBundleSecret is the name of the Kubernetes `Secret`
+                in the same namespace which contains the base Quay config and extra
+                certs.
+              type: string
+          type: object
+        status:
+          description: QuayRegistryStatus defines the observed state of QuayRegistry.
+          properties:
+            configEditorEndpoint:
+              description: ConfigEditorEndpoint is the external access point for a
+                web-based reconfiguration interface for the Quay registry instance.
+              type: string
+            currentVersion:
+              description: CurrentVersion is the actual version of Quay that is actively
+                deployed.
+              type: string
+            lastUpdated:
+              description: LastUpdate is the timestamp when the Operator last processed
+                this instance.
+              type: string
+            registryEndpoint:
+              description: RegistryEndpoint is the external access point for the Quay
+                registry.
+              type: string
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
