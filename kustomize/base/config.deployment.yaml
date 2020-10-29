@@ -31,6 +31,8 @@ spec:
           env:
             - name: QUAY_CONFIG_PATH
               value: /conf/stack
+            - name: DEBUGLOG
+              value: "true"
             - name: QUAY_PASSWORD
               valueFrom:
                 secretKeyRef:
