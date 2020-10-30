@@ -165,7 +165,7 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 			DistributedStorageDefaultLocations: []string{"local_us"},
 			DistributedStorageConfig: map[string]*distributedstorage.DistributedStorageDefinition{
 				"local_us": {
-					Name: "RadosGWStorage",
+					Name: "RHOCSStorage",
 					Args: &shared.DistributedStorageArgs{
 						Hostname:    hostname,
 						IsSecure:    true,

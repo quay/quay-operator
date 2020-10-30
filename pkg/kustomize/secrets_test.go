@@ -95,7 +95,7 @@ var fieldGroupForTests = []struct {
 			DistributedStorageDefaultLocations: []string{"local_us"},
 			DistributedStorageConfig: map[string]*distributedstorage.DistributedStorageDefinition{
 				"local_us": {
-					Name: "RadosGWStorage",
+					Name: "RHOCSStorage",
 					Args: &shared.DistributedStorageArgs{
 						AccessKey:   "abc123",
 						BucketName:  "quay-datastore",
