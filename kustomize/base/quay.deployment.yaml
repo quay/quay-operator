@@ -33,7 +33,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: DEBUGLOG
-              value: "true"
+              value: "false"
             - name: WORKER_COUNT_WEB
               value: "4"
             - name: WORKER_COUNT_SECSCAN
