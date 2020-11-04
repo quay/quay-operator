@@ -217,12 +217,25 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		}
 	}
 
+	configEditorPassword, err := generateRandomString(16)
+	if err != nil {
+		return nil, err
+	}
+
 	generatedSecrets := []types.SecretArgs{
 		{
 			GeneratorArgs: types.GeneratorArgs{
 				Name: configSecretPrefix,
 				KvPairSources: types.KvPairSources{
 					FileSources: configFiles,
+				},
+			},
+		},
+		{
+			GeneratorArgs: types.GeneratorArgs{
+				Name: "quay-config-editor-credentials",
+				KvPairSources: types.KvPairSources{
+					LiteralSources: []string{"password=" + configEditorPassword},
 				},
 			},
 		},
