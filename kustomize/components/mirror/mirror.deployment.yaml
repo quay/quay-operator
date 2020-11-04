@@ -43,7 +43,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: DEBUGLOG
-              value: "true"
+              value: "false"
             - name: ENSURE_NO_MIGRATION
               value: "true"
           # TODO: Determine if we need to set resource requirements
