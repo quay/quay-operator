@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -42,6 +43,7 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var testLogger logr.Logger
+var testEventRecorder record.EventRecorder
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -54,6 +56,7 @@ func TestAPIs(t *testing.T) {
 var _ = BeforeSuite(func(done Done) {
 	testLogger = zap.LoggerTo(GinkgoWriter, true)
 	logf.SetLogger(testLogger)
+	testEventRecorder = record.NewFakeRecorder(10)
 
 	By("bootstrapping test environment")
 	// useExistingCluster := true

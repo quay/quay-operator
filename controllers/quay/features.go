@@ -59,8 +59,12 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(quay *v1.QuayR
 		}
 		existingAnnotations[v1.SupportsObjectStorageAnnotation] = "true"
 
+		found := false
 		for _, obc := range objectBucketClaims.Items {
 			if obc.GetNamespace()+"/"+obc.GetName() == datastoreName.String() {
+				found = true
+				r.Log.Info("`ObjectBucketClaim` exists")
+
 				var datastoreSecret corev1.Secret
 				if err = r.Client.Get(context.Background(), datastoreName, &datastoreSecret); err != nil {
 					r.Log.Error(err, "unable to retrieve Quay datastore `Secret`")
@@ -85,12 +89,32 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(quay *v1.QuayR
 				existingAnnotations[v1.StorageHostnameAnnotation] = host
 				existingAnnotations[v1.StorageAccessKeyAnnotation] = string(datastoreSecret.Data[datastoreAccessKey])
 				existingAnnotations[v1.StorageSecretKeyAnnotation] = string(datastoreSecret.Data[datastoreSecretKey])
+				existingAnnotations[v1.ObjectStorageInitializedAnnotation] = "true"
 			}
 		}
+
+		if !found {
+			r.Log.Info("`ObjectBucketClaim` not found")
+		}
+
 		quay.SetAnnotations(existingAnnotations)
 	} else if err != nil {
 		r.Log.Info("cluster does not support `ObjectBucketClaim` API")
 	}
 
 	return quay, nil
+}
+
+func stripObjectBucketClaimAnnotations(quay *v1.QuayRegistry) *v1.QuayRegistry {
+	existingAnnotations := quay.GetAnnotations()
+	if existingAnnotations == nil {
+		return quay
+	}
+
+	delete(existingAnnotations, v1.StorageBucketNameAnnotation)
+	delete(existingAnnotations, v1.StorageHostnameAnnotation)
+	delete(existingAnnotations, v1.StorageAccessKeyAnnotation)
+	delete(existingAnnotations, v1.StorageSecretKeyAnnotation)
+
+	return quay
 }

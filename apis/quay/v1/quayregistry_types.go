@@ -26,14 +26,15 @@ import (
 )
 
 const (
-	SupportsRoutesAnnotation  = "supports-routes"
-	ClusterHostnameAnnotation = "router-canonical-hostname"
+	SupportsRoutesAnnotation  = "quay.redhat.com/supports-routes"
+	ClusterHostnameAnnotation = "quay.redhat.com/router-canonical-hostname"
 
-	SupportsObjectStorageAnnotation = "supports-object-storage"
-	StorageHostnameAnnotation       = "storage-hostname"
-	StorageBucketNameAnnotation     = "storage-bucketname"
-	StorageAccessKeyAnnotation      = "storage-access-key"
-	StorageSecretKeyAnnotation      = "storage-secret-key"
+	SupportsObjectStorageAnnotation    = "quay.redhat.com/supports-object-storage"
+	ObjectStorageInitializedAnnotation = "quay.redhat.com/object-storage-initialized"
+	StorageHostnameAnnotation          = "quay.redhat.com/storage-hostname"
+	StorageBucketNameAnnotation        = "quay.redhat.com/storage-bucketname"
+	StorageAccessKeyAnnotation         = "quay.redhat.com/storage-access-key"
+	StorageSecretKeyAnnotation         = "quay.redhat.com/storage-secret-key"
 )
 
 type QuayVersion string
@@ -75,6 +76,42 @@ type Component struct {
 	Managed bool `json:"managed"`
 }
 
+type ConditionType string
+
+const (
+	ConditionTypeAvailable      ConditionType = "Available"
+	ConditionTypeRolloutBlocked ConditionType = "RolloutBlocked"
+	// TODO: Add more useful conditions.
+)
+
+type ConditionReason string
+
+const (
+	// ConditionTypeAvailable
+	ConditionReasonHealthChecksPassing  ConditionReason = "HealthChecksPassing"
+	ConditionReasonMigrationsInProgress ConditionReason = "MigrationsInProgress"
+	// ConditionTypeRolloutBlocked
+	ConditionReasonComponentsCreationSuccess             ConditionReason = "ComponentsCreationSuccess"
+	ConditionReasonUpgradeUnsupported                    ConditionReason = "UpgradeUnsupported"
+	ConditionReasonComponentCreationFailed               ConditionReason = "ComponentCreationFailed"
+	ConditionReasonRouteComponentDependencyError         ConditionReason = "RouteComponentDependencyError"
+	ConditionReasonObjectStorageComponentDependencyError ConditionReason = "ObjectStorageComponentDependencyError"
+	ConditionReasonConfigInvalid                         ConditionReason = "ConfigInvalid"
+)
+
+// Condition is a single condition of a QuayRegistry.
+// Conditions should follow the "abnormal-true" principle in order to only bring the attention of users to "broken" states.
+// Example: a condition of `type: "Ready", status: "True"`` is less useful and should be omitted whereas `type: "NotReady", status: "True"`
+// is more useful when trying to monitor when something is wrong.
+type Condition struct {
+	Type               ConditionType          `json:"type,omitempty"`
+	Status             metav1.ConditionStatus `json:"status,omitempty"`
+	Reason             ConditionReason        `json:"reason,omitempty"`
+	Message            string                 `json:"message,omitempty"`
+	LastUpdateTime     metav1.Time            `json:"lastUpdateTime,omitempty"`
+	LastTransitionTime metav1.Time            `json:"lastTransitionTime,omitempty"`
+}
+
 // QuayRegistryStatus defines the observed state of QuayRegistry.
 type QuayRegistryStatus struct {
 	// CurrentVersion is the actual version of Quay that is actively deployed.
@@ -86,6 +123,52 @@ type QuayRegistryStatus struct {
 	// ConfigEditorEndpoint is the external access point for a web-based reconfiguration interface
 	// for the Quay registry instance.
 	ConfigEditorEndpoint string `json:"configEditorEndpoint,omitempty"`
+	// Conditions represent the conditions that a QuayRegistry can have.
+	Conditions []Condition `json:"conditions,omitempty"`
+}
+
+// GetCondition retrieves the condition with the matching type from the given list.
+func GetCondition(conditions []Condition, conditionType ConditionType) *Condition {
+	for _, c := range conditions {
+		if c.Type == conditionType {
+			return &c
+		}
+	}
+
+	return nil
+}
+
+// SetCondition adds or updates a given condition.
+// TODO(alecmerdler): Use https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/api/meta/conditions.go when we can.
+func SetCondition(existing []Condition, newCondition Condition) []Condition {
+	if existing == nil {
+		existing = []Condition{}
+	}
+
+	for i, existingCondition := range existing {
+		if existingCondition.Type == newCondition.Type {
+			existing[i] = newCondition
+			return existing
+		}
+	}
+
+	return append(existing, newCondition)
+}
+
+// RemoveCondition removes any conditions with the matching type.
+func RemoveCondition(conditions []Condition, conditionType ConditionType) []Condition {
+	if conditions == nil {
+		return []Condition{}
+	}
+
+	filtered := []Condition{}
+	for _, existingCondition := range conditions {
+		if existingCondition.Type != conditionType {
+			filtered = append(filtered, existingCondition)
+		}
+	}
+
+	return filtered
 }
 
 // +kubebuilder:object:root=true
@@ -150,6 +233,10 @@ func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
 	return updatedQuay, nil
 }
 
+func EnsureComponents(components []Component) []Component {
+	return append(components, components[0])[1 : len(components)+1]
+}
+
 // ComponentsMatch returns true if both set of components are equivalent, and false otherwise.
 func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 	if len(firstComponents) != len(secondComponents) {
@@ -169,6 +256,16 @@ func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 		}
 	}
 	return true
+}
+
+// ComponentIsManaged returns whether the given component is managed or not.
+func ComponentIsManaged(components []Component, name string) bool {
+	for _, c := range components {
+		if c.Kind == name {
+			return c.Managed
+		}
+	}
+	return false
 }
 
 // EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was changed.
