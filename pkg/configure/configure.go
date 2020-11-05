@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/quay/quay-operator/pkg/kustomize"
+
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -61,16 +64,36 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 
 		log.Info("created new config secret for QuayRegistry: " + reconfigureRequest.Namespace + "/" + reconfigureRequest.QuayRegistryName)
 
-		quayRegistry := v1.QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      reconfigureRequest.QuayRegistryName,
-				Namespace: reconfigureRequest.Namespace,
-			},
-			Spec: v1.QuayRegistrySpec{
-				ConfigBundleSecret: newSecret.GetName(),
-			},
+		var quay v1.QuayRegistry
+		if err := k8sClient.Get(context.Background(), types.NamespacedName{Namespace: reconfigureRequest.Namespace, Name: reconfigureRequest.QuayRegistryName}, &quay); err != nil {
+			log.Error(err, "failed to fetch QuayRegistry", "name", reconfigureRequest.QuayRegistryName, "namespace", reconfigureRequest.Namespace)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-		if err := k8sClient.Patch(context.Background(), &quayRegistry, client.Merge); err != nil {
+
+		// Infer managed/unmanaged components from the given `config.yaml`.
+		newComponents := []v1.Component{}
+		for _, component := range quay.Spec.Components {
+			contains, err := kustomize.ContainsComponentConfig(reconfigureRequest.Config, component.Kind)
+
+			if err != nil {
+				log.Error(err, "failed to check `config.yaml` for component fieldgroup", "component", component.Kind)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if contains {
+				log.Info("marking component as unmanaged", "component", component.Kind)
+				newComponents = append(newComponents, v1.Component{Kind: component.Kind, Managed: false})
+			} else {
+				log.Info("marking component as managed", "component", component.Kind)
+				newComponents = append(newComponents, v1.Component{Kind: component.Kind, Managed: true})
+			}
+		}
+		quay.Spec.Components = newComponents
+		quay.Spec.ConfigBundleSecret = newSecret.GetName()
+
+		if err := k8sClient.Update(context.Background(), &quay); err != nil {
 			log.Error(err, "failed to update QuayRegistry with new `configBundleSecret`: "+reconfigureRequest.Namespace+"/"+reconfigureRequest.QuayRegistryName)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -107,7 +130,7 @@ func createUpdatedSecret(reconfigureRequest request) corev1.Secret {
 	for fullFilePathname, encodedCert := range reconfigureRequest.Certs {
 		log.Println("including cert in secret: " + fullFilePathname)
 		certName := strings.Split(fullFilePathname, "/")[len(strings.Split(fullFilePathname, "/"))-1]
-		secretData["extra_ca_cert_"+certName] = encodedCert
+		secretData["extra_ca_cert_"+strings.ReplaceAll(certName, "extra_ca_cert_", "")] = encodedCert
 	}
 
 	newSecret := corev1.Secret{

@@ -17,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -89,6 +90,17 @@ func overlayDir() string {
 
 func upgradeOverlayDir() string {
 	return filepath.Join(kustomizeDir(), "overlays", "current", "upgrade")
+}
+
+func configEditorOnlyOverlay() string {
+	return filepath.Join(kustomizeDir(), "overlays", "current", "config-only")
+}
+
+func rolloutBlocked(quay *v1.QuayRegistry) bool {
+	if cond := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeRolloutBlocked); cond != nil && cond.Status == metav1.ConditionTrue {
+		return true
+	}
+	return false
 }
 
 func check(err error) {
@@ -294,7 +306,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		Components:      componentPaths,
 		SecretGenerator: generatedSecrets,
 		CommonAnnotations: map[string]string{
-			managedFieldGroupsKey: strings.Join(managedFieldGroups, ","),
+			managedFieldGroupsKey: strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
 			registryHostnameKey:   string(quayConfigFiles[registryHostnameKey]),
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
@@ -351,7 +363,6 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	// Each `managedComponent` brings in their own generated `config.yaml` fields which are added to the base `Secret`
 	componentConfigFiles := baseConfigBundle.DeepCopy().Data
 
-	// Parse the user-provided config bundle.
 	var parsedUserConfig map[string]interface{}
 	err := yaml.Unmarshal(componentConfigFiles["config.yaml"], &parsedUserConfig)
 	check(err)
@@ -396,7 +407,9 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	check(err)
 
 	var overlay string
-	if quay.Status.CurrentVersion == "" {
+	if rolloutBlocked(quay) {
+		overlay = configEditorOnlyOverlay()
+	} else if quay.Status.CurrentVersion == "" {
 		overlay = upgradeOverlayDir()
 	} else {
 		overlay = overlayDir()
