@@ -222,6 +222,7 @@ func BaseConfig() map[string]interface{} {
 		"TEAM_RESYNC_STALE_TIME":             "60m",
 		"FEATURE_DIRECT_LOGIN":               true,
 		"FEATURE_BUILD_SUPPORT":              false,
+		"TESTING":                            false,
 	}
 }
 
