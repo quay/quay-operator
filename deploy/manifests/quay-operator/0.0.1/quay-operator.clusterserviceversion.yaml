@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:4cf12a770d040dac36a6d876c797afc233dd6969b595bdd19399e10ccb86154c
+    containerImage: quay.io/projectquay/quay-operator@sha256:3d04e4346775c696a37243caa8ed75cb919363908237b452bcaaf965121acdc3
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -81,6 +81,11 @@ spec:
           description: Observed conditions of Quay components.
           x-descriptors:
             - 'urn:alm:descriptor:io.kubernetes.conditions'
+        - path: configEditorCredentialsSecret
+          displayName: Config Editor Credentials Secret
+          description: Name of the secret containing credentials for the Quay config editor.
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
     - kind: QuayEcosystem
       version: v1alpha1
       name: quayecosystems.redhatcop.redhat.io
@@ -105,7 +110,7 @@ spec:
             spec:
               containers:
               - name: quay-operator
-                image: quay.io/projectquay/quay-operator@sha256:4cf12a770d040dac36a6d876c797afc233dd6969b595bdd19399e10ccb86154c
+                image: quay.io/projectquay/quay-operator@sha256:3d04e4346775c696a37243caa8ed75cb919363908237b452bcaaf965121acdc3
                 command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'

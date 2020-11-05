@@ -7,6 +7,9 @@ import (
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -117,4 +120,18 @@ func stripObjectBucketClaimAnnotations(quay *v1.QuayRegistry) *v1.QuayRegistry {
 	delete(existingAnnotations, v1.StorageSecretKeyAnnotation)
 
 	return quay
+}
+
+func configEditorCredentialsSecretFrom(objs []runtime.Object) string {
+	for _, obj := range objs {
+		objectMeta, _ := meta.Accessor(obj)
+		groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
+		secretGVK := schema.GroupVersionKind{Version: "v1", Kind: "Secret"}.String()
+
+		if groupVersionKind == secretGVK && strings.Contains(objectMeta.GetName(), "quay-config-editor-credentials") {
+			return objectMeta.GetName()
+		}
+	}
+
+	return ""
 }

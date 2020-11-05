@@ -36,6 +36,8 @@ const (
 	managedFieldGroupsKey = "quay-managed-fieldgroups"
 
 	componentImagePrefix = "RELATED_IMAGE_COMPONENT_"
+
+	configEditorUser = "quayconfig"
 )
 
 // componentImageFor checks for an environment variable indicating which component container image
@@ -235,7 +237,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 			GeneratorArgs: types.GeneratorArgs{
 				Name: "quay-config-editor-credentials",
 				KvPairSources: types.KvPairSources{
-					LiteralSources: []string{"password=" + configEditorPassword},
+					LiteralSources: []string{"username=" + configEditorUser, "password=" + configEditorPassword},
 				},
 			},
 		},

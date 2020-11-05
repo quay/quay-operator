@@ -123,6 +123,8 @@ type QuayRegistryStatus struct {
 	// ConfigEditorEndpoint is the external access point for a web-based reconfiguration interface
 	// for the Quay registry instance.
 	ConfigEditorEndpoint string `json:"configEditorEndpoint,omitempty"`
+	// ConfigEditorCredentialsSecret is the Kubernetes `Secret` containing the config editor password.
+	ConfigEditorCredentialsSecret string `json:"configEditorCredentialsSecret,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
 }
