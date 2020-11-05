@@ -18,9 +18,6 @@ spec:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: quay-database
-      # FIXME(alecmerdler): Need to set `fsGroup: 0` for `centos/postgresql-10-centos7` but not `rhel8/postgresql-10`
-      securityContext:
-        fsGroup: 0
       containers:
         - name: postgres
           image: centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33
