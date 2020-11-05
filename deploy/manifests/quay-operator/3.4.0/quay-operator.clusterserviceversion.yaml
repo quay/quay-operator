@@ -32,6 +32,7 @@ metadata:
       ]
     operators.operatorframework.io/internal-objects: |-
       ["quayecosystems.redhatcop.redhat.io"]
+    operators.openshift.io/infrastructure-features: '["Disconnected"]'
   name: quay-operator.v3.4.0
   namespace: placeholder
 spec:
