@@ -249,6 +249,47 @@ func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]b
 	)
 }
 
+// ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
+// the fieldgroup for the given component by comparing it with the fieldgroup defaults.
+// TODO(alecmerdler): Replace this with function from `config-tool` library once implemented.
+func ContainsComponentConfig(fullConfig map[string]interface{}, component string) (bool, error) {
+	fields := []string{}
+
+	switch component {
+	case "clair":
+		fields = (&securityscanner.SecurityScannerFieldGroup{}).Fields()
+	case "postgres":
+		fields = (&database.DatabaseFieldGroup{}).Fields()
+	case "redis":
+		fields = (&redis.RedisFieldGroup{}).Fields()
+	case "objectstorage":
+		fields = (&distributedstorage.DistributedStorageFieldGroup{}).Fields()
+	case "horizontalpodautoscaler":
+		// HorizontalPodAutoscaler has no associated config fieldgroup.
+		return false, nil
+	case "mirror":
+		fields = (&repomirror.RepoMirrorFieldGroup{}).Fields()
+	case "route":
+		for _, field := range (&hostsettings.HostSettingsFieldGroup{}).Fields() {
+			// SERVER_HOSTNAME is a special field which we allow when using managed `route` component.
+			if field != "SERVER_HOSTNAME" {
+				fields = append(fields, field)
+			}
+		}
+	default:
+		panic("unknown component: " + component)
+	}
+
+	// FIXME(alecmerdler): Only checking for the existance of a single field
+	for _, field := range fields {
+		if _, ok := fullConfig[field]; ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[string]interface{}) map[string][]byte {
 	configFiles := map[string][]byte{}
 	fieldGroup, err := FieldGroupFor(component, quay)

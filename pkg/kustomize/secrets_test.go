@@ -150,3 +150,133 @@ func TestFieldGroupFor(t *testing.T) {
 		assert.Equal(string(expected), string(configFields), test.name)
 	}
 }
+
+var containsComponentConfigTests = []struct {
+	name          string
+	component     string
+	rawConfig     string
+	expected      bool
+	expectedError error
+}{
+	{
+		"ClairContains",
+		"clair",
+		`FEATURE_SECURITY_SCANNER: true`,
+		true,
+		nil,
+	},
+	{
+		"ClairDoesNotContain",
+		"clair",
+		``,
+		false,
+		nil,
+	},
+	{
+		"PostgresContains",
+		"postgres",
+		`DB_URI: postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database`,
+		true,
+		nil,
+	},
+	{
+		"PostgresDoesNotContain",
+		"postgres",
+		``,
+		false,
+		nil,
+	},
+	{
+		"RedisContains",
+		"redis",
+		`BUILDLOGS_REDIS:
+  host: test-quay-redis
+`,
+		true,
+		nil,
+	},
+	{
+		"RedisDoesNotContain",
+		"redis",
+		``,
+		false,
+		nil,
+	},
+	{
+		"ObjectStorageContains",
+		"objectstorage",
+		`DISTRIBUTED_STORAGE_PREFERENCE: 
+  - local_us
+`,
+		true,
+		nil,
+	},
+	{
+		"ObjectStorageDoesNotContain",
+		"objectstorage",
+		``,
+		false,
+		nil,
+	},
+	{
+		"MirrorContains",
+		"mirror",
+		`FEATURE_REPO_MIRROR: true`,
+		true,
+		nil,
+	},
+	{
+		"MirrorDeosNotContain",
+		"mirror",
+		``,
+		false,
+		nil,
+	},
+	{
+		"RouteContains",
+		"route",
+		`PREFERRED_URL_SCHEME: http`,
+		true,
+		nil,
+	},
+	{
+		"RouteContainsServerHostname",
+		"route",
+		`SERVER_HOSTNAME: registry.skynet.com`,
+		false,
+		nil,
+	},
+	{
+		"RouteDoesNotContain",
+		"route",
+		``,
+		false,
+		nil,
+	},
+	{
+		"HorizontalPodAutoscalerDoesNotContain",
+		"horizontalpodautoscaler",
+		``,
+		false,
+		nil,
+	},
+}
+
+func TestContainsComponentConfig(t *testing.T) {
+	assert := assert.New(t)
+
+	for _, test := range containsComponentConfigTests {
+		var fullConfig map[string]interface{}
+		err := yaml.Unmarshal([]byte(test.rawConfig), &fullConfig)
+		assert.Nil(err, test.name)
+
+		contains, err := ContainsComponentConfig(fullConfig, test.component)
+
+		if test.expectedError != nil {
+			assert.NotNil(err, test.name)
+		} else {
+			assert.Nil(err, test.name)
+			assert.Equal(test.expected, contains, test.name)
+		}
+	}
+}

@@ -1,0 +1,10 @@
+# Overlay variant for only deploying config editor.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+commonAnnotations:
+  quay-version: vader
+bases:
+  - ../../../tmp
+patchesStrategicMerge:
+  # Scale the app deployment to 0 pods in order to prevent pod errors on startup from invalid configuration.
+  - ./quay.deployment.patch.yaml
