@@ -47,9 +47,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: QUAY_OPERATOR_ENDPOINT
-              # FIXME(alecmerdler): Debugging
-              # value: http://quay-operator:7071
-              value: http://9f22be9064aa.ngrok.io
+              value: http://quay-operator:7071
             - name: QUAY_CONFIG_READ_ONLY_FIELD_GROUPS
               valueFrom:
                 fieldRef:
