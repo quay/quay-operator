@@ -75,7 +75,7 @@ spec:
           description: Indicates whether lifecycle of this component is managed by the Operator or externally.
       statusDescriptors:
         - path: currentVersion
-          displayName: CurrentVersion
+          displayName: Current Version
           description: The currently installed version of all Quay components.
         - path: conditions
           displayName: Conditions
@@ -87,6 +87,16 @@ spec:
           description: Name of the secret containing credentials for the Quay config editor.
           x-descriptors:
             - 'urn:alm:descriptor:io.kubernetes:Secret'
+        - path: registryEndpoint
+          displayName: Registry Endpoint
+          description: Externally accessible URL for container pull/push and web frontend.
+          x-descriptors:
+            - 'urn:alm:descriptor:org.w3:link'
+        - path: configEditorEndpoint
+          displayName: Config Editor Endpoint
+          description: Externally accessible URL for the config editor UI.
+          x-descriptors:
+            - 'urn:alm:descriptor:org.w3:link'
     - kind: QuayEcosystem
       version: v1alpha1
       name: quayecosystems.redhatcop.redhat.io
