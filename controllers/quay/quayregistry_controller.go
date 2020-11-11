@@ -46,7 +46,7 @@ import (
 )
 
 const upgradePollInterval = time.Second * 10
-const upgradePollTimeout = time.Second * 360
+const upgradePollTimeout = time.Second * 600
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
 type QuayRegistryReconciler struct {
@@ -210,8 +210,8 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 				return ctrl.Result{}, nil
 			}
-		} else if !component.Managed && !contains {
-			msg := fmt.Sprintf("%s component marked as unmanaged, but `configBundleSecret` is missing required fields", component.Kind)
+		} else if !component.Managed && v1.RequiredComponent(component.Kind) && !contains {
+			msg := fmt.Sprintf("required component `%s` marked as unmanaged, but `configBundleSecret` is missing necessary fields", component.Kind)
 
 			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 			if err != nil {

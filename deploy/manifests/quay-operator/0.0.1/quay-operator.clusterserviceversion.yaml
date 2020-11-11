@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:ddb475693da995260c663d2b335bc7f7a419a52650d84659e2b7cefb674086d7
+    containerImage: quay.io/projectquay/quay-operator@sha256:564024b11ff4d227f0ba2a74eef97e9cb8cd32c3ae12b6c595d13ab564e9a24a
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -120,7 +120,7 @@ spec:
             spec:
               containers:
               - name: quay-operator
-                image: quay.io/projectquay/quay-operator@sha256:ddb475693da995260c663d2b335bc7f7a419a52650d84659e2b7cefb674086d7
+                image: quay.io/projectquay/quay-operator@sha256:564024b11ff4d227f0ba2a74eef97e9cb8cd32c3ae12b6c595d13ab564e9a24a
                 command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'
@@ -138,7 +138,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
                 - name: RELATED_IMAGE_COMPONENT_QUAY
-                  value: quay.io/projectquay/quay@sha256:6fe0cfe3ecb544f273d775d16f03e6dff7313775af982dbbd546bf976e3c97e3
+                  value: quay.io/projectquay/quay@sha256:acd4fa1d6c4045020c8b5483a4de5741692240e7137b6cb4a12bdadffe8bdfac
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
                   value: quay.io/projectquay/clair@sha256:70c99feceb4c0973540d22e740659cd8d616775d3ad1c1698ddf71d0221f3ce6
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES
