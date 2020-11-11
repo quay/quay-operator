@@ -277,7 +277,7 @@ func EnsureRegistryEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
 	if supportsRoutes(quay) {
 		clusterHostname := quay.GetAnnotations()[ClusterHostnameAnnotation]
 		// FIXME(alecmerdler): This is incorrect if `SERVER_HOSTNAME` is set...
-		updatedQuay.Status.RegistryEndpoint = strings.Join([]string{
+		updatedQuay.Status.RegistryEndpoint = "https://" + strings.Join([]string{
 			strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
 			clusterHostname},
 			".")
@@ -293,7 +293,7 @@ func EnsureConfigEditorEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
 
 	if supportsRoutes(quay) {
 		clusterHostname := quay.GetAnnotations()[ClusterHostnameAnnotation]
-		updatedQuay.Status.ConfigEditorEndpoint = strings.Join([]string{
+		updatedQuay.Status.ConfigEditorEndpoint = "https://" + strings.Join([]string{
 			strings.Join([]string{quay.GetName(), "quay-config-editor", quay.GetNamespace()}, "-"),
 			clusterHostname},
 			".")
