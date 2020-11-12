@@ -385,7 +385,7 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []
 	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
 	config := config.Config{
 		HTTPListenAddr: ":8080",
-		LogLevel:       "debug",
+		LogLevel:       "info",
 		Indexer: config.Indexer{
 			ConnString:           dbConn,
 			ScanLockRetry:        10,
