@@ -322,7 +322,7 @@ var ensureRegistryEndpointTests = []struct {
 				},
 			},
 		},
-		"test-quay-ns-1.apps.example.com",
+		"https://test-quay-ns-1.apps.example.com",
 		false,
 	},
 	{
@@ -337,10 +337,10 @@ var ensureRegistryEndpointTests = []struct {
 				},
 			},
 			Status: QuayRegistryStatus{
-				RegistryEndpoint: "test-quay-ns-1.apps.example.com",
+				RegistryEndpoint: "https://test-quay-ns-1.apps.example.com",
 			},
 		},
-		"test-quay-ns-1.apps.example.com",
+		"https://test-quay-ns-1.apps.example.com",
 		true,
 	},
 	{
