@@ -59,6 +59,11 @@ var allComponents = []string{
 	"mirror",
 }
 
+var requiredComponents = []string{
+	"postgres",
+	"objectstorage",
+}
+
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
 	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace which contains the base Quay config and extra certs.
@@ -265,6 +270,16 @@ func ComponentIsManaged(components []Component, name string) bool {
 	for _, c := range components {
 		if c.Kind == name {
 			return c.Managed
+		}
+	}
+	return false
+}
+
+// RequiredComponent returns whether the given component is required for Quay or not.
+func RequiredComponent(component string) bool {
+	for _, c := range requiredComponents {
+		if c == component {
+			return true
 		}
 	}
 	return false
