@@ -3,3 +3,9 @@ apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 resources: 
   - ./mirror.deployment.yaml
+vars:
+  - name: QUAY_APP_SERVICE_HOST
+    objref:
+      kind: Service
+      apiVersion: v1
+      name: quay-app
