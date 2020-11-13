@@ -28,7 +28,16 @@ spec:
                   items:
                     - key: ssl.cert
                       path: quay-ssl.cert
-      # FIXME(alecmerdler): May need an `initContainer` which blocks until Quay app is running...
+      initContainers:
+        - name: quay-mirror-init
+          image: quay.io/projectquay/quay@sha256:acd4fa1d6c4045020c8b5483a4de5741692240e7137b6cb4a12bdadffe8bdfac
+          command:
+            - /bin/sh
+            - -c
+            - curl $QUAY_APP_SERVICE_HOST
+          env:
+            - name: QUAY_APP_SERVICE_HOST
+              value: $(QUAY_APP_SERVICE_HOST)
       containers:
         - name: quay-mirror
           image: quay.io/projectquay/quay@sha256:acd4fa1d6c4045020c8b5483a4de5741692240e7137b6cb4a12bdadffe8bdfac
