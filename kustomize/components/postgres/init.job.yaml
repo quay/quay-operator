@@ -8,9 +8,6 @@ spec:
       name: quay-postgres-init
     spec:
       restartPolicy: Never
-      # FIXME(alecmerdler): Need to set `fsGroup: 0` for `centos/postgresql-10-centos7` but not `rhel8/postgresql-10`
-      # securityContext:
-      #   fsGroup: 0
       volumes:
         - name: postgres-bootstrap
           secret:

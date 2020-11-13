@@ -9,5 +9,13 @@ resources:
   - ./postgres.service.yaml
 generatorOptions:
   disableNameSuffixHash: true
+vars:
+  - name: CLAIR_SERVICE_HOST
+    objref:
+      kind: Service
+      apiVersion: v1
+      name: clair
+patchesStrategicMerge:
+  - ./upgrade.deployment.patch.yaml
 secretGenerator:
   - name: clair-config-secret
