@@ -32,9 +32,12 @@ import (
 )
 
 const (
-	configSecretPrefix    = "quay-config-secret"
-	registryHostnameKey   = "quay-registry-hostname"
-	managedFieldGroupsKey = "quay-managed-fieldgroups"
+	configSecretPrefix         = "quay-config-secret"
+	registryHostnameKey        = "quay-registry-hostname"
+	managedFieldGroupsKey      = "quay-managed-fieldgroups"
+	operatorServiceEndpointKey = "quay-operator-service-endpoint"
+
+	podNamespaceKey = "MY_POD_NAMESPACE"
 
 	componentImagePrefix = "RELATED_IMAGE_COMPONENT_"
 
@@ -294,6 +297,13 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		}
 	}
 
+	operatorServiceEndpoint := "http://quay-operator"
+	ns := os.Getenv(podNamespaceKey)
+	if ns != "" {
+		operatorServiceEndpoint = strings.Join([]string{operatorServiceEndpoint, ns}, ".")
+	}
+	operatorServiceEndpoint = strings.Join([]string{operatorServiceEndpoint, "7071"}, ":")
+
 	return &types.Kustomization{
 		TypeMeta: types.TypeMeta{
 			APIVersion: types.KustomizationVersion,
@@ -306,8 +316,9 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		Components:      componentPaths,
 		SecretGenerator: generatedSecrets,
 		CommonAnnotations: map[string]string{
-			managedFieldGroupsKey: strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
-			registryHostnameKey:   string(quayConfigFiles[registryHostnameKey]),
+			managedFieldGroupsKey:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
+			registryHostnameKey:        string(quayConfigFiles[registryHostnameKey]),
+			operatorServiceEndpointKey: operatorServiceEndpoint,
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
 		Vars: []types.Var{
