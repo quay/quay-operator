@@ -47,7 +47,9 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: QUAY_OPERATOR_ENDPOINT
-              value: http://quay-operator:7071
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['quay-operator-service-endpoint']
             - name: QUAY_CONFIG_READ_ONLY_FIELD_GROUPS
               valueFrom:
                 fieldRef:
