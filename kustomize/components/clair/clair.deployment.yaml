@@ -2,22 +2,22 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    quay-component: clair
-  name: clair
+    quay-component: clair-app
+  name: clair-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      quay-component: clair
+      quay-component: clair-app
   template:
     metadata:
       labels:
-        quay-component: clair
+        quay-component: clair-app
     spec:
       containers:
         - image: quay.io/projectquay/clair@sha256:70c99feceb4c0973540d22e740659cd8d616775d3ad1c1698ddf71d0221f3ce6
           imagePullPolicy: IfNotPresent
-          name: clair
+          name: clair-app
           env:
             - name: CLAIR_CONF
               value: /clair/config.yaml

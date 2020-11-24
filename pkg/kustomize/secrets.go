@@ -33,6 +33,8 @@ const (
 	// secretKeySecretName is the name of the Secret in which generated secret keys are stored.
 	secretKeySecretName = "quay-registry-managed-secret-keys"
 	secretKeyLength     = 80
+
+	clairService = "clair-app"
 )
 
 // SecretKeySecretName returns the name of the Secret in which generated secret keys are stored.
@@ -117,7 +119,7 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 		psk := base64.StdEncoding.EncodeToString([]byte(preSharedKey))
 
 		fieldGroup.FeatureSecurityScanner = true
-		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + "clair:80"
+		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + clairService + ":80"
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 		fieldGroup.SecurityScannerNotifications = true
 		fieldGroup.SecurityScannerV4PSK = psk
@@ -405,7 +407,7 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []
 			Webhook: &webhook.Config{
 				// NOTE: This can't be the in-cluster service hostname because the `passthrough` TLS certs are only valid for external `SERVER_HOSTNAME`.
 				Target:   "https://" + quayHostname + "/secscan/notification",
-				Callback: "http://" + quay.GetName() + "-clair/notifier/api/v1/notifications",
+				Callback: "http://" + quay.GetName() + "-" + clairService + "/notifier/api/v1/notifications",
 			},
 		},
 		Auth: config.Auth{

@@ -182,8 +182,8 @@ var quayComponents = map[string][]runtime.Object{
 	},
 	"clair": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clair-config-secret"}},
-		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "clair"}},
-		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "clair"}},
+		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
+		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
