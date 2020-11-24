@@ -297,13 +297,6 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		}
 	}
 
-	operatorServiceEndpoint := "http://quay-operator"
-	ns := os.Getenv(podNamespaceKey)
-	if ns != "" {
-		operatorServiceEndpoint = strings.Join([]string{operatorServiceEndpoint, ns}, ".")
-	}
-	operatorServiceEndpoint = strings.Join([]string{operatorServiceEndpoint, "7071"}, ":")
-
 	return &types.Kustomization{
 		TypeMeta: types.TypeMeta{
 			APIVersion: types.KustomizationVersion,
@@ -318,7 +311,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		CommonAnnotations: map[string]string{
 			managedFieldGroupsKey:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
 			registryHostnameKey:        string(quayConfigFiles[registryHostnameKey]),
-			operatorServiceEndpointKey: operatorServiceEndpoint,
+			operatorServiceEndpointKey: operatorServiceEndpoint(),
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
 		Vars: []types.Var{
@@ -452,4 +445,18 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	}
 
 	return resources, err
+}
+
+func operatorServiceEndpoint() string {
+	// For local development, use ngrok or some other tool to expose local server to config editor.
+	if devEndpoint := os.Getenv("DEV_OPERATOR_ENDPOINT"); devEndpoint != "" {
+		return devEndpoint
+	}
+
+	endpoint := "http://quay-operator"
+	if ns := os.Getenv(podNamespaceKey); ns != "" {
+		endpoint = strings.Join([]string{endpoint, ns}, ".")
+	}
+
+	return strings.Join([]string{endpoint, "7071"}, ":")
 }
