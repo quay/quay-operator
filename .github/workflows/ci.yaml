@@ -1,8 +1,8 @@
 name: CI
 on: [push, pull_request]
 jobs:
-  tidy:
-    name: Tidy
+  build:
+    name: Build
     runs-on: ubuntu-latest
     container: docker.io/library/golang:latest
     steps:
@@ -12,6 +12,8 @@ jobs:
         run: go mod tidy
       - name: Git Diff
         run: git diff --exit-code
+      - name: Go Build
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod vendor -o manager main.go
   tests:
     name: Tests
     runs-on: ubuntu-latest
