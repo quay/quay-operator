@@ -4,7 +4,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:564024b11ff4d227f0ba2a74eef97e9cb8cd32c3ae12b6c595d13ab564e9a24a
+    containerImage: quay.io/projectquay/quay-operator@sha256:6bcf045a0ac06fc692229e804fb92ed97e696cb3e372ae963a2b640b243979b5
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
@@ -120,7 +120,7 @@ spec:
             spec:
               containers:
               - name: quay-operator
-                image: quay.io/projectquay/quay-operator@sha256:564024b11ff4d227f0ba2a74eef97e9cb8cd32c3ae12b6c595d13ab564e9a24a
+                image: quay.io/projectquay/quay-operator@sha256:6bcf045a0ac06fc692229e804fb92ed97e696cb3e372ae963a2b640b243979b5
                 command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'
