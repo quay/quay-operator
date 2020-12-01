@@ -20,7 +20,7 @@ Upgrades are supported from previous versions of the Operator which used the `Qu
 
 1. Ensure that the existing managed Postgres database has a password set for the `postgres` root admin user (not set by default). This allows remote access to the database for migration. The Operator looks for this password in the `Secret` referenced by `spec.quay.database.credentialsSecretKey` under the `database-root-password` key.
 
- To set/change the password, use either the OpenShift console or `kubectl` to [open an SSH terminal connection](https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/) to the Postgres pod:
+To set/change the password, use either the OpenShift console or `kubectl` to [open an SSH terminal connection](https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/) to the Postgres pod:
 ```sh
 $ kubectl exec -n <namespace> --stdin --tty deployment/<quayecosystem-name>-quay-postgresql -- /bin/bash
 ```
@@ -52,3 +52,26 @@ $ kubectl delete -n <namespace> quayregistry <quayecosystem-name>
 ```
 
 2. If external access was provided using a `Route`, change the `Route` to point back to the original `Service` using the UI or `kubectl`.
+
+
+#### Supported QuayEcosystem Configurations for Upgrades
+
+The Quay Operator will report errors in its logs and in `status.conditions` if migrating a `QuayEcosystem` component fails or is unsupported. All unmanaged components should migrate successfully because no Kubernetes resources need to be adopted and all the necessary values are already provided in Quay's `config.yaml`.
+
+**Database**
+Ephemeral database not supported (`volumeSize` field must be set). The `postgres` user must have a password set and referenced in `credentialsSecretName` (instructions above).
+
+**Redis**
+Nothing special needed.
+
+**External Access**
+Only `Route` access supported.
+
+**Clair**
+Nothing special needed.
+
+**Object Storage**
+`QuayEcosystem` did not have a managed object storage component, so object storage will always be marked as unmanaged. Local storage is not supported.
+
+**Repository Mirroring**
+Nothing special needed.

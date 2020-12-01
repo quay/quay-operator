@@ -3,8 +3,6 @@ package v1alpha1
 import (
 	"time"
 
-	// "github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/constants"
-	// "github.com/redhat-cop/quay-operator/pkg/controller/quayecosystem/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,6 +66,15 @@ const (
 	// QuayEcosystemSecurityScannerConfigurationFailure indicates that the security scanner configuration failed
 	QuayEcosystemSecurityScannerConfigurationFailure QuayEcosystemConditionType = "QuayEcosystemSecurityScannerConfigurationFailure"
 
+	// QuayEcosystemConfigMigrationFailure indicates that migrating a managed component failed.
+	QuayEcosystemConfigMigrationFailure QuayEcosystemConditionType = "QuayEcosystemConfigMigrationFailure"
+
+	// QuayEcosystemComponentMigrationFailure indicates that migrating a managed component failed.
+	QuayEcosystemComponentMigrationFailure QuayEcosystemConditionType = "QuayEcosystemComponentMigrationFailure"
+
+	// QuayEcosystemMigrationFailure indicates that migrating to `QuayRegistry` failed.
+	QuayEcosystemMigrationFailure QuayEcosystemConditionType = "QuayEcosystemMigrationFailure"
+
 	// ExtraCaCertConfigFileType specifies a Extra Ca Certificate file type
 	ExtraCaCertConfigFileType ConfigFileType = "extraCaCert"
 
@@ -111,6 +118,39 @@ type QuayEcosystemStatus struct {
 	// +listType=atomic
 	Conditions    []QuayEcosystemCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 	SetupComplete bool                     `json:"setupComplete,omitempty"`
+}
+
+// SetCondition adds or updates a given condition.
+// TODO: Use https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/api/meta/conditions.go when we can.
+func SetCondition(existing []QuayEcosystemCondition, newCondition QuayEcosystemCondition) []QuayEcosystemCondition {
+	if existing == nil {
+		existing = []QuayEcosystemCondition{}
+	}
+
+	for i, existingCondition := range existing {
+		if existingCondition.Type == newCondition.Type {
+			existing[i] = newCondition
+			return existing
+		}
+	}
+
+	return append(existing, newCondition)
+}
+
+// RemoveCondition removes any conditions with the matching type.
+func RemoveCondition(conditions []QuayEcosystemCondition, conditionType QuayEcosystemConditionType) []QuayEcosystemCondition {
+	if conditions == nil {
+		return []QuayEcosystemCondition{}
+	}
+
+	filtered := []QuayEcosystemCondition{}
+	for _, existingCondition := range conditions {
+		if existingCondition.Type != conditionType {
+			filtered = append(filtered, existingCondition)
+		}
+	}
+
+	return filtered
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -444,25 +484,9 @@ var (
 	RemoveOldField          QuayMigrationPhase = "remove-old-field"
 )
 
-// FIXME(alecmerdler): Might not need this...
 func init() {
 	SchemeBuilder.Register(&QuayEcosystem{}, &QuayEcosystemList{})
 }
-
-// GetKeys returns the keys found in Configuration Files
-// func (quayConfigFiles *ConfigFiles) GetKeys() []string {
-// 	keys := []string{}
-
-// 	if !utils.IsZeroOfUnderlyingType(quayConfigFiles.Files) {
-// 		for _, file := range quayConfigFiles.Files {
-// 			if !utils.IsZeroOfUnderlyingType(file) {
-// 				keys = append(keys, file.Key)
-// 			}
-// 		}
-// 	}
-// 	return keys
-
-// }
 
 // SetCondition applies the condition
 func (q *QuayEcosystem) SetCondition(newCondition QuayEcosystemCondition) *QuayEcosystemCondition {
@@ -507,22 +531,3 @@ func (q *QuayEcosystem) FindConditionByType(conditionType QuayEcosystemCondition
 
 	return &QuayEcosystemCondition{}, false
 }
-
-// GetQuayPort returns the port associated with Quay
-// func (q *QuayEcosystem) GetQuayPort() int32 {
-// 	if q.IsInsecureQuay() {
-// 		return constants.QuayHTTPContainerPort
-// 	}
-// 	return constants.QuayHTTPSContainerPort
-// }
-
-// IsInsecureQuay determines whether Quay is insecure
-// func (q *QuayEcosystem) IsInsecureQuay() bool {
-
-// 	if utils.IsZeroOfUnderlyingType(q.Spec.Quay.ExternalAccess.TLS.Termination) || q.Spec.Quay.ExternalAccess.TLS.Termination == EdgeTLSTerminationType || q.Spec.Quay.ExternalAccess.TLS.Termination == NoneTLSTerminationType {
-// 		return true
-// 	}
-
-// 	return false
-
-// }

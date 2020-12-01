@@ -34,6 +34,7 @@ import (
 	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -74,6 +75,7 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	var quayEcosystem redhatcop.QuayEcosystem
 	if err := r.Client.Get(ctx, req.NamespacedName, &quayEcosystem); err != nil {
 		log.Error(err, "unable to retrieve `QuayEcosystem`")
+
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -86,6 +88,13 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 		return ctrl.Result{}, nil
 	} else if migrationComplete, ok := quayEcosystemLabels[migrationCompleteLabel]; ok && migrationComplete == "true" {
 		log.Info("`QuayEcosystem` migration already completed, skipping")
+
+		updatedQuayEcosystem.Status.Conditions = redhatcop.RemoveCondition(updatedQuayEcosystem.Status.Conditions, redhatcop.QuayEcosystemConfigMigrationFailure)
+		updatedQuayEcosystem.Status.Conditions = redhatcop.RemoveCondition(updatedQuayEcosystem.Status.Conditions, redhatcop.QuayEcosystemComponentMigrationFailure)
+
+		if err := r.Client.Status().Update(ctx, updatedQuayEcosystem); err != nil {
+			log.Error(err, "failed to remove conditions from `QuayEcosystem`")
+		}
 
 		return ctrl.Result{}, nil
 	}
@@ -110,16 +119,28 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 	var configBundle corev1.Secret
 	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: quayEcosystem.GetNamespace(), Name: quayEnterpriseConfigSecretName}, &configBundle); err != nil {
-		log.Error(err, "failed to retrieve `quay-enterprise-config-secret`")
+		msg := "failed to retrieve `quay-enterprise-config-secret`"
+		log.Error(err, msg)
 
-		return ctrl.Result{}, nil
+		return r.reconcileWithCondition(
+			&quayEcosystem,
+			redhatcop.QuayEcosystemConfigMigrationFailure,
+			corev1.ConditionTrue,
+			"ConfigBundleSecretInvalid",
+			fmt.Sprintf("%s: %s", msg, err))
 	}
 
 	var baseConfig map[string]interface{}
 	if err := yaml.Unmarshal(configBundle.Data["config.yaml"], &baseConfig); err != nil {
-		log.Error(err, "failed to unmarshal config.yaml")
+		msg := "failed to unmarshal config.yaml"
+		log.Error(err, msg)
 
-		return ctrl.Result{}, nil
+		return r.reconcileWithCondition(
+			&quayEcosystem,
+			redhatcop.QuayEcosystemConfigMigrationFailure,
+			corev1.ConditionTrue,
+			"ConfigBundleSecretInvalid",
+			fmt.Sprintf("%s: %s", msg, err))
 	}
 
 	if canHandleObjectStorage(quayEcosystem) {
@@ -132,18 +153,32 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 		log.Info("successfully migrated managed object storage")
 	} else {
-		log.Error(errors.New("cannot migrate local object storage"), "failed to migrate object storage")
+		err := errors.New("cannot migrate local object storage")
+		msg := "failed to migrate object storage"
+		log.Error(err, msg)
 
-		return ctrl.Result{}, nil
+		return r.reconcileWithCondition(
+			&quayEcosystem,
+			redhatcop.QuayEcosystemComponentMigrationFailure,
+			corev1.ConditionTrue,
+			"ComponentUnsupported",
+			fmt.Sprintf("%s: %s", msg, err))
 	}
 
 	if canHandleDatabase(quayEcosystem) {
 		log.Info("attempting to migrate managed database")
 
 		if quayEcosystem.Spec.Quay.Database.CredentialsSecretName == "" {
-			log.Error(fmt.Errorf("database config missing `credentialsSecretName` containing password for `postgres` user"), "failed to migrate database")
+			err := fmt.Errorf("database config missing `credentialsSecretName` containing password for `postgres` user")
+			msg := "failed to migrate database"
+			log.Error(err, msg)
 
-			return ctrl.Result{}, nil
+			return r.reconcileWithCondition(
+				&quayEcosystem,
+				redhatcop.QuayEcosystemComponentMigrationFailure,
+				corev1.ConditionTrue,
+				"ComponentUnsupported",
+				fmt.Sprintf("%s: %s", msg, err))
 		}
 
 		log.Info("attempting to create `PersistentVolumeClaim` for database migration")
@@ -160,16 +195,6 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 				},
 			},
 		}
-
-		if err := r.Client.Create(ctx, &postgresPVC); err != nil {
-			log.Error(err, "failed to create `PersistentVolumeClaim` for database migration")
-
-			return ctrl.Result{}, nil
-		}
-
-		log.Info("successfully created `PersistentVolumeClaim` for database migration")
-
-		log.Info("attempting to create `Deployment` for database migration")
 
 		pgImage := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES")
 		if pgImage == "" {
@@ -279,10 +304,58 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 			},
 		}
 
-		if err := r.Client.Create(ctx, migrationDeployment); err != nil {
-			log.Error(err, "failed to create `Deployment` for database migration")
+		if err := wait.Poll(time.Second*1, time.Second*120, func() (bool, error) {
+			log.Info("checking that new database `PersistentVolumeClaim` does not already exist")
 
-			return ctrl.Result{}, nil
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: postgresPVC.GetName(), Namespace: postgresPVC.GetNamespace()}, &corev1.PersistentVolumeClaim{}); err == nil || !k8sErrors.IsNotFound(err) {
+				log.Info("attempting to delete new database `PersistentVolumeClaim` to start clean migration")
+
+				r.Client.Delete(ctx, migrationDeployment)
+				r.Client.Delete(ctx, &postgresPVC)
+
+				return false, nil
+			}
+
+			return true, nil
+		}); err != nil {
+			msg := "failed to clean up database migration resources from previous attempt"
+			log.Error(err, msg)
+
+			return r.reconcileWithCondition(
+				&quayEcosystem,
+				redhatcop.QuayEcosystemComponentMigrationFailure,
+				corev1.ConditionTrue,
+				"ComponentUnsupported",
+				fmt.Sprintf("%s: %s", msg, err))
+		}
+
+		if err := r.Client.Create(ctx, &postgresPVC); err != nil {
+			log.Error(err, "failed to create `PersistentVolumeClaim` for database migration")
+
+			msg := "failed to create `PersistentVolumeClaim` for database migration"
+			log.Error(err, msg)
+
+			return r.reconcileWithCondition(
+				&quayEcosystem,
+				redhatcop.QuayEcosystemComponentMigrationFailure,
+				corev1.ConditionTrue,
+				"ComponentUnsupported",
+				fmt.Sprintf("%s: %s", msg, err))
+		}
+
+		log.Info("successfully created `PersistentVolumeClaim` for database migration")
+		log.Info("attempting to create `Deployment` for database migration")
+
+		if err := r.Client.Create(ctx, migrationDeployment); err != nil {
+			msg := "failed to create `Deployment` for database migration"
+			log.Error(err, msg)
+
+			return r.reconcileWithCondition(
+				&quayEcosystem,
+				redhatcop.QuayEcosystemComponentMigrationFailure,
+				corev1.ConditionTrue,
+				"ComponentUnsupported",
+				fmt.Sprintf("%s: %s", msg, err))
 		}
 
 		log.Info("successfully created `Deployment` for database migration", "deployment", migrationDeployment.GetNamespace()+"/"+migrationDeployment.GetName())
@@ -322,15 +395,27 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 		})
 
 		if err != nil {
-			log.Error(err, "failed to check status of database migration `Deployment`")
+			msg := "database migration pod blocked, ensure that the `postgres` user has a password set"
+			log.Error(err, msg)
 
-			return ctrl.Result{}, nil
+			return r.reconcileWithCondition(
+				&quayEcosystem,
+				redhatcop.QuayEcosystemComponentMigrationFailure,
+				corev1.ConditionTrue,
+				"ComponentUnsupported",
+				fmt.Sprintf("%s: %s", msg, err))
 		}
 
 		if err := r.Client.Delete(ctx, migrationDeployment); err != nil {
-			log.Error(err, "failed to delete `Deployment` after database migration")
+			msg := "failed to delete `Deployment` after database migration"
+			log.Error(err, msg)
 
-			return ctrl.Result{}, nil
+			return r.reconcileWithCondition(
+				&quayEcosystem,
+				redhatcop.QuayEcosystemComponentMigrationFailure,
+				corev1.ConditionTrue,
+				"ComponentUnsupported",
+				fmt.Sprintf("%s: %s", msg, err))
 		}
 
 		for _, field := range (&database.DatabaseFieldGroup{}).Fields() {
@@ -426,8 +511,15 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	}
 	config, err := yaml.Marshal(baseConfig)
 	if err != nil {
-		log.Error(err, "failed to marshal `config.yaml`")
-		return ctrl.Result{}, nil
+		msg := "failed to marshal `config.yaml`"
+		log.Error(err, msg)
+
+		return r.reconcileWithCondition(
+			&quayEcosystem,
+			redhatcop.QuayEcosystemConfigMigrationFailure,
+			corev1.ConditionTrue,
+			"ConfigBundleSecretInvalid",
+			fmt.Sprintf("%s: %s", msg, err))
 	}
 
 	log.Info("attempting to create base `configBundleSecret`", "configBundleSecret", quayEcosystem.GetName()+"-config-bundle-")
@@ -444,22 +536,70 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	log.Info("attempting to create `QuayRegistry` from `QuayEcosystem`")
 
 	if err := r.Client.Create(ctx, quayRegistry); err != nil {
-		log.Error(err, "failed to create `QuayRegistry` from `QuayEcosystem`")
-		return ctrl.Result{}, nil
+		msg := "failed to create `QuayRegistry` from `QuayEcosystem`"
+		log.Error(err, msg)
+
+		return r.reconcileWithCondition(
+			&quayEcosystem,
+			redhatcop.QuayEcosystemMigrationFailure,
+			corev1.ConditionTrue,
+			"QuayRegistryCreationError",
+			fmt.Sprintf("%s: %s", msg, err))
 	}
 
 	log.Info("succesfully created `QuayRegistry` from `QuayEcosystem`")
+
+	// Fetch `QuayEcosystem` again to ensure we have the most recent version.
+	if err := r.Client.Get(ctx, req.NamespacedName, updatedQuayEcosystem); err != nil {
+		log.Error(err, "unable to retrieve `QuayEcosystem`")
+
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
 	newLabels := updatedQuayEcosystem.GetLabels()
 	newLabels[migrationCompleteLabel] = "true"
 	updatedQuayEcosystem.SetLabels(newLabels)
 
 	if err := r.Client.Update(ctx, updatedQuayEcosystem); err != nil {
-		log.Error(err, "failed to mark `QuayEcosystem` with migration completed label")
-		return ctrl.Result{}, nil
+		msg := "failed to mark `QuayEcosystem` with migration completed label"
+		log.Error(err, msg)
+
+		return r.reconcileWithCondition(
+			updatedQuayEcosystem,
+			redhatcop.QuayEcosystemMigrationFailure,
+			corev1.ConditionTrue,
+			"QuayEcosystemLabelError",
+			fmt.Sprintf("%s: %s", msg, err))
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *QuayEcosystemReconciler) updateWithCondition(q *redhatcop.QuayEcosystem, t redhatcop.QuayEcosystemConditionType, s corev1.ConditionStatus, reason, msg string) (*redhatcop.QuayEcosystem, error) {
+	updatedQuay := q.DeepCopy()
+
+	condition := redhatcop.QuayEcosystemCondition{
+		Type:               t,
+		Status:             s,
+		Reason:             reason,
+		Message:            msg,
+		LastUpdateTime:     metav1.Now(),
+		LastTransitionTime: metav1.Now(),
+	}
+	updatedQuay.Status.Conditions = redhatcop.SetCondition(q.Status.Conditions, condition)
+
+	if err := r.Client.Status().Update(context.Background(), updatedQuay); err != nil {
+		return nil, err
+	}
+
+	return updatedQuay, nil
+}
+
+// reconcileWithCondition sets the given condition on the `QuayEcosystem` and returns a reconcile result.
+func (r *QuayEcosystemReconciler) reconcileWithCondition(q *redhatcop.QuayEcosystem, t redhatcop.QuayEcosystemConditionType, s corev1.ConditionStatus, reason, msg string) (ctrl.Result, error) {
+	_, err := r.updateWithCondition(q, t, s, reason, msg)
+
+	return ctrl.Result{}, err
 }
 
 func canHandleDatabase(q redhatcop.QuayEcosystem) bool {
