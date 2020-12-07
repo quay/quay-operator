@@ -21,3 +21,4 @@ spec:
       targetPort: 8081
   selector:
     quay-component: quay-app
+    # FIXME(alecmerdler): This won't work with multiple `QuayRegistries` in the same namespace...
