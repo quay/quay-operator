@@ -413,7 +413,7 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []
 		Auth: config.Auth{
 			PSK: &config.AuthPSK{
 				Key:    psk,
-				Issuer: []string{"quay"},
+				Issuer: []string{"quay", "clairctl"},
 			},
 		},
 		Metrics: config.Metrics{
