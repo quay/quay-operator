@@ -122,15 +122,20 @@ func createUpdatedSecret(reconfigureRequest request) corev1.Secret {
 	if len(reconfigureRequest.Namespace) == 0 {
 		panic("namespace not provided")
 	}
+
 	if len(reconfigureRequest.QuayRegistryName) == 0 {
 		panic("quayRegistryName not provided")
 	}
 
 	secretData["config.yaml"] = encode(reconfigureRequest.Config)
 	for fullFilePathname, encodedCert := range reconfigureRequest.Certs {
-		log.Println("including cert in secret: " + fullFilePathname)
 		certName := strings.Split(fullFilePathname, "/")[len(strings.Split(fullFilePathname, "/"))-1]
-		secretData["extra_ca_cert_"+strings.ReplaceAll(certName, "extra_ca_cert_", "")] = encodedCert
+		if strings.HasPrefix(fullFilePathname, "extra_ca_certs/") {
+			certName = "extra_ca_cert_" + strings.ReplaceAll(certName, "extra_ca_cert_", "")
+		}
+		secretData[certName] = encodedCert
+
+		log.Println("including cert in secret: " + certName)
 	}
 
 	newSecret := corev1.Secret{
