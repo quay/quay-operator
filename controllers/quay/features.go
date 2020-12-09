@@ -3,11 +3,13 @@ package controllers
 import (
 	"context"
 	"strings"
+	"time"
 
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,29 +25,48 @@ const (
 )
 
 func (r *QuayRegistryReconciler) checkRoutesAvailable(quay *v1.QuayRegistry) (*v1.QuayRegistry, error) {
-	var routes routev1.RouteList
-	err := r.Client.List(context.Background(), &routes)
-	if err == nil {
-		r.Log.Info("cluster supports `Routes` API")
-		existingAnnotations := quay.GetAnnotations()
-		if existingAnnotations == nil {
-			existingAnnotations = map[string]string{}
-		}
+	fakeRoute, err := v1.EnsureOwnerReference(quay, &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      quay.GetName() + "-test-route",
+			Namespace: quay.GetNamespace(),
+		},
+		Spec: routev1.RouteSpec{To: routev1.RouteTargetReference{Kind: "Service", Name: "none"}},
+	})
 
-		existingAnnotations[v1.SupportsRoutesAnnotation] = "true"
-
-		if _, ok := existingAnnotations[v1.ClusterHostnameAnnotation]; !ok && len(routes.Items) > 0 {
-			for _, route := range routes.Items {
-				if len(route.Status.Ingress) > 0 {
-					existingAnnotations[v1.ClusterHostnameAnnotation] = route.Status.Ingress[0].RouterCanonicalHostname
-					r.Log.Info("detected router canonical hostname: " + route.Status.Ingress[0].RouterCanonicalHostname)
-					break
-				}
-			}
-		}
-
-		quay.SetAnnotations(existingAnnotations)
+	if err != nil {
+		return quay, err
 	}
+
+	if err := r.Client.Create(context.Background(), fakeRoute); err != nil {
+		return quay, err
+	}
+
+	r.Log.Info("cluster supports `Routes` API")
+
+	// Wait until `status.ingress` is populated.
+	time.Sleep(time.Millisecond * 500)
+
+	if err := r.Client.Get(context.Background(), types.NamespacedName{Name: quay.GetName() + "-test-route", Namespace: quay.GetNamespace()}, fakeRoute); err != nil {
+		return quay, err
+	}
+
+	existingAnnotations := quay.GetAnnotations()
+	if existingAnnotations == nil {
+		existingAnnotations = map[string]string{}
+	}
+
+	existingAnnotations[v1.SupportsRoutesAnnotation] = "true"
+
+	if _, ok := existingAnnotations[v1.ClusterHostnameAnnotation]; !ok {
+		existingAnnotations[v1.ClusterHostnameAnnotation] = fakeRoute.(*routev1.Route).Status.Ingress[0].RouterCanonicalHostname
+		r.Log.Info("detected router canonical hostname: " + existingAnnotations[v1.ClusterHostnameAnnotation])
+	}
+
+	if err := r.Client.Delete(context.Background(), fakeRoute); err != nil {
+		return quay, err
+	}
+
+	quay.SetAnnotations(existingAnnotations)
 
 	return quay, nil
 }

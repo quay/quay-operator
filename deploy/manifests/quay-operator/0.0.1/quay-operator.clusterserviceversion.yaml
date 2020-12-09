@@ -138,7 +138,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
                 - name: RELATED_IMAGE_COMPONENT_QUAY
-                  value: quay.io/projectquay/quay@sha256:acd4fa1d6c4045020c8b5483a4de5741692240e7137b6cb4a12bdadffe8bdfac
+                  value: quay.io/projectquay/quay@sha256:a544ee36a20cb24d02a5f7b70daef776b169e3b2cdfc8f5dcf605475067ac8b0
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
                   value: quay.io/projectquay/clair@sha256:70c99feceb4c0973540d22e740659cd8d616775d3ad1c1698ddf71d0221f3ce6
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES
