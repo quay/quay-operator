@@ -6,15 +6,9 @@ resources:
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
   - ./init.job.yaml
-generatorOptions:
-  disableNameSuffixHash: true
 secretGenerator:
+  # NOTE: `postgres-config-secret` fields generated in `kustomize.go`.
+  - name: postgres-config-secret
   - name: postgres-bootstrap
     files:
       - ./create-extensions.sh
-vars:
-  - name: POSTGRES_DEPLOYMENT_NAME
-    objref:
-      kind: Deployment
-      apiVersion: apps/v1
-      name: quay-database

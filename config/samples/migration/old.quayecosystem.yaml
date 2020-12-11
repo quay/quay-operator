@@ -9,17 +9,18 @@ spec:
       volumeSize: 10Gi
       credentialsSecretName: old-quay-database
     externalAccess:
-      type: LoadBalancer
-      hostname: projquay-1345.skynet-dev.com
+      tls:
+        secretName: old-quay-tls
+        termination: passthrough
     registryBackends:
-      - name: default
+      - name: <driver>
         rhocs:
-          hostname: s3.openshift-storage.svc
+          hostname: <hostname>
           port: 443
           secure: true
-          accessKey: uxf9MtIRvsGLxCmbUcXR
-          secretKey: j2+KBW+rOl4efOdtzLQXGMMC0u8xMEgPxyAAqBjs
-          bucketName: projquay-1345-7f6ce2ff-1efb-4e67-9be5-3128967ef0f9
+          accessKey: <accessKey>
+          secretKey: <secretKey>
+          bucketName: <bucketName>
     configFiles:
       - secretName: quay-extra-certs
         type: extraCaCert

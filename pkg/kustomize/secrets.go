@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -147,11 +148,14 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 			return nil, err
 		}
 		user := quay.GetName() + "-quay-database"
-		// FIXME(alecmerdler): Make this more secure using `generateRandomString()`...
-		password := "postgres"
+		name := quay.GetName() + "-quay-database"
 		host := strings.Join([]string{quay.GetName(), "quay-database"}, "-")
 		port := "5432"
-		name := quay.GetName() + "-quay-database"
+		password, err := generateRandomString(32)
+		if err != nil {
+			return nil, err
+		}
+
 		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
 
 		return fieldGroup, nil
@@ -292,6 +296,7 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component string
 	return false, nil
 }
 
+// TODO(alecmerdler): Refactor this into `FieldGroupFor`.
 func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[string]interface{}) map[string][]byte {
 	configFiles := map[string][]byte{}
 	fieldGroup, err := FieldGroupFor(component, quay)
@@ -344,6 +349,36 @@ func fieldGroupFor(component string) string {
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
 func componentConfigFilesFor(component string, quay *v1.QuayRegistry, configFiles map[string][]byte) (map[string][]byte, error) {
 	switch component {
+	case "postgres":
+		dbConfig, ok := configFiles["postgres.config.yaml"]
+		if !ok {
+			return nil, fmt.Errorf("cannot generate managed component config file for `postgres` if `postgres.config.yaml` is missing")
+		}
+
+		var fieldGroup database.DatabaseFieldGroup
+		if err := yaml.Unmarshal(dbConfig, &fieldGroup); err != nil {
+			return nil, err
+		}
+
+		dbURI, err := url.Parse(fieldGroup.DbUri)
+		if err != nil {
+			return nil, err
+		}
+
+		databaseUsername := dbURI.User.Username()
+		databasePassword, _ := dbURI.User.Password()
+		databaseName := dbURI.Path[1:]
+		databaseRootPassword, err := generateRandomString(32)
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string][]byte{
+			"database-username":      []byte(databaseUsername),
+			"database-password":      []byte(databasePassword),
+			"database-name":          []byte(databaseName),
+			"database-root-password": []byte(databaseRootPassword),
+		}, nil
 	case "clair":
 		var quayHostname string
 		for _, component := range quay.Spec.Components {
@@ -378,7 +413,6 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
 	dbname := "postgres"
 	user := "postgres"
-	// FIXME(alecmerdler): Make this more secure...
 	password := "postgres"
 
 	psk, err := base64.StdEncoding.DecodeString(preSharedKey)

@@ -6,6 +6,8 @@ metadata:
     quay-component: quay-app-upgrade
 spec:
   replicas: 0
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       quay-component: quay-app-upgrade
