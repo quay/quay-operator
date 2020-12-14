@@ -107,7 +107,7 @@ spec:
   install:
     spec:
       deployments:
-      - name: quay-operator
+      - name: quay-operator.v3.4.0
         spec:
           replicas: 1
           selector:

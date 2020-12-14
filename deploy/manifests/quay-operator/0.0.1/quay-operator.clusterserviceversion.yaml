@@ -106,7 +106,7 @@ spec:
   install:
     spec:
       deployments:
-      - name: quay-operator
+      - name: quay-operator-tng
         spec:
           replicas: 1
           selector:
