@@ -45,8 +45,12 @@ import (
 	"github.com/quay/quay-operator/pkg/kustomize"
 )
 
-const upgradePollInterval = time.Second * 10
-const upgradePollTimeout = time.Second * 600
+const (
+	upgradePollInterval  = time.Second * 10
+	upgradePollTimeout   = time.Second * 600
+	creationPollInterval = time.Second * 1
+	creationPollTimeout  = time.Second * 600
+)
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
 type QuayRegistryReconciler struct {
@@ -321,7 +325,6 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 					return true, nil
 				}
-
 				return false, nil
 			})
 
@@ -371,26 +374,33 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 	objectMeta.SetManagedFields([]metav1.ManagedFieldsEntry{})
 
 	if immutableResources[groupVersionKind] {
-		log.Info("deleting immutable resource")
-		if err := r.Client.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {
+		log.Info("(re)creating immutable resource")
+		if err := r.Client.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) && !errors.IsAlreadyExists(err) {
 			log.Error(err, "failed to delete immutable resource")
 
 			return err
 		}
 
-		if err := r.Client.Create(ctx, obj); err != nil {
-			log.Error(err, "failed to create new immutable resource")
+		err := wait.Poll(creationPollInterval, creationPollTimeout, func() (bool, error) {
+			if err := r.Client.Create(ctx, obj); err == nil {
+				return true, nil
+			} else if errors.IsAlreadyExists(err) {
+				return false, nil
+			} else {
+				return false, err
+			}
+		})
+
+		if err != nil {
+			log.Error(err, "failed to create immutable resource")
 
 			return err
 		}
 
-		log.Info("succefully re-created immutable resource")
+		log.Info("succefully (re)created immutable resource")
 	} else {
-		opts := []client.PatchOption{}
-		opts = append([]client.PatchOption{client.ForceOwnership, client.FieldOwner("quay-operator")}, opts...)
-		err = r.Client.Patch(ctx, obj, client.Apply, opts...)
-
-		if err != nil {
+		opts := []client.PatchOption{client.ForceOwnership, client.FieldOwner("quay-operator")}
+		if err := r.Client.Patch(ctx, obj, client.Apply, opts...); err != nil {
 			log.Error(err, "failed to create/update object")
 
 			return err
