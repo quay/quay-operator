@@ -16,31 +16,15 @@ If `status.currentVersion` does not equal the Operator version, check if it can 
 
 ### From QuayEcosystem
 
-Upgrades are supported from previous versions of the Operator which used the `QuayEcosystem` API. To ensure that migrations do not happen unexpectedly, a special label needs to be applied to the `QuayEcosystem` for it to be migrated. A new `QuayRegistry` will be created for the Operator to manage, but the old `QuayEcosystem` will remain until manually deleted to ensure that you can roll back and still access Quay in case anything goes wrong. To migrate an existing `QuayEcosystem` to a new `QuayRegistry`, follow these steps:
+Upgrades are supported from previous versions of the Operator which used the `QuayEcosystem` API for a limited set of configurations. To ensure that migrations do not happen unexpectedly, a special label needs to be applied to the `QuayEcosystem` for it to be migrated. A new `QuayRegistry` will be created for the Operator to manage, but the old `QuayEcosystem` will remain until manually deleted to ensure that you can roll back and still access Quay in case anything goes wrong. To migrate an existing `QuayEcosystem` to a new `QuayRegistry`, follow these steps:
 
-1. Ensure that the existing managed Postgres database has a password set for the `postgres` root admin user (not set by default). This allows remote access to the database for migration. The Operator looks for this password in the `Secret` referenced by `spec.quay.database.credentialsSecretKey` under the `database-root-password` key.
+1. Add `"quay-operator/migrate": "true"` to the `metadata.labels` of the `QuayEcosystem`.
 
-To set/change the password, use either the OpenShift console or `kubectl` to [open an SSH terminal connection](https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/) to the Postgres pod:
-```sh
-$ kubectl exec -n <namespace> --stdin --tty deployment/<quayecosystem-name>-quay-postgresql -- /bin/bash
-```
+2. Wait for a `QuayRegistry` to be created with the same `metadata.name` as your `QuayEcosystem`. The `QuayEcosystem` will be marked with the label `"quay-operator/migration-complete": "true"`.
 
-Execute the following command and follow instructions to change the password:
-```sh
-$ psql
-psql (10.12)
-Type "help" for help.
+3. Once the `status.registryEndpoint` of the new `QuayRegistry` is set, access Quay and confirm all data and settings were migrated successfully.
 
-postgres=# \password
-```
-
-2. Add `"quay-operator/migrate": "true"` to the `metadata.labels` of the `QuayEcosystem`.
-
-3. Wait for a `QuayRegistry` to be created with the same `metadata.name` as your `QuayEcosystem`.
-
-4. Once the `status.registryEndpoint` of the new `QuayRegistry` is set, access Quay and confirm all data and settings were migrated successfully.
-
-5. When you are confident everything worked correctly, you may delete the `QuayEcosystem` and Kubernetes garbage collection will clean up all old resources.
+4. When you are confident everything worked correctly, you may delete the `QuayEcosystem` and Kubernetes garbage collection will clean up all old resources.
 
 #### Reverting QuayEcosystem Upgrade
 
@@ -53,25 +37,36 @@ $ kubectl delete -n <namespace> quayregistry <quayecosystem-name>
 
 2. If external access was provided using a `Route`, change the `Route` to point back to the original `Service` using the UI or `kubectl`.
 
-
 #### Supported QuayEcosystem Configurations for Upgrades
 
 The Quay Operator will report errors in its logs and in `status.conditions` if migrating a `QuayEcosystem` component fails or is unsupported. All unmanaged components should migrate successfully because no Kubernetes resources need to be adopted and all the necessary values are already provided in Quay's `config.yaml`.
 
 **Database**
-Ephemeral database not supported (`volumeSize` field must be set). The `postgres` user must have a password set and referenced in `credentialsSecretName` (instructions above).
+
+Ephemeral database not supported (`volumeSize` field must be set).
 
 **Redis**
+
 Nothing special needed.
 
 **External Access**
-Only `Route` access supported.
+
+Only `Route` access supported for automatic migration. Manual migration required for other methods.
+
+* `LoadBalancer` without custom hostname:
+After the `QuayEcosystem` is marked with label `"quay-operator/migration-complete": "true"`, delete the `metadata.ownerReferences` field from existing `Service` _before_ deleting the `QuayEcosystem` to prevent Kubernetes from garbage collecting the `Service` and removing the load balancer. A new `Service` will be created with `metadata.name` format `<QuayEcosystem-name>-quay-app`. Edit the `spec.selector` of the existing `Service` to match the `spec.selector` of the new `Service` so traffic to the old load balancer endpoint will now be directed to the new pods. You are now responsible for the old `Service`; the Quay Operator will not manage it.
+
+* `LoadBalancer`/`NodePort`/`Ingress` with custom hostname:
+A new `Service` of type `LoadBalancer` will be created with `metadata.name` format `<QuayEcosystem-name>-quay-app`. Change your DNS settings to point to the `status.loadBalancer` endpoint provided by the new `Service`.
 
 **Clair**
+
 Nothing special needed.
 
 **Object Storage**
+
 `QuayEcosystem` did not have a managed object storage component, so object storage will always be marked as unmanaged. Local storage is not supported.
 
 **Repository Mirroring**
+
 Nothing special needed.

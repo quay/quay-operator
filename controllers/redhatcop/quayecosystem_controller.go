@@ -54,6 +54,9 @@ const (
 	migrationComponentLabel        = "quay-operator/migration-component"
 	quayEnterpriseConfigSecretName = "quay-enterprise-config-secret"
 	migratedFromAnnotation         = "quay-operator/migrated-from"
+
+	pollInterval = time.Second * 5
+	pollTimeout  = time.Second * 600
 )
 
 // QuayEcosystemReconciler reconciles a QuayEcosystem object
@@ -168,9 +171,16 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	if canHandleDatabase(quayEcosystem) {
 		log.Info("attempting to migrate managed database")
 
-		if quayEcosystem.Spec.Quay.Database.CredentialsSecretName == "" {
-			err := fmt.Errorf("database config missing `credentialsSecretName` containing password for `postgres` user")
-			msg := "failed to migrate database"
+		credentialsSecretName := quayEcosystem.Spec.Quay.Database.CredentialsSecretName
+		if credentialsSecretName == "" {
+			credentialsSecretName = defaultDBSecretFor(quayEcosystem)
+		}
+
+		log.Info("using `Secret` containing database credentials", "credentialsSecretName", credentialsSecretName)
+
+		var postgresDeployment appsv1.Deployment
+		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: quayEcosystem.GetNamespace(), Name: defaultDBSecretFor(quayEcosystem)}, &postgresDeployment); err != nil {
+			msg := "failed to retrieve existing managed database `Deployment`"
 			log.Error(err, msg)
 
 			return r.reconcileWithCondition(
@@ -181,6 +191,38 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 				fmt.Sprintf("%s: %s", msg, err))
 		}
 
+		// This environemnt variable wasn't being added by previous Operator version and prevents external access as the `postgres` user.
+		envVars := []corev1.EnvVar{
+			{
+				Name: "POSTGRESQL_ADMIN_PASSWORD",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecretName},
+						Key:                  "database-root-password",
+					},
+				},
+			},
+		}
+		for _, envVar := range postgresDeployment.Spec.Template.Spec.Containers[0].Env {
+			if envVar.Name != "POSTGRESQL_ADMIN_PASSWORD" {
+				envVars = append(envVars, envVar)
+			}
+		}
+		postgresDeployment.Spec.Template.Spec.Containers[0].Env = envVars
+
+		if err := r.Client.Update(ctx, &postgresDeployment); err != nil {
+			msg := "failed to update managed Postgres `Deployment` with `POSTGRESQL_ADMIN_PASSWORD` environment variable"
+			log.Error(err, msg)
+
+			return r.reconcileWithCondition(
+				&quayEcosystem,
+				redhatcop.QuayEcosystemComponentMigrationFailure,
+				corev1.ConditionTrue,
+				"ComponentUnsupported",
+				fmt.Sprintf("%s: %s", msg, err))
+		}
+
+		log.Info("successfully updated managed Postgres `Deployment` with `POSTGRESQL_ADMIN_PASSWORD` environment variable")
 		log.Info("attempting to create `PersistentVolumeClaim` for database migration")
 
 		postgresPVC := corev1.PersistentVolumeClaim{
@@ -201,6 +243,7 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 			pgImage = "centos/postgresql-10-centos7"
 		}
 
+		cleanupCommand := `sleep 20; rm -f /tmp/change-username.sql /tmp/check-user.sql; echo "ALTER ROLE \"$OLD_DB_USERNAME\" RENAME TO \"$NEW_DB_USERNAME\"; ALTER DATABASE \"$OLD_DB_NAME\" RENAME TO \"$NEW_DB_NAME\";" > /tmp/change-username.sql; echo "SELECT 1 FROM pg_roles WHERE rolname = '$NEW_DB_USERNAME';" > /tmp/check-user.sql; psql -h localhost -f /tmp/check-user.sql | grep -q 1 || psql -h localhost -f /tmp/change-username.sql; sleep 600;`
 		migrationDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      quayRegistry.GetName() + "-quay-postgres-migration",
@@ -256,7 +299,7 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 										Name: "PGPASSWORD",
 										ValueFrom: &corev1.EnvVarSource{
 											SecretKeyRef: &corev1.SecretKeySelector{
-												LocalObjectReference: corev1.LocalObjectReference{Name: quayEcosystem.Spec.Quay.Database.CredentialsSecretName},
+												LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecretName},
 												Key:                  "database-root-password",
 											},
 										},
@@ -278,7 +321,7 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 										// NOTE: By default, `QuayEcosystems` will not have a password set for `postgres` user, preventing remote connections. Users must SSH into Postgres pod and use `\password` before beginning migration.
 										ValueFrom: &corev1.EnvVarSource{
 											SecretKeyRef: &corev1.SecretKeySelector{
-												LocalObjectReference: corev1.LocalObjectReference{Name: quayEcosystem.Spec.Quay.Database.CredentialsSecretName},
+												LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecretName},
 												Key:                  "database-root-password",
 											},
 										},
@@ -298,13 +341,62 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 									},
 								},
 							},
+							{
+								Name:    "quay-postgres-migration-cleanup",
+								Image:   pgImage,
+								Command: []string{"/bin/bash", "-c", cleanupCommand},
+								ReadinessProbe: &corev1.Probe{
+									Handler: corev1.Handler{
+										Exec: &corev1.ExecAction{
+											Command: []string{"/bin/bash", "-c", "psql -h localhost -f /tmp/check-user.sql | grep -q 1"},
+										},
+									},
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name: "PGPASSWORD",
+										ValueFrom: &corev1.EnvVarSource{
+											SecretKeyRef: &corev1.SecretKeySelector{
+												LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecretName},
+												Key:                  "database-root-password",
+											},
+										},
+									},
+									{
+										Name: "OLD_DB_USERNAME",
+										ValueFrom: &corev1.EnvVarSource{
+											SecretKeyRef: &corev1.SecretKeySelector{
+												LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecretName},
+												Key:                  "database-username",
+											},
+										},
+									},
+									{
+										Name:  "NEW_DB_USERNAME",
+										Value: quayEcosystem.GetName() + "-quay-database",
+									},
+									{
+										Name: "OLD_DB_NAME",
+										ValueFrom: &corev1.EnvVarSource{
+											SecretKeyRef: &corev1.SecretKeySelector{
+												LocalObjectReference: corev1.LocalObjectReference{Name: credentialsSecretName},
+												Key:                  "database-name",
+											},
+										},
+									},
+									{
+										Name:  "NEW_DB_NAME",
+										Value: quayEcosystem.GetName() + "-quay-database",
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 		}
 
-		if err := wait.Poll(time.Second*1, time.Second*120, func() (bool, error) {
+		if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 			log.Info("checking that new database `PersistentVolumeClaim` does not already exist")
 
 			if err := r.Client.Get(ctx, types.NamespacedName{Name: postgresPVC.GetName(), Namespace: postgresPVC.GetNamespace()}, &corev1.PersistentVolumeClaim{}); err == nil || !k8sErrors.IsNotFound(err) {
@@ -360,7 +452,7 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 		log.Info("successfully created `Deployment` for database migration", "deployment", migrationDeployment.GetNamespace()+"/"+migrationDeployment.GetName())
 
-		err := wait.Poll(time.Second*15, time.Second*120, func() (bool, error) {
+		err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 			log.Info("checking if database migration `Deployment` completed")
 
 			if err := r.Client.Get(ctx, types.NamespacedName{Namespace: migrationDeployment.GetNamespace(), Name: migrationDeployment.GetName()}, migrationDeployment); err != nil {
@@ -385,9 +477,17 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 			for _, migrationPod := range migrationPods.Items {
 				if !migrationPod.Status.InitContainerStatuses[0].Ready {
-					log.Info("database migration pod blocked, ensure that the `postgres` user has a password set")
+					log.Info("database migration pod in progress")
 
 					return false, nil
+				}
+
+				for _, containerStatus := range migrationPod.Status.ContainerStatuses {
+					if !containerStatus.Ready {
+						log.Info("database migration container not ready", "container", containerStatus.Name)
+
+						return false, nil
+					}
 				}
 			}
 
@@ -395,7 +495,7 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 		})
 
 		if err != nil {
-			msg := "database migration pod blocked, ensure that the `postgres` user has a password set"
+			msg := "database migration pod failed"
 			log.Error(err, msg)
 
 			return r.reconcileWithCondition(
@@ -648,6 +748,10 @@ func clean(config map[string]interface{}) map[string]interface{} {
 	}
 
 	return config
+}
+
+func defaultDBSecretFor(q redhatcop.QuayEcosystem) string {
+	return q.GetName() + "-quay-postgresql"
 }
 
 func (r *QuayEcosystemReconciler) SetupWithManager(mgr ctrl.Manager) error {

@@ -36,6 +36,7 @@ const (
 	registryHostnameKey        = "quay-registry-hostname"
 	managedFieldGroupsKey      = "quay-managed-fieldgroups"
 	operatorServiceEndpointKey = "quay-operator-service-endpoint"
+	quayRegistryNameKey        = "quay-operator/quayregistry"
 
 	podNamespaceKey = "MY_POD_NAMESPACE"
 
@@ -308,6 +309,9 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		Images:          images,
 		Components:      componentPaths,
 		SecretGenerator: generatedSecrets,
+		CommonLabels: map[string]string{
+			quayRegistryNameKey: quay.GetName(),
+		},
 		CommonAnnotations: map[string]string{
 			managedFieldGroupsKey:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
 			registryHostnameKey:        string(quayConfigFiles[registryHostnameKey]),

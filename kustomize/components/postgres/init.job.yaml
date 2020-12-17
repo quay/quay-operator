@@ -23,9 +23,15 @@ spec:
             - /opt/app-root/src/docker-entrypoint-initdb.d/create-extensions.sh
           env: 
             - name: POSTGRESQL_DATABASE
-              value: $(POSTGRES_DEPLOYMENT_NAME)
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-config-secret
+                  key: database-name
             - name: PGPASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-config-secret
+                  key: database-root-password
           volumeMounts:
             - name: postgres-bootstrap
               mountPath: /opt/app-root/src/docker-entrypoint-initdb.d

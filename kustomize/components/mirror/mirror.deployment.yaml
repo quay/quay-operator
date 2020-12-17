@@ -6,6 +6,8 @@ metadata:
     quay-component: quay-mirror
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       quay-component: quay-mirror

@@ -178,7 +178,6 @@ var quayComponents = map[string][]runtime.Object{
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-secret"}},
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cluster-service-ca"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor-credentials"}},
-		// &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-registry-managed-secret-keys"}},
 	},
 	"clair": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clair-config-secret"}},
@@ -190,6 +189,7 @@ var quayComponents = map[string][]runtime.Object{
 	},
 	"postgres": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "postgres-bootstrap"}},
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "postgres-config-secret"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},

@@ -6,6 +6,8 @@ metadata:
     quay-component: postgres
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       quay-component: postgres
@@ -28,13 +30,25 @@ spec:
           # TODO(alecmerdler): Readiness/liveliness probes which execute `psql` command to check if database is created.
           env:
             - name: POSTGRESQL_USER
-              value: $(POSTGRES_DEPLOYMENT_NAME)
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-config-secret
+                  key: database-username
             - name: POSTGRESQL_DATABASE
-              value: $(POSTGRES_DEPLOYMENT_NAME)
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-config-secret
+                  key: database-name
             - name: POSTGRESQL_ADMIN_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-config-secret
+                  key: database-root-password
             - name: POSTGRESQL_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-config-secret
+                  key: database-password
             - name: POSTGRESQL_SHARED_BUFFERS
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS

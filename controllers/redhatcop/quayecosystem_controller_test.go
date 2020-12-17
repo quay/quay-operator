@@ -31,7 +31,7 @@ func newQuayEcosystem(name, namespace string) *redhatcop.QuayEcosystem {
 		},
 		Spec: redhatcop.QuayEcosystemSpec{
 			Quay: &redhatcop.Quay{
-				Database:         &redhatcop.Database{VolumeSize: "10Gi", CredentialsSecretName: "quay-database"},
+				Database:         &redhatcop.Database{Server: "some-external-database"},
 				RegistryBackends: []redhatcop.RegistryBackend{{Name: "default"}},
 				ExternalAccess: &redhatcop.ExternalAccess{
 					Type: redhatcop.RouteExternalAccessType,
@@ -159,8 +159,6 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 
 			Context("is unsupported for migration", func() {
 				JustBeforeEach(func() {
-					quayEcosystem.Spec.Quay.Database = &redhatcop.Database{Server: "some-external-database"}
-
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
 					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
@@ -186,29 +184,35 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 				})
 			})
 
-			Context("is missing the credentials `Secret` containing the root password", func() {
-				JustBeforeEach(func() {
-					quayEcosystem.Spec.Quay.Database = &redhatcop.Database{VolumeSize: "10Gi"}
-
-					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
-
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
-				})
-
-				It("does not create a `QuayRegistry`", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(result.Requeue).To(BeFalse())
-
-					err = k8sClient.Get(context.Background(), quayRegistryName, &v1.QuayRegistry{})
-
-					Expect(err).To(HaveOccurred())
-					Expect(errors.IsNotFound(err)).To(BeTrue())
-				})
-			})
-
 			Context("is supported for migration", func() {
 				JustBeforeEach(func() {
+					quayEcosystem.Spec.Quay.Database = &redhatcop.Database{VolumeSize: "50Gi"}
+
+					oldDatabase := &appsv1.Deployment{
+						ObjectMeta: metav1.ObjectMeta{Name: "test-registry-quay-postgresql", Namespace: namespace},
+						Spec: appsv1.DeploymentSpec{
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"quay-database": quayEcosystemName.Name},
+							},
+							Template: corev1.PodTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: map[string]string{"quay-database": quayEcosystemName.Name},
+								},
+								Spec: corev1.PodSpec{
+									Containers: []corev1.Container{
+										{
+											Name:  "postgresql",
+											Image: "centos/postgresql-10-centos7",
+											Env:   []corev1.EnvVar{},
+										},
+									},
+								},
+							},
+						},
+					}
+
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
+					Expect(k8sClient.Create(context.Background(), oldDatabase)).Should(Succeed())
 
 					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
 				})
