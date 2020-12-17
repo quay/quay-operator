@@ -351,36 +351,53 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 	objectMeta, _ := meta.Accessor(obj)
 	groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
 
-	shouldIgnoreError := func(e error) bool {
-		// Jobs are immutable after creation, so ignore the error.
-		jobGVK := schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}
-
-		return groupVersionKind == jobGVK.String()
+	immutableResources := map[string]bool{
+		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String(): true,
 	}
 
-	log := r.Log.WithValues("quayregistry", quay.GetNamespace())
-	log.Info("creating/updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+	log := r.Log.WithValues(
+		"quayregistry", quay.GetNamespace(),
+		"Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+	log.Info("creating/updating object")
 
 	obj, err := v1.EnsureOwnerReference(&quay, obj)
 	if err != nil {
 		log.Error(err, "could not ensure `ownerReferences` before creating object", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+
 		return err
 	}
 
 	// managedFields cannot be set on a PATCH.
 	objectMeta.SetManagedFields([]metav1.ManagedFieldsEntry{})
 
-	opts := []client.PatchOption{}
-	opts = append([]client.PatchOption{client.ForceOwnership, client.FieldOwner("quay-operator")}, opts...)
-	err = r.Client.Patch(ctx, obj, client.Apply, opts...)
+	if immutableResources[groupVersionKind] {
+		log.Info("deleting immutable resource")
+		if err := r.Client.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "failed to delete immutable resource")
 
-	if err != nil && !shouldIgnoreError(err) {
-		log.Error(err, "failed to create/update object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+			return err
+		}
 
-		return err
+		if err := r.Client.Create(ctx, obj); err != nil {
+			log.Error(err, "failed to create new immutable resource")
+
+			return err
+		}
+
+		log.Info("succefully re-created immutable resource")
+	} else {
+		opts := []client.PatchOption{}
+		opts = append([]client.PatchOption{client.ForceOwnership, client.FieldOwner("quay-operator")}, opts...)
+		err = r.Client.Patch(ctx, obj, client.Apply, opts...)
+
+		if err != nil {
+			log.Error(err, "failed to create/update object")
+
+			return err
+		}
 	}
 
-	log.Info("finished creating/updating object", "Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+	log.Info("finished creating/updating object")
 
 	return nil
 }
