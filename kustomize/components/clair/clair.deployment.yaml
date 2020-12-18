@@ -15,7 +15,7 @@ spec:
         quay-component: clair-app
     spec:
       containers:
-        - image: quay.io/projectquay/clair@sha256:70c99feceb4c0973540d22e740659cd8d616775d3ad1c1698ddf71d0221f3ce6
+        - image: quay.io/projectquay/clair@sha256:5fec3cf459159eabe2e4e1089687e25f638183a7e9bed1ecea8724e0597f8a14
           imagePullPolicy: IfNotPresent
           name: clair-app
           env:
