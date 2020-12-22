@@ -43,20 +43,29 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var testLogger logr.Logger
-var testEventRecorder record.EventRecorder
+
+// var testEventRecorder record.EventRecorder
+var testEventRecorder *record.FakeRecorder
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
+		"QuayRegistry Controller Suite",
 		[]Reporter{printer.NewlineReporter{}})
 }
 
 var _ = BeforeSuite(func(done Done) {
 	testLogger = zap.LoggerTo(GinkgoWriter, true)
 	logf.SetLogger(testLogger)
-	testEventRecorder = record.NewFakeRecorder(10)
+	testEventRecorder = record.NewFakeRecorder(100)
+
+	go func() {
+		for {
+			evt := <-testEventRecorder.Events
+			testLogger.Info(evt)
+		}
+	}()
 
 	By("bootstrapping test environment")
 	// useExistingCluster := true

@@ -37,36 +37,37 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(quay *v1.QuayRegistry) (*v
 		return quay, err
 	}
 
-	if err := r.Client.Create(context.Background(), fakeRoute); err != nil {
+	if err := r.Client.Create(context.Background(), fakeRoute); err == nil {
+		r.Log.Info("cluster supports `Routes` API")
+		// Wait until `status.ingress` is populated.
+		time.Sleep(time.Millisecond * 500)
+
+		if err := r.Client.Get(context.Background(), types.NamespacedName{Name: quay.GetName() + "-test-route", Namespace: quay.GetNamespace()}, fakeRoute); err != nil {
+			return quay, err
+		}
+
+		existingAnnotations := quay.GetAnnotations()
+		if existingAnnotations == nil {
+			existingAnnotations = map[string]string{}
+		}
+
+		existingAnnotations[v1.SupportsRoutesAnnotation] = "true"
+
+		if _, ok := existingAnnotations[v1.ClusterHostnameAnnotation]; !ok {
+			existingAnnotations[v1.ClusterHostnameAnnotation] = fakeRoute.(*routev1.Route).Status.Ingress[0].RouterCanonicalHostname
+			r.Log.Info("detected router canonical hostname: " + existingAnnotations[v1.ClusterHostnameAnnotation])
+		}
+
+		if err := r.Client.Delete(context.Background(), fakeRoute); err != nil {
+			return quay, err
+		}
+
+		quay.SetAnnotations(existingAnnotations)
+
 		return quay, err
+	} else {
+		r.Log.Info("cluster does not support `Route` API")
 	}
-
-	r.Log.Info("cluster supports `Routes` API")
-
-	// Wait until `status.ingress` is populated.
-	time.Sleep(time.Millisecond * 500)
-
-	if err := r.Client.Get(context.Background(), types.NamespacedName{Name: quay.GetName() + "-test-route", Namespace: quay.GetNamespace()}, fakeRoute); err != nil {
-		return quay, err
-	}
-
-	existingAnnotations := quay.GetAnnotations()
-	if existingAnnotations == nil {
-		existingAnnotations = map[string]string{}
-	}
-
-	existingAnnotations[v1.SupportsRoutesAnnotation] = "true"
-
-	if _, ok := existingAnnotations[v1.ClusterHostnameAnnotation]; !ok {
-		existingAnnotations[v1.ClusterHostnameAnnotation] = fakeRoute.(*routev1.Route).Status.Ingress[0].RouterCanonicalHostname
-		r.Log.Info("detected router canonical hostname: " + existingAnnotations[v1.ClusterHostnameAnnotation])
-	}
-
-	if err := r.Client.Delete(context.Background(), fakeRoute); err != nil {
-		return quay, err
-	}
-
-	quay.SetAnnotations(existingAnnotations)
 
 	return quay, nil
 }
@@ -92,13 +93,15 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(quay *v1.QuayR
 				var datastoreSecret corev1.Secret
 				if err = r.Client.Get(context.Background(), datastoreName, &datastoreSecret); err != nil {
 					r.Log.Error(err, "unable to retrieve Quay datastore `Secret`")
-					return nil, err
+
+					return quay, err
 				}
 
 				var datastoreConfig corev1.ConfigMap
 				if err = r.Client.Get(context.Background(), datastoreName, &datastoreConfig); err != nil {
 					r.Log.Error(err, "unable to retrieve Quay datastore `ConfigMap`")
-					return nil, err
+
+					return quay, err
 				}
 
 				r.Log.Info("found `ObjectBucketClaim` and credentials `Secret`, `ConfigMap`")

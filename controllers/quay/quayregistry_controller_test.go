@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -20,8 +19,8 @@ import (
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
-func newQuayRegistry(name, namespace string) v1.QuayRegistry {
-	return v1.QuayRegistry{
+func newQuayRegistry(name, namespace string) *v1.QuayRegistry {
+	quay := &v1.QuayRegistry{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "quay.redhat.com/v1",
 			Kind:       "QuayRegistry",
@@ -30,16 +29,12 @@ func newQuayRegistry(name, namespace string) v1.QuayRegistry {
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: v1.QuayRegistrySpec{
-			Components: []v1.Component{
-				// FIXME(alecmerdler): Test omitting components and marking some as disabled/unmanaged...
-				{Kind: "postgres", Managed: true},
-				{Kind: "clair", Managed: true},
-				{Kind: "redis", Managed: true},
-				{Kind: "objectstorage", Managed: false},
-			},
-		},
+		Spec: v1.QuayRegistrySpec{},
 	}
+	// TODO(alecmerdler): Test omitting components and marking some as disabled/unmanaged...
+	quay, _ = v1.EnsureDefaultComponents(quay)
+
+	return quay
 }
 
 func newConfigBundle(name, namespace string) corev1.Secret {
@@ -67,13 +62,15 @@ func randIdentifier(randomBytes int) string {
 	return hex.EncodeToString(identBytes)
 }
 
-var _ = Describe("QuayRegistryReconciler", func() {
+var _ = Describe("Reconciling a QuayRegistry", func() {
 	var controller *QuayRegistryReconciler
 
 	var namespace string
-	var quayRegistry v1.QuayRegistry
+	var quayRegistry *v1.QuayRegistry
 	var quayRegistryName types.NamespacedName
 	var configBundle corev1.Secret
+	var result reconcile.Result
+	var err error
 
 	verifyOwnerRefs := func(refs []metav1.OwnerReference) {
 		Expect(refs).To(HaveLen(1))
@@ -81,15 +78,22 @@ var _ = Describe("QuayRegistryReconciler", func() {
 		Expect(refs[0].Name).To(Equal(quayRegistry.GetName()))
 	}
 
+	// progressUpgradeDeployment sets the `status` manually because `envtest` only runs apiserver, not controllers.
+	progressUpgradeDeployment := func() error {
+		var upgradeDeployment appsv1.Deployment
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: namespace}, &upgradeDeployment)
+		if err != nil {
+			return err
+		}
+
+		upgradeDeployment.Status.Replicas = 1
+		upgradeDeployment.Status.ReadyReplicas = 1
+
+		return k8sClient.Status().Update(context.Background(), &upgradeDeployment)
+	}
+
 	BeforeEach(func() {
 		namespace = randIdentifier(16)
-		configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
-		quayRegistry = newQuayRegistry("test-registry", namespace)
-		quayRegistryName = types.NamespacedName{
-			Name:      quayRegistry.Name,
-			Namespace: quayRegistry.Namespace,
-		}
-		quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
 
 		controller = &QuayRegistryReconciler{
 			Client:        k8sClient,
@@ -97,356 +101,288 @@ var _ = Describe("QuayRegistryReconciler", func() {
 			Scheme:        scheme.Scheme,
 			EventRecorder: testEventRecorder,
 		}
+
+		Expect(k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})).Should(Succeed())
 	})
 
-	// FIXME(alecmerdler): Refactor into separate test suites to improve sanity
-	XDescribe("Running Reconcile()", func() {
-		var result reconcile.Result
-		var err error
-
-		// progressUpgradeDeployment sets the `status` manually because `envtest` only runs apiserver, not controllers.
-		progressUpgradeDeployment := func() error {
-			var upgradeDeployment appsv1.Deployment
-			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: namespace}, &upgradeDeployment)
-			if err != nil {
-				return err
+	When("the `configBundleSecret` field is empty", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
 			}
 
-			upgradeDeployment.Status.Replicas = 1
-			upgradeDeployment.Status.ReadyReplicas = 1
-
-			return k8sClient.Status().Update(context.Background(), &upgradeDeployment)
-		}
-
-		JustBeforeEach(func() {
-			Expect(k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})).Should(Succeed())
-			Expect(k8sClient.Create(context.Background(), &quayRegistry)).Should(Succeed())
-			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
 
 			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
 		})
 
-		JustAfterEach(func() {
-			Expect(k8sClient.Delete(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})).Should(Succeed())
+		It("should not return an error", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
 		})
 
-		Context("on a newly created `QuayRegistry`", func() {
-			When("the `configBundleSecret` field is empty", func() {
-				BeforeEach(func() {
-					quayRegistry.Spec.ConfigBundleSecret = ""
-				})
+		It("should create a fresh `Secret` and populate `configBundleSecret`", func() {
+			var updatedQuayRegistry v1.QuayRegistry
+			var configBundleSecret corev1.Secret
 
-				It("should not return an error", func() {
-					Expect(err).ShouldNot(HaveOccurred())
-				})
-
-				It("should create a fresh `Secret` and populate `configBundleSecret`", func() {
-					var updatedQuayRegistry v1.QuayRegistry
-					var configBundleSecret corev1.Secret
-
-					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
-					Expect(updatedQuayRegistry.Spec.ConfigBundleSecret).To(ContainSubstring(quayRegistry.GetName() + "-config-bundle-"))
-
-					Expect(k8sClient.Get(
-						context.Background(),
-						types.NamespacedName{
-							Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
-							Namespace: quayRegistry.GetNamespace()},
-						&configBundleSecret)).
-						Should(Succeed())
-				})
-			})
-
-			When("it references a `configBundleSecret` that does not exist", func() {
-				BeforeEach(func() {
-					quayRegistry.Spec.ConfigBundleSecret = "does-not-exist"
-				})
-
-				It("should not return an error", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(result.Requeue).To(BeFalse())
-				})
-
-				It("will not create any Quay objects on the cluster", func() {
-					var deployments appsv1.DeploymentList
-					var services corev1.ServiceList
-					var persistentVolumeClaims corev1.PersistentVolumeClaimList
-					listOptions := client.ListOptions{Namespace: namespace}
-
-					Expect(k8sClient.List(context.Background(), &deployments, &listOptions)).NotTo(HaveOccurred())
-					Expect(deployments.Items).To(HaveLen(0))
-					Expect(k8sClient.List(context.Background(), &services, &listOptions)).NotTo(HaveOccurred())
-					Expect(services.Items).To(HaveLen(0))
-					Expect(k8sClient.List(context.Background(), &persistentVolumeClaims, &listOptions)).NotTo(HaveOccurred())
-					Expect(persistentVolumeClaims.Items).To(HaveLen(0))
-				})
-
-				It("does not set the current version in the `status` block", func() {
-					var updatedQuayRegistry v1.QuayRegistry
-
-					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
-					Expect(len(updatedQuayRegistry.Status.CurrentVersion)).To(Equal(0))
-				})
-			})
-
-			When("it references a `configBundleSecret` that does exist", func() {
-				JustBeforeEach(func() {
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
-				})
-
-				It("should not return an error", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(result.Requeue).To(BeFalse())
-				})
-
-				It("will create Quay objects on the cluster with `ownerReferences` back to the `QuayRegistry`", func() {
-					var deployments appsv1.DeploymentList
-					var services corev1.ServiceList
-					var persistentVolumeClaims corev1.PersistentVolumeClaimList
-					listOptions := client.ListOptions{Namespace: namespace}
-
-					Expect(k8sClient.List(context.Background(), &deployments, &listOptions)).NotTo(HaveOccurred())
-					Expect(deployments.Items).NotTo(HaveLen(0))
-					for _, deployment := range deployments.Items {
-						verifyOwnerRefs(deployment.GetOwnerReferences())
-					}
-					Expect(k8sClient.List(context.Background(), &services, &listOptions)).NotTo(HaveOccurred())
-					Expect(services.Items).NotTo(HaveLen(0))
-					for _, service := range services.Items {
-						verifyOwnerRefs(service.GetOwnerReferences())
-					}
-					Expect(k8sClient.List(context.Background(), &persistentVolumeClaims, &listOptions)).NotTo(HaveOccurred())
-					Expect(persistentVolumeClaims.Items).NotTo(HaveLen(0))
-					for _, persistentVolumeClaim := range persistentVolumeClaims.Items {
-						verifyOwnerRefs(persistentVolumeClaim.GetOwnerReferences())
-					}
-				})
-
-				It("reports the current version in the `status` block", func() {
-					Expect(progressUpgradeDeployment()).Should(Succeed())
-
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
-
-					var updatedQuayRegistry v1.QuayRegistry
-
-					Eventually(func() v1.QuayVersion {
-						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
-						return updatedQuayRegistry.Status.CurrentVersion
-					}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
-				})
-
-				When("the `spec.components` field is empty", func() {
-					It("will add all backing components as managed", func() {
-
-					})
-				})
-			})
-
-			When("running on native Kubernetes", func() {
-				XIt("reports `Service` load balancer endpoint in the `status` block", func() {
-					Expect(progressUpgradeDeployment()).Should(Succeed())
-
-					var updatedQuayRegistry v1.QuayRegistry
-
-					Eventually(func() string {
-						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
-						return updatedQuayRegistry.Status.RegistryEndpoint
-					}, time.Second*30).Should(Equal("16.22.171.225"))
-				})
-			})
-
-			When("running on OpenShift", func() {
-				XIt("reports registry `Route` endpoint in the `status` block", func() {
-					Expect(progressUpgradeDeployment()).Should(Succeed())
-
-					var updatedQuayRegistry v1.QuayRegistry
-
-					Eventually(func() string {
-						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
-						return updatedQuayRegistry.Status.RegistryEndpoint
-					}, time.Second*30).Should(Equal(strings.Join([]string{
-						strings.Join([]string{quayRegistry.GetName(), "quay", quayRegistry.GetNamespace()}, "-"),
-						"example.com"},
-						".")))
-				})
-			})
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
+			Expect(updatedQuayRegistry.Spec.ConfigBundleSecret).To(ContainSubstring(quayRegistry.GetName() + "-config-bundle-"))
+			Expect(k8sClient.Get(
+				context.Background(),
+				types.NamespacedName{
+					Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
+					Namespace: quayRegistry.GetNamespace()},
+				&configBundleSecret)).
+				Should(Succeed())
 		})
 
-		Context("on an existing `QuayRegistry`", func() {
-			var oldPods corev1.PodList
+		It("will reference the same `configBundleSecret` when reconciled again", func() {
+			var updatedQuayRegistry v1.QuayRegistry
+			var configBundleSecretName string
+			var configBundleSecret corev1.Secret
+
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
+
+			configBundleSecretName = updatedQuayRegistry.Spec.ConfigBundleSecret
+
+			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
+			Expect(updatedQuayRegistry.Spec.ConfigBundleSecret).To(Equal(configBundleSecretName))
+			Expect(k8sClient.Get(
+				context.Background(),
+				types.NamespacedName{
+					Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
+					Namespace: quayRegistry.GetNamespace()},
+				&configBundleSecret)).
+				Should(Succeed())
+		})
+	})
+
+	When("it references a `configBundleSecret` that does not exist", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			quayRegistry.Spec.ConfigBundleSecret = "does-not-exist"
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("should not return an error", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+		})
+
+		It("will not create any Quay objects on the cluster", func() {
+			var deployments appsv1.DeploymentList
+			var services corev1.ServiceList
+			var persistentVolumeClaims corev1.PersistentVolumeClaimList
 			listOptions := client.ListOptions{Namespace: namespace}
 
-			JustBeforeEach(func() {
-				_ = k8sClient.List(context.Background(), &oldPods, &listOptions)
-			})
-
-			XWhen("the `status.conditions` indicates that migrations are in-progress", func() {
-				It("should not attempt to create any Kubernetes objects", func() {
-
-				})
-			})
-
-			When("the `configBundleSecret` field is empty", func() {
-				BeforeEach(func() {
-					quayRegistry.Spec.ConfigBundleSecret = ""
-				})
-
-				It("should not return an error", func() {
-					Expect(err).ShouldNot(HaveOccurred())
-					Expect(result.Requeue).To(BeFalse())
-				})
-
-				It("should create a fresh `Secret` and populate `configBundleSecret`", func() {
-					var updatedQuayRegistry v1.QuayRegistry
-					var configBundleSecret corev1.Secret
-
-					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
-					Expect(updatedQuayRegistry.Spec.ConfigBundleSecret).To(ContainSubstring(quayRegistry.GetName() + "-config-bundle-"))
-
-					Expect(k8sClient.Get(
-						context.Background(),
-						types.NamespacedName{
-							Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
-							Namespace: quayRegistry.GetNamespace()},
-						&configBundleSecret)).
-						Should(Succeed())
-				})
-			})
-
-			When("it references a `configBundleSecret` that does not exist", func() {
-				JustBeforeEach(func() {
-					Expect(k8sClient.Get(context.Background(), quayRegistryName, &quayRegistry))
-					quayRegistry.Spec.ConfigBundleSecret = "does-not-exist"
-					Expect(k8sClient.Update(context.Background(), &quayRegistry)).NotTo(HaveOccurred())
-
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
-				})
-
-				It("should not return an error", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(result.Requeue).To(BeFalse())
-				})
-
-				It("will not update any Quay objects on the cluster", func() {
-					var pods corev1.PodList
-					listOptions := client.ListOptions{Namespace: namespace}
-
-					_ = k8sClient.List(context.Background(), &pods, &listOptions)
-					Expect(len(pods.Items)).To(Equal(len(oldPods.Items)))
-					for _, pod := range pods.Items {
-						for _, oldPod := range oldPods.Items {
-							if pod.GetName() == oldPod.GetName() {
-								Expect(pod.GetResourceVersion()).To(Equal(oldPod.GetResourceVersion()))
-							}
-						}
-					}
-				})
-
-				It("does not change the current version in the `status` block", func() {
-					var updatedQuayRegistry v1.QuayRegistry
-
-					Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry))
-					Expect(updatedQuayRegistry.Status.CurrentVersion).To(Equal(quayRegistry.Status.CurrentVersion))
-				})
-			})
-
-			When("it references a `configBundleSecret` that does exist", func() {
-				JustBeforeEach(func() {
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
-				})
-
-				It("will update Quay objects on the cluster with `ownerReferences` back to the `QuayRegistry`", func() {
-					var deployments appsv1.DeploymentList
-					var services corev1.ServiceList
-					var persistentVolumeClaims corev1.PersistentVolumeClaimList
-					listOptions := client.ListOptions{Namespace: namespace}
-
-					Expect(k8sClient.List(context.Background(), &deployments, &listOptions)).NotTo(HaveOccurred())
-					Expect(deployments.Items).NotTo(HaveLen(0))
-					for _, deployment := range deployments.Items {
-						verifyOwnerRefs(deployment.GetOwnerReferences())
-					}
-					Expect(k8sClient.List(context.Background(), &services, &listOptions)).NotTo(HaveOccurred())
-					Expect(services.Items).NotTo(HaveLen(0))
-					for _, service := range services.Items {
-						verifyOwnerRefs(service.GetOwnerReferences())
-					}
-					Expect(k8sClient.List(context.Background(), &persistentVolumeClaims, &listOptions)).NotTo(HaveOccurred())
-					Expect(persistentVolumeClaims.Items).NotTo(HaveLen(0))
-					for _, persistentVolumeClaim := range persistentVolumeClaims.Items {
-						verifyOwnerRefs(persistentVolumeClaim.GetOwnerReferences())
-					}
-				})
-
-				It("reports the current version in the `status` block", func() {
-					Expect(progressUpgradeDeployment()).Should(Succeed())
-
-					var updatedQuayRegistry v1.QuayRegistry
-
-					Eventually(func() v1.QuayVersion {
-						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
-						return updatedQuayRegistry.Status.CurrentVersion
-					}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
-				})
-			})
-
-			When("the current version in the `status` block is the same as the Operator", func() {
-				JustBeforeEach(func() {
-					quayRegistry.Status.CurrentVersion = v1.QuayVersionCurrent
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
-				})
-
-				It("does not attempt an upgrade", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(result.Requeue).To(BeFalse())
-					Expect(quayRegistry.Status.CurrentVersion).To(Equal(v1.QuayVersionCurrent))
-				})
-			})
-
-			When("the current version in the `status` block is upgradable", func() {
-				JustBeforeEach(func() {
-					quayRegistry.Status.CurrentVersion = v1.QuayVersionPrevious
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
-				})
-
-				It("successfully performs an upgrade", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(result.Requeue).To(BeFalse())
-					Expect(progressUpgradeDeployment()).Should(Succeed())
-
-					var updatedQuayRegistry v1.QuayRegistry
-
-					Eventually(func() v1.QuayVersion {
-						_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
-						return updatedQuayRegistry.Status.CurrentVersion
-					}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
-				})
-			})
-
-			When("the current version in the `status` block is not upgradable", func() {
-				JustBeforeEach(func() {
-					quayRegistry.Status.CurrentVersion = "not-a-real-version"
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
-				})
-
-				It("does not attempt an upgrade", func() {
-					Expect(err).NotTo(HaveOccurred())
-					Expect(result.Requeue).To(BeFalse())
-					Expect(string(quayRegistry.Status.CurrentVersion)).To(Equal("not-a-real-version"))
-				})
-			})
+			Expect(k8sClient.List(context.Background(), &deployments, &listOptions)).NotTo(HaveOccurred())
+			Expect(deployments.Items).To(HaveLen(0))
+			Expect(k8sClient.List(context.Background(), &services, &listOptions)).NotTo(HaveOccurred())
+			Expect(services.Items).To(HaveLen(0))
+			Expect(k8sClient.List(context.Background(), &persistentVolumeClaims, &listOptions)).NotTo(HaveOccurred())
+			Expect(persistentVolumeClaims.Items).To(HaveLen(0))
 		})
 
-		Context("on a deleted `QuayRegistry`", func() {
-			JustBeforeEach(func() {
-				_ = k8sClient.Delete(context.Background(), &quayRegistry)
-				result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
-			})
+		It("does not set the current version in the `status` block", func() {
+			var updatedQuayRegistry v1.QuayRegistry
 
-			It("should not return an error", func() {
-				Expect(err).NotTo(HaveOccurred())
-				Expect(result.Requeue).To(BeFalse())
-			})
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
+			Expect(len(updatedQuayRegistry.Status.CurrentVersion)).To(Equal(0))
+		})
+	})
+
+	When("it references a `configBundleSecret` that does exist", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
+			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("does not return an error", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+		})
+
+		It("will ensure all created objects have `ownerReference` back to the `QuayRegistry`", func() {
+			var deployments appsv1.DeploymentList
+			var services corev1.ServiceList
+			var persistentVolumeClaims corev1.PersistentVolumeClaimList
+			listOptions := client.ListOptions{Namespace: namespace}
+
+			Expect(k8sClient.List(context.Background(), &deployments, &listOptions)).NotTo(HaveOccurred())
+			Expect(deployments.Items).NotTo(HaveLen(0))
+			for _, deployment := range deployments.Items {
+				verifyOwnerRefs(deployment.GetOwnerReferences())
+			}
+			Expect(k8sClient.List(context.Background(), &services, &listOptions)).NotTo(HaveOccurred())
+			Expect(services.Items).NotTo(HaveLen(0))
+			for _, service := range services.Items {
+				verifyOwnerRefs(service.GetOwnerReferences())
+			}
+			Expect(k8sClient.List(context.Background(), &persistentVolumeClaims, &listOptions)).NotTo(HaveOccurred())
+			Expect(persistentVolumeClaims.Items).NotTo(HaveLen(0))
+			for _, persistentVolumeClaim := range persistentVolumeClaims.Items {
+				verifyOwnerRefs(persistentVolumeClaim.GetOwnerReferences())
+			}
+		})
+
+		It("reports the current version in the `status` block", func() {
+			Expect(progressUpgradeDeployment()).Should(Succeed())
+
+			var updatedQuayRegistry v1.QuayRegistry
+
+			Eventually(func() v1.QuayVersion {
+				_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
+				return updatedQuayRegistry.Status.CurrentVersion
+			}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
+		})
+	})
+
+	When("the current version in the `status` block is the same as the Operator", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
+			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			quayRegistry.Status.CurrentVersion = v1.QuayVersionCurrent
+
+			Expect(k8sClient.Status().Update(context.Background(), quayRegistry)).To(Succeed())
+
+			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("does not attempt an upgrade", func() {
+			var updatedQuayRegistry v1.QuayRegistry
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
+			Expect(updatedQuayRegistry.Status.CurrentVersion).To(Equal(v1.QuayVersionCurrent))
+		})
+	})
+
+	When("the current version in the `status` block is upgradable", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
+			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			quayRegistry.Status.CurrentVersion = v1.QuayVersionPrevious
+
+			Expect(k8sClient.Status().Update(context.Background(), quayRegistry)).To(Succeed())
+
+			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("successfully performs an upgrade", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+			Expect(progressUpgradeDeployment()).Should(Succeed())
+
+			var updatedQuayRegistry v1.QuayRegistry
+
+			Eventually(func() v1.QuayVersion {
+				_ = k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)
+				return updatedQuayRegistry.Status.CurrentVersion
+			}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
+		})
+	})
+
+	When("the current version in the `status` block is not upgradable", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			quayRegistry.Status.CurrentVersion = "not-a-real-version"
+
+			Expect(k8sClient.Status().Update(context.Background(), quayRegistry)).To(Succeed())
+
+			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("does not attempt an upgrade", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+
+			var updatedQuayRegistry v1.QuayRegistry
+
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
+			Expect(string(quayRegistry.Status.CurrentVersion)).To(Equal("not-a-real-version"))
+		})
+	})
+
+	When("not all default managed components have been specified", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
+			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
+			quayRegistry.Spec.Components = nil
+
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("does not return an error", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+		})
+
+		It("populates `spec.components` field with all default managed components", func() {
+			var updatedQuayRegistry v1.QuayRegistry
+
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
+
+			expectedQuay, err := v1.EnsureDefaultComponents(quayRegistry.DeepCopy())
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(v1.ComponentsMatch(updatedQuayRegistry.Spec.Components, expectedQuay.Spec.Components))
 		})
 	})
 })
