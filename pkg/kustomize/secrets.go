@@ -380,16 +380,17 @@ func componentConfigFilesFor(component string, quay *v1.QuayRegistry, configFile
 			"database-root-password": []byte(databaseRootPassword),
 		}, nil
 	case "clair":
-		var quayHostname string
-		for _, component := range quay.Spec.Components {
-			if component.Kind == "route" && component.Managed {
-				config := decode(configFiles["route.config.yaml"])
-				quayHostname = config.(map[string]interface{})["SERVER_HOSTNAME"].(string)
-			}
+		quayHostname := ""
+		if v1.ComponentIsManaged(quay.Spec.Components, "route") {
+			config := decode(configFiles["route.config.yaml"])
+			quayHostname = config.(map[string]interface{})["SERVER_HOSTNAME"].(string)
 		}
+
 		if _, ok := configFiles["config.yaml"]; ok && quayHostname == "" {
 			config := decode(configFiles["config.yaml"])
-			quayHostname = config.(map[string]interface{})["SERVER_HOSTNAME"].(string)
+			if configHostname, ok := config.(map[string]interface{})["SERVER_HOSTNAME"].(string); ok && configHostname != "" {
+				quayHostname = configHostname
+			}
 		}
 
 		if quayHostname == "" {

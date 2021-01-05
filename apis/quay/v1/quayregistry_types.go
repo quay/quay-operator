@@ -199,47 +199,6 @@ type QuayRegistryList struct {
 	Items           []QuayRegistry `json:"items"`
 }
 
-// EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`
-// and returns a new `QuayRegistry` copy.
-func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
-	updatedQuay := quay.DeepCopy()
-	if updatedQuay.Spec.Components == nil {
-		updatedQuay.Spec.Components = []Component{}
-	}
-
-	for _, component := range quay.Spec.Components {
-		if component.Kind == "route" && component.Managed && !supportsRoutes(quay) {
-			return nil, errors.New("cannot use `route` component when `Route` API not available")
-		}
-		if component.Kind == "objectstorage" && component.Managed && !supportsObjectBucketClaims(quay) {
-			return nil, errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available")
-		}
-	}
-
-	for _, component := range allComponents {
-		found := false
-		for _, definedComponent := range quay.Spec.Components {
-			if component == definedComponent.Kind {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			if component == "route" && !supportsRoutes(quay) {
-				continue
-			}
-			if component == "objectstorage" && !supportsObjectBucketClaims(quay) {
-				continue
-			}
-
-			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{Kind: component, Managed: true})
-		}
-	}
-
-	return updatedQuay, nil
-}
-
 func EnsureComponents(components []Component) []Component {
 	return append(components, components[0])[1 : len(components)+1]
 }
@@ -283,6 +242,46 @@ func RequiredComponent(component string) bool {
 		}
 	}
 	return false
+}
+
+// EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`
+// and returns a new `QuayRegistry` copy.
+func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
+	updatedQuay := quay.DeepCopy()
+	if updatedQuay.Spec.Components == nil {
+		updatedQuay.Spec.Components = []Component{}
+	}
+
+	if ComponentIsManaged(updatedQuay.Spec.Components, "route") && !supportsRoutes(quay) {
+		return nil, errors.New("cannot use `route` component when `Route` API not available")
+	}
+
+	if ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") && !supportsObjectBucketClaims(quay) {
+		return nil, errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available")
+	}
+
+	for _, component := range allComponents {
+		found := false
+		for _, definedComponent := range quay.Spec.Components {
+			if component == definedComponent.Kind {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			if component == "route" && !supportsRoutes(quay) {
+				continue
+			}
+			if component == "objectstorage" && !supportsObjectBucketClaims(quay) {
+				continue
+			}
+
+			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{Kind: component, Managed: true})
+		}
+	}
+
+	return updatedQuay, nil
 }
 
 // EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was changed.

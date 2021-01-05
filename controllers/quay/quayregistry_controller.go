@@ -73,8 +73,9 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	if err := r.Client.Get(ctx, req.NamespacedName, &quay); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("`QuayRegistry` deleted")
+		} else {
+			log.Error(err, "unable to retrieve QuayRegistry")
 		}
-		log.Error(err, "unable to retrieve QuayRegistry")
 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -147,14 +148,14 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	updatedQuay, err := r.checkRoutesAvailable(updatedQuay.DeepCopy())
-	if err != nil {
+	if v1.ComponentIsManaged(updatedQuay.Spec.Components, "route") && err != nil {
 		msg := fmt.Sprintf("could not check for `Routes` API: %s", err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonRouteComponentDependencyError, msg)
 	}
 
 	updatedQuay, err = r.checkObjectBucketClaimsAvailable(updatedQuay.DeepCopy())
-	if err != nil {
+	if v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") && err != nil {
 		msg := fmt.Sprintf("could not check for `ObjectBucketClaims` API: %s", err)
 		if _, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg); err != nil {
 			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
@@ -444,6 +445,7 @@ func (r *QuayRegistryReconciler) updateWithCondition(q *v1.QuayRegistry, t v1.Co
 	if err := r.Client.Status().Update(context.Background(), updatedQuay); err != nil {
 		return nil, err
 	}
+	// FIXME(alecmerdler): Events are not being recorded during testing, making it hard to debug...
 	r.EventRecorder.Event(updatedQuay, eventType, string(reason), msg)
 
 	return updatedQuay, nil
