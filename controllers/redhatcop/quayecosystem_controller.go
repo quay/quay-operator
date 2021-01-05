@@ -476,7 +476,7 @@ func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 			}
 
 			for _, migrationPod := range migrationPods.Items {
-				if !migrationPod.Status.InitContainerStatuses[0].Ready {
+				if len(migrationPod.Status.InitContainerStatuses) == 0 || !migrationPod.Status.InitContainerStatuses[0].Ready {
 					log.Info("database migration pod in progress")
 
 					return false, nil
