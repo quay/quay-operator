@@ -2,11 +2,12 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
+    olm.skipRange: ">=3.3.x <3.4.0"
     capabilities: Full Lifecycle
     categories: Integration & Delivery
     containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-quay-operator-container:v3.4.0
-    createdAt: 2020-08-24 00:00:00
-    description: Opinionated deployment of Quay on Kubernetes.
+    createdAt: 2021-01-05 16:01 UTC
+    description: Opinionated deployment of Red Hat Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
     alm-examples: |-
@@ -102,8 +103,47 @@ spec:
       name: quayecosystems.redhatcop.redhat.io
       displayName: Quay Ecosystem
       description: "[DEPRECATED] Old representation of a full Quay installation."
-  description: Opinionated deployment of Quay on Kubernetes.
-  displayName: Quay
+  description: |-
+    The Red Hat Quay Operator deploys and manages a production-ready
+    [Red Hat Quay](https://www.openshift.com/products/quay) private container registry.
+    This operator provides an opinionated installation and configuration of Red Hat Quay.
+    All components required, including Clair, database, and storage, are provided in an
+    operator-managed fashion. Each component may optionally be self-managed.
+
+    ## Operator Features
+
+    * Automated installation of Red Hat Quay
+    * Provisions instance of Redis
+    * Provisions PostgreSQL to support both Quay and Clair
+    * Installation of Clair for container scanning and integration with Quay
+    * Provisions and configures RHOCS for supported registry object storage
+    * Enables and configures Quay's registry mirroring feature
+
+    ## Prerequisites
+
+    By default, the Red Hat Quay operator expects RHOCS to be installed on the cluster to
+    provide the _ObjectBucketClaim_ API for object storage. For instructions installing and
+    configuring the RHOCS Operator, see the "Enabling OpenShift Container Storage" in the
+    [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3.3/html/deploy_red_hat_quay_on_openshift_with_quay_setup_operator/index).
+
+    ## Simplified Deployment
+
+    The following example provisions a fully operator-managed deployment of Red Hat Quay,
+    including all services necessary for production:
+
+    ```
+    apiVersion: quay.redhat.com/v1
+    kind: QuayRegistry
+    metadata:
+      name: my-registry
+    ```
+
+    ## Documentation
+
+    See the
+    [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3.3/html/deploy_red_hat_quay_on_openshift_with_quay_setup_operator/index)
+    for more complex deployment scenarios and information.
+  displayName: Red Hat Quay
   install:
     spec:
       deployments:
@@ -142,10 +182,14 @@ spec:
                   value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay:v3.4.0
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
                   value: registry-proxy.engineering.redhat.com/rh-osbs/quay-clair:v3.4.0
+                - name: RELATED_IMAGE_COMPONENT_BUILDER
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder:v3.4.0
+                - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos:v3.4.0
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES
-                  value: registry.redhat.io/rhel8/postgresql-10:latest
+                  value: registry.redhat.io/rhel8/postgresql-10:1
                 - name: RELATED_IMAGE_COMPONENT_REDIS
-                  value: registry.redhat.io/rhel8/redis-5:latest
+                  value: registry.redhat.io/rhel8/redis-5:1
               serviceAccountName: quay-operator
       permissions:
       - rules:
