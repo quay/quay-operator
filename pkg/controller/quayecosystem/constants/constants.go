@@ -14,13 +14,13 @@ const (
 	// OperatorName is a operator name
 	OperatorName = "quay-operator"
 	// QuayImage is the Quay image
-	QuayImage = "quay.io/redhat/quay:v3.3.3"
+	QuayImage = "quay.io/redhat/quay:v3.3.4"
 	// ImagePullSecret is the name of the image pull secret for retrieving images from a protected image registry
 	ImagePullSecret = "redhat-pull-secret"
 	// RedisImage is the name of the Redis Image
 	RedisImage = "registry.access.redhat.com/rhscl/redis-32-rhel7:latest"
 	// ClairImage is the Clair image
-	ClairImage = "quay.io/redhat/clair-jwt:v3.3.3"
+	ClairImage = "quay.io/redhat/clair-jwt:v3.3.4"
 	// LabelAppKey is the name of the label key
 	LabelAppKey = "app"
 	// LabelAppValue is the name of the label
