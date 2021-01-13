@@ -19,5 +19,9 @@ spec:
       protocol: TCP
       port: 8081
       targetPort: 8081
+    - name: grpc
+      protocol: TCP
+      port: 55443
+      targetPort: 55443
   selector:
     quay-component: quay-app
