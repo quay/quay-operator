@@ -6,6 +6,7 @@ crds:
 resources: 
   - ./quay.route.yaml
   - ./config.route.yaml
+  - ./builder.route.yaml
 patchesStrategicMerge:
   # Switch `Service` to `type: ClusterIP`
   - ./quay.service.patch.yaml
@@ -21,3 +22,10 @@ vars:
       name: quay-app
     fieldref:
       fieldpath: metadata.annotations["quay-registry-hostname"]
+  - name: BUILDMAN_HOSTNAME
+    objref:
+      kind: Service
+      apiVersion: v1
+      name: quay-app
+    fieldref:
+      fieldpath: metadata.annotations["quay-buildmanager-hostname"]

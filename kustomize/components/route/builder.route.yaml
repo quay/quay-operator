@@ -1,0 +1,14 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: quay-builder
+spec:
+  host: $(BUILDMAN_HOSTNAME)
+  to:
+    kind: Service
+    name: quay-app
+  port:
+    targetPort: grpc
+  tls:
+    termination: passthrough
+    insecureEdgeTerminationPolicy: Redirect
