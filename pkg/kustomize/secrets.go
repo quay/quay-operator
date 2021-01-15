@@ -36,6 +36,8 @@ const (
 	secretKeyLength     = 80
 
 	clairService = "clair-app"
+	// FIXME: Ensure this includes the `QuayRegistry` name prefix when we add `builder` managed component.
+	buildmanRoute = "quay-builder"
 )
 
 // SecretKeySecretName returns the name of the Secret in which generated secret keys are stored.
@@ -243,6 +245,7 @@ func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]b
 	}
 
 	svc := quay.GetName() + "-quay-app"
+	buildManagerHostname := string(routeConfigFiles[buildManagerHostnameKey])
 
 	return cert.GenerateSelfSignedCertKey(
 		fieldGroup.ServerHostname,
@@ -251,6 +254,7 @@ func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]b
 			svc,
 			strings.Join([]string{svc, quay.GetNamespace(), "svc"}, "."),
 			strings.Join([]string{svc, quay.GetNamespace(), "svc", "cluster", "local"}, "."),
+			buildManagerHostname,
 		},
 	)
 }
@@ -315,6 +319,17 @@ func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[stri
 		if hostname, ok := baseConfig["SERVER_HOSTNAME"]; ok {
 			configFiles[registryHostnameKey] = []byte(hostname.(string))
 			hostSettings.ServerHostname = hostname.(string)
+		}
+
+		if buildManagerHostname, ok := baseConfig["BUILDMAN_HOSTNAME"]; ok {
+			configFiles[buildManagerHostnameKey] = []byte(buildManagerHostname.(string))
+		} else {
+			clusterHostname := quay.GetAnnotations()[v1.ClusterHostnameAnnotation]
+			configFiles[buildManagerHostnameKey] = []byte(strings.Join([]string{
+				strings.Join([]string{quay.GetName(), "quay-builder", quay.GetNamespace()}, "-"),
+				clusterHostname},
+				"."))
+
 		}
 	default:
 		panic("unknown component: " + component)

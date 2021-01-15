@@ -34,6 +34,7 @@ import (
 const (
 	configSecretPrefix         = "quay-config-secret"
 	registryHostnameKey        = "quay-registry-hostname"
+	buildManagerHostnameKey    = "quay-buildmanager-hostname"
 	managedFieldGroupsKey      = "quay-managed-fieldgroups"
 	operatorServiceEndpointKey = "quay-operator-service-endpoint"
 	quayRegistryNameKey        = "quay-operator/quayregistry"
@@ -230,7 +231,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 
 	configFiles := []string{}
 	for key := range quayConfigFiles {
-		if key != registryHostnameKey {
+		if key != registryHostnameKey && key != buildManagerHostnameKey {
 			configFiles = append(configFiles, filepath.Join("bundle", key))
 		}
 	}
@@ -315,6 +316,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		CommonAnnotations: map[string]string{
 			managedFieldGroupsKey:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
 			registryHostnameKey:        string(quayConfigFiles[registryHostnameKey]),
+			buildManagerHostnameKey:    string(quayConfigFiles[buildManagerHostnameKey]),
 			operatorServiceEndpointKey: operatorServiceEndpoint(),
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
