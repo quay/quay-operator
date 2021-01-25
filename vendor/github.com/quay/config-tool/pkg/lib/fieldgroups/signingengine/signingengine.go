@@ -8,9 +8,10 @@ import (
 
 // SigningEngineFieldGroup represents the SigningEngineFieldGroup config fields
 type SigningEngineFieldGroup struct {
-	Gpg2PrivateKeyFilename string `default:"" validate:"" json:"GPG2_PRIVATE_KEY_FILENAME,omitempty" yaml:"GPG2_PRIVATE_KEY_FILENAME,omitempty"`
+	FeatureSigning         bool   `default:"false" validate:"" json:"FEATURE_SIGNING" yaml:"FEATURE_SIGNING"`
+	Gpg2PrivateKeyFilename string `default:"signing-private.gpg" validate:"" json:"GPG2_PRIVATE_KEY_FILENAME,omitempty" yaml:"GPG2_PRIVATE_KEY_FILENAME,omitempty"`
 	Gpg2PrivateKeyName     string `default:"" validate:"" json:"GPG2_PRIVATE_KEY_NAME,omitempty" yaml:"GPG2_PRIVATE_KEY_NAME,omitempty"`
-	Gpg2PublicKeyFilename  string `default:"" validate:"" json:"GPG2_PUBLIC_KEY_FILENAME,omitempty" yaml:"GPG2_PUBLIC_KEY_FILENAME,omitempty"`
+	Gpg2PublicKeyFilename  string `default:"signing-public.gpg" validate:"" json:"GPG2_PUBLIC_KEY_FILENAME,omitempty" yaml:"GPG2_PUBLIC_KEY_FILENAME,omitempty"`
 	SigningEngine          string `default:"" validate:"" json:"SIGNING_ENGINE,omitempty" yaml:"SIGNING_ENGINE,omitempty"`
 }
 
@@ -41,6 +42,12 @@ func NewSigningEngineFieldGroup(fullConfig map[string]interface{}) (*SigningEngi
 		newSigningEngineFieldGroup.SigningEngine, ok = value.(string)
 		if !ok {
 			return newSigningEngineFieldGroup, errors.New("SIGNING_ENGINE must be of type string")
+		}
+	}
+	if value, ok := fullConfig["FEATURE_SIGNING"]; ok {
+		newSigningEngineFieldGroup.FeatureSigning, ok = value.(bool)
+		if !ok {
+			return newSigningEngineFieldGroup, errors.New("FEATURE_SIGNING must be of type boolean")
 		}
 	}
 

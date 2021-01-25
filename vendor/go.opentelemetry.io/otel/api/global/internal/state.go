@@ -18,23 +18,22 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"go.opentelemetry.io/otel/api/correlation"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/api/metric"
-	"go.opentelemetry.io/otel/api/propagation"
 	"go.opentelemetry.io/otel/api/trace"
 )
 
 type (
-	traceProviderHolder struct {
-		tp trace.Provider
+	tracerProviderHolder struct {
+		tp trace.TracerProvider
 	}
 
 	meterProviderHolder struct {
-		mp metric.Provider
+		mp metric.MeterProvider
 	}
 
 	propagatorsHolder struct {
-		pr propagation.Propagators
+		tm otel.TextMapPropagator
 	}
 )
 
@@ -47,35 +46,35 @@ var (
 	delegateTraceOnce sync.Once
 )
 
-// TraceProvider is the internal implementation for global.TraceProvider.
-func TraceProvider() trace.Provider {
-	return globalTracer.Load().(traceProviderHolder).tp
+// TracerProvider is the internal implementation for global.TracerProvider.
+func TracerProvider() trace.TracerProvider {
+	return globalTracer.Load().(tracerProviderHolder).tp
 }
 
-// SetTraceProvider is the internal implementation for global.SetTraceProvider.
-func SetTraceProvider(tp trace.Provider) {
+// SetTracerProvider is the internal implementation for global.SetTracerProvider.
+func SetTracerProvider(tp trace.TracerProvider) {
 	delegateTraceOnce.Do(func() {
-		current := TraceProvider()
+		current := TracerProvider()
 		if current == tp {
 			// Setting the provider to the prior default is nonsense, panic.
 			// Panic is acceptable because we are likely still early in the
 			// process lifetime.
-			panic("invalid Provider, the global instance cannot be reinstalled")
-		} else if def, ok := current.(*traceProvider); ok {
+			panic("invalid TracerProvider, the global instance cannot be reinstalled")
+		} else if def, ok := current.(*tracerProvider); ok {
 			def.setDelegate(tp)
 		}
 
 	})
-	globalTracer.Store(traceProviderHolder{tp: tp})
+	globalTracer.Store(tracerProviderHolder{tp: tp})
 }
 
 // MeterProvider is the internal implementation for global.MeterProvider.
-func MeterProvider() metric.Provider {
+func MeterProvider() metric.MeterProvider {
 	return globalMeter.Load().(meterProviderHolder).mp
 }
 
 // SetMeterProvider is the internal implementation for global.SetMeterProvider.
-func SetMeterProvider(mp metric.Provider) {
+func SetMeterProvider(mp metric.MeterProvider) {
 	delegateMeterOnce.Do(func() {
 		current := MeterProvider()
 
@@ -83,7 +82,7 @@ func SetMeterProvider(mp metric.Provider) {
 			// Setting the provider to the prior default is nonsense, panic.
 			// Panic is acceptable because we are likely still early in the
 			// process lifetime.
-			panic("invalid Provider, the global instance cannot be reinstalled")
+			panic("invalid MeterProvider, the global instance cannot be reinstalled")
 		} else if def, ok := current.(*meterProvider); ok {
 			def.setDelegate(mp)
 		}
@@ -91,19 +90,19 @@ func SetMeterProvider(mp metric.Provider) {
 	globalMeter.Store(meterProviderHolder{mp: mp})
 }
 
-// Propagators is the internal implementation for global.Propagators.
-func Propagators() propagation.Propagators {
-	return globalPropagators.Load().(propagatorsHolder).pr
+// TextMapPropagator is the internal implementation for global.TextMapPropagator.
+func TextMapPropagator() otel.TextMapPropagator {
+	return globalPropagators.Load().(propagatorsHolder).tm
 }
 
-// SetPropagators is the internal implementation for global.SetPropagators.
-func SetPropagators(pr propagation.Propagators) {
-	globalPropagators.Store(propagatorsHolder{pr: pr})
+// SetTextMapPropagator is the internal implementation for global.SetTextMapPropagator.
+func SetTextMapPropagator(p otel.TextMapPropagator) {
+	globalPropagators.Store(propagatorsHolder{tm: p})
 }
 
 func defaultTracerValue() *atomic.Value {
 	v := &atomic.Value{}
-	v.Store(traceProviderHolder{tp: &traceProvider{}})
+	v.Store(tracerProviderHolder{tp: &tracerProvider{}})
 	return v
 }
 
@@ -115,19 +114,14 @@ func defaultMeterValue() *atomic.Value {
 
 func defaultPropagatorsValue() *atomic.Value {
 	v := &atomic.Value{}
-	v.Store(propagatorsHolder{pr: getDefaultPropagators()})
+	v.Store(propagatorsHolder{tm: getDefaultTextMapPropagator()})
 	return v
 }
 
-// getDefaultPropagators returns a default Propagators, configured
-// with W3C trace and correlation context propagation.
-func getDefaultPropagators() propagation.Propagators {
-	tcPropagator := trace.TraceContext{}
-	ccPropagator := correlation.CorrelationContext{}
-	return propagation.New(
-		propagation.WithExtractors(tcPropagator, ccPropagator),
-		propagation.WithInjectors(tcPropagator, ccPropagator),
-	)
+// getDefaultTextMapPropagator returns the default TextMapPropagator,
+// configured with W3C trace and baggage propagation.
+func getDefaultTextMapPropagator() otel.TextMapPropagator {
+	return otel.NewCompositeTextMapPropagator()
 }
 
 // ResetForTest restores the initial global state, for testing purposes.

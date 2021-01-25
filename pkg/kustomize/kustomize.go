@@ -316,7 +316,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		CommonAnnotations: map[string]string{
 			managedFieldGroupsKey:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
 			registryHostnameKey:        string(quayConfigFiles[registryHostnameKey]),
-			buildManagerHostnameKey:    string(quayConfigFiles[buildManagerHostnameKey]),
+			buildManagerHostnameKey:    strings.Split(string(quayConfigFiles[buildManagerHostnameKey]), ":")[0],
 			operatorServiceEndpointKey: operatorServiceEndpoint(),
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them

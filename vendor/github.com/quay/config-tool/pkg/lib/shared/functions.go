@@ -3,6 +3,9 @@ package shared
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -47,21 +50,34 @@ func GetFields(fg FieldGroup) []string {
 
 // LoadCerts will load certificates in a config directory.
 func LoadCerts(dir string) map[string][]byte {
+
+	// Check if dir exists
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return map[string][]byte{}
+	}
+
 	// Get filenames in directory
 	certs := make(map[string][]byte)
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() || strings.Contains(path, "..") || (!strings.HasSuffix(path, ".crt") && !strings.HasSuffix(path, ".cert") && !strings.HasSuffix(path, ".key")) {
+		if info.IsDir() || strings.Contains(path, "..") || (!strings.HasSuffix(path, ".crt") && !strings.HasSuffix(path, ".cert") && !strings.HasSuffix(path, ".key") && !strings.HasSuffix(path, ".pem")) {
 			return nil
 		}
 
-		data, _ := ioutil.ReadFile(path)
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
 		relativePath, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
 
 		certs[relativePath] = data
 		return nil
 	})
 	if err != nil {
-		fmt.Println("fail")
+		return map[string][]byte{}
 	}
 
 	return certs
@@ -161,4 +177,48 @@ func RemoveNullValues(m map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return m
+}
+
+// InterfaceArrayToStringArray converts a []interface{} to []string
+func InterfaceArrayToStringArray(input []interface{}) []string {
+	output := make([]string, len(input))
+	for i, v := range input {
+		output[i] = v.(string)
+	}
+	return output
+}
+
+// GetTlsConfig will build a tls config struct given a set of CA certs
+func GetTlsConfig(opts Options) (*tls.Config, error) {
+
+	rootCAs, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	for name, cert := range opts.Certificates {
+		if strings.HasPrefix(name, "extra_ca_certs/") {
+			if ok := rootCAs.AppendCertsFromPEM(cert); !ok {
+				return nil, errors.New("Failed to append custom certificate: " + name)
+			}
+		}
+	}
+
+	return &tls.Config{RootCAs: rootCAs}, nil
+}
+
+// HasOIDCProvider will find if an OIDC provider is included in a config.yaml
+func HasOIDCProvider(fullConfig map[string]interface{}) bool {
+
+	for key, value := range fullConfig {
+		if _, ok := value.(map[string]interface{}); ok {
+			if strings.HasSuffix(key, "_LOGIN_CONFIG") && key != "GOOGLE_LOGIN_CONFIG" && key != "GITHUB_LOGIN_CONFIG" {
+				return true
+			}
+		}
+	}
+	return false
 }

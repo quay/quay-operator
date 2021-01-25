@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,8 +14,6 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 // ValidateGitHubOAuth checks that the Bitbucker OAuth credentials are correct
@@ -144,7 +140,8 @@ func ValidateRedisConnection(options *redis.Options, field, fgName string) (bool
 	rdb := redis.NewClient(options)
 
 	// Ping client
-	var ctx = context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 	_, err := rdb.Ping(ctx).Result()
 	if err != nil {
 		newError := ValidationError{
@@ -178,7 +175,7 @@ func ValidateIsOneOfString(input string, options []string, field string, fgName 
 		newError := ValidationError{
 			Tags:       []string{field},
 			FieldGroup: fgName,
-			Message:    field + " must be one of " + strings.Join(options, ",") + ".",
+			Message:    field + " must be one of " + strings.Join(options, ", ") + ".",
 		}
 		return false, newError
 	}
@@ -233,26 +230,58 @@ func ValidateIsHostname(input string, field string, fgName string) (bool, Valida
 }
 
 // ValidateHostIsReachable will check if a get request returns a 200 status code
-func ValidateHostIsReachable(input string, field string, fgName string) (bool, ValidationError) {
+func ValidateHostIsReachable(opts Options, input string, field string, fgName string) (bool, ValidationError) {
 
-	// Set timeout
-	timeout := 1 * time.Second
+	// Get protocol
+	u, _ := url.Parse(input)
+	scheme := u.Scheme
 
 	// Get raw hostname without protocol
 	url := strings.TrimPrefix(input, "https://")
 	url = strings.TrimPrefix(url, "http://")
 
-	fmt.Println(url)
-	// FIXME(alecmerdler): Use `tls.Dial` for servers with custom CA certificates...
-	tls.Dial("tcp", url, &tls.Config{})
-	_, err := net.DialTimeout("tcp", url, timeout)
-	if err != nil {
-		newError := ValidationError{
-			Tags:       []string{field},
-			FieldGroup: fgName,
-			Message:    "Cannot reach " + input,
+	// Set timeout
+	timeout := 3 * time.Second
+
+	// Switch on protocol
+	switch scheme {
+	case "http":
+
+		_, err := net.DialTimeout("tcp", url, timeout)
+		if err != nil {
+			newError := ValidationError{
+				Tags:       []string{field},
+				FieldGroup: fgName,
+				Message:    err.Error(),
+			}
+			return false, newError
 		}
-		return false, newError
+
+	case "https":
+
+		config, err := GetTlsConfig(opts)
+		if err != nil {
+			newError := ValidationError{
+				Tags:       []string{field},
+				FieldGroup: fgName,
+				Message:    err.Error(),
+			}
+			return false, newError
+		}
+		dialer := &net.Dialer{
+			Timeout: timeout,
+		}
+
+		_, err = tls.DialWithDialer(dialer, "tcp", url, config)
+		if err != nil {
+			newError := ValidationError{
+				Tags:       []string{field},
+				FieldGroup: fgName,
+				Message:    "Cannot reach " + input + ". Error: " + err.Error(),
+			}
+			return false, newError
+		}
+
 	}
 
 	return true, ValidationError{}
@@ -342,7 +371,13 @@ func ValidateCertPairWithHostname(cert, key []byte, hostname string, fgName stri
 
 	certificate, err := x509.ParseCertificate(certChain.Certificate[0])
 
-	err = certificate.VerifyHostname(hostname)
+	// Make sure port is removed
+	cleanHost, _, err := net.SplitHostPort(hostname)
+	if err != nil {
+		cleanHost = hostname
+	}
+
+	err = certificate.VerifyHostname(cleanHost)
 	if err != nil {
 		newError := ValidationError{
 			Tags:       []string{"Certificates"},
@@ -354,50 +389,4 @@ func ValidateCertPairWithHostname(cert, key []byte, hostname string, fgName stri
 
 	return true, ValidationError{}
 
-}
-
-// ValidateMinioStorage will validate a S3 storage connection.
-func ValidateMinioStorage(opts Options, args *DistributedStorageArgs, fgName string) (bool, ValidationError) {
-	tr, err := minio.DefaultTransport(true)
-	if err != nil {
-		log.Fatalf("error creating the minio connection: error creating the default transport layer: %v", err)
-	}
-
-	rootCAs, _ := x509.SystemCertPool()
-	if rootCAs == nil {
-		rootCAs = x509.NewCertPool()
-	}
-
-	for name, cert := range opts.Certificates {
-		if strings.HasPrefix(name, "extra_ca_certs/") {
-			log.Println("adding certificate: " + name)
-			if ok := rootCAs.AppendCertsFromPEM(cert); !ok {
-				log.Fatalf("failed to append custom certificate: " + name)
-			}
-		}
-	}
-
-	config := &tls.Config{RootCAs: rootCAs}
-	tr.TLSClientConfig = config
-
-	st, _ := minio.New(args.Hostname, &minio.Options{
-		Creds:     credentials.NewStaticV4(args.AccessKey, args.SecretKey, ""),
-		Secure:    args.IsSecure,
-		Transport: tr,
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	_, err = st.ListBuckets(ctx)
-	if err != nil {
-		newError := ValidationError{
-			Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
-			FieldGroup: fgName,
-			Message:    "Could not connect to storage. Error: " + err.Error(),
-		}
-		return false, newError
-	}
-
-	return true, ValidationError{}
 }
