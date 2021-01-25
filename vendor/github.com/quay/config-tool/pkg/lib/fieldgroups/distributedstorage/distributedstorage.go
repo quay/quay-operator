@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/creasty/defaults"
 	"github.com/quay/config-tool/pkg/lib/shared"
@@ -14,8 +15,8 @@ type DistributedStorageFieldGroup struct {
 	DistributedStorageConfig           map[string]*DistributedStorageDefinition `default:"{}" validate:"" json:"DISTRIBUTED_STORAGE_CONFIG,omitempty" yaml:"DISTRIBUTED_STORAGE_CONFIG,omitempty"`
 	DistributedStoragePreference       []string                                 `default:"[]" validate:"" json:"DISTRIBUTED_STORAGE_PREFERENCE,omitempty" yaml:"DISTRIBUTED_STORAGE_PREFERENCE,omitempty"`
 	DistributedStorageDefaultLocations []string                                 `default:"[]" validate:"" json:"DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS,omitempty" yaml:"DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS,omitempty"`
-	FeatureStorageReplication          bool                                     `default:"false" validate:"" json:"FEATURE_STORAGE_REPLICATION,omitempty" yaml:"FEATURE_STORAGE_REPLICATION,omitempty"`
-	FeatureProxyStorage                bool                                     `default:"false" validate:"" json:"FEATURE_PROXY_STORAGE,omitempty" yaml:"FEATURE_PROXY_STORAGE,omitempty"`
+	FeatureStorageReplication          bool                                     `default:"false" validate:"" json:"FEATURE_STORAGE_REPLICATION" yaml:"FEATURE_STORAGE_REPLICATION"`
+	FeatureProxyStorage                bool                                     `default:"false" validate:"" json:"FEATURE_PROXY_STORAGE" yaml:"FEATURE_PROXY_STORAGE"`
 }
 
 // DistributedStorageDefinition represents a single storage configuration as a tuple (Name, Arguments)
@@ -142,17 +143,26 @@ func NewDistributedStorageArgs(storageArgs map[string]interface{}) (*shared.Dist
 	}
 
 	if value, ok := storageArgs["port"]; ok {
-		newDistributedStorageArgs.Port, ok = value.(int)
-		if !ok {
 
-			// We must have an extra check for float64
-			if v, ok := value.(float64); ok {
-				newDistributedStorageArgs.Port = int(v)
+		switch t := value.(type) {
+		case int:
+			newDistributedStorageArgs.Port = t
+		case string:
+			if len(t) == 0 {
+				newDistributedStorageArgs.Port = 0
 			} else {
-				return newDistributedStorageArgs, errors.New("port must be of type integer")
+				v, err := strconv.Atoi(t)
+				if err != nil {
+					return newDistributedStorageArgs, errors.New("port must be of type integer")
+				}
+				newDistributedStorageArgs.Port = v
 			}
-
+		case float64:
+			newDistributedStorageArgs.Port = int(t)
+		default:
+			return newDistributedStorageArgs, errors.New("port must be of type integer")
 		}
+
 	}
 
 	if value, ok := storageArgs["secret_key"]; ok {
@@ -162,10 +172,152 @@ func NewDistributedStorageArgs(storageArgs map[string]interface{}) (*shared.Dist
 		}
 	}
 
+	if value, ok := storageArgs["s3_secret_key"]; ok {
+		newDistributedStorageArgs.S3SecretKey, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("s3_secret_key must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["s3_access_key"]; ok {
+		newDistributedStorageArgs.S3AccessKey, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("s3_access_key must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["host"]; ok {
+		newDistributedStorageArgs.Host, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("host must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["s3_bucket"]; ok {
+		newDistributedStorageArgs.S3Bucket, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("s3_bucket must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["azure_container"]; ok {
+		newDistributedStorageArgs.AzureContainer, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("azure_container must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["azure_account_name"]; ok {
+		newDistributedStorageArgs.AzureAccountName, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("azure_container must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["azure_account_key"]; ok {
+		newDistributedStorageArgs.AzureAccountKey, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("azure_account_key must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["sas_token"]; ok {
+		newDistributedStorageArgs.SASToken, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("sas_token must be of type string")
+		}
+	}
+
 	if value, ok := storageArgs["storage_path"]; ok {
 		newDistributedStorageArgs.StoragePath, ok = value.(string)
 		if !ok {
 			return newDistributedStorageArgs, errors.New("storage_path must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["cloudfront_distribution_domain"]; ok {
+		newDistributedStorageArgs.CloudfrontDistributionDomain, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("cloudfront_distribution_domain must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["cloudfront_key_id"]; ok {
+		newDistributedStorageArgs.CloudfrontKeyID, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("cloudfront_key_id must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["auth_version"]; ok {
+
+		switch t := value.(type) {
+		case int:
+			newDistributedStorageArgs.SwiftAuthVersion = t
+		case string:
+			if len(t) == 0 {
+				newDistributedStorageArgs.SwiftAuthVersion = 0
+			} else {
+				v, err := strconv.Atoi(t)
+				if err != nil {
+					return newDistributedStorageArgs, errors.New("auth_version must be of type integer")
+				}
+				newDistributedStorageArgs.SwiftAuthVersion = v
+			}
+		case float64:
+			newDistributedStorageArgs.SwiftAuthVersion = int(t)
+		default:
+			return newDistributedStorageArgs, errors.New("auth_version must be of type integer")
+		}
+
+	}
+
+	if value, ok := storageArgs["auth_url"]; ok {
+		newDistributedStorageArgs.SwiftAuthURL, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("auth_url must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["swift_container"]; ok {
+		newDistributedStorageArgs.SwiftContainer, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("swift_container must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["swift_user"]; ok {
+		newDistributedStorageArgs.SwiftUser, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("swift_user must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["swift_password"]; ok {
+		newDistributedStorageArgs.SwiftPassword, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("swift_password must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["ca_cert_path"]; ok {
+		newDistributedStorageArgs.SwiftCaCertPath, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("ca_cert_path must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["temp_url_key"]; ok {
+		newDistributedStorageArgs.SwiftTempURLKey, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("temp_url_key must be of type string")
+		}
+	}
+
+	if value, ok := storageArgs["os_options"]; ok {
+		newDistributedStorageArgs.SwiftOsOptions, ok = value.(map[string]interface{})
+		if !ok {
+			return newDistributedStorageArgs, errors.New("os_options must be an object")
 		}
 	}
 
