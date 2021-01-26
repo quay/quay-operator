@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 func newQuayRegistry(name, namespace string) *v1.QuayRegistry {
@@ -31,8 +32,11 @@ func newQuayRegistry(name, namespace string) *v1.QuayRegistry {
 		},
 		Spec: v1.QuayRegistrySpec{},
 	}
-	// TODO(alecmerdler): Test omitting components and marking some as disabled/unmanaged...
-	quay, _ = v1.EnsureDefaultComponents(quay)
+	// TODO: Test omitting components and marking some as disabled/unmanaged...
+	quay, _ = v1.EnsureDefaultComponents(
+		&quaycontext.QuayRegistryContext{SupportsRoutes: false, SupportsObjectStorage: false},
+		quay.DeepCopy(),
+	)
 
 	return quay
 }
@@ -379,7 +383,10 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 
 			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
 
-			expectedQuay, err := v1.EnsureDefaultComponents(quayRegistry.DeepCopy())
+			expectedQuay, err := v1.EnsureDefaultComponents(
+				&quaycontext.QuayRegistryContext{SupportsRoutes: false, SupportsObjectStorage: false},
+				quayRegistry.DeepCopy(),
+			)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(v1.ComponentsMatch(updatedQuayRegistry.Spec.Components, expectedQuay.Spec.Components))

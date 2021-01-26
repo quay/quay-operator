@@ -18,28 +18,26 @@ import (
 	"sigs.k8s.io/kustomize/api/types"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 var kustomizationForTests = []struct {
 	name         string
 	quayRegistry *v1.QuayRegistry
+	ctx          quaycontext.QuayRegistryContext
 	expected     *types.Kustomization
 	expectedErr  string
 }{
 	{
 		"InvalidQuayRegistry",
 		nil,
+		quaycontext.QuayRegistryContext{},
 		nil,
 		"given QuayRegistry should not be nil",
 	},
 	{
 		"AllComponents",
 		&v1.QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					v1.SupportsObjectStorageAnnotation: "true",
-				},
-			},
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
@@ -50,6 +48,7 @@ var kustomizationForTests = []struct {
 				},
 			},
 		},
+		quaycontext.QuayRegistryContext{},
 		&types.Kustomization{
 			TypeMeta: types.TypeMeta{
 				APIVersion: types.KustomizationVersion,
@@ -78,6 +77,7 @@ var kustomizationForTests = []struct {
 				},
 			},
 		},
+		quaycontext.QuayRegistryContext{},
 		&types.Kustomization{
 			TypeMeta: types.TypeMeta{
 				APIVersion: types.KustomizationVersion,
@@ -111,7 +111,7 @@ func TestKustomizationFor(t *testing.T) {
 			}
 		}
 
-		kustomization, err := KustomizationFor(test.quayRegistry, map[string][]byte{})
+		kustomization, err := KustomizationFor(&test.ctx, test.quayRegistry, map[string][]byte{})
 
 		if test.expectedErr != "" {
 			assert.EqualError(err, test.expectedErr)
@@ -178,6 +178,7 @@ var quayComponents = map[string][]runtime.Object{
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-secret"}},
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cluster-service-ca"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor-credentials"}},
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-registry-managed-secret-keys"}},
 	},
 	"clair": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clair-config-secret"}},
@@ -203,7 +204,7 @@ var quayComponents = map[string][]runtime.Object{
 		&objectbucket.ObjectBucketClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-datastorage"}},
 	},
 	"route": {
-		// TODO(alecmerdler): Import OpenShift `Route` API struct
+		// TODO: Import OpenShift `Route` API struct
 	},
 	"mirror": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror"}},
@@ -222,6 +223,7 @@ func withComponents(components []string) []runtime.Object {
 var inflateTests = []struct {
 	name         string
 	quayRegistry *v1.QuayRegistry
+	ctx          quaycontext.QuayRegistryContext
 	configBundle *corev1.Secret
 	expected     []runtime.Object
 	expectedErr  error
@@ -229,11 +231,6 @@ var inflateTests = []struct {
 	{
 		"AllComponentsManagedExplicit",
 		&v1.QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					v1.SupportsObjectStorageAnnotation: "true",
-				},
-			},
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
@@ -243,6 +240,9 @@ var inflateTests = []struct {
 					{Kind: "mirror", Managed: true},
 				},
 			},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsObjectStorage: true,
 		},
 		&corev1.Secret{
 			Data: map[string][]byte{
@@ -265,6 +265,7 @@ var inflateTests = []struct {
 				},
 			},
 		},
+		quaycontext.QuayRegistryContext{},
 		&corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
@@ -286,6 +287,7 @@ var inflateTests = []struct {
 				},
 			},
 		},
+		quaycontext.QuayRegistryContext{},
 		&corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
@@ -297,11 +299,6 @@ var inflateTests = []struct {
 	{
 		"CurrentVersion",
 		&v1.QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					v1.SupportsObjectStorageAnnotation: "true",
-				},
-			},
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
@@ -315,9 +312,39 @@ var inflateTests = []struct {
 				CurrentVersion: v1.QuayVersionCurrent,
 			},
 		},
+		quaycontext.QuayRegistryContext{
+			SupportsObjectStorage: true,
+		},
 		&corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+			},
+		},
+		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
+		nil,
+	},
+	{
+		"ManagedKeysInProvidedConfig",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "mirror", Managed: true},
+				},
+			},
+			Status: v1.QuayRegistryStatus{
+				CurrentVersion: v1.QuayVersionCurrent,
+			},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsObjectStorage: true,
+		},
+		&corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io", "DATABASE_SECRET_KEY": "abc123"}),
 			},
 		},
 		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
@@ -331,18 +358,36 @@ func TestInflate(t *testing.T) {
 	log := testlogr.TestLogger{}
 
 	for _, test := range inflateTests {
-		pieces, err := Inflate(test.quayRegistry, test.configBundle, nil, log)
+		pieces, err := Inflate(&test.ctx, test.quayRegistry, test.configBundle, log)
 
 		assert.NotNil(pieces, test.name)
 		assert.Equal(len(test.expected), len(pieces), test.name)
 		assert.Nil(err, test.name)
 
+		var config map[string]interface{}
+		for _, obj := range pieces {
+			objectMeta, _ := meta.Accessor(obj)
+
+			if strings.Contains(objectMeta.GetName(), configSecretPrefix) {
+				configBundle := obj.(*corev1.Secret)
+				config = decode(configBundle.Data["config.yaml"]).(map[string]interface{})
+			}
+		}
+
 		for _, obj := range pieces {
 			objectMeta, _ := meta.Accessor(obj)
 
 			assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-", test.name)
-			if !strings.Contains(objectMeta.GetName(), "managed-secret-keys") {
-				assert.Equal(string(v1.QuayVersionCurrent), objectMeta.GetAnnotations()["quay-version"], test.name)
+			assert.Equal(string(v1.QuayVersionCurrent), objectMeta.GetAnnotations()["quay-version"], test.name)
+
+			if strings.Contains(objectMeta.GetName(), v1.ManagedKeysSecretNameFor(test.quayRegistry)) {
+				managedKeys := obj.(*corev1.Secret)
+
+				assert.Equal(test.ctx.DatabaseSecretKey, string(managedKeys.Data["DATABASE_SECRET_KEY"]), test.name)
+				assert.Equal(test.ctx.SecretKey, string(managedKeys.Data["SECRET_KEY"]), test.name)
+
+				assert.Equal(test.ctx.DatabaseSecretKey, config["DATABASE_SECRET_KEY"], test.name)
+				assert.Equal(test.ctx.SecretKey, config["SECRET_KEY"], test.name)
 			}
 		}
 	}

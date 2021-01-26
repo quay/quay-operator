@@ -10,24 +10,21 @@ import (
 
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/redis"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/repomirror"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
 	"github.com/quay/config-tool/pkg/lib/shared"
+
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 func quayRegistry(name string) *v1.QuayRegistry {
 	return &v1.QuayRegistry{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Annotations: map[string]string{
-				v1.SupportsObjectStorageAnnotation: "true",
-				v1.StorageHostnameAnnotation:       "s3.noobaa.svc",
-				v1.StorageBucketNameAnnotation:     "quay-datastore",
-				v1.StorageAccessKeyAnnotation:      "abc123",
-				v1.StorageSecretKeyAnnotation:      "super-secret",
-			},
+			Name:      name,
+			Namespace: "ns",
 		},
 		Spec: v1.QuayRegistrySpec{
 			Components: []v1.Component{
@@ -44,12 +41,14 @@ var fieldGroupForTests = []struct {
 	name      string
 	component string
 	quay      *v1.QuayRegistry
+	ctx       quaycontext.QuayRegistryContext
 	expected  shared.FieldGroup
 }{
 	{
 		"clair",
 		"clair",
 		quayRegistry("test"),
+		quaycontext.QuayRegistryContext{},
 		&securityscanner.SecurityScannerFieldGroup{
 			FeatureSecurityScanner:              true,
 			SecurityScannerIndexingInterval:     30,
@@ -63,6 +62,7 @@ var fieldGroupForTests = []struct {
 		"redis",
 		"redis",
 		quayRegistry("test"),
+		quaycontext.QuayRegistryContext{},
 		&redis.RedisFieldGroup{
 			BuildlogsRedis: &redis.BuildlogsRedisStruct{
 				Host: "test-quay-redis",
@@ -78,6 +78,7 @@ var fieldGroupForTests = []struct {
 		"postgres",
 		"postgres",
 		quayRegistry("test"),
+		quaycontext.QuayRegistryContext{},
 		&database.DatabaseFieldGroup{
 			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
 			DbConnectionArgs: &database.DbConnectionArgsStruct{
@@ -90,6 +91,13 @@ var fieldGroupForTests = []struct {
 		"objectstorage",
 		"objectstorage",
 		quayRegistry("test"),
+		quaycontext.QuayRegistryContext{
+			SupportsObjectStorage: true,
+			StorageBucketName:     "quay-datastore",
+			StorageHostname:       "s3.noobaa.svc",
+			StorageAccessKey:      "abc123",
+			StorageSecretKey:      "super-secret",
+		},
 		&distributedstorage.DistributedStorageFieldGroup{
 			FeatureProxyStorage:                true,
 			DistributedStoragePreference:       []string{"local_us"},
@@ -111,15 +119,32 @@ var fieldGroupForTests = []struct {
 		},
 	},
 	{
+		"route",
+		"route",
+		quayRegistry("test"),
+		quaycontext.QuayRegistryContext{
+			SupportsRoutes:  true,
+			ClusterHostname: "apps.example.com",
+			ServerHostname:  "test-quay-ns.apps.example.com",
+		},
+		&hostsettings.HostSettingsFieldGroup{
+			ServerHostname:         "test-quay-ns.apps.example.com",
+			ExternalTlsTermination: false,
+			PreferredUrlScheme:     "https",
+		},
+	},
+	{
 		"horizontalpodautoscaler",
 		"horizontalpodautoscaler",
 		quayRegistry("test"),
+		quaycontext.QuayRegistryContext{},
 		nil,
 	},
 	{
 		"mirror",
 		"mirror",
 		quayRegistry("test"),
+		quaycontext.QuayRegistryContext{},
 		&repomirror.RepoMirrorFieldGroup{
 			FeatureRepoMirror:   true,
 			RepoMirrorInterval:  30,
@@ -132,10 +157,10 @@ func TestFieldGroupFor(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range fieldGroupForTests {
-		fieldGroup, err := FieldGroupFor(test.component, test.quay)
+		fieldGroup, err := FieldGroupFor(&test.ctx, test.component, test.quay)
 		assert.Nil(err, test.name)
 
-		// TODO(alecmerdler): Make this more generic for other randomly-generated fields.
+		// TODO: Make this more generic for other randomly-generated fields.
 		if test.name == "clair" {
 			secscanFieldGroup := fieldGroup.(*securityscanner.SecurityScannerFieldGroup)
 

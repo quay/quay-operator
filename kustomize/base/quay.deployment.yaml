@@ -26,7 +26,7 @@ spec:
           image: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
           env:
             - name: QE_K8S_CONFIG_SECRET
-              # FIXME(alecmerdler): Using `vars` is kinda ugly because it's basically templating, but this needs to be the generated `Secret` name...
+              # FIXME: Using `vars` is kinda ugly because it's basically templating, but this needs to be the generated `Secret` name...
               value: $(QE_K8S_CONFIG_SECRET)
             - name: QE_K8S_NAMESPACE
               valueFrom:
