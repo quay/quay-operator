@@ -47,7 +47,7 @@ spec:
           args: ["repomirror-nomigrate"]
           env:
             - name: QE_K8S_CONFIG_SECRET
-              # FIXME(alecmerdler): Using `vars` is kinda ugly because it's basically templating, but this needs to be the generated `Secret` name...
+              # FIXME: Using `vars` is kinda ugly because it's basically templating, but this needs to be the generated `Secret` name...
               value: $(QE_K8S_CONFIG_SECRET)
             - name: QE_K8S_NAMESPACE
               valueFrom:
