@@ -4,4 +4,4 @@ metadata:
   name: quay-operator
 spec:
   sourceType: grpc
-  image: quay.io/projectquay/quay-operator-catalog@sha256:a32ebc1d422c5285dacd9e97f2216be4a9aa8f06d20034909e4dba7f4b136004
+  image: quay.io/projectquay/quay-operator-catalog@sha256:598dc75adf6da2c0fa82d34ecda88bf71f254518fc87d0d9374027a57c911ead

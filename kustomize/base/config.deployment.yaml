@@ -23,7 +23,7 @@ spec:
             name: cluster-service-ca
       containers:
         - name: quay-config-editor
-          image: quay.io/projectquay/quay@sha256:3c8b7755732b93786ba738fd0d0831a4aea73837e05cc26bbdff19f84e9ed58d
+          image: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
           ports:
             - containerPort: 8080
               protocol: TCP
