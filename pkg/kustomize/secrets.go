@@ -254,7 +254,7 @@ func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]b
 			svc,
 			strings.Join([]string{svc, quay.GetNamespace(), "svc"}, "."),
 			strings.Join([]string{svc, quay.GetNamespace(), "svc", "cluster", "local"}, "."),
-			buildManagerHostname,
+			strings.Split(buildManagerHostname, ":")[0],
 		},
 	)
 }
