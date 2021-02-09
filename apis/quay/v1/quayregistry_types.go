@@ -26,9 +26,8 @@ import (
 )
 
 const (
-	SupportsRoutesAnnotation  = "quay.redhat.com/supports-routes"
-	ClusterHostnameAnnotation = "quay.redhat.com/router-canonical-hostname"
-
+	SupportsRoutesAnnotation           = "quay.redhat.com/supports-routes"
+	ClusterHostnameAnnotation          = "quay.redhat.com/router-canonical-hostname"
 	SupportsObjectStorageAnnotation    = "quay.redhat.com/supports-object-storage"
 	ObjectStorageInitializedAnnotation = "quay.redhat.com/object-storage-initialized"
 	StorageHostnameAnnotation          = "quay.redhat.com/storage-hostname"

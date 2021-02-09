@@ -47,7 +47,7 @@ import (
 
 const (
 	upgradePollInterval  = time.Second * 10
-	upgradePollTimeout   = time.Second * 600
+	upgradePollTimeout   = time.Second * 6000
 	creationPollInterval = time.Second * 1
 	creationPollTimeout  = time.Second * 600
 )
@@ -376,7 +376,9 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 
 	if immutableResources[groupVersionKind] {
 		log.Info("(re)creating immutable resource")
-		if err := r.Client.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) && !errors.IsAlreadyExists(err) {
+
+		propagationPolicy := metav1.DeletePropagationForeground
+		if err := r.Client.Delete(ctx, obj, &client.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil && !errors.IsNotFound(err) && !errors.IsAlreadyExists(err) {
 			log.Error(err, "failed to delete immutable resource")
 
 			return err
