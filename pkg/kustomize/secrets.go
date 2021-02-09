@@ -234,10 +234,11 @@ func BaseConfig() map[string]interface{} {
 	}
 }
 
-// CustomTLSFor generates a TLS certificate/key pair for the Quay registry to use for secure communication with clients.
+// EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for secure communication with clients,
+// and generates a TLS certificate/key pair if they are invalid.
 // In addition to `SERVER_HOSTNAME`, it sets certificate subject alternative names
 // for the internal k8s service hostnames (i.e. `registry-quay-app.quay-enterprise.svc`).
-func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]byte, []byte, error) {
+func EnsureTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}, tlsCert, tlsKey []byte) ([]byte, []byte, error) {
 	routeConfigFiles := configFilesFor("route", quay, baseConfig)
 	var fieldGroup hostsettings.HostSettingsFieldGroup
 	if err := yaml.Unmarshal(routeConfigFiles["route.config.yaml"], &fieldGroup); err != nil {
@@ -247,16 +248,21 @@ func CustomTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}) ([]b
 	svc := quay.GetName() + "-quay-app"
 	buildManagerHostname := string(routeConfigFiles[buildManagerHostnameKey])
 
-	return cert.GenerateSelfSignedCertKey(
+	hosts := []string{
 		fieldGroup.ServerHostname,
-		[]net.IP{},
-		[]string{
-			svc,
-			strings.Join([]string{svc, quay.GetNamespace(), "svc"}, "."),
-			strings.Join([]string{svc, quay.GetNamespace(), "svc", "cluster", "local"}, "."),
-			strings.Split(buildManagerHostname, ":")[0],
-		},
-	)
+		svc,
+		strings.Join([]string{svc, quay.GetNamespace(), "svc"}, "."),
+		strings.Join([]string{svc, quay.GetNamespace(), "svc", "cluster", "local"}, "."),
+		strings.Split(buildManagerHostname, ":")[0],
+	}
+
+	for _, host := range hosts {
+		if valid, _ := shared.ValidateCertPairWithHostname(tlsCert, tlsKey, host, fieldGroupFor("route")); !valid {
+			return cert.GenerateSelfSignedCertKey(fieldGroup.ServerHostname, []net.IP{}, hosts)
+		}
+	}
+
+	return tlsCert, tlsKey, nil
 }
 
 // ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
@@ -323,13 +329,6 @@ func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[stri
 
 		if buildManagerHostname, ok := baseConfig["BUILDMAN_HOSTNAME"]; ok {
 			configFiles[buildManagerHostnameKey] = []byte(buildManagerHostname.(string))
-		} else {
-			clusterHostname := quay.GetAnnotations()[v1.ClusterHostnameAnnotation]
-			configFiles[buildManagerHostnameKey] = []byte(strings.Join([]string{
-				strings.Join([]string{quay.GetName(), "quay-builder", quay.GetNamespace()}, "-"),
-				clusterHostname},
-				"."))
-
 		}
 	default:
 		panic("unknown component: " + component)

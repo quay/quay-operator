@@ -246,8 +246,8 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 	}
 
-	updatedQuay.Status.ConfigEditorCredentialsSecret = configEditorCredentialsSecretFrom(deploymentObjects)
 	updatedQuay, _ = v1.EnsureConfigEditorEndpoint(updatedQuay)
+	updatedQuay.Status.ConfigEditorCredentialsSecret = configEditorCredentialsSecretFrom(deploymentObjects)
 
 	if c := v1.GetCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked); c != nil && c.Status == metav1.ConditionTrue && c.Reason == v1.ConditionReasonConfigInvalid {
 		return r.reconcileWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, c.Message)
@@ -295,7 +295,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 				if upgradeDeployment.Status.ReadyReplicas > 0 {
 					log.Info("Quay upgrade complete, updating `status.currentVersion`")
 
-					updatedQuay, _ := v1.EnsureRegistryEndpoint(updatedQuay)
+					updatedQuay, _ := v1.EnsureRegistryEndpoint(updatedQuay, userProvidedConfig)
 					msg := "all registry component healthchecks passing"
 					condition := v1.Condition{
 						Type:               v1.ConditionTypeAvailable,
