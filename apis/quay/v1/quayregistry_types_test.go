@@ -307,6 +307,7 @@ func TestComponentsMatch(t *testing.T) {
 var ensureRegistryEndpointTests = []struct {
 	name       string
 	quay       QuayRegistry
+	config     map[string]interface{}
 	expected   string
 	expectedOk bool
 }{
@@ -322,6 +323,7 @@ var ensureRegistryEndpointTests = []struct {
 				},
 			},
 		},
+		nil,
 		"https://test-quay-ns-1.apps.example.com",
 		false,
 	},
@@ -340,6 +342,7 @@ var ensureRegistryEndpointTests = []struct {
 				RegistryEndpoint: "https://test-quay-ns-1.apps.example.com",
 			},
 		},
+		map[string]interface{}{},
 		"https://test-quay-ns-1.apps.example.com",
 		true,
 	},
@@ -351,7 +354,39 @@ var ensureRegistryEndpointTests = []struct {
 				Namespace: "ns-1",
 			},
 		},
+		map[string]interface{}{},
 		"",
+		true,
+	},
+	{
+		"ServerHostnameInConfigChanged",
+		QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "ns-1",
+			},
+		},
+		map[string]interface{}{
+			"SERVER_HOSTNAME": "registry.example.com",
+		},
+		"https://registry.example.com",
+		false,
+	},
+	{
+		"ServerHostnameInConfigSame",
+		QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "ns-1",
+			},
+			Status: QuayRegistryStatus{
+				RegistryEndpoint: "https://registry.example.com",
+			},
+		},
+		map[string]interface{}{
+			"SERVER_HOSTNAME": "registry.example.com",
+		},
+		"https://registry.example.com",
 		true,
 	},
 }
@@ -360,7 +395,7 @@ func TestEnsureRegistryEndpoint(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range ensureRegistryEndpointTests {
-		quay, ok := EnsureRegistryEndpoint(&test.quay)
+		quay, ok := EnsureRegistryEndpoint(&test.quay, test.config)
 
 		assert.Equal(test.expectedOk, ok, test.name)
 		assert.Equal(test.expected, quay.Status.RegistryEndpoint, test.name)

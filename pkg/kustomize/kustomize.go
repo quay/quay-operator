@@ -401,17 +401,14 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 		}
 	}
 
-	_, quayCertExists := componentConfigFiles["ssl.cert"]
-	_, quayKeyExists := componentConfigFiles["ssl.key"]
-	if !quayCertExists || !quayKeyExists {
-		log.Info("Generating missing `ssl.cert` and `ssl.key` pair for Quay app TLS")
-
-		cert, key, err := CustomTLSFor(quay, parsedUserConfig)
-		check(err)
-
-		componentConfigFiles["ssl.cert"] = cert
-		componentConfigFiles["ssl.key"] = key
+	log.Info("Ensuring `ssl.cert` and `ssl.key` pair for Quay app TLS")
+	tlsCert, tlsKey, err := EnsureTLSFor(quay, parsedUserConfig, baseConfigBundle.Data["ssl.cert"], baseConfigBundle.Data["ssl.key"])
+	if err != nil {
+		return nil, err
 	}
+
+	componentConfigFiles["ssl.cert"] = tlsCert
+	componentConfigFiles["ssl.key"] = tlsKey
 
 	kustomization, err := KustomizationFor(quay, componentConfigFiles)
 	check(err)
