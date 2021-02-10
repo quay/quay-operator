@@ -27,7 +27,6 @@ spec:
           ports:
             - containerPort: 5432
               protocol: TCP
-          # TODO(alecmerdler): Readiness/liveliness probes which execute `psql` command to check if database is created.
           env:
             - name: POSTGRESQL_USER
               valueFrom:
