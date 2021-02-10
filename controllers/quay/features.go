@@ -66,7 +66,7 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(quay *v1.QuayRegistry) (*v
 
 		return quay, err
 	} else {
-		r.Log.Info("cluster does not support `Route` API")
+		r.Log.Info("cluster does not support `Route` API", "error", err)
 	}
 
 	return quay, nil
