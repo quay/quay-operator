@@ -283,13 +283,18 @@ func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
 	return updatedQuay, nil
 }
 
-// EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was changed.
-func EnsureRegistryEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
+// EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was unchanged.
+func EnsureRegistryEndpoint(quay *QuayRegistry, config map[string]interface{}) (*QuayRegistry, bool) {
 	updatedQuay := quay.DeepCopy()
 
-	if supportsRoutes(quay) {
+	if config == nil {
+		config = map[string]interface{}{}
+	}
+
+	if serverHostname, ok := config["SERVER_HOSTNAME"]; ok {
+		updatedQuay.Status.RegistryEndpoint = "https://" + serverHostname.(string)
+	} else if supportsRoutes(quay) {
 		clusterHostname := quay.GetAnnotations()[ClusterHostnameAnnotation]
-		// FIXME(alecmerdler): This is incorrect if `SERVER_HOSTNAME` is set...
 		updatedQuay.Status.RegistryEndpoint = "https://" + strings.Join([]string{
 			strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
 			clusterHostname},
@@ -300,7 +305,7 @@ func EnsureRegistryEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
 	return updatedQuay, quay.Status.RegistryEndpoint == updatedQuay.Status.RegistryEndpoint
 }
 
-// EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field and returns `ok` if it was changed.
+// EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field and returns `ok` if it was unchanged.
 func EnsureConfigEditorEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
 	updatedQuay := quay.DeepCopy()
 
