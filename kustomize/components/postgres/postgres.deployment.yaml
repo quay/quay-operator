@@ -16,6 +16,10 @@ spec:
       labels:
         quay-component: postgres
     spec:
+      tolerations:
+        - effect: NoSchedule 
+          key: node-role.kubernetes.io/infra 
+          operator: Exists
       volumes:
         - name: postgres-data
           persistentVolumeClaim:

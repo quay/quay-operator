@@ -14,6 +14,10 @@ spec:
       labels:
         quay-component: quay-config-editor
     spec:
+      tolerations:
+        - effect: NoSchedule 
+          key: node-role.kubernetes.io/infra 
+          operator: Exists
       volumes:
         - name: config-bundle
           secret:

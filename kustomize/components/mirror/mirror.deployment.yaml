@@ -16,6 +16,10 @@ spec:
       labels:
         quay-component: quay-mirror
     spec:
+      tolerations:
+        - effect: NoSchedule 
+          key: node-role.kubernetes.io/infra 
+          operator: Exists
       volumes:
         - name: configvolume
           secret:
