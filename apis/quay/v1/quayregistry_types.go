@@ -20,20 +20,12 @@ import (
 	"errors"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-)
 
-const (
-	SupportsRoutesAnnotation           = "quay.redhat.com/supports-routes"
-	ClusterHostnameAnnotation          = "quay.redhat.com/router-canonical-hostname"
-	SupportsObjectStorageAnnotation    = "quay.redhat.com/supports-object-storage"
-	ObjectStorageInitializedAnnotation = "quay.redhat.com/object-storage-initialized"
-	StorageHostnameAnnotation          = "quay.redhat.com/storage-hostname"
-	StorageBucketNameAnnotation        = "quay.redhat.com/storage-bucketname"
-	StorageAccessKeyAnnotation         = "quay.redhat.com/storage-access-key"
-	StorageSecretKeyAnnotation         = "quay.redhat.com/storage-secret-key"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 type QuayVersion string
@@ -145,7 +137,7 @@ func GetCondition(conditions []Condition, conditionType ConditionType) *Conditio
 }
 
 // SetCondition adds or updates a given condition.
-// TODO(alecmerdler): Use https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/api/meta/conditions.go when we can.
+// TODO: Use https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/api/meta/conditions.go when we can.
 func SetCondition(existing []Condition, newCondition Condition) []Condition {
 	if existing == nil {
 		existing = []Condition{}
@@ -245,17 +237,17 @@ func RequiredComponent(component string) bool {
 
 // EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`
 // and returns a new `QuayRegistry` copy.
-func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
+func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) (*QuayRegistry, error) {
 	updatedQuay := quay.DeepCopy()
 	if updatedQuay.Spec.Components == nil {
 		updatedQuay.Spec.Components = []Component{}
 	}
 
-	if ComponentIsManaged(updatedQuay.Spec.Components, "route") && !supportsRoutes(quay) {
+	if ComponentIsManaged(updatedQuay.Spec.Components, "route") && !ctx.SupportsRoutes {
 		return nil, errors.New("cannot use `route` component when `Route` API not available")
 	}
 
-	if ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") && !supportsObjectBucketClaims(quay) {
+	if ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") && !ctx.SupportsObjectStorage {
 		return nil, errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available")
 	}
 
@@ -269,10 +261,10 @@ func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
 		}
 
 		if !found {
-			if component == "route" && !supportsRoutes(quay) {
+			if component == "route" && !ctx.SupportsRoutes {
 				continue
 			}
-			if component == "objectstorage" && !supportsObjectBucketClaims(quay) {
+			if component == "objectstorage" && !ctx.SupportsObjectStorage {
 				continue
 			}
 
@@ -284,7 +276,7 @@ func EnsureDefaultComponents(quay *QuayRegistry) (*QuayRegistry, error) {
 }
 
 // EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was unchanged.
-func EnsureRegistryEndpoint(quay *QuayRegistry, config map[string]interface{}) (*QuayRegistry, bool) {
+func EnsureRegistryEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry, config map[string]interface{}) (*QuayRegistry, bool) {
 	updatedQuay := quay.DeepCopy()
 
 	if config == nil {
@@ -293,30 +285,28 @@ func EnsureRegistryEndpoint(quay *QuayRegistry, config map[string]interface{}) (
 
 	if serverHostname, ok := config["SERVER_HOSTNAME"]; ok {
 		updatedQuay.Status.RegistryEndpoint = "https://" + serverHostname.(string)
-	} else if supportsRoutes(quay) {
-		clusterHostname := quay.GetAnnotations()[ClusterHostnameAnnotation]
+	} else if ctx.SupportsRoutes {
 		updatedQuay.Status.RegistryEndpoint = "https://" + strings.Join([]string{
 			strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
-			clusterHostname},
+			ctx.ClusterHostname},
 			".")
 	}
-	// TODO(alecmerdler): Retrieve load balancer IP from `Service`
+	// TODO: Retrieve load balancer IP from `Service`
 
 	return updatedQuay, quay.Status.RegistryEndpoint == updatedQuay.Status.RegistryEndpoint
 }
 
 // EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field and returns `ok` if it was unchanged.
-func EnsureConfigEditorEndpoint(quay *QuayRegistry) (*QuayRegistry, bool) {
+func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) (*QuayRegistry, bool) {
 	updatedQuay := quay.DeepCopy()
 
-	if supportsRoutes(quay) {
-		clusterHostname := quay.GetAnnotations()[ClusterHostnameAnnotation]
+	if ctx.SupportsRoutes {
 		updatedQuay.Status.ConfigEditorEndpoint = "https://" + strings.Join([]string{
 			strings.Join([]string{quay.GetName(), "quay-config-editor", quay.GetNamespace()}, "-"),
-			clusterHostname},
+			ctx.ClusterHostname},
 			".")
 	}
-	// TODO(alecmerdler): Retrieve load balancer IP from `Service`
+	// TODO: Retrieve load balancer IP from `Service`
 
 	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
 }
@@ -350,26 +340,15 @@ func EnsureOwnerReference(quay *QuayRegistry, obj runtime.Object) (runtime.Objec
 	return obj, nil
 }
 
-func supportsRoutes(quay *QuayRegistry) bool {
-	annotations := quay.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
+const ManagedKeysName = "quay-registry-managed-secret-keys"
 
-	_, ok := annotations[SupportsRoutesAnnotation]
-
-	return ok
+// ManagedKeysSecretNameFor returns the name of the `Secret` in which generated secret keys are stored.
+func ManagedKeysSecretNameFor(quay *QuayRegistry) string {
+	return strings.Join([]string{quay.GetName(), ManagedKeysName}, "-")
 }
 
-func supportsObjectBucketClaims(quay *QuayRegistry) bool {
-	annotations := quay.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-
-	_, ok := annotations[SupportsObjectStorageAnnotation]
-
-	return ok
+func IsManagedKeysSecretFor(quay *QuayRegistry, secret *corev1.Secret) bool {
+	return strings.Contains(secret.GetName(), quay.GetName()+"-"+ManagedKeysName)
 }
 
 func init() {

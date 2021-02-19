@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/go-logr/logr"
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	route "github.com/openshift/api/route/v1"
 	apps "k8s.io/api/apps/v1"
@@ -27,17 +28,18 @@ import (
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/yaml"
 
-	"github.com/go-logr/logr"
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 const (
-	configSecretPrefix         = "quay-config-secret"
-	registryHostnameKey        = "quay-registry-hostname"
-	buildManagerHostnameKey    = "quay-buildmanager-hostname"
-	managedFieldGroupsKey      = "quay-managed-fieldgroups"
-	operatorServiceEndpointKey = "quay-operator-service-endpoint"
-	quayRegistryNameKey        = "quay-operator/quayregistry"
+	QuayRegistryNameLabel = "quay-operator/quayregistry"
+
+	configSecretPrefix                = "quay-config-secret"
+	registryHostnameAnnotation        = "quay-registry-hostname"
+	buildManagerHostnameAnnotation    = "quay-buildmanager-hostname"
+	managedFieldGroupsAnnotation      = "quay-managed-fieldgroups"
+	operatorServiceEndpointAnnotation = "quay-operator-service-endpoint"
 
 	podNamespaceKey = "MY_POD_NAMESPACE"
 
@@ -211,7 +213,7 @@ func generate(kustomization *types.Kustomization, overlay string, quayConfigFile
 		})
 
 		if obj == nil {
-			panic("TODO(alecmerdler): Not implemented for GroupVersionKind: " + resource.GetGvk().String())
+			panic("TODO: Not implemented for GroupVersionKind: " + resource.GetGvk().String())
 		}
 
 		err = json.Unmarshal(resourceJSON, obj)
@@ -224,16 +226,14 @@ func generate(kustomization *types.Kustomization, overlay string, quayConfigFile
 }
 
 // KustomizationFor takes a `QuayRegistry` object and generates a Kustomization for it.
-func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) (*types.Kustomization, error) {
+func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) (*types.Kustomization, error) {
 	if quay == nil {
 		return nil, errors.New("given QuayRegistry should not be nil")
 	}
 
 	configFiles := []string{}
 	for key := range quayConfigFiles {
-		if key != registryHostnameKey && key != buildManagerHostnameKey {
-			configFiles = append(configFiles, filepath.Join("bundle", key))
-		}
+		configFiles = append(configFiles, filepath.Join("bundle", key))
 	}
 
 	configEditorPassword, err := generateRandomString(16)
@@ -252,9 +252,23 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		},
 		{
 			GeneratorArgs: types.GeneratorArgs{
+				Name: v1.ManagedKeysName,
+				KvPairSources: types.KvPairSources{
+					LiteralSources: []string{
+						"DATABASE_SECRET_KEY=" + ctx.DatabaseSecretKey,
+						"SECRET_KEY=" + ctx.SecretKey,
+					},
+				},
+			},
+		},
+		{
+			GeneratorArgs: types.GeneratorArgs{
 				Name: "quay-config-editor-credentials",
 				KvPairSources: types.KvPairSources{
-					LiteralSources: []string{"username=" + configEditorUser, "password=" + configEditorPassword},
+					LiteralSources: []string{
+						"username=" + configEditorUser,
+						"password=" + configEditorPassword,
+					},
 				},
 			},
 		},
@@ -265,7 +279,7 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 	for _, component := range quay.Spec.Components {
 		if component.Managed {
 			componentPaths = append(componentPaths, filepath.Join("..", "components", component.Kind))
-			managedFieldGroups = append(managedFieldGroups, fieldGroupFor(component.Kind))
+			managedFieldGroups = append(managedFieldGroups, fieldGroupNameFor(component.Kind))
 
 			componentConfigFiles, err := componentConfigFilesFor(component.Kind, quay, quayConfigFiles)
 			if componentConfigFiles == nil || err != nil {
@@ -311,13 +325,13 @@ func KustomizationFor(quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) 
 		Components:      componentPaths,
 		SecretGenerator: generatedSecrets,
 		CommonLabels: map[string]string{
-			quayRegistryNameKey: quay.GetName(),
+			QuayRegistryNameLabel: quay.GetName(),
 		},
 		CommonAnnotations: map[string]string{
-			managedFieldGroupsKey:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
-			registryHostnameKey:        string(quayConfigFiles[registryHostnameKey]),
-			buildManagerHostnameKey:    strings.Split(string(quayConfigFiles[buildManagerHostnameKey]), ":")[0],
-			operatorServiceEndpointKey: operatorServiceEndpoint(),
+			managedFieldGroupsAnnotation:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
+			registryHostnameAnnotation:        ctx.ServerHostname,
+			buildManagerHostnameAnnotation:    strings.Split(ctx.BuildManagerHostname, ":")[0],
+			operatorServiceEndpointAnnotation: operatorServiceEndpoint(),
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
 		Vars: []types.Var{
@@ -340,8 +354,9 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 	flattenedSecret := configBundle.DeepCopy()
 
 	var flattenedConfig map[string]interface{}
-	err := yaml.Unmarshal(configBundle.Data["config.yaml"], &flattenedConfig)
-	check(err)
+	if err := yaml.Unmarshal(configBundle.Data["config.yaml"], &flattenedConfig); err != nil {
+		return nil, err
+	}
 
 	isConfigField := func(field string) bool {
 		return strings.Contains(field, ".config.yaml")
@@ -350,8 +365,9 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 	for key, file := range configBundle.Data {
 		if isConfigField(key) {
 			var valueYAML map[string]interface{}
-			err = yaml.Unmarshal(file, &valueYAML)
-			check(err)
+			if err := yaml.Unmarshal(file, &valueYAML); err != nil {
+				return nil, err
+			}
 
 			for configKey, configValue := range valueYAML {
 				flattenedConfig[configKey] = configValue
@@ -361,7 +377,9 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 	}
 
 	flattenedConfigYAML, err := yaml.Marshal(flattenedConfig)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
 
 	flattenedSecret.Data["config.yaml"] = []byte(flattenedConfigYAML)
 
@@ -369,40 +387,76 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 }
 
 // Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
-func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysSecret *corev1.Secret, log logr.Logger) ([]k8sruntime.Object, error) {
-	// Each `managedComponent` brings in their own generated `config.yaml` fields which are added to the base `Secret`
-	componentConfigFiles := baseConfigBundle.DeepCopy().Data
+func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, log logr.Logger) ([]k8sruntime.Object, error) {
+	// Each managed component brings its own generated `config.yaml` fields
+	// which are accumulated under the key `<component>.config.yaml` and then added to the base `Secret`.
+	componentConfigFiles := map[string][]byte{}
 
 	var parsedUserConfig map[string]interface{}
-	err := yaml.Unmarshal(componentConfigFiles["config.yaml"], &parsedUserConfig)
-	check(err)
-
-	// Generate or pull out the SECRET_KEY and DATABASE_SECRET_KEY. Since these must be stable across
-	// runs of the same config, we store them (and re-read them) from a specialized Secret.
-	secretKey, databaseSecretKey, secretKeysSecret := handleSecretKeys(parsedUserConfig, secretKeysSecret, quay, log)
-
-	quayConfig := map[string]interface{}{
-		"SETUP_COMPLETE":      true,
-		"DATABASE_SECRET_KEY": databaseSecretKey,
-		"SECRET_KEY":          secretKey,
+	if err := yaml.Unmarshal(baseConfigBundle.Data["config.yaml"], &parsedUserConfig); err != nil {
+		return nil, err
 	}
-	for field, value := range BaseConfig() {
-		if _, ok := parsedUserConfig[field]; !ok {
-			quayConfig[field] = value
+
+	// Generate or pull out the `SECRET_KEY` and `DATABASE_SECRET_KEY`. Since these must be stable across
+	// runs of the same config, we store them (and re-read them) from a specialized `Secret`.
+	if ctx.DatabaseSecretKey == "" {
+		if key, found := parsedUserConfig["DATABASE_SECRET_KEY"]; found {
+			log.Info("`DATABASE_SECRET_KEY` found in user-provided config")
+
+			ctx.DatabaseSecretKey = key.(string)
+		} else {
+			log.Info("`DATABASE_SECRET_KEY` not found in user-provided config, generating new one")
+
+			databaseSecretKey, err := generateRandomString(secretKeyLength)
+			if err != nil {
+				return nil, err
+			}
+
+			ctx.DatabaseSecretKey = databaseSecretKey
 		}
 	}
-	componentConfigFiles["quay.config.yaml"] = encode(quayConfig)
+
+	if ctx.SecretKey == "" {
+		if key, found := parsedUserConfig["SECRET_KEY"]; found {
+			log.Info("`SECRET_KEY` found in user-provided config")
+
+			ctx.SecretKey = key.(string)
+		} else {
+			log.Info("`SECRET_KEY` not found in user-provided config, generating new one")
+
+			secretKey, err := generateRandomString(secretKeyLength)
+			if err != nil {
+				return nil, err
+			}
+
+			ctx.SecretKey = secretKey
+		}
+	}
+
+	parsedUserConfig["SETUP_COMPLETE"] = true
+	parsedUserConfig["DATABASE_SECRET_KEY"] = ctx.DatabaseSecretKey
+	parsedUserConfig["SECRET_KEY"] = ctx.SecretKey
+
+	for field, value := range BaseConfig() {
+		if _, ok := parsedUserConfig[field]; !ok {
+			parsedUserConfig[field] = value
+		}
+	}
+	componentConfigFiles["config.yaml"] = encode(parsedUserConfig)
 
 	for _, component := range quay.Spec.Components {
 		if component.Managed {
-			for name, contents := range configFilesFor(component.Kind, quay, parsedUserConfig) {
-				componentConfigFiles[name] = contents
+			fieldGroup, err := FieldGroupFor(ctx, component.Kind, quay)
+			if err != nil {
+				return nil, err
 			}
+
+			componentConfigFiles[component.Kind+".config.yaml"] = encode(fieldGroup)
 		}
 	}
 
 	log.Info("Ensuring `ssl.cert` and `ssl.key` pair for Quay app TLS")
-	tlsCert, tlsKey, err := EnsureTLSFor(quay, parsedUserConfig, baseConfigBundle.Data["ssl.cert"], baseConfigBundle.Data["ssl.key"])
+	tlsCert, tlsKey, err := EnsureTLSFor(ctx, quay, baseConfigBundle.Data["ssl.cert"], baseConfigBundle.Data["ssl.key"])
 	if err != nil {
 		return nil, err
 	}
@@ -410,7 +464,7 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 	componentConfigFiles["ssl.cert"] = tlsCert
 	componentConfigFiles["ssl.key"] = tlsKey
 
-	kustomization, err := KustomizationFor(quay, componentConfigFiles)
+	kustomization, err := KustomizationFor(ctx, quay, componentConfigFiles)
 	check(err)
 
 	var overlay string
@@ -434,12 +488,6 @@ func Inflate(quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, secretKeysS
 
 			resources[index] = configBundleSecret
 		}
-	}
-
-	if secretKeysSecret.Data != nil {
-		secretKeysSecret.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "Secret"})
-		secretKeysSecret.SetName(SecretKeySecretName(quay))
-		resources = append(resources, secretKeysSecret)
 	}
 
 	for _, resource := range resources {

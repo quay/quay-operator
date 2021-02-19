@@ -42,6 +42,7 @@ import (
 
 	quayredhatcomv1 "github.com/quay/quay-operator/apis/quay/v1"
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/quay/quay-operator/pkg/kustomize"
 )
 
@@ -81,6 +82,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	updatedQuay := quay.DeepCopy()
+	quayContext := quaycontext.NewQuayRegistryContext()
 
 	if available := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeAvailable); available != nil && available.Reason == v1.ConditionReasonMigrationsInProgress {
 		log.Info("migrations in progress, skipping reconcile")
@@ -138,23 +140,21 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
 
-	var secretKeysBundle corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: kustomize.SecretKeySecretName(&quay)}, &secretKeysBundle); err != nil {
-		if !errors.IsNotFound(err) {
-			msg := fmt.Sprintf("unable to retrieve secret keys bundle: %s", err)
+	quayContext, updatedQuay, err := r.checkManagedKeys(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	if err != nil {
+		msg := fmt.Sprintf("unable to retrieve managed keys `Secret`: %s", err)
 
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-		}
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 	}
 
-	updatedQuay, err := r.checkRoutesAvailable(updatedQuay.DeepCopy())
+	quayContext, updatedQuay, err = r.checkRoutesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
 	if v1.ComponentIsManaged(updatedQuay.Spec.Components, "route") && err != nil {
 		msg := fmt.Sprintf("could not check for `Routes` API: %s", err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonRouteComponentDependencyError, msg)
 	}
 
-	updatedQuay, err = r.checkObjectBucketClaimsAvailable(updatedQuay.DeepCopy())
+	quayContext, updatedQuay, err = r.checkObjectBucketClaimsAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
 	if v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") && err != nil {
 		msg := fmt.Sprintf("could not check for `ObjectBucketClaims` API: %s", err)
 		if _, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg); err != nil {
@@ -164,7 +164,14 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{RequeueAfter: time.Millisecond * 1000}, nil
 	}
 
-	updatedQuay, err = v1.EnsureDefaultComponents(updatedQuay.DeepCopy())
+	quayContext, updatedQuay, err = r.checkBuildManagerAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	if err != nil {
+		msg := fmt.Sprintf("could not check for build manager support: %s", err)
+
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg)
+	}
+
+	updatedQuay, err = v1.EnsureDefaultComponents(quayContext, updatedQuay.DeepCopy())
 	if err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
 
@@ -228,14 +235,12 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	log.Info("inflating QuayRegistry into Kubernetes objects using Kustomize")
-	deploymentObjects, err := kustomize.Inflate(updatedQuay, &configBundle, &secretKeysBundle, log)
+	deploymentObjects, err := kustomize.Inflate(quayContext, updatedQuay, &configBundle, log)
 	if err != nil {
 		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
 
 		return ctrl.Result{}, nil
 	}
-
-	updatedQuay = stripObjectBucketClaimAnnotations(updatedQuay)
 
 	for _, obj := range deploymentObjects {
 		err = r.createOrUpdateObject(ctx, obj, quay)
@@ -246,7 +251,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 	}
 
-	updatedQuay, _ = v1.EnsureConfigEditorEndpoint(updatedQuay)
+	updatedQuay, _ = v1.EnsureConfigEditorEndpoint(quayContext, updatedQuay)
 	updatedQuay.Status.ConfigEditorCredentialsSecret = configEditorCredentialsSecretFrom(deploymentObjects)
 
 	if c := v1.GetCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked); c != nil && c.Status == metav1.ConditionTrue && c.Reason == v1.ConditionReasonConfigInvalid {
@@ -260,7 +265,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, nil
 	}
 
-	if _, ok := updatedQuay.GetAnnotations()[v1.ObjectStorageInitializedAnnotation]; !ok && v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") {
+	if !quayContext.ObjectStorageInitialized && v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") {
 		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
 
 		return ctrl.Result{Requeue: true}, nil
@@ -295,7 +300,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 				if upgradeDeployment.Status.ReadyReplicas > 0 {
 					log.Info("Quay upgrade complete, updating `status.currentVersion`")
 
-					updatedQuay, _ := v1.EnsureRegistryEndpoint(updatedQuay, userProvidedConfig)
+					updatedQuay, _ := v1.EnsureRegistryEndpoint(quayContext, updatedQuay, userProvidedConfig)
 					msg := "all registry component healthchecks passing"
 					condition := v1.Condition{
 						Type:               v1.ConditionTypeAvailable,
@@ -434,7 +439,7 @@ func (r *QuayRegistryReconciler) updateWithCondition(q *v1.QuayRegistry, t v1.Co
 		eventType = corev1.EventTypeWarning
 	}
 
-	// FIXME(alecmerdler): Need to pause here because race condition between updating `conditions` multiple times changes `resourceVersion`...
+	// FIXME: Need to pause here because race condition between updating `conditions` multiple times changes `resourceVersion`...
 	time.Sleep(1000 * time.Millisecond)
 
 	// Fetch first to ensure we have the right `resourceVersion` for updates.
@@ -447,7 +452,7 @@ func (r *QuayRegistryReconciler) updateWithCondition(q *v1.QuayRegistry, t v1.Co
 	if err := r.Client.Status().Update(context.Background(), updatedQuay); err != nil {
 		return nil, err
 	}
-	// FIXME(alecmerdler): Events are not being recorded during testing, making it hard to debug...
+	// FIXME: Events are not being recorded during testing, making it hard to debug...
 	r.EventRecorder.Event(updatedQuay, eventType, string(reason), msg)
 
 	return updatedQuay, nil
@@ -461,13 +466,13 @@ func (r *QuayRegistryReconciler) reconcileWithCondition(q *v1.QuayRegistry, t v1
 }
 
 func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// FIXME(alecmerdler): Can we do this in the `init()` function in `main.go`...?
+	// FIXME: Can we do this in the `init()` function in `main.go`...?
 	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add OpenShift `Route` API to scheme")
 
 		return err
 	}
-	// FIXME(alecmerdler): Can we do this in the `init()` function in `main.go`...?
+	// FIXME: Can we do this in the `init()` function in `main.go`...?
 	if err := objectbucket.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add `ObjectBucketClaim` API to scheme")
 
@@ -477,6 +482,6 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&quayredhatcomv1.QuayRegistry{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		// TODO(alecmerdler): Add `.Owns()` for every resource type we manage...
+		// TODO: Add `.Owns()` for every resource type we manage...
 		Complete(r)
 }

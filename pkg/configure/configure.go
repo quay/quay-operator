@@ -99,7 +99,7 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 			return
 		}
 
-		// FIXME(alecmerdler): Better response body
+		// FIXME: Better response body
 		js, err := json.Marshal(response{Status: "success"})
 		if err != nil {
 			log.Error(err, "failed to marshal response to JSON")

@@ -7,24 +7,59 @@ import (
 
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
+	"github.com/quay/quay-operator/pkg/kustomize"
 )
 
 const (
-	datastoreBucketName = "BUCKET_NAME"
-	datastoreBucketHost = "BUCKET_HOST"
-	datastoreAccessKey  = "AWS_ACCESS_KEY_ID"
-	datastoreSecretKey  = "AWS_SECRET_ACCESS_KEY"
+	datastoreBucketNameKey = "BUCKET_NAME"
+	datastoreBucketHostKey = "BUCKET_HOST"
+	datastoreAccessKey     = "AWS_ACCESS_KEY_ID"
+	datastoreSecretKey     = "AWS_SECRET_ACCESS_KEY"
+
+	databaseSecretKey = "DATABASE_SECRET_KEY"
+	secretKey         = "SECRET_KEY"
 )
 
-func (r *QuayRegistryReconciler) checkRoutesAvailable(quay *v1.QuayRegistry) (*v1.QuayRegistry, error) {
+func (r *QuayRegistryReconciler) checkManagedKeys(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+	var secrets corev1.SecretList
+	listOptions := &client.ListOptions{
+		Namespace: quay.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			kustomize.QuayRegistryNameLabel: quay.GetName(),
+		}),
+	}
+
+	if err := r.List(context.Background(), &secrets, listOptions); err != nil {
+		return ctx, quay, err
+	}
+
+	for _, secret := range secrets.Items {
+		if v1.IsManagedKeysSecretFor(quay, &secret) {
+			ctx.DatabaseSecretKey = string(secret.Data[databaseSecretKey])
+			ctx.SecretKey = string(secret.Data[secretKey])
+			break
+		}
+	}
+
+	return ctx, quay, nil
+}
+
+func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
 	fakeRoute, err := v1.EnsureOwnerReference(quay, &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      quay.GetName() + "-test-route",
@@ -34,55 +69,75 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(quay *v1.QuayRegistry) (*v
 	})
 
 	if err != nil {
-		return quay, err
+		return ctx, quay, err
 	}
 
-	if err := r.Client.Create(context.Background(), fakeRoute); err == nil {
+	if err := r.Client.Create(context.Background(), fakeRoute); err == nil || errors.IsAlreadyExists(err) {
 		r.Log.Info("cluster supports `Routes` API")
-		// Wait until `status.ingress` is populated.
-		time.Sleep(time.Millisecond * 500)
 
-		if err := r.Client.Get(context.Background(), types.NamespacedName{Name: quay.GetName() + "-test-route", Namespace: quay.GetNamespace()}, fakeRoute); err != nil {
-			return quay, err
+		// Wait until `status.ingress` is populated (should be immediately).
+		err = wait.Poll(500*time.Millisecond, 5*time.Minute, func() (done bool, err error) {
+			if err := r.Client.Get(context.Background(), types.NamespacedName{Name: quay.GetName() + "-test-route", Namespace: quay.GetNamespace()}, fakeRoute); err != nil {
+				return false, client.IgnoreNotFound(err)
+			}
+
+			if len(fakeRoute.(*routev1.Route).Status.Ingress) > 0 {
+				ctx.SupportsRoutes = true
+				ctx.ClusterHostname = fakeRoute.(*routev1.Route).Status.Ingress[0].RouterCanonicalHostname
+
+				return true, nil
+			}
+
+			r.Log.Info("waiting to detect `routerCanonicalHostname`")
+
+			return false, nil
+		})
+		if err != nil {
+			return ctx, quay, err
 		}
 
-		existingAnnotations := quay.GetAnnotations()
-		if existingAnnotations == nil {
-			existingAnnotations = map[string]string{}
+		// NOTE: The `route` component is unique because we allow users to set the `SERVER_HOSTNAME` field instead of controlling the entire fieldgroup.
+		// This value is then passed to the created `Route` using a Kustomize variable.
+		var config map[string]interface{}
+		if err := yaml.Unmarshal(rawConfig, &config); err != nil {
+			return ctx, quay, err
 		}
 
-		existingAnnotations[v1.SupportsRoutesAnnotation] = "true"
-
-		if _, ok := existingAnnotations[v1.ClusterHostnameAnnotation]; !ok {
-			existingAnnotations[v1.ClusterHostnameAnnotation] = fakeRoute.(*routev1.Route).Status.Ingress[0].RouterCanonicalHostname
-			r.Log.Info("detected router canonical hostname: " + existingAnnotations[v1.ClusterHostnameAnnotation])
+		fieldGroup, err := hostsettings.NewHostSettingsFieldGroup(config)
+		if err != nil {
+			return ctx, quay, err
 		}
+
+		if fieldGroup.ServerHostname != "" {
+			ctx.ServerHostname = fieldGroup.ServerHostname
+		} else {
+			ctx.ServerHostname = strings.Join([]string{
+				strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
+				ctx.ClusterHostname},
+				".")
+		}
+
+		r.Log.Info("detected router canonical hostname: " + ctx.ClusterHostname)
 
 		if err := r.Client.Delete(context.Background(), fakeRoute); err != nil {
-			return quay, err
+			return ctx, quay, err
 		}
 
-		quay.SetAnnotations(existingAnnotations)
-
-		return quay, err
-	} else {
-		r.Log.Info("cluster does not support `Route` API", "error", err)
+		return ctx, quay, nil
 	}
 
-	return quay, nil
+	r.Log.Info("cluster does not support `Route` API", "error", err)
+
+	return ctx, quay, nil
 }
 
-func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(quay *v1.QuayRegistry) (*v1.QuayRegistry, error) {
+func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
 	datastoreName := types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.GetName() + "-quay-datastore"}
 	var objectBucketClaims objectbucket.ObjectBucketClaimList
 	if err := r.Client.List(context.Background(), &objectBucketClaims); err == nil {
 		r.Log.Info("cluster supports `ObjectBucketClaims` API")
 
-		existingAnnotations := quay.GetAnnotations()
-		if existingAnnotations == nil {
-			existingAnnotations = map[string]string{}
-		}
-		existingAnnotations[v1.SupportsObjectStorageAnnotation] = "true"
+		ctx.SupportsObjectStorage = true
 
 		found := false
 		for _, obc := range objectBucketClaims.Items {
@@ -94,29 +149,29 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(quay *v1.QuayR
 				if err = r.Client.Get(context.Background(), datastoreName, &datastoreSecret); err != nil {
 					r.Log.Error(err, "unable to retrieve Quay datastore `Secret`")
 
-					return quay, err
+					return ctx, quay, err
 				}
 
 				var datastoreConfig corev1.ConfigMap
 				if err = r.Client.Get(context.Background(), datastoreName, &datastoreConfig); err != nil {
 					r.Log.Error(err, "unable to retrieve Quay datastore `ConfigMap`")
 
-					return quay, err
+					return ctx, quay, err
 				}
 
 				r.Log.Info("found `ObjectBucketClaim` and credentials `Secret`, `ConfigMap`")
 
-				host := string(datastoreConfig.Data[datastoreBucketHost])
+				host := string(datastoreConfig.Data[datastoreBucketHostKey])
 				if strings.Contains(host, ".svc") && !strings.Contains(host, ".svc.cluster.local") {
 					r.Log.Info("`ObjectBucketClaim` is using in-cluster endpoint, ensuring we use the fully qualified domain name")
 					host = strings.ReplaceAll(host, ".svc", ".svc.cluster.local")
 				}
 
-				existingAnnotations[v1.StorageBucketNameAnnotation] = string(datastoreConfig.Data[datastoreBucketName])
-				existingAnnotations[v1.StorageHostnameAnnotation] = host
-				existingAnnotations[v1.StorageAccessKeyAnnotation] = string(datastoreSecret.Data[datastoreAccessKey])
-				existingAnnotations[v1.StorageSecretKeyAnnotation] = string(datastoreSecret.Data[datastoreSecretKey])
-				existingAnnotations[v1.ObjectStorageInitializedAnnotation] = "true"
+				ctx.StorageBucketName = string(datastoreConfig.Data[datastoreBucketNameKey])
+				ctx.StorageHostname = host
+				ctx.StorageAccessKey = string(datastoreSecret.Data[datastoreAccessKey])
+				ctx.StorageSecretKey = string(datastoreSecret.Data[datastoreSecretKey])
+				ctx.ObjectStorageInitialized = true
 			}
 		}
 
@@ -124,26 +179,25 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(quay *v1.QuayR
 			r.Log.Info("`ObjectBucketClaim` not found")
 		}
 
-		quay.SetAnnotations(existingAnnotations)
 	} else if err != nil {
 		r.Log.Info("cluster does not support `ObjectBucketClaim` API")
 	}
 
-	return quay, nil
+	return ctx, quay, nil
 }
 
-func stripObjectBucketClaimAnnotations(quay *v1.QuayRegistry) *v1.QuayRegistry {
-	existingAnnotations := quay.GetAnnotations()
-	if existingAnnotations == nil {
-		return quay
+// TODO: Improve this once `builds` is a managed component.
+func (r *QuayRegistryReconciler) checkBuildManagerAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(rawConfig, &config); err != nil {
+		return ctx, quay, err
 	}
 
-	delete(existingAnnotations, v1.StorageBucketNameAnnotation)
-	delete(existingAnnotations, v1.StorageHostnameAnnotation)
-	delete(existingAnnotations, v1.StorageAccessKeyAnnotation)
-	delete(existingAnnotations, v1.StorageSecretKeyAnnotation)
+	if buildManagerHostname, ok := config["BUILDMAN_HOSTNAME"]; ok {
+		ctx.BuildManagerHostname = buildManagerHostname.(string)
+	}
 
-	return quay
+	return ctx, quay, nil
 }
 
 func configEditorCredentialsSecretFrom(objs []runtime.Object) string {
