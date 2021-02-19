@@ -63,11 +63,6 @@ NAME     MGMT-ENDPOINTS              S3-ENDPOINTS                IMAGE          
 noobaa   [https://10.0.32.3:30318]   [https://10.0.32.3:31958]   registry.redhat.io/ocs4/mcg-core-rhel8@sha256:56624aa7dd4ca178c1887343c7445a9425a841600b1309f6deace37ce6b8678d   Ready   3d18h
 ```
 
-**Grant filesystem permissions to managed Postgres pods (OpenShift only):**
-```sh
-$ oc adm policy add-scc-to-user nonroot system:serviceaccount:<your-namespace>:default
-```
-
 **Create `QuayRegistry` instance:**
 ```sh
 $ kubectl create -n <your-namespace> -f ./config/samples/managed.quayregistry.yaml
@@ -114,8 +109,8 @@ $ go test -v ./...
 1. Build and push the Quay Operator container:
 
 ```sh
-$ docker build -t quay.io/<namespace>/quay-operator:dev .
-$ docker push quay.io/<namespace>/quay-operator:dev
+$ docker build -t <some-registry>/<namespace>/quay-operator:dev .
+$ docker push <some-registry>/<namespace>/quay-operator:dev
 ```
 
 2. Replace the `image` field in `deploy/manifests/quay-operator/0.0.1/quay-operator.clusterserviceversion.yaml` with the image above.
@@ -124,8 +119,8 @@ $ docker push quay.io/<namespace>/quay-operator:dev
 
 ```sh
 $ cd deploy
-$ docker build -t quay.io/<namespace>/quay-operator-catalog:dev .
-$ docker push quay.io/<namespace>/quay-operator-catalog:dev
+$ docker build -t <some-registry>/<namespace>/quay-operator-catalog:dev .
+$ docker push <some-registry>/<namespace>/quay-operator-catalog:dev
 ```
 
 4. Replace the `spec.image` field in `deploy/quay-operator.catalogsource.yaml` with the image above.
