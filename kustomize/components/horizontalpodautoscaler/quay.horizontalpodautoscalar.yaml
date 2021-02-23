@@ -9,7 +9,7 @@ spec:
     name: quay-app
   minReplicas: 1
   maxReplicas: 20
-  # TODO(alecmerdler): Use custom Prometheus metrics (https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-metrics-apis)
+  # TODO: Use custom Prometheus metrics (https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-metrics-apis)
   metrics:
   - type: Resource
     resource:

@@ -59,7 +59,7 @@ var _ = BeforeSuite(func(done Done) {
 	By("bootstrapping test environment")
 	// useExistingCluster := true
 	testEnv = &envtest.Environment{
-		// TODO(alecmerdler): Set `UseExistingCluster` env var to test against a real cluster...
+		// TODO: Set `UseExistingCluster` env var to test against a real cluster...
 		// UseExistingCluster: &useExistingCluster,
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
 	}

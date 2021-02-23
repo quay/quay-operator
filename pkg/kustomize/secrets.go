@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/go-logr/logr"
 	"github.com/quay/clair/v4/config"
 	"github.com/quay/clair/v4/notifier/webhook"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
@@ -20,18 +19,16 @@ import (
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
 	"github.com/quay/config-tool/pkg/lib/shared"
 	"gopkg.in/yaml.v3"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/cert"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 // underTest can be switched on/off to ensure deterministic random string generation for testing output.
 var underTest = false
 
 const (
-	// secretKeySecretName is the name of the Secret in which generated secret keys are stored.
 	secretKeySecretName = "quay-registry-managed-secret-keys"
 	secretKeyLength     = 80
 
@@ -40,74 +37,8 @@ const (
 	buildmanRoute = "quay-builder"
 )
 
-// SecretKeySecretName returns the name of the Secret in which generated secret keys are stored.
-func SecretKeySecretName(quay *v1.QuayRegistry) string {
-	return quay.GetName() + "-" + secretKeySecretName
-}
-
-// generateKeyIfMissing checks if the given key is in the parsed config. If not, the secretKeysSecret
-// is checked for the key. If not present, a new key is generated.
-func generateKeyIfMissing(parsedConfig map[string]interface{}, secretKeysSecret *corev1.Secret, keyName string, quay *v1.QuayRegistry, log logr.Logger) (string, *corev1.Secret) {
-	// Check for the user-given key in config.
-	found, ok := parsedConfig[keyName]
-	if ok {
-		log.Info("Secret key found in provided config", "keyName", keyName)
-		return found.(string), secretKeysSecret
-	}
-
-	// If not found in the given config, check the secret keys Secret.
-	if secretKeysSecret == nil {
-		log.Info("Creating a new secret key Secret")
-		secretKeysSecret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      SecretKeySecretName(quay),
-				Namespace: quay.Namespace,
-			},
-			StringData: map[string]string{},
-		}
-	}
-
-	foundSecretKey, ok := secretKeysSecret.Data[keyName]
-	if ok {
-		log.Info("Secret key found in managed secret", "keyName", keyName)
-		return string(foundSecretKey), secretKeysSecret
-	} else {
-		log.Info("Generating secret key", "keyName", keyName)
-		generatedSecretKey, err := generateRandomString(secretKeyLength)
-		check(err)
-
-		stringData := secretKeysSecret.StringData
-		if stringData == nil {
-			stringData = map[string]string{}
-		}
-
-		secretKeysSecret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      SecretKeySecretName(quay),
-				Namespace: quay.Namespace,
-			},
-			Data:       secretKeysSecret.Data,
-			StringData: stringData,
-		}
-		secretKeysSecret.StringData[keyName] = generatedSecretKey
-
-		return generatedSecretKey, secretKeysSecret
-	}
-}
-
-// handleSecretKeys generates any secret keys not already present in the config bundle and adds them
-// to the specialized secretKeysSecret.
-// TODO(alecmerdler): Refactor and test this more thoroughly.
-func handleSecretKeys(parsedConfig map[string]interface{}, secretKeysSecret *corev1.Secret, quay *v1.QuayRegistry, log logr.Logger) (string, string, *corev1.Secret) {
-	// Check for SECRET_KEY and DATABASE_SECRET_KEY. If not present, generate them
-	// and place them into their own Secret.
-	secretKey, secretKeysSecret := generateKeyIfMissing(parsedConfig, secretKeysSecret, "SECRET_KEY", quay, log)
-	databaseSecretKey, secretKeysSecret := generateKeyIfMissing(parsedConfig, secretKeysSecret, "DATABASE_SECRET_KEY", quay, log)
-	return secretKey, databaseSecretKey, secretKeysSecret
-}
-
 // FieldGroupFor generates and returns the correct config field group for the given component.
-func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, error) {
+func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component string, quay *v1.QuayRegistry) (shared.FieldGroup, error) {
 	switch component {
 	case "clair":
 		fieldGroup, err := securityscanner.NewSecurityScannerFieldGroup(map[string]interface{}{})
@@ -162,11 +93,6 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 
 		return fieldGroup, nil
 	case "objectstorage":
-		hostname := quay.GetAnnotations()[v1.StorageHostnameAnnotation]
-		bucketName := quay.GetAnnotations()[v1.StorageBucketNameAnnotation]
-		accessKey := quay.GetAnnotations()[v1.StorageAccessKeyAnnotation]
-		secretKey := quay.GetAnnotations()[v1.StorageSecretKeyAnnotation]
-
 		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
 			FeatureProxyStorage:                true,
 			DistributedStoragePreference:       []string{"local_us"},
@@ -175,12 +101,12 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 				"local_us": {
 					Name: "RHOCSStorage",
 					Args: &shared.DistributedStorageArgs{
-						Hostname:    hostname,
+						Hostname:    ctx.StorageHostname,
 						IsSecure:    true,
 						Port:        443,
-						BucketName:  bucketName,
-						AccessKey:   accessKey,
-						SecretKey:   secretKey,
+						BucketName:  ctx.StorageBucketName,
+						AccessKey:   ctx.StorageAccessKey,
+						SecretKey:   ctx.StorageSecretKey,
 						StoragePath: "/datastorage/registry",
 					},
 				},
@@ -189,15 +115,10 @@ func FieldGroupFor(component string, quay *v1.QuayRegistry) (shared.FieldGroup, 
 
 		return fieldGroup, nil
 	case "route":
-		clusterHostname := quay.GetAnnotations()[v1.ClusterHostnameAnnotation]
-
 		fieldGroup := &hostsettings.HostSettingsFieldGroup{
 			ExternalTlsTermination: false,
 			PreferredUrlScheme:     "https",
-			ServerHostname: strings.Join([]string{
-				strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
-				clusterHostname},
-				"."),
+			ServerHostname:         ctx.ServerHostname,
 		}
 
 		return fieldGroup, nil
@@ -238,27 +159,26 @@ func BaseConfig() map[string]interface{} {
 // and generates a TLS certificate/key pair if they are invalid.
 // In addition to `SERVER_HOSTNAME`, it sets certificate subject alternative names
 // for the internal k8s service hostnames (i.e. `registry-quay-app.quay-enterprise.svc`).
-func EnsureTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}, tlsCert, tlsKey []byte) ([]byte, []byte, error) {
-	routeConfigFiles := configFilesFor("route", quay, baseConfig)
-	var fieldGroup hostsettings.HostSettingsFieldGroup
-	if err := yaml.Unmarshal(routeConfigFiles["route.config.yaml"], &fieldGroup); err != nil {
-		return nil, nil, err
+func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, tlsCert, tlsKey []byte) ([]byte, []byte, error) {
+	fieldGroup, err := FieldGroupFor(ctx, "route", quay)
+	if err != nil {
+		return tlsCert, tlsKey, err
 	}
 
-	svc := quay.GetName() + "-quay-app"
-	buildManagerHostname := string(routeConfigFiles[buildManagerHostnameKey])
+	routeFieldGroup := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
 
+	svc := quay.GetName() + "-quay-app"
 	hosts := []string{
-		fieldGroup.ServerHostname,
+		routeFieldGroup.ServerHostname,
 		svc,
 		strings.Join([]string{svc, quay.GetNamespace(), "svc"}, "."),
 		strings.Join([]string{svc, quay.GetNamespace(), "svc", "cluster", "local"}, "."),
-		strings.Split(buildManagerHostname, ":")[0],
+		strings.Split(ctx.BuildManagerHostname, ":")[0],
 	}
 
 	for _, host := range hosts {
-		if valid, _ := shared.ValidateCertPairWithHostname(tlsCert, tlsKey, host, fieldGroupFor("route")); !valid {
-			return cert.GenerateSelfSignedCertKey(fieldGroup.ServerHostname, []net.IP{}, hosts)
+		if valid, _ := shared.ValidateCertPairWithHostname(tlsCert, tlsKey, host, fieldGroupNameFor("route")); !valid {
+			return cert.GenerateSelfSignedCertKey(routeFieldGroup.ServerHostname, []net.IP{}, hosts)
 		}
 	}
 
@@ -267,7 +187,7 @@ func EnsureTLSFor(quay *v1.QuayRegistry, baseConfig map[string]interface{}, tlsC
 
 // ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
 // the fieldgroup for the given component by comparing it with the fieldgroup defaults.
-// TODO(alecmerdler): Replace this with function from `config-tool` library once implemented.
+// TODO: Replace this with function from `config-tool` library once implemented.
 func ContainsComponentConfig(fullConfig map[string]interface{}, component string) (bool, error) {
 	fields := []string{}
 
@@ -296,7 +216,7 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component string
 		panic("unknown component: " + component)
 	}
 
-	// FIXME(alecmerdler): Only checking for the existance of a single field
+	// FIXME: Only checking for the existance of a single field
 	for _, field := range fields {
 		if _, ok := fullConfig[field]; ok {
 			return true, nil
@@ -306,40 +226,7 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component string
 	return false, nil
 }
 
-// TODO(alecmerdler): Refactor this into `FieldGroupFor`.
-func configFilesFor(component string, quay *v1.QuayRegistry, baseConfig map[string]interface{}) map[string][]byte {
-	configFiles := map[string][]byte{}
-	fieldGroup, err := FieldGroupFor(component, quay)
-	check(err)
-
-	switch component {
-	case "clair":
-	case "postgres":
-	case "redis":
-	case "objectstorage":
-	case "horizontalpodautoscaler":
-	case "mirror":
-	case "route":
-		hostSettings := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
-
-		if hostname, ok := baseConfig["SERVER_HOSTNAME"]; ok {
-			configFiles[registryHostnameKey] = []byte(hostname.(string))
-			hostSettings.ServerHostname = hostname.(string)
-		}
-
-		if buildManagerHostname, ok := baseConfig["BUILDMAN_HOSTNAME"]; ok {
-			configFiles[buildManagerHostnameKey] = []byte(buildManagerHostname.(string))
-		}
-	default:
-		panic("unknown component: " + component)
-	}
-
-	configFiles[component+".config.yaml"] = encode(fieldGroup)
-
-	return configFiles
-}
-
-func fieldGroupFor(component string) string {
+func fieldGroupNameFor(component string) string {
 	switch component {
 	case "clair":
 		return "SecurityScanner"

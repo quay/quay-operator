@@ -6,187 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
 
-var ensureDefaultComponentsTests = []struct {
-	name        string
-	quay        QuayRegistry
-	expected    []Component
-	expectedErr error
-}{
-	{
-		"AllComponentsProvided",
-		QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{SupportsObjectStorageAnnotation: "true"},
-			},
-			Spec: QuayRegistrySpec{
-				Components: []Component{
-					{Kind: "postgres", Managed: true},
-					{Kind: "redis", Managed: true},
-					{Kind: "clair", Managed: true},
-					{Kind: "objectstorage", Managed: true},
-					{Kind: "horizontalpodautoscaler", Managed: true},
-					{Kind: "mirror", Managed: true},
-				},
-			},
-		},
-		[]Component{
-			{Kind: "postgres", Managed: true},
-			{Kind: "redis", Managed: true},
-			{Kind: "clair", Managed: true},
-			{Kind: "objectstorage", Managed: true},
-			{Kind: "horizontalpodautoscaler", Managed: true},
-			{Kind: "mirror", Managed: true},
-		},
-		nil,
-	},
-	{
-		"AllComponentsProvidedWithoutObjectBucketClaims",
-		QuayRegistry{
-			Spec: QuayRegistrySpec{
-				Components: []Component{
-					{Kind: "postgres", Managed: true},
-					{Kind: "redis", Managed: true},
-					{Kind: "clair", Managed: true},
-					{Kind: "objectstorage", Managed: true},
-					{Kind: "horizontalpodautoscaler", Managed: true},
-					{Kind: "mirror", Managed: true},
-				},
-			},
-		},
-		[]Component{
-			{Kind: "postgres", Managed: true},
-			{Kind: "redis", Managed: true},
-			{Kind: "clair", Managed: true},
-			{Kind: "objectstorage", Managed: true},
-			{Kind: "horizontalpodautoscaler", Managed: true},
-			{Kind: "mirror", Managed: true},
-		},
-		errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available"),
-	},
-	{
-		"AllComponentsProvidedWithRoutes",
-		QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					SupportsRoutesAnnotation:        "true",
-					ClusterHostnameAnnotation:       "apps.example.com",
-					SupportsObjectStorageAnnotation: "true",
-				},
-			},
-			Spec: QuayRegistrySpec{
-				Components: []Component{
-					{Kind: "postgres", Managed: true},
-					{Kind: "redis", Managed: true},
-					{Kind: "clair", Managed: true},
-					{Kind: "objectstorage", Managed: true},
-					{Kind: "horizontalpodautoscaler", Managed: true},
-					{Kind: "mirror", Managed: true},
-				},
-			},
-		},
-		[]Component{
-			{Kind: "postgres", Managed: true},
-			{Kind: "redis", Managed: true},
-			{Kind: "clair", Managed: true},
-			{Kind: "objectstorage", Managed: true},
-			{Kind: "route", Managed: true},
-			{Kind: "horizontalpodautoscaler", Managed: true},
-			{Kind: "mirror", Managed: true},
-		},
-		nil,
-	},
-	{
-		"AllComponentsOmitted",
-		QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{SupportsObjectStorageAnnotation: "true"},
-			},
-			Spec: QuayRegistrySpec{},
-		},
-		[]Component{
-			{Kind: "postgres", Managed: true},
-			{Kind: "redis", Managed: true},
-			{Kind: "clair", Managed: true},
-			{Kind: "objectstorage", Managed: true},
-			{Kind: "horizontalpodautoscaler", Managed: true},
-			{Kind: "mirror", Managed: true},
-		},
-		nil,
-	},
-	{
-		"AllComponentsOmittedWithRoutes",
-		QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					SupportsRoutesAnnotation:        "true",
-					ClusterHostnameAnnotation:       "apps.example.com",
-					SupportsObjectStorageAnnotation: "true",
-				},
-			},
-			Spec: QuayRegistrySpec{},
-		},
-		[]Component{
-			{Kind: "postgres", Managed: true},
-			{Kind: "redis", Managed: true},
-			{Kind: "clair", Managed: true},
-			{Kind: "objectstorage", Managed: true},
-			{Kind: "route", Managed: true},
-			{Kind: "horizontalpodautoscaler", Managed: true},
-			{Kind: "mirror", Managed: true},
-		},
-		nil,
-	},
-	{
-		"SomeComponentsProvided",
-		QuayRegistry{
-			Spec: QuayRegistrySpec{
-				Components: []Component{
-					{Kind: "postgres", Managed: false},
-					{Kind: "objectstorage", Managed: false},
-				},
-			},
-		},
-		[]Component{
-			{Kind: "postgres", Managed: false},
-			{Kind: "redis", Managed: true},
-			{Kind: "clair", Managed: true},
-			{Kind: "objectstorage", Managed: false},
-			{Kind: "horizontalpodautoscaler", Managed: true},
-			{Kind: "mirror", Managed: true},
-		},
-		nil,
-	},
-	{
-		"SomeComponentsProvidedWithRoutes",
-		QuayRegistry{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: map[string]string{
-					SupportsRoutesAnnotation:  "true",
-					ClusterHostnameAnnotation: "apps.example.com",
-				},
-			},
-			Spec: QuayRegistrySpec{
-				Components: []Component{
-					{Kind: "postgres", Managed: false},
-					{Kind: "objectstorage", Managed: false},
-					{Kind: "route", Managed: false},
-				},
-			},
-		},
-		[]Component{
-			{Kind: "postgres", Managed: false},
-			{Kind: "redis", Managed: true},
-			{Kind: "clair", Managed: true},
-			{Kind: "objectstorage", Managed: false},
-			{Kind: "route", Managed: false},
-			{Kind: "horizontalpodautoscaler", Managed: true},
-			{Kind: "mirror", Managed: true},
-		},
-		nil,
-	},
-}
+	quaycontext "github.com/quay/quay-operator/pkg/context"
+)
 
 var canUpgradeTests = []struct {
 	name        string
@@ -223,11 +45,188 @@ func TestCanUpgrade(t *testing.T) {
 	}
 }
 
+var ensureDefaultComponentsTests = []struct {
+	name        string
+	quay        QuayRegistry
+	ctx         quaycontext.QuayRegistryContext
+	expected    []Component
+	expectedErr error
+}{
+	{
+		"AllComponentsProvided",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsObjectStorage: true,
+		},
+		[]Component{
+			{Kind: "postgres", Managed: true},
+			{Kind: "redis", Managed: true},
+			{Kind: "clair", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+			{Kind: "horizontalpodautoscaler", Managed: true},
+			{Kind: "mirror", Managed: true},
+		},
+		nil,
+	},
+	{
+		"AllComponentsProvidedWithoutObjectBucketClaims",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{},
+		[]Component{
+			{Kind: "postgres", Managed: true},
+			{Kind: "redis", Managed: true},
+			{Kind: "clair", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+			{Kind: "horizontalpodautoscaler", Managed: true},
+			{Kind: "mirror", Managed: true},
+		},
+		errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available"),
+	},
+	{
+		"AllComponentsProvidedWithRoutes",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsRoutes:        true,
+			ClusterHostname:       "apps.example.com",
+			SupportsObjectStorage: true,
+		},
+		[]Component{
+			{Kind: "postgres", Managed: true},
+			{Kind: "redis", Managed: true},
+			{Kind: "clair", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+			{Kind: "route", Managed: true},
+			{Kind: "horizontalpodautoscaler", Managed: true},
+			{Kind: "mirror", Managed: true},
+		},
+		nil,
+	},
+	{
+		"AllComponentsOmitted",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsObjectStorage: true,
+		},
+		[]Component{
+			{Kind: "postgres", Managed: true},
+			{Kind: "redis", Managed: true},
+			{Kind: "clair", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+			{Kind: "horizontalpodautoscaler", Managed: true},
+			{Kind: "mirror", Managed: true},
+		},
+		nil,
+	},
+	{
+		"AllComponentsOmittedWithRoutes",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsRoutes:        true,
+			ClusterHostname:       "apps.example.com",
+			SupportsObjectStorage: true,
+		},
+		[]Component{
+			{Kind: "postgres", Managed: true},
+			{Kind: "redis", Managed: true},
+			{Kind: "clair", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+			{Kind: "route", Managed: true},
+			{Kind: "horizontalpodautoscaler", Managed: true},
+			{Kind: "mirror", Managed: true},
+		},
+		nil,
+	},
+	{
+		"SomeComponentsProvided",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: false},
+					{Kind: "objectstorage", Managed: false},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{},
+		[]Component{
+			{Kind: "postgres", Managed: false},
+			{Kind: "redis", Managed: true},
+			{Kind: "clair", Managed: true},
+			{Kind: "objectstorage", Managed: false},
+			{Kind: "horizontalpodautoscaler", Managed: true},
+			{Kind: "mirror", Managed: true},
+		},
+		nil,
+	},
+	{
+		"SomeComponentsProvidedWithRoutes",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: false},
+					{Kind: "objectstorage", Managed: false},
+					{Kind: "route", Managed: false},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsRoutes:  true,
+			ClusterHostname: "apps.example.com",
+		},
+		[]Component{
+			{Kind: "postgres", Managed: false},
+			{Kind: "redis", Managed: true},
+			{Kind: "clair", Managed: true},
+			{Kind: "objectstorage", Managed: false},
+			{Kind: "route", Managed: false},
+			{Kind: "horizontalpodautoscaler", Managed: true},
+			{Kind: "mirror", Managed: true},
+		},
+		nil,
+	},
+}
+
 func TestEnsureDefaultComponents(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range ensureDefaultComponentsTests {
-		updatedQuay, err := EnsureDefaultComponents(&test.quay)
+		updatedQuay, err := EnsureDefaultComponents(&test.ctx, &test.quay)
 
 		if test.expectedErr != nil {
 			assert.NotNil(err, test.name)
@@ -307,6 +306,7 @@ func TestComponentsMatch(t *testing.T) {
 var ensureRegistryEndpointTests = []struct {
 	name       string
 	quay       QuayRegistry
+	ctx        quaycontext.QuayRegistryContext
 	config     map[string]interface{}
 	expected   string
 	expectedOk bool
@@ -317,11 +317,11 @@ var ensureRegistryEndpointTests = []struct {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "ns-1",
-				Annotations: map[string]string{
-					SupportsRoutesAnnotation:  "true",
-					ClusterHostnameAnnotation: "apps.example.com",
-				},
 			},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsRoutes:  true,
+			ClusterHostname: "apps.example.com",
 		},
 		nil,
 		"https://test-quay-ns-1.apps.example.com",
@@ -333,14 +333,14 @@ var ensureRegistryEndpointTests = []struct {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "ns-1",
-				Annotations: map[string]string{
-					SupportsRoutesAnnotation:  "true",
-					ClusterHostnameAnnotation: "apps.example.com",
-				},
 			},
 			Status: QuayRegistryStatus{
 				RegistryEndpoint: "https://test-quay-ns-1.apps.example.com",
 			},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsRoutes:  true,
+			ClusterHostname: "apps.example.com",
 		},
 		map[string]interface{}{},
 		"https://test-quay-ns-1.apps.example.com",
@@ -354,6 +354,7 @@ var ensureRegistryEndpointTests = []struct {
 				Namespace: "ns-1",
 			},
 		},
+		quaycontext.QuayRegistryContext{},
 		map[string]interface{}{},
 		"",
 		true,
@@ -366,6 +367,7 @@ var ensureRegistryEndpointTests = []struct {
 				Namespace: "ns-1",
 			},
 		},
+		quaycontext.QuayRegistryContext{},
 		map[string]interface{}{
 			"SERVER_HOSTNAME": "registry.example.com",
 		},
@@ -383,6 +385,7 @@ var ensureRegistryEndpointTests = []struct {
 				RegistryEndpoint: "https://registry.example.com",
 			},
 		},
+		quaycontext.QuayRegistryContext{},
 		map[string]interface{}{
 			"SERVER_HOSTNAME": "registry.example.com",
 		},
@@ -395,7 +398,7 @@ func TestEnsureRegistryEndpoint(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range ensureRegistryEndpointTests {
-		quay, ok := EnsureRegistryEndpoint(&test.quay, test.config)
+		quay, ok := EnsureRegistryEndpoint(&test.ctx, &test.quay, test.config)
 
 		assert.Equal(test.expectedOk, ok, test.name)
 		assert.Equal(test.expected, quay.Status.RegistryEndpoint, test.name)
