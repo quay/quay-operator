@@ -390,7 +390,7 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, log logr.Logger) ([]k8sruntime.Object, error) {
 	// Each managed component brings its own generated `config.yaml` fields
 	// which are accumulated under the key `<component>.config.yaml` and then added to the base `Secret`.
-	componentConfigFiles := map[string][]byte{}
+	componentConfigFiles := baseConfigBundle.DeepCopy().Data
 
 	var parsedUserConfig map[string]interface{}
 	if err := yaml.Unmarshal(baseConfigBundle.Data["config.yaml"], &parsedUserConfig); err != nil {
