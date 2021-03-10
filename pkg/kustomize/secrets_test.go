@@ -1,11 +1,14 @@
 package kustomize
 
 import (
+	"net"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/yaml"
 
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
@@ -314,4 +317,96 @@ func TestContainsComponentConfig(t *testing.T) {
 			assert.Equal(test.expected, contains, test.name)
 		}
 	}
+}
+
+func TestEnsureTLSFor(t *testing.T) {
+
+	emptyCert := []byte{}
+	serverHostname := "serverhostname.com"
+	builderHostname := "builderhostname.com"
+	quayRegistry := quayRegistry("test")
+
+	quayContextWithoutBuilder := &quaycontext.QuayRegistryContext{
+		ServerHostname: serverHostname,
+	}
+	quayContextWithBuilder := &quaycontext.QuayRegistryContext{
+		BuildManagerHostname: builderHostname,
+		ServerHostname:       serverHostname,
+	}
+
+	svc := quayRegistry.GetName() + "-quay-app"
+	hostsWithoutBuilder := []string{
+		serverHostname,
+		svc,
+		strings.Join([]string{svc, quayRegistry.GetNamespace(), "svc"}, "."),
+		strings.Join([]string{svc, quayRegistry.GetNamespace(), "svc", "cluster", "local"}, "."),
+	}
+	// Generate certs without builder hostname in SAN
+	pubWithoutBuilder, privWithoutBuilder, err := cert.GenerateSelfSignedCertKey(serverHostname, []net.IP{}, hostsWithoutBuilder)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	// Generate certs with builder hostname in SAN
+	hostsWithBuilder := append(hostsWithoutBuilder, builderHostname)
+	pubWithBuilder, privWithBuilder, err := cert.GenerateSelfSignedCertKey(serverHostname, []net.IP{}, hostsWithBuilder)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	t.Run("Quay context has buildman hostname. Certs are empty, Operator should generate own.", func(t *testing.T) {
+		assert := assert.New(t)
+		// Empty certs, should generate own
+		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithBuilder, quayRegistry, emptyCert, emptyCert)
+		if err != nil {
+			t.Errorf(err.Error())
+		}
+		assert.NotEqual(recPublicKey, emptyCert)
+		assert.NotEqual(recPrivateKey, emptyCert)
+	})
+
+	t.Run("Quay context has buildman hostname. Certs do not contain buildman hostname. Operator should generate own.", func(t *testing.T) {
+		assert := assert.New(t)
+		// Buildman missing from certs, should generate own
+		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithBuilder, quayRegistry, pubWithoutBuilder, privWithoutBuilder)
+		if err != nil {
+			t.Errorf(err.Error())
+		}
+		assert.NotEqual(recPublicKey, pubWithoutBuilder)
+		assert.NotEqual(recPrivateKey, privWithoutBuilder)
+	})
+
+	t.Run("Quay context has buildman hostname. Certs contain buildman hostname. Operator should not generate own.", func(t *testing.T) {
+		assert := assert.New(t)
+		// Buildman present in certs, should not generate
+		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithBuilder, quayRegistry, pubWithBuilder, privWithBuilder)
+		if err != nil {
+			t.Errorf(err.Error())
+		}
+		assert.Equal(recPublicKey, pubWithBuilder)
+		assert.Equal(recPrivateKey, privWithBuilder)
+	})
+
+	t.Run("Quay context does not have buildman hostname. Certs do not contain buildman hostname. Operator should not generate own.", func(t *testing.T) {
+		assert := assert.New(t)
+		// Buildman not in certs, not in context, should not generate
+		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithoutBuilder, quayRegistry, pubWithoutBuilder, privWithoutBuilder)
+		if err != nil {
+			t.Errorf(err.Error())
+		}
+		assert.Equal(recPublicKey, pubWithoutBuilder)
+		assert.Equal(recPrivateKey, privWithoutBuilder)
+	})
+
+	t.Run("Quay context does not have buildman hostname. Certs contain buildman hostname. Operator should not generate own.", func(t *testing.T) {
+		assert := assert.New(t)
+		// Buildman not in certs, not in context, should not generate
+		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithoutBuilder, quayRegistry, pubWithBuilder, privWithBuilder)
+		if err != nil {
+			t.Errorf(err.Error())
+		}
+		assert.Equal(recPublicKey, pubWithBuilder)
+		assert.Equal(recPrivateKey, privWithBuilder)
+	})
+
 }
