@@ -173,11 +173,16 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, t
 		svc,
 		strings.Join([]string{svc, quay.GetNamespace(), "svc"}, "."),
 		strings.Join([]string{svc, quay.GetNamespace(), "svc", "cluster", "local"}, "."),
-		strings.Split(ctx.BuildManagerHostname, ":")[0],
+	}
+
+	// Only add BUILDMAN_HOSTNAME as host if provided.
+	if ctx.BuildManagerHostname != "" {
+		hosts = append(hosts, strings.Split(ctx.BuildManagerHostname, ":")[0])
 	}
 
 	for _, host := range hosts {
 		if valid, _ := shared.ValidateCertPairWithHostname(tlsCert, tlsKey, host, fieldGroupNameFor("route")); !valid {
+			fmt.Printf("Host %s not valid for certificates provided. Generating self-signed certs", host) // change to logger?
 			return cert.GenerateSelfSignedCertKey(routeFieldGroup.ServerHostname, []net.IP{}, hosts)
 		}
 	}
