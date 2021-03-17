@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	quayredhatcomv1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -51,6 +52,8 @@ const (
 	upgradePollTimeout   = time.Second * 6000
 	creationPollInterval = time.Second * 1
 	creationPollTimeout  = time.Second * 600
+
+	QuayOperatorFinalizer = "quay-operator/finalizer"
 )
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
@@ -83,6 +86,22 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	updatedQuay := quay.DeepCopy()
 	quayContext := quaycontext.NewQuayRegistryContext()
+
+	isQuayMarkedToBeDeleted := quay.GetDeletionTimestamp() != nil
+	if isQuayMarkedToBeDeleted {
+		if controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
+			if err := r.finalizeQuay(ctx, updatedQuay); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			controllerutil.RemoveFinalizer(updatedQuay, QuayOperatorFinalizer)
+			err := r.Update(ctx, updatedQuay)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
 
 	if available := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeAvailable); available != nil && available.Reason == v1.ConditionReasonMigrationsInProgress {
 		log.Info("migrations in progress, skipping reconcile")
@@ -340,6 +359,15 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}(updatedQuay.DeepCopy())
 	}
 
+	// Add finalizer for this CR
+	if !controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
+		controllerutil.AddFinalizer(updatedQuay, QuayOperatorFinalizer)
+		err = r.Update(ctx, updatedQuay)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -484,4 +512,9 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		// TODO: Add `.Owns()` for every resource type we manage...
 		Complete(r)
+}
+
+// finalizeQuay runs the Cleanup operations when a `QuayRegistry` is deleted
+func (r *QuayRegistryReconciler) finalizeQuay(ctx context.Context, quay *v1.QuayRegistry) error {
+	return nil
 }
