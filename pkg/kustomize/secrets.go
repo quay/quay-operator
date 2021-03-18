@@ -38,9 +38,9 @@ const (
 )
 
 // FieldGroupFor generates and returns the correct config field group for the given component.
-func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component string, quay *v1.QuayRegistry) (shared.FieldGroup, error) {
+func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentKind, quay *v1.QuayRegistry) (shared.FieldGroup, error) {
 	switch component {
-	case "clair":
+	case v1.ComponentClair:
 		fieldGroup, err := securityscanner.NewSecurityScannerFieldGroup(map[string]interface{}{})
 		if err != nil {
 			return nil, err
@@ -59,7 +59,7 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component string, quay 
 		fieldGroup.SecurityScannerV4PSK = psk
 
 		return fieldGroup, nil
-	case "redis":
+	case v1.ComponentRedis:
 		fieldGroup, err := redis.NewRedisFieldGroup(map[string]interface{}{})
 		if err != nil {
 			return nil, err
@@ -75,7 +75,7 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component string, quay 
 		}
 
 		return fieldGroup, nil
-	case "postgres":
+	case v1.ComponentPostgres:
 		fieldGroup, err := database.NewDatabaseFieldGroup(map[string]interface{}{})
 		if err != nil {
 			return nil, err
@@ -92,7 +92,7 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component string, quay 
 		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
 
 		return fieldGroup, nil
-	case "objectstorage":
+	case v1.ComponentObjectStorage:
 		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
 			FeatureProxyStorage:                true,
 			DistributedStoragePreference:       []string{"local_us"},
@@ -114,7 +114,7 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component string, quay 
 		}
 
 		return fieldGroup, nil
-	case "route":
+	case v1.ComponentRoute:
 		fieldGroup := &hostsettings.HostSettingsFieldGroup{
 			ExternalTlsTermination: false,
 			PreferredUrlScheme:     "https",
@@ -122,7 +122,7 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component string, quay 
 		}
 
 		return fieldGroup, nil
-	case "mirror":
+	case v1.ComponentMirror:
 		fieldGroup := &repomirror.RepoMirrorFieldGroup{
 			FeatureRepoMirror:   true,
 			RepoMirrorInterval:  30,
@@ -130,10 +130,12 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component string, quay 
 		}
 
 		return fieldGroup, nil
-	case "horizontalpodautoscaler":
+	case v1.ComponentHPA:
+		return nil, nil
+	case v1.ComponentMonitoring:
 		return nil, nil
 	default:
-		return nil, errors.New("unknown component: " + component)
+		return nil, errors.New("unknown component: " + string(component))
 	}
 }
 
@@ -193,30 +195,32 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, t
 // ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
 // the fieldgroup for the given component by comparing it with the fieldgroup defaults.
 // TODO: Replace this with function from `config-tool` library once implemented.
-func ContainsComponentConfig(fullConfig map[string]interface{}, component string) (bool, error) {
+func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.ComponentKind) (bool, error) {
 	fields := []string{}
 
 	switch component {
-	case "clair":
+	case v1.ComponentClair:
 		fields = (&securityscanner.SecurityScannerFieldGroup{}).Fields()
-	case "postgres":
+	case v1.ComponentPostgres:
 		fields = (&database.DatabaseFieldGroup{}).Fields()
-	case "redis":
+	case v1.ComponentRedis:
 		fields = (&redis.RedisFieldGroup{}).Fields()
-	case "objectstorage":
+	case v1.ComponentObjectStorage:
 		fields = (&distributedstorage.DistributedStorageFieldGroup{}).Fields()
-	case "horizontalpodautoscaler":
+	case v1.ComponentHPA:
 		// HorizontalPodAutoscaler has no associated config fieldgroup.
 		return false, nil
-	case "mirror":
+	case v1.ComponentMirror:
 		fields = (&repomirror.RepoMirrorFieldGroup{}).Fields()
-	case "route":
+	case v1.ComponentRoute:
 		for _, field := range (&hostsettings.HostSettingsFieldGroup{}).Fields() {
 			// SERVER_HOSTNAME is a special field which we allow when using managed `route` component.
 			if field != "SERVER_HOSTNAME" {
 				fields = append(fields, field)
 			}
 		}
+	case v1.ComponentMonitoring:
+		return false, nil
 	default:
 		panic("unknown component: " + component)
 	}
@@ -231,21 +235,23 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component string
 	return false, nil
 }
 
-func fieldGroupNameFor(component string) string {
+func fieldGroupNameFor(component v1.ComponentKind) string {
 	switch component {
-	case "clair":
+	case v1.ComponentClair:
 		return "SecurityScanner"
-	case "postgres":
+	case v1.ComponentPostgres:
 		return "Database"
-	case "redis":
+	case v1.ComponentRedis:
 		return "Redis"
-	case "objectstorage":
+	case v1.ComponentObjectStorage:
 		return "DistributedStorage"
-	case "route":
+	case v1.ComponentRoute:
 		return "HostSettings"
-	case "mirror":
+	case v1.ComponentMirror:
 		return "RepoMirror"
-	case "horizontalpodautoscaler":
+	case v1.ComponentHPA:
+		return ""
+	case v1.ComponentMonitoring:
 		return ""
 	default:
 		panic("unknown component: " + component)
@@ -253,9 +259,9 @@ func fieldGroupNameFor(component string) string {
 }
 
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
-func componentConfigFilesFor(component string, quay *v1.QuayRegistry, configFiles map[string][]byte) (map[string][]byte, error) {
+func componentConfigFilesFor(component v1.ComponentKind, quay *v1.QuayRegistry, configFiles map[string][]byte) (map[string][]byte, error) {
 	switch component {
-	case "postgres":
+	case v1.ComponentPostgres:
 		dbConfig, ok := configFiles["postgres.config.yaml"]
 		if !ok {
 			return nil, fmt.Errorf("cannot generate managed component config file for `postgres` if `postgres.config.yaml` is missing")
@@ -285,7 +291,7 @@ func componentConfigFilesFor(component string, quay *v1.QuayRegistry, configFile
 			"database-name":          []byte(databaseName),
 			"database-root-password": []byte(databaseRootPassword),
 		}, nil
-	case "clair":
+	case v1.ComponentClair:
 		quayHostname := ""
 		if v1.ComponentIsManaged(quay.Spec.Components, "route") {
 			config := decode(configFiles["route.config.yaml"])

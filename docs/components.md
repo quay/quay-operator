@@ -12,6 +12,7 @@ This is the full list of components ([code](https://github.com/quay/quay-operato
 - `horizontalpodautoscaler`
 - `mirror`
 - `route`
+- `monitoring`
 
 ### API
 

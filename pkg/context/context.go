@@ -16,6 +16,9 @@ type QuayRegistryContext struct {
 	StorageAccessKey         string
 	StorageSecretKey         string
 
+	// Monitoring
+	SupportsMonitoring bool
+
 	// Secret Keys
 	DatabaseSecretKey string
 	SecretKey         string

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/scheme: "http"
+    prometheus.io/port: "9091"
+  labels:
+    quay-component: monitoring
+  name: quay-metrics
+spec:
+  ports:
+    - name: quay-metrics
+      port: 9091
+      targetPort: 9091
+      protocol: TCP
+  selector:
+    quay-component: quay-app
+  type: ClusterIP

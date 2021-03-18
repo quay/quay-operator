@@ -2,9 +2,11 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
+	prometheusv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	"gopkg.in/yaml.v2"
@@ -33,6 +35,8 @@ const (
 
 	databaseSecretKey = "DATABASE_SECRET_KEY"
 	secretKey         = "SECRET_KEY"
+
+	GrafanaDashboardConfigNamespace = "openshift-config-managed"
 )
 
 func (r *QuayRegistryReconciler) checkManagedKeys(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
@@ -196,6 +200,38 @@ func (r *QuayRegistryReconciler) checkBuildManagerAvailable(ctx *quaycontext.Qua
 	if buildManagerHostname, ok := config["BUILDMAN_HOSTNAME"]; ok {
 		ctx.BuildManagerHostname = buildManagerHostname.(string)
 	}
+
+	return ctx, quay, nil
+}
+
+// Validates if the monitoring component can be run. We assume that we are
+// running in an Openshift environment with cluster monitoring enabled for our
+// monitoring component to work
+func (r *QuayRegistryReconciler) checkMonitoringAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+	var serviceMonitors prometheusv1.ServiceMonitorList
+	if err := r.Client.List(context.Background(), &serviceMonitors); err != nil {
+		r.Log.Info("Unable to find ServiceMonitor CRD. Monitoring component disabled")
+		return ctx, quay, err
+	}
+	r.Log.Info("cluster supports `ServiceMonitor` API")
+
+	var prometheusRules prometheusv1.PrometheusRuleList
+	if err := r.Client.List(context.Background(), &prometheusRules); err != nil {
+		r.Log.Info("Unable to find PrometheusRule CRD. Monitoring component disabled")
+		return ctx, quay, err
+	}
+	r.Log.Info("cluster supports `PrometheusRules` API")
+
+	namespaceKey := types.NamespacedName{Name: GrafanaDashboardConfigNamespace}
+	var grafanaDashboardNamespace corev1.Namespace
+	if err := r.Client.Get(context.Background(), namespaceKey, &grafanaDashboardNamespace); err != nil {
+		msg := fmt.Sprintf("Unable to find the Grafana config namespace %s. Monitoring component disabled", GrafanaDashboardConfigNamespace)
+		r.Log.Info(msg)
+		return ctx, quay, err
+	}
+	r.Log.Info(GrafanaDashboardConfigNamespace + " found")
+
+	ctx.SupportsMonitoring = true
 
 	return ctx, quay, nil
 }

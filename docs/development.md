@@ -6,6 +6,12 @@ The local development experience of the Quay Operator should be easy and straigh
 
 1. Ensure that the `KUBECONFIG` environment variable is set for your Kubernetes cluster (same file that `kubectl` uses).
 
+2. Install the CRDs for the operator
+
+```sh
+$ kubectl apply -f ./deploy/manifests/quay-operator/0.0.1/*.crd.yaml
+```
+
 2. Run the controller:
 ```sh
 $ go run main.go --namespace <your-namespace>
@@ -13,9 +19,12 @@ $ go run main.go --namespace <your-namespace>
 
 ### Tests
 
+Prerequsites: Install `kubebuilder`
+
 ```sh
 $ go test -v ./...
 ```
+
 
 ### Config Editor
 
@@ -30,3 +39,14 @@ $ ngrok http 7071
 ```sh
 $ DEV_OPERATOR_ENDPOINT=http://988e36df98ca.ngrok.io go run main.go --namespace <your-namespace>
 ```
+
+3. Access the config editor locally by port-forwarding the service endpoint
+
+```shell script
+$ kubectl port-forward -n <quay-namespace> svc/<name>-quay-config-editor 8080
+```
+
+Point the browser to localhost:8080 to access the config UI
+
+The credentials for the Config editor can be found in the secret `<prefix>-config-secret-<random-suffix>`
+eg: `test-quay-config-secret-tk88ffkdmt`

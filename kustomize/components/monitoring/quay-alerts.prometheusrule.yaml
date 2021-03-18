@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  name: quay-prometheus-rules
+spec:
+  groups:
+    - name: quay-alerts.rules
+      rules:
+        - alert: QuayPodFrequentlyRestarting
+          expr: increase(kube_pod_container_status_restarts_total{pod=~".*-quay-app-.*"}[1h]) > 5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            description: Pod {{`{{$labels.namespace}}`}}/{{`{{$labels.pod}}`}} was restarted {{`{{$value}}`}}
+              times within the last hour
+            message: Quay Pod is restarting frequently
+            severity_level: warning

@@ -1,0 +1,12 @@
+# Monitoring component adds Prometheus metrics and Grafana dashboard for Openshift Monitoring
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: 
+  - ./quay-metrics.service.yaml
+  - ./quay-metrics.role.yaml
+  - ./quay-metrics.rolebinding.yaml
+  - ./quay-metrics.servicemonitor.yaml
+  - ./quay-grafana-dashboard.configmap.yaml
+  - ./quay-alerts.role.yaml
+  - ./quay-alerts.rolebinding.yaml
+  - ./quay-alerts.prometheusrule.yaml

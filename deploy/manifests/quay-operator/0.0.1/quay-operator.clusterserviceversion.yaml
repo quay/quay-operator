@@ -26,6 +26,7 @@ metadata:
               {"kind": "horizontalpodautoscaler", "managed": true},
               {"kind": "route", "managed": true},
               {"kind": "mirror", "managed": true}
+              {"kind": "monitoring", "managed": true}
             ]
           }
         }
@@ -55,6 +56,8 @@ spec:
         - kind: Role
         - kind: Rolebinding
         - kind: HorizontalPodAutoscaler
+        - kind: ServiceMonitor
+        - kind: PrometheusRule
       specDescriptors:
         - path: configBundleSecret
           displayName: Config Bundle Secret
@@ -205,6 +208,13 @@ spec:
           - objectbucketclaims
           verbs:
           - '*'
+        - apiGroups:
+            - monitoring.coreos.com
+          resources:
+            - prometheusrules
+            - servicemonitors
+          verbs:
+            - '*'
         - apiGroups:
           - batch
           resources:
