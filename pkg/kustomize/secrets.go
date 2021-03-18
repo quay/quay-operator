@@ -158,9 +158,7 @@ func BaseConfig() map[string]interface{} {
 }
 
 // EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for secure communication with clients,
-// and generates a TLS certificate/key pair if they are invalid.
-// In addition to `SERVER_HOSTNAME`, it sets certificate subject alternative names
-// for the internal k8s service hostnames (i.e. `registry-quay-app.quay-enterprise.svc`).
+// and generates a TLS certificate/key pair if they are not provided.
 func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, tlsCert, tlsKey []byte) ([]byte, []byte, error) {
 	fieldGroup, err := FieldGroupFor(ctx, "route", quay)
 	if err != nil {
@@ -169,12 +167,8 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, t
 
 	routeFieldGroup := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
 
-	svc := quay.GetName() + "-quay-app"
 	hosts := []string{
 		routeFieldGroup.ServerHostname,
-		svc,
-		strings.Join([]string{svc, quay.GetNamespace(), "svc"}, "."),
-		strings.Join([]string{svc, quay.GetNamespace(), "svc", "cluster", "local"}, "."),
 	}
 
 	// Only add BUILDMAN_HOSTNAME as host if provided.
@@ -182,10 +176,13 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, t
 		hosts = append(hosts, strings.Split(ctx.BuildManagerHostname, ":")[0])
 	}
 
+	if tlsCert == nil && tlsKey == nil {
+		return cert.GenerateSelfSignedCertKey(routeFieldGroup.ServerHostname, []net.IP{}, hosts)
+	}
+
 	for _, host := range hosts {
-		if valid, _ := shared.ValidateCertPairWithHostname(tlsCert, tlsKey, host, fieldGroupNameFor("route")); !valid {
-			fmt.Printf("Host %s not valid for certificates provided. Generating self-signed certs", host) // change to logger?
-			return cert.GenerateSelfSignedCertKey(routeFieldGroup.ServerHostname, []net.IP{}, hosts)
+		if valid, validationErr := shared.ValidateCertPairWithHostname(tlsCert, tlsKey, host, fieldGroupNameFor("route")); !valid {
+			return nil, nil, fmt.Errorf("provided certificate/key pair not valid for host '%s': %s", host, validationErr.String())
 		}
 	}
 
@@ -195,10 +192,10 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, t
 // ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
 // the fieldgroup for the given component by comparing it with the fieldgroup defaults.
 // TODO: Replace this with function from `config-tool` library once implemented.
-func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.ComponentKind) (bool, error) {
+func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Component) (bool, error) {
 	fields := []string{}
 
-	switch component {
+	switch component.Kind {
 	case v1.ComponentClair:
 		fields = (&securityscanner.SecurityScannerFieldGroup{}).Fields()
 	case v1.ComponentPostgres:
@@ -213,16 +210,20 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Com
 	case v1.ComponentMirror:
 		fields = (&repomirror.RepoMirrorFieldGroup{}).Fields()
 	case v1.ComponentRoute:
-		for _, field := range (&hostsettings.HostSettingsFieldGroup{}).Fields() {
-			// SERVER_HOSTNAME is a special field which we allow when using managed `route` component.
-			if field != "SERVER_HOSTNAME" {
-				fields = append(fields, field)
+		fields = (&hostsettings.HostSettingsFieldGroup{}).Fields()
+
+		if component.Managed {
+			for i, field := range fields {
+				// SERVER_HOSTNAME is a special field which we allow when using managed `route` component.
+				if field == "SERVER_HOSTNAME" {
+					fields = append(fields[:i], fields[i+1:]...)
+				}
 			}
 		}
 	case v1.ComponentMonitoring:
 		return false, nil
 	default:
-		panic("unknown component: " + component)
+		panic("unknown component: " + component.Kind)
 	}
 
 	// FIXME: Only checking for the existance of a single field

@@ -61,6 +61,7 @@ var allComponents = []ComponentKind{
 var requiredComponents = []ComponentKind{
 	ComponentPostgres,
 	ComponentObjectStorage,
+	ComponentRoute,
 }
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.

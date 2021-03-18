@@ -233,7 +233,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	updatedQuay.Status.Conditions = v1.RemoveCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked)
 
 	for _, component := range updatedQuay.Spec.Components {
-		contains, err := kustomize.ContainsComponentConfig(userProvidedConfig, component.Kind)
+		contains, err := kustomize.ContainsComponentConfig(userProvidedConfig, component)
 		if err != nil {
 			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, err.Error())
 			if err != nil {
@@ -463,6 +463,7 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 
 	immutableResources := map[string]bool{
 		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String(): true,
+		schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}.String():  true,
 	}
 
 	log := r.Log.WithValues(
