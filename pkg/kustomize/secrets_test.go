@@ -42,7 +42,7 @@ func quayRegistry(name string) *v1.QuayRegistry {
 
 var fieldGroupForTests = []struct {
 	name      string
-	component string
+	component v1.ComponentKind
 	quay      *v1.QuayRegistry
 	ctx       quaycontext.QuayRegistryContext
 	expected  shared.FieldGroup
@@ -191,7 +191,7 @@ func TestFieldGroupFor(t *testing.T) {
 
 var containsComponentConfigTests = []struct {
 	name          string
-	component     string
+	component     v1.ComponentKind
 	rawConfig     string
 	expected      bool
 	expectedError error

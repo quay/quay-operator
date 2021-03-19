@@ -40,19 +40,34 @@ func CanUpgrade(fromVersion QuayVersion) bool {
 	return fromVersion == QuayVersionCurrent || fromVersion == QuayVersionPrevious
 }
 
-var allComponents = []string{
-	"postgres",
-	"clair",
-	"redis",
-	"horizontalpodautoscaler",
-	"objectstorage",
-	"route",
-	"mirror",
+type ComponentKind string
+
+const (
+	ComponentBase          ComponentKind = "base"
+	ComponentPostgres                    = "postgres"
+	ComponentClair                       = "clair"
+	ComponentRedis                       = "redis"
+	ComponentHPA                         = "horizontalpodautoscaler"
+	ComponentObjectStorage               = "objectstorage"
+	ComponentRoute                       = "route"
+	ComponentMirror                      = "mirror"
+	ComponentMonitoring                  = "monitoring"
+)
+
+var allComponents = []ComponentKind{
+	ComponentPostgres,
+	ComponentClair,
+	ComponentRedis,
+	ComponentHPA,
+	ComponentObjectStorage,
+	ComponentRoute,
+	ComponentMirror,
+	ComponentMonitoring,
 }
 
-var requiredComponents = []string{
-	"postgres",
-	"objectstorage",
+var requiredComponents = []ComponentKind{
+	ComponentPostgres,
+	ComponentObjectStorage,
 }
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
@@ -66,7 +81,7 @@ type QuayRegistrySpec struct {
 // Component describes how the Operator should handle a backing Quay service.
 type Component struct {
 	// Kind is the unique name of this type of component.
-	Kind string `json:"kind"`
+	Kind ComponentKind `json:"kind"`
 	// Managed indicates whether or not the Operator is responsible for the lifecycle of this component.
 	// Default is true.
 	Managed bool `json:"managed"`
@@ -92,6 +107,7 @@ const (
 	ConditionReasonComponentCreationFailed               ConditionReason = "ComponentCreationFailed"
 	ConditionReasonRouteComponentDependencyError         ConditionReason = "RouteComponentDependencyError"
 	ConditionReasonObjectStorageComponentDependencyError ConditionReason = "ObjectStorageComponentDependencyError"
+	ConditionReasonMonitoringComponentDependencyError    ConditionReason = "MonitoringComponentDependencyError"
 	ConditionReasonConfigInvalid                         ConditionReason = "ConfigInvalid"
 )
 
@@ -216,7 +232,7 @@ func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 }
 
 // ComponentIsManaged returns whether the given component is managed or not.
-func ComponentIsManaged(components []Component, name string) bool {
+func ComponentIsManaged(components []Component, name ComponentKind) bool {
 	for _, c := range components {
 		if c.Kind == name {
 			return c.Managed
@@ -226,7 +242,7 @@ func ComponentIsManaged(components []Component, name string) bool {
 }
 
 // RequiredComponent returns whether the given component is required for Quay or not.
-func RequiredComponent(component string) bool {
+func RequiredComponent(component ComponentKind) bool {
 	for _, c := range requiredComponents {
 		if c == component {
 			return true
@@ -243,12 +259,16 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 		updatedQuay.Spec.Components = []Component{}
 	}
 
-	if ComponentIsManaged(updatedQuay.Spec.Components, "route") && !ctx.SupportsRoutes {
+	if ComponentIsManaged(updatedQuay.Spec.Components, ComponentRoute) && !ctx.SupportsRoutes {
 		return nil, errors.New("cannot use `route` component when `Route` API not available")
 	}
 
-	if ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") && !ctx.SupportsObjectStorage {
+	if ComponentIsManaged(updatedQuay.Spec.Components, ComponentObjectStorage) && !ctx.SupportsObjectStorage {
 		return nil, errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available")
+	}
+
+	if ComponentIsManaged(updatedQuay.Spec.Components, ComponentMonitoring) && !ctx.SupportsMonitoring {
+		return nil, errors.New("cannot use `monitoring` component when `Prometheus` API not available")
 	}
 
 	for _, component := range allComponents {
@@ -261,10 +281,13 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 		}
 
 		if !found {
-			if component == "route" && !ctx.SupportsRoutes {
+			if component == ComponentRoute && !ctx.SupportsRoutes {
 				continue
 			}
-			if component == "objectstorage" && !ctx.SupportsObjectStorage {
+			if component == ComponentObjectStorage && !ctx.SupportsObjectStorage {
+				continue
+			}
+			if component == ComponentMonitoring && !ctx.SupportsMonitoring {
 				continue
 			}
 

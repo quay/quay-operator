@@ -1,0 +1,10 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: quay-metrics-monitor
+spec:
+  endpoints:
+    - port: quay-metrics
+  selector:
+    matchLabels:
+      quay-component: monitoring

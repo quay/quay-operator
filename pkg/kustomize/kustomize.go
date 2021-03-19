@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	prometheusv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/go-logr/logr"
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	route "github.com/openshift/api/route/v1"
@@ -50,18 +51,18 @@ const (
 
 // componentImageFor checks for an environment variable indicating which component container image
 // to use. If set, returns a Kustomize image override for the given component.
-func componentImageFor(component string) types.Image {
-	envVarFor := map[string]string{
-		"base":     componentImagePrefix + "QUAY",
-		"clair":    componentImagePrefix + "CLAIR",
-		"redis":    componentImagePrefix + "REDIS",
-		"postgres": componentImagePrefix + "POSTGRES",
+func componentImageFor(component v1.ComponentKind) types.Image {
+	envVarFor := map[v1.ComponentKind]string{
+		v1.ComponentBase:     componentImagePrefix + "QUAY",
+		v1.ComponentClair:    componentImagePrefix + "CLAIR",
+		v1.ComponentRedis:    componentImagePrefix + "REDIS",
+		v1.ComponentPostgres: componentImagePrefix + "POSTGRES",
 	}
-	defaultImagesFor := map[string]string{
-		"base":     "quay.io/projectquay/quay",
-		"clair":    "quay.io/projectquay/clair",
-		"redis":    "centos/redis-32-centos7",
-		"postgres": "centos/postgresql-10-centos7",
+	defaultImagesFor := map[v1.ComponentKind]string{
+		v1.ComponentBase:     "quay.io/projectquay/quay",
+		v1.ComponentClair:    "quay.io/projectquay/clair",
+		v1.ComponentRedis:    "centos/redis-32-centos7",
+		v1.ComponentPostgres: "centos/postgresql-10-centos7",
 	}
 
 	imageOverride := types.Image{
@@ -133,6 +134,8 @@ func decode(bytes []byte) interface{} {
 // Example: Calling with `core.v1.Secret` GVK returns an empty `corev1.Secret` instance.
 func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 	switch gvk.String() {
+	case schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}.String():
+		return &corev1.Namespace{}
 	case schema.GroupVersionKind{Version: "v1", Kind: "Secret"}.String():
 		return &corev1.Secret{}
 	case schema.GroupVersionKind{Version: "v1", Kind: "Service"}.String():
@@ -155,6 +158,10 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 		return &autoscaling.HorizontalPodAutoscaler{}
 	case schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String():
 		return &batchv1.Job{}
+	case schema.GroupVersionKind{Group: "monitoring.coreos.com", Version: "v1", Kind: "ServiceMonitor"}.String():
+		return &prometheusv1.ServiceMonitor{}
+	case schema.GroupVersionKind{Group: "monitoring.coreos.com", Version: "v1", Kind: "PrometheusRule"}.String():
+		return &prometheusv1.PrometheusRule{}
 	default:
 		panic(fmt.Sprintf("Missing model for GVK %s", gvk.String()))
 	}
@@ -278,7 +285,7 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 	managedFieldGroups := []string{}
 	for _, component := range quay.Spec.Components {
 		if component.Managed {
-			componentPaths = append(componentPaths, filepath.Join("..", "components", component.Kind))
+			componentPaths = append(componentPaths, filepath.Join("..", "components", string(component.Kind)))
 			managedFieldGroups = append(managedFieldGroups, fieldGroupNameFor(component.Kind))
 
 			componentConfigFiles, err := componentConfigFilesFor(component.Kind, quay, quayConfigFiles)
@@ -293,7 +300,7 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 
 			generatedSecrets = append(generatedSecrets, types.SecretArgs{
 				GeneratorArgs: types.GeneratorArgs{
-					Name:     component.Kind + "-config-secret",
+					Name:     string(component.Kind) + "-config-secret",
 					Behavior: "merge",
 					KvPairSources: types.KvPairSources{
 						LiteralSources: sources,
@@ -451,7 +458,7 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 				return nil, err
 			}
 
-			componentConfigFiles[component.Kind+".config.yaml"] = encode(fieldGroup)
+			componentConfigFiles[string(component.Kind)+".config.yaml"] = encode(fieldGroup)
 		}
 	}
 

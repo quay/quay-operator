@@ -63,11 +63,13 @@ var ensureDefaultComponentsTests = []struct {
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "horizontalpodautoscaler", Managed: true},
 					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
 				},
 			},
 		},
 		quaycontext.QuayRegistryContext{
 			SupportsObjectStorage: true,
+			SupportsMonitoring:    true,
 		},
 		[]Component{
 			{Kind: "postgres", Managed: true},
@@ -76,6 +78,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "objectstorage", Managed: true},
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
+			{Kind: "monitoring", Managed: true},
 		},
 		nil,
 	},
@@ -115,6 +118,7 @@ var ensureDefaultComponentsTests = []struct {
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "horizontalpodautoscaler", Managed: true},
 					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
 				},
 			},
 		},
@@ -122,6 +126,7 @@ var ensureDefaultComponentsTests = []struct {
 			SupportsRoutes:        true,
 			ClusterHostname:       "apps.example.com",
 			SupportsObjectStorage: true,
+			SupportsMonitoring:    true,
 		},
 		[]Component{
 			{Kind: "postgres", Managed: true},
@@ -131,6 +136,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "route", Managed: true},
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
+			{Kind: "monitoring", Managed: true},
 		},
 		nil,
 	},
@@ -141,6 +147,7 @@ var ensureDefaultComponentsTests = []struct {
 		},
 		quaycontext.QuayRegistryContext{
 			SupportsObjectStorage: true,
+			SupportsMonitoring:    true,
 		},
 		[]Component{
 			{Kind: "postgres", Managed: true},
@@ -149,6 +156,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "objectstorage", Managed: true},
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
+			{Kind: "monitoring", Managed: true},
 		},
 		nil,
 	},
@@ -161,6 +169,7 @@ var ensureDefaultComponentsTests = []struct {
 			SupportsRoutes:        true,
 			ClusterHostname:       "apps.example.com",
 			SupportsObjectStorage: true,
+			SupportsMonitoring:    true,
 		},
 		[]Component{
 			{Kind: "postgres", Managed: true},
@@ -170,6 +179,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "route", Managed: true},
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
+			{Kind: "monitoring", Managed: true},
 		},
 		nil,
 	},
@@ -180,6 +190,7 @@ var ensureDefaultComponentsTests = []struct {
 				Components: []Component{
 					{Kind: "postgres", Managed: false},
 					{Kind: "objectstorage", Managed: false},
+					{Kind: "monitoring", Managed: false},
 				},
 			},
 		},
@@ -191,6 +202,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "objectstorage", Managed: false},
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
+			{Kind: "monitoring", Managed: false},
 		},
 		nil,
 	},
@@ -206,8 +218,9 @@ var ensureDefaultComponentsTests = []struct {
 			},
 		},
 		quaycontext.QuayRegistryContext{
-			SupportsRoutes:  true,
-			ClusterHostname: "apps.example.com",
+			SupportsRoutes:     true,
+			SupportsMonitoring: true,
+			ClusterHostname:    "apps.example.com",
 		},
 		[]Component{
 			{Kind: "postgres", Managed: false},
@@ -217,6 +230,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "route", Managed: false},
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
+			{Kind: "monitoring", Managed: true},
 		},
 		nil,
 	},

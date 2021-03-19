@@ -52,6 +52,9 @@ github.com/beorn7/perks/quantile
 github.com/bgentry/go-netrc/netrc
 # github.com/cespare/xxhash v1.1.0
 github.com/cespare/xxhash
+# github.com/coreos/prometheus-operator v0.28.0
+github.com/coreos/prometheus-operator/pkg/apis/monitoring
+github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1
 # github.com/creasty/defaults v1.4.0
 github.com/creasty/defaults
 # github.com/davecgh/go-spew v1.1.1
@@ -292,6 +295,14 @@ github.com/spf13/pflag
 github.com/streadway/amqp
 # github.com/stretchr/testify v1.6.1
 github.com/stretchr/testify/assert
+# github.com/tidwall/gjson v1.6.8
+github.com/tidwall/gjson
+# github.com/tidwall/match v1.0.3
+github.com/tidwall/match
+# github.com/tidwall/pretty v1.0.2
+github.com/tidwall/pretty
+# github.com/tidwall/sjson v1.1.5
+github.com/tidwall/sjson
 # github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc
 github.com/tmthrgd/go-hex
 # github.com/ulikunitz/xz v0.5.7

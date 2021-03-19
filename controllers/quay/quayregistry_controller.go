@@ -19,11 +19,14 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	prometheusv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/go-logr/logr"
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/tidwall/sjson"
 	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -53,7 +56,14 @@ const (
 	creationPollInterval = time.Second * 1
 	creationPollTimeout  = time.Second * 600
 
-	QuayOperatorFinalizer = "quay-operator/finalizer"
+	GrafanaDashboardConfigMapNameSuffix = "grafana-dashboard-quay"
+	GrafanaTitleJSONPath                = "title"
+	GrafanaNamespaceFilterJSONPath      = "templating.list.1.options.0.value"
+	GrafanaServiceFilterJSONPath        = "templating.list.2.options.0.value"
+	ClusterMonitoringLabelKey           = "openshift.io/cluster-monitoring"
+	QuayDashboardJSONKey                = "quay.json"
+	QuayOperatorManagedLabelKey         = "quay-operator/managed-label"
+	QuayOperatorFinalizer               = "quay-operator/finalizer"
 )
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
@@ -167,14 +177,14 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	quayContext, updatedQuay, err = r.checkRoutesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
-	if v1.ComponentIsManaged(updatedQuay.Spec.Components, "route") && err != nil {
+	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentRoute) {
 		msg := fmt.Sprintf("could not check for `Routes` API: %s", err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonRouteComponentDependencyError, msg)
 	}
 
 	quayContext, updatedQuay, err = r.checkObjectBucketClaimsAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
-	if v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") && err != nil {
+	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentObjectStorage) {
 		msg := fmt.Sprintf("could not check for `ObjectBucketClaims` API: %s", err)
 		if _, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg); err != nil {
 			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
@@ -188,6 +198,13 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		msg := fmt.Sprintf("could not check for build manager support: %s", err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg)
+	}
+
+	quayContext, updatedQuay, err = r.checkMonitoringAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentMonitoring) {
+		msg := fmt.Sprintf("could not check for monitoring support: %s", err)
+
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonMonitoringComponentDependencyError, msg)
 	}
 
 	updatedQuay, err = v1.EnsureDefaultComponents(quayContext, updatedQuay.DeepCopy())
@@ -262,11 +279,30 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	for _, obj := range deploymentObjects {
-		err = r.createOrUpdateObject(ctx, obj, quay)
-		if err != nil {
+		// For metrics and dashboards to work, we need to deploy the Grafana ConfigMap
+		// in the `openshift-config-managed` namespace and add the label
+		// `openshift.io/cluster-monitoring: true` to the registry namespace
+		if quayContext.SupportsMonitoring && isGrafanaConfigMap(obj) {
+			obj = updateResourceNamespace(obj, GrafanaDashboardConfigNamespace)
+
+			if obj, err = updateGrafanaDashboardData(obj, updatedQuay.GetName(), updatedQuay.GetNamespace()); err != nil {
+				msg := fmt.Sprintf("Unable to update title on Grafana ConfigMap %s", err)
+				return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonMonitoringComponentDependencyError, msg)
+			}
+		}
+
+		if err := r.createOrUpdateObject(ctx, obj, quay); err != nil {
 			msg := fmt.Sprintf("all Kubernetes objects not created/updated successfully: %s", err)
 
 			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonComponentCreationFailed, msg)
+		}
+	}
+
+	if quayContext.SupportsMonitoring {
+		err := r.patchNamespaceForMonitoring(ctx, quay)
+		if err != nil {
+			return r.reconcileWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
+				v1.ConditionReasonMonitoringComponentDependencyError, err.Error())
 		}
 	}
 
@@ -369,6 +405,49 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// updateGrafanaDashboardData parses the Grafana Dashboard ConfigMap and updates the title and labels to filter the query by
+func updateGrafanaDashboardData(obj k8sruntime.Object, quayName string, quayNamespace string) (k8sruntime.Object, error) {
+	updatedObj := obj.DeepCopyObject()
+	configMapObj := updatedObj.(*corev1.ConfigMap)
+
+	dashboardConfigJSON := configMapObj.Data[QuayDashboardJSONKey]
+
+	newTitle := fmt.Sprintf("Quay - %s - %s", quayNamespace, quayName)
+	dashboardConfigJSON, err := sjson.Set(dashboardConfigJSON, GrafanaTitleJSONPath, newTitle)
+	if err != nil {
+		return nil, err
+	}
+
+	dashboardConfigJSON, err = sjson.Set(dashboardConfigJSON, GrafanaNamespaceFilterJSONPath, quayNamespace)
+	if err != nil {
+		return nil, err
+	}
+
+	metricsServiceName := fmt.Sprintf("%s-quay-metrics", quayName)
+	dashboardConfigJSON, err = sjson.Set(dashboardConfigJSON, GrafanaServiceFilterJSONPath, metricsServiceName)
+	if err != nil {
+		return nil, err
+	}
+
+	configMapObj.Data[QuayDashboardJSONKey] = dashboardConfigJSON
+	return configMapObj, nil
+}
+
+// updateResourceNamespace updates an Object's namespace replacing the existing namespace
+func updateResourceNamespace(obj k8sruntime.Object, newNamespace string) k8sruntime.Object {
+	updatedObj := obj.DeepCopyObject()
+	updatedObj.(*corev1.ConfigMap).SetNamespace(newNamespace)
+	return updatedObj
+}
+
+// isGrafanaConfigMap checks if an Object is the Grafana ConfigMap used in the monitoring component
+func isGrafanaConfigMap(obj k8sruntime.Object) bool {
+	configMapGVK := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
+
+	return configMapGVK == obj.GetObjectKind().GroupVersionKind() &&
+		strings.HasSuffix(obj.(*corev1.ConfigMap).GetName(), GrafanaDashboardConfigMapNameSuffix)
 }
 
 func encode(value interface{}) []byte {
@@ -493,6 +572,7 @@ func (r *QuayRegistryReconciler) reconcileWithCondition(q *v1.QuayRegistry, t v1
 	return ctrl.Result{}, err
 }
 
+// SetupWithManager initializes the controller manager
 func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// FIXME: Can we do this in the `init()` function in `main.go`...?
 	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
@@ -507,6 +587,12 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	if err := prometheusv1.AddToScheme(mgr.GetScheme()); err != nil {
+		r.Log.Error(err, "Failed to add `PrometheusRule` API to scheme")
+
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&quayredhatcomv1.QuayRegistry{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
@@ -514,7 +600,76 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// patchNamespaceForMonitoring Adds the cluster-monitoring label to the namespace if needed
+func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(ctx context.Context, quay v1.QuayRegistry) error {
+	var ns corev1.Namespace
+	err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
+
+	if err != nil {
+		return err
+	}
+
+	updatedNs := ns.DeepCopy()
+	labels := make(map[string]string)
+	for k, v := range updatedNs.Labels {
+		labels[k] = v
+	}
+
+	// We only add the `cluster-monitoring` label when it's not already present. In this case
+	// We also add another label to make sure we clean up correctly
+	// i.e remove the label only when we added it
+	if val, ok := labels[ClusterMonitoringLabelKey]; !ok || val != "true" {
+		labels[ClusterMonitoringLabelKey] = "true"
+		labels[QuayOperatorManagedLabelKey] = "true"
+		updatedNs.Labels = labels
+
+		patch := client.MergeFrom(&ns)
+		err = r.Client.Patch(context.Background(), updatedNs, patch)
+		return err
+	}
+
+	return nil
+}
+
+// cleanupNamespaceLabels Cleans up the monitoring label if we added it on the namespace
+// This runs as part of the finalizer which is invoked when a registry is deleted
+func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, quay *v1.QuayRegistry) error {
+	var ns corev1.Namespace
+	err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
+
+	if err != nil {
+		return err
+	}
+
+	var quayRegistryList v1.QuayRegistryList
+	listOps := client.ListOptions{
+		Namespace: quay.GetNamespace(),
+	}
+
+	if err := r.Client.List(ctx, &quayRegistryList, &listOps); err != nil {
+		return err
+	}
+
+	// Only update if we had initially added the label and this is the last QuayRegistry in the namespace
+	if ns.Labels != nil && ns.Labels[QuayOperatorManagedLabelKey] != "" && len(quayRegistryList.Items) == 1 {
+		updatedNs := ns.DeepCopy()
+		labels := make(map[string]string)
+		for k, v := range updatedNs.Labels {
+			labels[k] = v
+		}
+		delete(labels, ClusterMonitoringLabelKey)
+		delete(labels, QuayOperatorManagedLabelKey)
+		updatedNs.Labels = labels
+
+		patch := client.MergeFrom(&ns)
+		err = r.Client.Patch(context.Background(), updatedNs, patch)
+		return err
+	}
+
+	return nil
+}
+
 // finalizeQuay runs the Cleanup operations when a `QuayRegistry` is deleted
 func (r *QuayRegistryReconciler) finalizeQuay(ctx context.Context, quay *v1.QuayRegistry) error {
-	return nil
+	return r.cleanupNamespaceLabels(ctx, quay)
 }
