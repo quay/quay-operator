@@ -2,11 +2,11 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    olm.skipRange: ">=3.3.x <3.4.0"
+    olm.skipRange: ">=3.3.x <3.4.3"
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-quay-operator-container:v3.4.0
-    createdAt: 2021-01-05 16:01 UTC
+    containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.4.3
+    createdAt: 2021-03-16 15:03 UTC
     description: Opinionated deployment of Red Hat Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
@@ -34,7 +34,7 @@ metadata:
     operators.operatorframework.io/internal-objects: |-
       ["quayecosystems.redhatcop.redhat.io"]
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-  name: quay-operator.v3.4.0
+  name: quay-operator.v3.4.3
   namespace: placeholder
 spec:
   customresourcedefinitions:
@@ -124,7 +124,7 @@ spec:
     By default, the Red Hat Quay operator expects RHOCS to be installed on the cluster to
     provide the _ObjectBucketClaim_ API for object storage. For instructions installing and
     configuring the RHOCS Operator, see the "Enabling OpenShift Container Storage" in the
-    [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3.3/html/deploy_red_hat_quay_on_openshift_with_quay_setup_operator/index).
+    [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3/html-single/deploy_red_hat_quay_on_openshift_with_the_quay_operator/index#enabling_openshift_container_storage).
 
     ## Simplified Deployment
 
@@ -141,13 +141,13 @@ spec:
     ## Documentation
 
     See the
-    [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3.3/html/deploy_red_hat_quay_on_openshift_with_quay_setup_operator/index)
+    [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3/html/deploy_red_hat_quay_on_openshift_with_the_quay_operator/index)
     for more complex deployment scenarios and information.
   displayName: Red Hat Quay
   install:
     spec:
       deployments:
-      - name: quay-operator.v3.4.0
+      - name: quay-operator.v3.4.3
         spec:
           replicas: 1
           selector:
@@ -161,7 +161,7 @@ spec:
             spec:
               containers:
               - name: quay-operator
-                image: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-quay-operator-container:v3.4.0
+                image: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.4.3
                 command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'
@@ -179,13 +179,13 @@ spec:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
                 - name: RELATED_IMAGE_COMPONENT_QUAY
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay:v3.4.0
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-rhel8:v3.4.3
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-clair:v3.4.0
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-clair-rhel8:v3.4.3
                 - name: RELATED_IMAGE_COMPONENT_BUILDER
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder:v3.4.0
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-rhel8:v3.4.3
                 - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos:v3.4.0
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos-rhel8:v3.4.3
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES
                   value: registry.redhat.io/rhel8/postgresql-10:1
                 - name: RELATED_IMAGE_COMPONENT_REDIS
@@ -290,4 +290,5 @@ spec:
     matchLabels:
       alm-owner-quay-operator: quay-operator
       operated-by: quay-operator
-  version: 3.4.0
+  version: 3.4.3
+  replaces: quay-operator.v3.4.2

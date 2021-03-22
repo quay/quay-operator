@@ -25,7 +25,7 @@ metadata:
               {"kind": "redis", "managed": true},
               {"kind": "horizontalpodautoscaler", "managed": true},
               {"kind": "route", "managed": true},
-              {"kind": "mirror", "managed": true}
+              {"kind": "mirror", "managed": true},
               {"kind": "monitoring", "managed": true}
             ]
           }
