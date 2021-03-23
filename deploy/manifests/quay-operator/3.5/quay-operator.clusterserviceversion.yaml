@@ -1,0 +1,303 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    olm.skipRange: ">=3.4.x <3.5.0"
+    capabilities: Full Lifecycle
+    categories: Integration & Delivery
+    containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.5.0
+    createdAt: 2021-03-16 12:03 UTC
+    description: Opinionated deployment of Red Hat Quay on Kubernetes.
+    repository: https://github.com/quay/quay-operator
+    tectonic-visibility: ocs
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "quay.redhat.com/v1",
+          "kind": "QuayRegistry",
+          "metadata": {
+            "name": "example-registry"
+          },
+          "spec": {
+            "components": [
+              {"kind": "clair", "managed": true},
+              {"kind": "postgres", "managed": true},
+              {"kind": "objectstorage", "managed": true},
+              {"kind": "redis", "managed": true},
+              {"kind": "horizontalpodautoscaler", "managed": true},
+              {"kind": "route", "managed": true},
+              {"kind": "mirror", "managed": true},
+              {"kind": "monitoring", "managed": true}
+            ]
+          }
+        }
+      ]
+    operators.operatorframework.io/internal-objects: |-
+      ["quayecosystems.redhatcop.redhat.io"]
+    operators.openshift.io/infrastructure-features: '["Disconnected"]'
+  name: quay-operator.v3.5.0
+  namespace: placeholder
+spec:
+  customresourcedefinitions:
+    owned:
+    - description: Represents a full Quay registry installation.
+      displayName: Quay Registry
+      kind: QuayRegistry
+      name: quayregistries.quay.redhat.com
+      version: v1
+      resources:
+        - kind: Deployment
+        - kind: ReplicaSet
+        - kind: Pod
+        - kind: Secret
+        - Kind: Job
+        - kind: ConfigMap
+        - kind: PersistentVolumeClaim
+        - kind: Ingress
+        - kind: Route
+        - kind: Role
+        - kind: Rolebinding
+        - kind: HorizontalPodAutoscaler
+        - kind: ServiceMonitor
+        - kind: PrometheusRule
+      specDescriptors:
+        - path: configBundleSecret
+          displayName: Config Bundle Secret
+          description: Name of the Quay config secret containing base configuration and custom SSL certificates.
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+        - path: components
+          displayName: Components
+          description: Declares how the Operator should handle supplemental Quay services.
+          x-descriptors:
+            - 'urn:alm:descriptor:com.tectonic.ui:advanced'
+        - path: components[0].kind
+          displayName: Kind
+          description: The unique name of this type of component.
+        - path: components[0].managed
+          displayName: Managed
+          description: Indicates whether lifecycle of this component is managed by the Operator or externally.
+      statusDescriptors:
+        - path: currentVersion
+          displayName: Current Version
+          description: The currently installed version of all Quay components.
+        - path: conditions
+          displayName: Conditions
+          description: Observed conditions of Quay components.
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes.conditions'
+        - path: configEditorCredentialsSecret
+          displayName: Config Editor Credentials Secret
+          description: Name of the secret containing credentials for the Quay config editor.
+          x-descriptors:
+            - 'urn:alm:descriptor:io.kubernetes:Secret'
+        - path: registryEndpoint
+          displayName: Registry Endpoint
+          description: Externally accessible URL for container pull/push and web frontend.
+          x-descriptors:
+            - 'urn:alm:descriptor:org.w3:link'
+        - path: configEditorEndpoint
+          displayName: Config Editor Endpoint
+          description: Externally accessible URL for the config editor UI.
+          x-descriptors:
+            - 'urn:alm:descriptor:org.w3:link'
+    - kind: QuayEcosystem
+      version: v1alpha1
+      name: quayecosystems.redhatcop.redhat.io
+      displayName: Quay Ecosystem
+      description: "[DEPRECATED] Old representation of a full Quay installation."
+  description: |-
+    The Red Hat Quay Operator deploys and manages a production-ready
+    [Red Hat Quay](https://www.openshift.com/products/quay) private container registry.
+    This operator provides an opinionated installation and configuration of Red Hat Quay.
+    All components required, including Clair, database, and storage, are provided in an
+    operator-managed fashion. Each component may optionally be self-managed.
+
+    ## Operator Features
+
+    * Automated installation of Red Hat Quay
+    * Provisions instance of Redis
+    * Provisions PostgreSQL to support both Quay and Clair
+    * Installation of Clair for container scanning and integration with Quay
+    * Provisions and configures RHOCS for supported registry object storage
+    * Enables and configures Quay's registry mirroring feature
+
+    ## Prerequisites
+
+    By default, the Red Hat Quay operator expects RHOCS to be installed on the cluster to
+    provide the _ObjectBucketClaim_ API for object storage. For instructions installing and
+    configuring the RHOCS Operator, see the "Enabling OpenShift Container Storage" in the
+    [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3/html-single/deploy_red_hat_quay_on_openshift_with_the_quay_operator/index#enabling_openshift_container_storage).
+
+    ## Simplified Deployment
+
+    The following example provisions a fully operator-managed deployment of Red Hat Quay,
+    including all services necessary for production:
+
+    ```
+    apiVersion: quay.redhat.com/v1
+    kind: QuayRegistry
+    metadata:
+      name: my-registry
+    ```
+
+    ## Documentation
+
+    See the
+    [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3/html/deploy_red_hat_quay_on_openshift_with_the_quay_operator/index)
+    for more complex deployment scenarios and information.
+  displayName: Red Hat Quay
+  install:
+    spec:
+      deployments:
+      - name: quay-operator.v3.5.0
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              name: quay-operator-alm-owned
+          template:
+            metadata:
+              labels:
+                name: quay-operator-alm-owned
+              name: quay-operator-alm-owned
+            spec:
+              containers:
+              - name: quay-operator
+                image: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.5.0
+                command:
+                - /workspace/manager
+                - '--namespace=$(WATCH_NAMESPACE)'
+                env:
+                - name: MY_POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: MY_POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: WATCH_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['olm.targetNamespaces']
+                - name: RELATED_IMAGE_COMPONENT_QUAY
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-rhel8:v3.5.0
+                - name: RELATED_IMAGE_COMPONENT_CLAIR
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-clair-rhel8:v3.5.0
+                - name: RELATED_IMAGE_COMPONENT_BUILDER
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-rhel8:v3.5.0
+                - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos-rhel8:v3.5.0
+                - name: RELATED_IMAGE_COMPONENT_POSTGRES
+                  value: registry.redhat.io/rhel8/postgresql-10:1
+                - name: RELATED_IMAGE_COMPONENT_REDIS
+                  value: registry.redhat.io/rhel8/redis-5:1
+              serviceAccountName: quay-operator
+      permissions:
+      - rules:
+        - apiGroups:
+          - quay.redhat.com
+          resources:
+          - quayregistries
+          - quayregistries/status
+          verbs:
+          - '*'
+        - apiGroups:
+          - redhatcop.redhat.io
+          resources:
+          - quayecosystems
+          - quayecosystems/status
+          verbs:
+          - '*'
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - '*'
+        - apiGroups:
+          - ''
+          resources:
+          - pods
+          - services
+          - secrets
+          - configmaps
+          - persistentvolumeclaims
+          - events
+          verbs:
+          - '*'
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - roles
+          - rolebindings
+          verbs:
+          - '*'
+        - apiGroups:
+          - route.openshift.io
+          resources:
+          - routes
+          - routes/custom-host
+          verbs:
+          - '*'
+        - apiGroups:
+          - autoscaling
+          resources:
+          - horizontalpodautoscalers
+          verbs:
+          - '*'
+        - apiGroups:
+          - objectbucket.io
+          resources:
+          - objectbucketclaims
+          verbs:
+          - '*'
+        - apiGroups:
+            - monitoring.coreos.com
+          resources:
+            - prometheusrules
+            - servicemonitors
+          verbs:
+            - '*'
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - '*'
+        serviceAccountName: quay-operator
+    strategy: deployment
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: true
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - open source
+  - containers
+  - registry
+  labels:
+    alm-owner-quay-operator: quay-operator
+    operated-by: quay-operator
+  icon:
+  - base64data: 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
+    mediatype: image/png
+  maturity: stable
+  links:
+  - name: Source Code
+    url: https://github.com/quay/quay-operator
+  maintainers:
+  - email: support@redhat.com
+    name: Red Hat
+  provider:
+    name: Red Hat
+  selector:
+    matchLabels:
+      alm-owner-quay-operator: quay-operator
+      operated-by: quay-operator
+  version: 3.5.0

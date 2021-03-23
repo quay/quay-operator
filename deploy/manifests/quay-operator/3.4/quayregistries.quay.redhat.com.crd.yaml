@@ -63,37 +63,6 @@ spec:
         status:
           description: QuayRegistryStatus defines the observed state of QuayRegistry.
           properties:
-            conditions:
-              description: Conditions represent the conditions that a QuayRegistry
-                can have.
-              items:
-                description: 'Condition is a single condition of a QuayRegistry. Conditions
-                  should follow the "abnormal-true" principle in order to only bring
-                  the attention of users to "broken" states. Example: a condition
-                  of `type: "Ready", status: "True"`` is less useful and should be
-                  omitted whereas `type: "NotReady", status: "True"` is more useful
-                  when trying to monitor when something is wrong.'
-                properties:
-                  lastTransitionTime:
-                    format: date-time
-                    type: string
-                  lastUpdateTime:
-                    format: date-time
-                    type: string
-                  message:
-                    type: string
-                  reason:
-                    type: string
-                  status:
-                    type: string
-                  type:
-                    type: string
-                type: object
-              type: array
-            configEditorCredentialsSecret:
-              description: ConfigEditorCredentialsSecret is the Kubernetes `Secret`
-                containing the config editor password.
-              type: string
             configEditorEndpoint:
               description: ConfigEditorEndpoint is the external access point for a
                 web-based reconfiguration interface for the Quay registry instance.
