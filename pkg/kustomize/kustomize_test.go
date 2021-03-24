@@ -378,7 +378,6 @@ func TestInflate(t *testing.T) {
 			objectMeta, _ := meta.Accessor(obj)
 
 			assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-", test.name)
-			assert.Equal(string(v1.QuayVersionCurrent), objectMeta.GetAnnotations()["quay-version"], test.name)
 
 			if strings.Contains(objectMeta.GetName(), v1.ManagedKeysSecretNameFor(test.quayRegistry)) {
 				managedKeys := obj.(*corev1.Secret)

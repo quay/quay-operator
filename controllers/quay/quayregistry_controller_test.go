@@ -307,8 +307,6 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
 			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
 
-			quayRegistry.Status.CurrentVersion = v1.QuayVersionPrevious
-
 			Expect(k8sClient.Status().Update(context.Background(), quayRegistry)).To(Succeed())
 
 			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})

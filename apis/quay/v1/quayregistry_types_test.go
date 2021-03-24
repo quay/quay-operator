@@ -10,41 +10,6 @@ import (
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
-var canUpgradeTests = []struct {
-	name        string
-	fromVersion QuayVersion
-	expected    bool
-}{
-	{
-		"none",
-		"",
-		true,
-	},
-	{
-		"nonexistent",
-		"not-a-real-version",
-		false,
-	},
-	{
-		"current",
-		QuayVersionCurrent,
-		true,
-	},
-	{
-		"previous",
-		QuayVersionPrevious,
-		true,
-	},
-}
-
-func TestCanUpgrade(t *testing.T) {
-	assert := assert.New(t)
-
-	for _, test := range canUpgradeTests {
-		assert.Equal(test.expected, CanUpgrade(test.fromVersion), test.name)
-	}
-}
-
 var ensureDefaultComponentsTests = []struct {
 	name        string
 	quay        QuayRegistry

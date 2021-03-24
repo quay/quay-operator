@@ -1,7 +1,5 @@
 # Overlay variant for current Project Quay release.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-commonAnnotations:
-  quay-version: vader
 bases:
   - ../../tmp

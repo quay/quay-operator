@@ -119,12 +119,6 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		return ctrl.Result{}, nil
 	}
 
-	if !v1.CanUpgrade(quay.Status.CurrentVersion) {
-		err := fmt.Errorf("cannot upgrade %s => %s", quay.Status.CurrentVersion, v1.QuayVersionCurrent)
-
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonUpgradeUnsupported, err.Error())
-	}
-
 	if quay.Spec.ConfigBundleSecret == "" {
 		log.Info("`spec.configBundleSecret` is unset. Creating base `Secret`")
 
