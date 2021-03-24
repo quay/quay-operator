@@ -225,6 +225,7 @@ spec:
           - configmaps
           - persistentvolumeclaims
           - events
+          - namespaces
           verbs:
           - '*'
         - apiGroups:
