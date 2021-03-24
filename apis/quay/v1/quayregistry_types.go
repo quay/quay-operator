@@ -18,6 +18,7 @@ package v1
 
 import (
 	"errors"
+	"os"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,15 +31,7 @@ import (
 
 type QuayVersion string
 
-const (
-	QuayVersionCurrent  QuayVersion = "vader"
-	QuayVersionPrevious QuayVersion = ""
-)
-
-// CanUpgrade returns true if the given version can be upgraded to this Operator's synchronized Quay version.
-func CanUpgrade(fromVersion QuayVersion) bool {
-	return fromVersion == QuayVersionCurrent || fromVersion == QuayVersionPrevious
-}
+var QuayVersionCurrent QuayVersion = QuayVersion(os.Getenv("QUAY_VERSION"))
 
 type ComponentKind string
 

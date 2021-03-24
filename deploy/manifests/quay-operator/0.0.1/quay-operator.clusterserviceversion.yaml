@@ -7,6 +7,7 @@ metadata:
     containerImage: quay.io/projectquay/quay-operator@sha256:c4d8de1b394eaf83a50f46882a4b0c3c6be966b08d8a2ab2e5f3cd6ff7bfbd2f
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
+    quay-version: 0.0.1
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
     alm-examples: |-
@@ -140,6 +141,10 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['olm.targetNamespaces']
+                - name: QUAY_VERSION
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['quay-version']
                 - name: RELATED_IMAGE_COMPONENT_QUAY
                   value: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
