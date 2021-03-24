@@ -180,9 +180,18 @@ spec:
           - configmaps
           - persistentvolumeclaims
           - events
-          - namespaces
           verbs:
           - '*'
+        - apiGroups:
+          - ''
+          resources:
+          - namespaces
+          verbs:
+          - get
+          - watch
+          - list
+          - update
+          - patch
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
