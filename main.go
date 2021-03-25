@@ -85,6 +85,7 @@ func main() {
 		Log:           ctrl.Log.WithName("controllers").WithName("QuayRegistry"),
 		Scheme:        mgr.GetScheme(),
 		EventRecorder: mgr.GetEventRecorderFor("quayregistry-controller"),
+		WatchNamespace: namespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistry")
 		os.Exit(1)
