@@ -208,6 +208,13 @@ func (r *QuayRegistryReconciler) checkBuildManagerAvailable(ctx *quaycontext.Qua
 // running in an Openshift environment with cluster monitoring enabled for our
 // monitoring component to work
 func (r *QuayRegistryReconciler) checkMonitoringAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+	if len(r.WatchNamespace) > 0 {
+		msg := "monitoring is only supported in AllNamespaces mode. Disabling component monitoring"
+		r.Log.Info(msg)
+		err := fmt.Errorf(msg)
+		return ctx, quay, err
+	}
+
 	var serviceMonitors prometheusv1.ServiceMonitorList
 	if err := r.Client.List(context.Background(), &serviceMonitors); err != nil {
 		r.Log.Info("Unable to find ServiceMonitor CRD. Monitoring component disabled")
