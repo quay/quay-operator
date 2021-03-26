@@ -143,10 +143,10 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 func BaseConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"FEATURE_MAILING":                    false,
-		"REGISTRY_TITLE":                     "Quay",
-		"REGISTRY_TITLE_SHORT":               "Quay",
+		"REGISTRY_TITLE":                     "Red Hat Quay",
+		"REGISTRY_TITLE_SHORT":               "Red Hat Quay",
 		"AUTHENTICATION_TYPE":                "Database",
-		"ENTERPRISE_LOGO_URL":                "/static/img/quay-horizontal-color.svg",
+		"ENTERPRISE_LOGO_URL":                "/static/img/RH_Logo_Quay_Black_UX-horizontal.svg",
 		"DEFAULT_TAG_EXPIRATION":             "2w",
 		"ALLOW_PULLS_WITHOUT_STRICT_LOGGING": false,
 		"TAG_EXPIRATION_OPTIONS":             []string{"2w"},
