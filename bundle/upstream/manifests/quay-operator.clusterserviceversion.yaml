@@ -7,7 +7,7 @@ metadata:
     containerImage: quay.io/alecmerdler/quay-operator@sha256:338fd69768edebc1e4fe027b76d897281b1d95324d39e8afad6c790e38ecc4eb
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
-    quay-version: 3.5.0
+    quay-version: projectquay-v3.5.0
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
     alm-examples: |-
@@ -34,7 +34,7 @@ metadata:
       ]
     operators.operatorframework.io/internal-objects: |-
       ["quayecosystems.redhatcop.redhat.io"]
-  name: quay-operator.v2.0.0
+  name: quay-operator.projectquay-v3.5.0
   namespace: placeholder
 spec:
   customresourcedefinitions:
@@ -619,4 +619,4 @@ spec:
     matchLabels:
       alm-owner-quay-operator: quay-operator
       operated-by: quay-operator
-  version: 2.0.0
+  version: 3.5.0
