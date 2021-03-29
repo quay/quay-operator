@@ -9,7 +9,7 @@ The local development experience of the Quay Operator should be easy and straigh
 2. Install the CRDs for the operator
 
 ```sh
-$ kubectl apply -f ./deploy/manifests/quay-operator/0.0.1/*.crd.yaml
+$ kubectl apply -f ./bundle/upstream/manifests/*.crd.yaml
 ```
 
 2. Run the controller:
