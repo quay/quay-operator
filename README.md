@@ -20,7 +20,7 @@ This Operator can be installed on any Kubernetes cluster running the [Operator L
 
 **Create the `CatalogSource`**:
 ```sh
-$ kubectl create -n openshift-marketplace -f ./deploy/quay-operator.catalogsource.yaml
+$ kubectl create -n openshift-marketplace -f ./bundle/quay-operator.catalogsource.yaml
 ```
 
 **Wait a few seconds for the package to become available**:
@@ -33,12 +33,12 @@ $ kubectl get packagemanifest --all-namespaces | grep quay
 NOTE: By default, the `targetNamespaces` field is specified to target the _quay-enterprise_ namespace. Update this value if the namespace the operator is deployed within differs. 
 
 ```sh
-$ kubectl create -n <your-namespace> -f ./deploy/quay-operator.operatorgroup.yaml
+$ kubectl create -n <your-namespace> -f ./bundle/quay-operator.operatorgroup.yaml
 ```
 
 **Create the `Subscription` to install the Operator**:
 ```sh
-$ kubectl create -n <your-namespace> -f ./deploy/quay-operator.subscription.yaml
+$ kubectl create -n <your-namespace> -f ./bundle/quay-operator.subscription.yaml
 ```
 
 ### Using the Operator
@@ -91,7 +91,7 @@ Pull requests and bug reports are always welcome!
 
 **Create the `QuayRegistry` CRD**:
 ```sh
-$ kubectl create -f ./config/crd/bases/
+$ kubectl create -f ./bundle/upstream/manifests/*.crd.yaml
 ```
 
 **Run the controller**:
@@ -113,20 +113,27 @@ $ docker build -t <some-registry>/<namespace>/quay-operator:dev .
 $ docker push <some-registry>/<namespace>/quay-operator:dev
 ```
 
-2. Replace the `image` field in `deploy/manifests/quay-operator/0.0.1/quay-operator.clusterserviceversion.yaml` with the image above.
+2. Replace the `image` field in `bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml` with the image above.
 
-3. Build and push the Quay Operator `CatalogSource` container:
+3. Build and push an [Operator bundle](https://github.com/operator-framework/operator-registry/blob/master/docs/design/operator-bundle.md):
 
 ```sh
-$ cd deploy
-$ docker build -t <some-registry>/<namespace>/quay-operator-catalog:dev .
-$ docker push <some-registry>/<namespace>/quay-operator-catalog:dev
+$ docker build -t <some-registry>/<namespace>/quay-operator-bundle:dev -f ./bundle/Dockerfile ./bundle
+$ docker push <some-registry>/<namespace>/quay-operator-bundle:dev
 ```
 
-4. Replace the `spec.image` field in `deploy/quay-operator.catalogsource.yaml` with the image above.
+4. Build and push an Operator index image using [`opm`](https://github.com/operator-framework/operator-registry/blob/master/docs/design/opm-tooling.md#opm):
+
+```sh
+$ cd bundle/upstream
+$ opm index add --bundles <some-registry>/<namespace>/quay-operator-bundle:dev --tag <some-registry>/<namespace>/quay-operator-index:dev
+$ docker push <some-registry>/<namespace>/quay-operator-index:dev
+```
+
+4. Replace the `spec.image` field in `bundle/quay-operator.catalogsource.yaml` with the image above.
 
 5. Create the custom `CatalogSource`:
 
 ```sh
-$ kubectl create -n openshift-marketplace -f ./deploy/quay-operator.catalogsource.yaml
+$ kubectl create -n openshift-marketplace -f ./bundle/quay-operator.catalogsource.yaml
 ```

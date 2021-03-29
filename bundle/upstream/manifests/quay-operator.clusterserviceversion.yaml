@@ -4,10 +4,10 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator@sha256:c4d8de1b394eaf83a50f46882a4b0c3c6be966b08d8a2ab2e5f3cd6ff7bfbd2f
+    containerImage: quay.io/alecmerdler/quay-operator@sha256:338fd69768edebc1e4fe027b76d897281b1d95324d39e8afad6c790e38ecc4eb
     createdAt: 2020-08-24 00:00:00
     description: Opinionated deployment of Quay on Kubernetes.
-    quay-version: 0.0.1
+    quay-version: 3.5.0
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
     alm-examples: |-
@@ -34,7 +34,7 @@ metadata:
       ]
     operators.operatorframework.io/internal-objects: |-
       ["quayecosystems.redhatcop.redhat.io"]
-  name: quay-operator.v0.0.1
+  name: quay-operator.v2.0.0
   namespace: placeholder
 spec:
   customresourcedefinitions:
@@ -124,7 +124,7 @@ spec:
             spec:
               containers:
               - name: quay-operator
-                image: quay.io/projectquay/quay-operator@sha256:c4d8de1b394eaf83a50f46882a4b0c3c6be966b08d8a2ab2e5f3cd6ff7bfbd2f
+                image: quay.io/alecmerdler/quay-operator@sha256:338fd69768edebc1e4fe027b76d897281b1d95324d39e8afad6c790e38ecc4eb
                 command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'
@@ -619,4 +619,4 @@ spec:
     matchLabels:
       alm-owner-quay-operator: quay-operator
       operated-by: quay-operator
-  version: 0.0.1
+  version: 2.0.0
