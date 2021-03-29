@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/quay/clair/v4/config"
@@ -141,12 +142,19 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 
 // BaseConfig returns a minimum config bundle with values that Quay doesn't have defaults for.
 func BaseConfig() map[string]interface{} {
+	registryTitle := "Quay"
+	enterpriseLogoURL := "/static/img/quay-horizontal-color.svg"
+	if os.Getenv("QUAY_DEFAULT_BRANDING") == "redhat" {
+		registryTitle = "Red Hat Quay"
+		enterpriseLogoURL = "/static/img/RH_Logo_Quay_Black_UX-horizontal.svg"
+	}
+
 	return map[string]interface{}{
 		"FEATURE_MAILING":                    false,
-		"REGISTRY_TITLE":                     "Quay",
-		"REGISTRY_TITLE_SHORT":               "Quay",
+		"REGISTRY_TITLE":                     registryTitle,
+		"REGISTRY_TITLE_SHORT":               registryTitle,
 		"AUTHENTICATION_TYPE":                "Database",
-		"ENTERPRISE_LOGO_URL":                "/static/img/quay-horizontal-color.svg",
+		"ENTERPRISE_LOGO_URL":                enterpriseLogoURL,
 		"DEFAULT_TAG_EXPIRATION":             "2w",
 		"ALLOW_PULLS_WITHOUT_STRICT_LOGGING": false,
 		"TAG_EXPIRATION_OPTIONS":             []string{"2w"},

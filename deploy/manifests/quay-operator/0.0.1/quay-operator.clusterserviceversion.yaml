@@ -145,6 +145,8 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.annotations['quay-version']
+                - name: QUAY_DEFAULT_BRANDING
+                  value: upstream
                 - name: RELATED_IMAGE_COMPONENT_QUAY
                   value: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
