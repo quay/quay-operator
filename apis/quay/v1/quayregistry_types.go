@@ -42,6 +42,7 @@ const (
 	ComponentRedis                       = "redis"
 	ComponentHPA                         = "horizontalpodautoscaler"
 	ComponentObjectStorage               = "objectstorage"
+	ComponentIngress                     = "ingress"
 	ComponentRoute                       = "route"
 	ComponentMirror                      = "mirror"
 	ComponentMonitoring                  = "monitoring"
@@ -53,6 +54,7 @@ var allComponents = []ComponentKind{
 	ComponentRedis,
 	ComponentHPA,
 	ComponentObjectStorage,
+	ComponentIngress,
 	ComponentRoute,
 	ComponentMirror,
 	ComponentMonitoring,
@@ -61,6 +63,7 @@ var allComponents = []ComponentKind{
 var requiredComponents = []ComponentKind{
 	ComponentPostgres,
 	ComponentObjectStorage,
+	ComponentIngress,
 	ComponentRoute,
 }
 
@@ -253,6 +256,10 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 		updatedQuay.Spec.Components = []Component{}
 	}
 
+	if ComponentIsManaged(updatedQuay.Spec.Components, ComponentIngress) && !ctx.SupportsIngresses {
+		return nil, errors.New("cannot use `ingress` component when `Ingresses` API not available")
+	}
+
 	if ComponentIsManaged(updatedQuay.Spec.Components, ComponentRoute) && !ctx.SupportsRoutes {
 		return nil, errors.New("cannot use `route` component when `Route` API not available")
 	}
@@ -275,6 +282,9 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 		}
 
 		if !found {
+			if component == ComponentIngress && !ctx.SupportsIngresses {
+				continue
+			}
 			if component == ComponentRoute && !ctx.SupportsRoutes {
 				continue
 			}
@@ -308,7 +318,6 @@ func EnsureRegistryEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegi
 			ctx.ClusterHostname},
 			".")
 	}
-	// TODO: Retrieve load balancer IP from `Service`
 
 	return updatedQuay, quay.Status.RegistryEndpoint == updatedQuay.Status.RegistryEndpoint
 }
@@ -317,13 +326,13 @@ func EnsureRegistryEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegi
 func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) (*QuayRegistry, bool) {
 	updatedQuay := quay.DeepCopy()
 
+	// TODO(alecmerdler): How do we handle `ingress` component for the config editor...?
 	if ctx.SupportsRoutes {
 		updatedQuay.Status.ConfigEditorEndpoint = "https://" + strings.Join([]string{
 			strings.Join([]string{quay.GetName(), "quay-config-editor", quay.GetNamespace()}, "-"),
 			ctx.ClusterHostname},
 			".")
 	}
-	// TODO: Retrieve load balancer IP from `Service`
 
 	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
 }

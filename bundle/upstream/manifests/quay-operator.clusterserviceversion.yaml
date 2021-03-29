@@ -238,6 +238,12 @@ spec:
           - jobs
           verbs:
           - '*'
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - ingresses
+          verbs:
+          - '*'
         serviceAccountName: quay-operator
     strategy: deployment
   installModes:

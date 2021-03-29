@@ -11,6 +11,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
+	networking "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,6 +60,33 @@ func (r *QuayRegistryReconciler) checkManagedKeys(ctx *quaycontext.QuayRegistryC
 			break
 		}
 	}
+
+	return ctx, quay, nil
+}
+
+func (r *QuayRegistryReconciler) checkIngressesAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+	fakeIngress, err := v1.EnsureOwnerReference(quay, &networking.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      quay.GetName() + "-test-ingress",
+			Namespace: quay.GetNamespace(),
+		},
+		Spec: networking.IngressSpec{
+			Rules: []networking.IngressRule{},
+		},
+	})
+
+	if err != nil {
+		return ctx, quay, err
+	}
+
+	if err := r.Client.Create(context.Background(), fakeIngress); err == nil || errors.IsAlreadyExists(err) {
+		// FIXME(alecmerdler): Need more comprehensive test that an ingress controller is running and processes the `Ingress`...
+		r.Log.Info("cluster supports `Ingresses` API")
+
+		return ctx, quay, nil
+	}
+
+	r.Log.Info("cluster does not support `Ingresses` API")
 
 	return ctx, quay, nil
 }

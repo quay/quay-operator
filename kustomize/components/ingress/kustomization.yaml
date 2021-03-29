@@ -1,16 +1,8 @@
-# Route component allows external access to the Quay registry using an OpenShift `Route`.
+# Ingress component allows external access to the Quay registry using a Kubernetes `Ingress`.
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
-crds:
-  - ./route.crd.json
 resources: 
-  - ./quay.route.yaml
-  - ./config.route.yaml
-  - ./builder.route.yaml
-patchesStrategicMerge:
-  - ./config.service.patch.yaml
-configurations:
-  - ./route.varreferences.yaml
+  - ./quay.ingress.yaml
 # NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
 vars:
   - name: SERVER_HOSTNAME

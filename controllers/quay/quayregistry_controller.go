@@ -69,9 +69,9 @@ const (
 // QuayRegistryReconciler reconciles a QuayRegistry object
 type QuayRegistryReconciler struct {
 	client.Client
-	Log           logr.Logger
-	Scheme        *runtime.Scheme
-	EventRecorder record.EventRecorder
+	Log            logr.Logger
+	Scheme         *runtime.Scheme
+	EventRecorder  record.EventRecorder
 	WatchNamespace string
 }
 
@@ -169,6 +169,13 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		msg := fmt.Sprintf("unable to retrieve managed keys `Secret`: %s", err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
+	}
+
+	quayContext, updatedQuay, err = r.checkIngressesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentIngress) {
+		msg := fmt.Sprintf("could not check for `Ingress` API: %s", err)
+
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonRouteComponentDependencyError, msg)
 	}
 
 	quayContext, updatedQuay, err = r.checkRoutesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
