@@ -106,6 +106,8 @@ $ go test -v ./...
 
 **Building custom `CatalogSource`**:
 
+TODO(alecmerdler): Replace with `Makefile` command...
+
 1. Build and push the Quay Operator container:
 
 ```sh
@@ -118,7 +120,7 @@ $ docker push <some-registry>/<namespace>/quay-operator:dev
 3. Build and push an [Operator bundle](https://github.com/operator-framework/operator-registry/blob/master/docs/design/operator-bundle.md):
 
 ```sh
-$ docker build -t <some-registry>/<namespace>/quay-operator-bundle:dev -f ./bundle/Dockerfile ./bundle
+$ docker build -t <some-registry>/<namespace>/quay-operator-bundle:dev -f ./bundle/upstream/Dockerfile ./bundle/upstream
 $ docker push <some-registry>/<namespace>/quay-operator-bundle:dev
 ```
 
