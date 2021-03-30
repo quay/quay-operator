@@ -69,9 +69,9 @@ const (
 // QuayRegistryReconciler reconciles a QuayRegistry object
 type QuayRegistryReconciler struct {
 	client.Client
-	Log           logr.Logger
-	Scheme        *runtime.Scheme
-	EventRecorder record.EventRecorder
+	Log            logr.Logger
+	Scheme         *runtime.Scheme
+	EventRecorder  record.EventRecorder
 	WatchNamespace string
 }
 
@@ -100,6 +100,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	isQuayMarkedToBeDeleted := quay.GetDeletionTimestamp() != nil
 	if isQuayMarkedToBeDeleted {
+		log.Info("`QuayRegistry` to be deleted")
 		if controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
 			if err := r.finalizeQuay(ctx, updatedQuay); err != nil {
 				return ctrl.Result{}, err
@@ -475,8 +476,16 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k
 	obj, err := v1.EnsureOwnerReference(&quay, obj)
 	if err != nil {
 		log.Error(err, "could not ensure `ownerReferences` before creating object", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
-
 		return err
+	}
+
+	// Remove owner reference to prevent cross-namespace owner reference
+	if isGrafanaConfigMap(obj) {
+		obj, err = v1.RemoveOwnerReference(&quay, obj)
+		if err != nil {
+			log.Error(err, "could not remove `ownerReferences` before creating object", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+			return err
+		}
 	}
 
 	// managedFields cannot be set on a PATCH.
@@ -665,7 +674,30 @@ func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, qua
 	return nil
 }
 
+// cleanupGrafanaConfigMap cleans up the monitoring config map that is created in the `openshift-config-managed` namespace
+// This runs as part of the finalizer which is invoked when a registry is deleted
+func (r *QuayRegistryReconciler) cleanupGrafanaConfigMap(ctx context.Context, quay *v1.QuayRegistry) error {
+	var grafanaConfigMap corev1.ConfigMap
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetName() + "-" + GrafanaDashboardConfigMapNameSuffix, Namespace: GrafanaDashboardConfigNamespace}, &grafanaConfigMap); err == nil || !errors.IsNotFound(err) {
+		return r.Client.Delete(ctx, &grafanaConfigMap)
+	}
+	return nil
+}
+
 // finalizeQuay runs the Cleanup operations when a `QuayRegistry` is deleted
 func (r *QuayRegistryReconciler) finalizeQuay(ctx context.Context, quay *v1.QuayRegistry) error {
-	return r.cleanupNamespaceLabels(ctx, quay)
+
+	r.Log.Info("cleaning up namespace labels")
+	if err := r.cleanupNamespaceLabels(ctx, quay); err != nil {
+		return err
+	}
+	r.Log.Info("successfully cleaned up namespace labels")
+
+	r.Log.Info("cleaning up grafana config map")
+	if err := r.cleanupGrafanaConfigMap(ctx, quay); err != nil {
+		return err
+	}
+	r.Log.Info("successfully cleaned up grafana config map")
+
+	return nil
 }

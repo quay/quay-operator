@@ -357,6 +357,25 @@ func EnsureOwnerReference(quay *QuayRegistry, obj runtime.Object) (runtime.Objec
 	return obj, nil
 }
 
+// RemoveOwnerReference removes the `ownerReference` of `QuayRegistry` on the given object.
+func RemoveOwnerReference(quay *QuayRegistry, obj runtime.Object) (runtime.Object, error) {
+	filteredOwnerReferences := []metav1.OwnerReference{}
+
+	objectMeta, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ownerRef := range objectMeta.GetOwnerReferences() {
+		if ownerRef.Name != quay.GetName() {
+			filteredOwnerReferences = append(filteredOwnerReferences, ownerRef)
+		}
+	}
+	objectMeta.SetOwnerReferences(filteredOwnerReferences)
+
+	return obj, nil
+}
+
 const ManagedKeysName = "quay-registry-managed-secret-keys"
 
 // ManagedKeysSecretNameFor returns the name of the `Secret` in which generated secret keys are stored.
