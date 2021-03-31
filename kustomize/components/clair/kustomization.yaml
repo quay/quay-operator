@@ -7,8 +7,6 @@ resources:
   - ./postgres.persistentvolumeclaim.yaml
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
-generatorOptions:
-  disableNameSuffixHash: true
 vars:
   - name: CLAIR_SERVICE_HOST
     objref:
