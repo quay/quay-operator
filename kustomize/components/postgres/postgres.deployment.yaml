@@ -16,6 +16,7 @@ spec:
       labels:
         quay-component: postgres
     spec:
+      serviceAccountName: quay-database
       volumes:
         - name: postgres-data
           persistentVolumeClaim:
