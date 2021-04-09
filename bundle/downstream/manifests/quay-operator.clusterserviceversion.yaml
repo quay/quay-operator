@@ -53,6 +53,7 @@ spec:
         - kind: Secret
         - Kind: Job
         - kind: ConfigMap
+        - kind: ServiceAccount
         - kind: PersistentVolumeClaim
         - kind: Ingress
         - kind: Route
@@ -228,6 +229,7 @@ spec:
           - services
           - secrets
           - configmaps
+          - serviceaccounts
           - persistentvolumeclaims
           - events
           verbs:

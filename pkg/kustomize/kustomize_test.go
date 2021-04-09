@@ -187,6 +187,7 @@ var quayComponents = map[string][]runtime.Object{
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
+		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 	},
 	"postgres": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "postgres-bootstrap"}},
@@ -195,6 +196,7 @@ var quayComponents = map[string][]runtime.Object{
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-database-init"}},
+		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 	},
 	"redis": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},

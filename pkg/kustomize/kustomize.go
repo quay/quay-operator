@@ -142,6 +142,8 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 		return &corev1.Service{}
 	case schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}.String():
 		return &corev1.ConfigMap{}
+	case schema.GroupVersionKind{Version: "v1", Kind: "ServiceAccount"}.String():
+		return &corev1.ServiceAccount{}
 	case schema.GroupVersionKind{Version: "v1", Kind: "PersistentVolumeClaim"}.String():
 		return &corev1.PersistentVolumeClaim{}
 	case schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}.String():

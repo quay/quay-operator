@@ -16,6 +16,7 @@ spec:
       labels:
         quay-component: clair-postgres
     spec:
+      serviceAccountName: clair-postgres
       volumes:
         - name: postgres-data
           persistentVolumeClaim:
