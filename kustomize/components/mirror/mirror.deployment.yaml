@@ -32,7 +32,7 @@ spec:
                       path: quay-ssl.cert
       initContainers:
         - name: quay-mirror-init
-          image: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
+          image: quay.io/alecmerdler/quay@sha256:2dd5687703c5e92325b4870d516bc595d12b70fb0762a9de2116302e34daf033
           command:
             - /bin/sh
             - -c
@@ -42,7 +42,7 @@ spec:
               value: $(QUAY_APP_SERVICE_HOST)
       containers:
         - name: quay-mirror
-          image: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
+          image: quay.io/alecmerdler/quay@sha256:2dd5687703c5e92325b4870d516bc595d12b70fb0762a9de2116302e34daf033
           command: ["/quay-registry/quay-entrypoint.sh"]
           args: ["repomirror-nomigrate"]
           env:
