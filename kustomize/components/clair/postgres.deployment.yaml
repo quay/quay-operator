@@ -37,16 +37,18 @@ spec:
               value: postgres
             - name: POSTGRESQL_ADMIN_PASSWORD
               value: postgres
+          startupProbe:
+            exec:
+              command: 
+                - /usr/libexec/check-container
+            periodSeconds: 10
+            failureThreshold: 20
           readinessProbe:
             exec:
-              timeoutSeconds: 1
-              initialDelaySeconds: 5
               command: 
                 - /usr/libexec/check-container
           livelinessProbe:
             exec:
-              timeoutSeconds: 10
-              initialDelaySeconds: 120
               command: 
                 - /usr/libexec/check-container
                 - --live

@@ -35,6 +35,11 @@ spec:
               name: config
             - mountPath: /var/run/certs
               name: certs
+          startupProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 300
           readinessProbe:
             tcpSocket:
               port: 8080

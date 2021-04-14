@@ -56,17 +56,24 @@ spec:
             limits:
               cpu: 2000m
               memory: 8Gi
-          readinessProbe:
-            exec:
-              command:
-                - curl
-                - '-k'
-                - 'https://localhost:8443/health/instance'
-            initialDelaySeconds: 30
+          startupProbe:
+            httpGet:
+              path: /health/instance
+              port: 8443
+              scheme: HTTPS
             timeoutSeconds: 20
             periodSeconds: 15
-            successThreshold: 1
-            failureThreshold: 3
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /health/instance
+              port: 8443
+              scheme: HTTPS
+          livelinessProbe:
+            httpGet:
+              path: /health/instance
+              port: 8443
+              scheme: HTTPS
           volumeMounts:
             - name: configvolume
               readOnly: false
