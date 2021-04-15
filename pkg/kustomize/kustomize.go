@@ -20,9 +20,9 @@ import (
 	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/api/resid"
@@ -132,7 +132,7 @@ func decode(bytes []byte) interface{} {
 
 // ModelFor returns an empty Kubernetes object instance for the given `GroupVersionKind`.
 // Example: Calling with `core.v1.Secret` GVK returns an empty `corev1.Secret` instance.
-func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
+func ModelFor(gvk schema.GroupVersionKind) client.Object {
 	switch gvk.String() {
 	case schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}.String():
 		return &corev1.Namespace{}
@@ -170,7 +170,7 @@ func ModelFor(gvk schema.GroupVersionKind) k8sruntime.Object {
 }
 
 // generate uses Kustomize as a library to build the runtime objects to be applied to a cluster.
-func generate(kustomization *types.Kustomization, overlay string, quayConfigFiles map[string][]byte) ([]k8sruntime.Object, error) {
+func generate(kustomization *types.Kustomization, overlay string, quayConfigFiles map[string][]byte) ([]client.Object, error) {
 	fSys := filesys.MakeEmptyDirInMemory()
 	err := filepath.Walk(kustomizeDir(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -210,7 +210,7 @@ func generate(kustomization *types.Kustomization, overlay string, quayConfigFile
 	resMap, err := k.Run(overlay)
 	check(err)
 
-	output := []k8sruntime.Object{}
+	output := []client.Object{}
 	for _, resource := range resMap.Resources() {
 		resourceJSON, err := resource.MarshalJSON()
 		check(err)
@@ -396,7 +396,7 @@ func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 }
 
 // Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
-func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, log logr.Logger) ([]k8sruntime.Object, error) {
+func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, log logr.Logger) ([]client.Object, error) {
 	// Each managed component brings its own generated `config.yaml` fields
 	// which are accumulated under the key `<component>.config.yaml` and then added to the base `Secret`.
 	componentConfigFiles := baseConfigBundle.DeepCopy().Data
