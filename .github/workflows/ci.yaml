@@ -32,3 +32,19 @@ jobs:
           export PATH=$PATH:/usr/local/kubebuilder/bin
       - name: Tests
         run: go test -v ./...
+
+  commit-check:
+    name: Commit Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: commit check
+        uses: gsactions/commit-message-checker@v1
+        with:
+          pattern: |
+            ^(.*):\s*(.*)\s\(PROJQUAY-[0-9]+\)(\n.*)*$
+          error: 'Commit must begin with <scope>: <subject> (PROJQUAY-####)'
+          flags: 'gm'
+          excludeTitle: true
+          excludeDescription: true
+          checkAllCommitMessages: true
+          accessToken: ${{ secrets.GITHUB_TOKEN }}
