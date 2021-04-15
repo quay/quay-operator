@@ -14,7 +14,7 @@ import (
 	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/api/types"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -166,7 +166,7 @@ func TestFlattenSecret(t *testing.T) {
 	assert.Equal("http://quay-clair", flattenedConfig.(map[string]interface{})["SECURITY_SCANNER_V4_ENDPOINT"])
 }
 
-var quayComponents = map[string][]runtime.Object{
+var quayComponents = map[string][]client.Object{
 	"base": {
 		&rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: "quay-serviceaccount"}},
 		&rbac.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "quay-secret-writer"}},
@@ -213,8 +213,8 @@ var quayComponents = map[string][]runtime.Object{
 	},
 }
 
-func withComponents(components []string) []runtime.Object {
-	selectedComponents := []runtime.Object{}
+func withComponents(components []string) []client.Object {
+	selectedComponents := []client.Object{}
 	for _, component := range components {
 		selectedComponents = append(selectedComponents, quayComponents[component]...)
 	}
@@ -227,7 +227,7 @@ var inflateTests = []struct {
 	quayRegistry *v1.QuayRegistry
 	ctx          quaycontext.QuayRegistryContext
 	configBundle *corev1.Secret
-	expected     []runtime.Object
+	expected     []client.Object
 	expectedErr  error
 }{
 	{

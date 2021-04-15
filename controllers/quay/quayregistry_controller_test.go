@@ -119,7 +119,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 
 			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 		})
 
 		It("should not return an error", func() {
@@ -151,7 +151,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 
 			configBundleSecretName = updatedQuayRegistry.Spec.ConfigBundleSecret
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Requeue).To(BeFalse())
@@ -178,7 +178,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 
 			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 		})
 
 		It("should not return an error", func() {
@@ -221,7 +221,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
 			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 		})
 
 		It("does not return an error", func() {
@@ -281,7 +281,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 
 			Expect(k8sClient.Status().Update(context.Background(), quayRegistry)).To(Succeed())
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 		})
 
 		It("does not attempt an upgrade", func() {
@@ -309,7 +309,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 
 			Expect(k8sClient.Status().Update(context.Background(), quayRegistry)).To(Succeed())
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 		})
 
 		It("successfully performs an upgrade", func() {
@@ -340,7 +340,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 
 			Expect(k8sClient.Status().Update(context.Background(), quayRegistry)).To(Succeed())
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 		})
 
 		It("does not attempt an upgrade", func() {
@@ -368,7 +368,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
 			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayRegistryName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 		})
 
 		It("does not return an error", func() {

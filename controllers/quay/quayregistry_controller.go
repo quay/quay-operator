@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -78,8 +77,7 @@ type QuayRegistryReconciler struct {
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
 
-func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("quayregistry", req.NamespacedName)
 
 	log.Info("begin reconcile")
@@ -404,7 +402,7 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 }
 
 // updateGrafanaDashboardData parses the Grafana Dashboard ConfigMap and updates the title and labels to filter the query by
-func updateGrafanaDashboardData(obj k8sruntime.Object, quayName string, quayNamespace string) (k8sruntime.Object, error) {
+func updateGrafanaDashboardData(obj client.Object, quayName string, quayNamespace string) (client.Object, error) {
 	updatedObj := obj.DeepCopyObject()
 	configMapObj := updatedObj.(*corev1.ConfigMap)
 
@@ -432,14 +430,14 @@ func updateGrafanaDashboardData(obj k8sruntime.Object, quayName string, quayName
 }
 
 // updateResourceNamespace updates an Object's namespace replacing the existing namespace
-func updateResourceNamespace(obj k8sruntime.Object, newNamespace string) k8sruntime.Object {
-	updatedObj := obj.DeepCopyObject()
-	updatedObj.(*corev1.ConfigMap).SetNamespace(newNamespace)
-	return updatedObj
+func updateResourceNamespace(obj client.Object, newNamespace string) client.Object {
+	obj.(*corev1.ConfigMap).SetNamespace(newNamespace)
+
+	return obj
 }
 
 // isGrafanaConfigMap checks if an Object is the Grafana ConfigMap used in the monitoring component
-func isGrafanaConfigMap(obj k8sruntime.Object) bool {
+func isGrafanaConfigMap(obj client.Object) bool {
 	configMapGVK := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
 
 	return configMapGVK == obj.GetObjectKind().GroupVersionKind() &&
@@ -459,7 +457,7 @@ func decode(bytes []byte) interface{} {
 	return value
 }
 
-func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k8sruntime.Object, quay v1.QuayRegistry) error {
+func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj client.Object, quay v1.QuayRegistry) error {
 	objectMeta, _ := meta.Accessor(obj)
 	groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
 
