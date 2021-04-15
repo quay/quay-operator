@@ -26,13 +26,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.inputs.branch }}
       - name: Changelog
+        shell: bash
         run: |
           curl -o /tmp/git-chglog.tar.gz -fsSL\
             https://github.com/git-chglog/git-chglog/releases/download/v0.14.0/git-chglog_0.14.0_linux_amd64.tar.gz
           tar xvf /tmp/git-chglog.tar.gz --directory /tmp
           chmod u+x /tmp/git-chglog
           echo "creating change log for tag: ${{ github.event.inputs.tag }}"
-          /tmp/git-chglog --tag-filter-pattern "v3.*" -o CHANGELOG.md v3.6.0-alpha.4..
+          /tmp/git-chglog --tag-filter-pattern "v3.*" -o CHANGELOG.md v3.6.0-alpha.1..
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v3.5.1
         with:

@@ -1,5 +1,5 @@
 ## Red Hat Quay Release Notes
-(Red Hat Customer Portal)[https://access.redhat.com/documentation/en-us/red_hat_quay/3.5/html/red_hat_quay_release_notes/index]
+(Red Hat Customer Portal)[https://access.redhat.com/documentation/en-us/red_hat_quay/3/html/red_hat_quay_release_notes/index]
 
 {{ range .Versions }}
 <a name="{{ .Tag.Name }}"></a>
@@ -45,6 +45,3 @@
 {{ end -}}
 {{ end -}}
 {{ end -}}
-
-## Historical Changelog
-[CHANGELOG.md](https://github.com/quay/quay/blob/96b17b8338fb10ca2ed12e9bc920dcbba148289c/CHANGELOG.md)
