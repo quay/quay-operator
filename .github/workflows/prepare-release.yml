@@ -34,6 +34,10 @@ jobs:
           chmod u+x /tmp/git-chglog
           echo "creating change log for tag: ${{ github.event.inputs.tag }}"
           /tmp/git-chglog --tag-filter-pattern "v3.*" -o CHANGELOG.md v3.6.0-alpha.2..
+      - name: Version bundle
+        env:
+          RELEASE: ${{ github.event.inputs.tag }}
+        run: make prepare-release
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v3.5.1
         with:
