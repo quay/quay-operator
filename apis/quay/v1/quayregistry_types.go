@@ -29,6 +29,8 @@ import (
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
+var GroupVersionKind = metav1.GroupVersionKind{Group: "quay.redhat.com", Version: "v1", Kind: "QuayRegistry"}
+
 type QuayVersion string
 
 var QuayVersionCurrent QuayVersion = QuayVersion(os.Getenv("QUAY_VERSION"))

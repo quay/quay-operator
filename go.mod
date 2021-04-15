@@ -1,6 +1,6 @@
 module github.com/quay/quay-operator
 
-go 1.12
+go 1.16
 
 require (
 	github.com/coreos/prometheus-operator v0.28.0

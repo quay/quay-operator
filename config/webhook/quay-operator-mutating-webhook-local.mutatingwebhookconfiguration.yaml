@@ -1,0 +1,39 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: quay-operator-mutating-webhook-local
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+  - name: mutating.quayregistries.quay.redhat.com
+    sideEffects: None
+    clientConfig:
+      # NOTE: Replace with output of `ngrok tcp 9443`
+      # url: 'https://6.tcp.ngrok.io:11863/mutate'
+      # NOTE: You could alternatively create a `Service` of `type: ExternalName` which points to the `ngrok` endpoint
+      service:
+        name: quay-operator-dev
+        namespace: projquay-1838
+        path: /mutate
+        port: tcp
+    reinvocationPolicy: Never
+    rules:
+      - operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        apiGroups:
+          - quay.redhat.com
+        apiVersions:
+          - v1
+        resources:
+          - quayregistries
+        scope: '*'
+    matchPolicy: Equivalent
+    namespaceSelector: {}
+    admissionReviewVersions:
+      - v1
+      - v1beta1
+    failurePolicy: Fail
+    objectSelector: {}
+    timeoutSeconds: 10

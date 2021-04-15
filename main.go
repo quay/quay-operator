@@ -44,6 +44,7 @@ var (
 
 const (
 	operatorPort = 7071
+	webhookPort  = 9443
 )
 
 func init() {
@@ -58,11 +59,14 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var namespace string
+	var certDir string
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&namespace, "namespace", "", "The Kubernetes namespace that the controller will watch.")
+	flag.StringVar(&certDir, "cert-dir", "", "Path to directory containing TLS certificates for webhook and reconfiguration endpoints.")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -70,10 +74,11 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
-		Port:               9443,
+		Port:               webhookPort,
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "7daa4ab6.quay.redhat.com",
 		Namespace:          namespace,
+		CertDir:            certDir,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -81,10 +86,10 @@ func main() {
 	}
 
 	if err = (&quaycontroller.QuayRegistryReconciler{
-		Client:        mgr.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("QuayRegistry"),
-		Scheme:        mgr.GetScheme(),
-		EventRecorder: mgr.GetEventRecorderFor("quayregistry-controller"),
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("QuayRegistry"),
+		Scheme:         mgr.GetScheme(),
+		EventRecorder:  mgr.GetEventRecorderFor("quayregistry-controller"),
 		WatchNamespace: namespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistry")
@@ -99,6 +104,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayEcosystem")
 		os.Exit(1)
 	}
+
+	if err = quay.SetupWebhooks(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "QuayRegistryValidator")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting server on port 7071")
