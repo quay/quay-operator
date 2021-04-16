@@ -99,6 +99,39 @@ var kustomizationForTests = []struct {
 		},
 		"",
 	},
+	{
+		"ComponentImageOverridesWithTag",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{},
+		&types.Kustomization{
+			TypeMeta: types.TypeMeta{
+				APIVersion: types.KustomizationVersion,
+				Kind:       types.KustomizationKind,
+			},
+			Resources: []string{},
+			Components: []string{
+				"../components/postgres",
+				"../components/clair",
+				"../components/redis",
+			},
+			Images: []types.Image{
+				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
+				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
+				{Name: "centos/redis-32-centos7", NewName: "redis", NewTag: "buster"},
+				{Name: "centos/postgresql-10-centos7", NewName: "postgres", NewTag: "latest"},
+			},
+			SecretGenerator: []types.SecretArgs{},
+		},
+		"",
+	},
 }
 
 func TestKustomizationFor(t *testing.T) {
@@ -107,7 +140,11 @@ func TestKustomizationFor(t *testing.T) {
 	for _, test := range kustomizationForTests {
 		if test.expected != nil {
 			for _, img := range test.expected.Images {
-				os.Setenv("RELATED_IMAGE_COMPONENT_"+strings.ToUpper(img.NewName), img.NewName+"@"+img.Digest)
+				if len(img.Digest) != 0 {
+					os.Setenv("RELATED_IMAGE_COMPONENT_"+strings.ToUpper(img.NewName), img.NewName+"@"+img.Digest)
+				} else {
+					os.Setenv("RELATED_IMAGE_COMPONENT_"+strings.ToUpper(img.NewName), img.NewName+":"+img.NewTag)
+				}
 			}
 		}
 

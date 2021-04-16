@@ -70,12 +70,15 @@ func componentImageFor(component v1.ComponentKind) types.Image {
 	}
 	image := os.Getenv(envVarFor[component])
 	if image != "" {
-		if len(strings.Split(image, "@")) != 2 {
-			panic(envVarFor[component] + " must use manifest digest reference")
+		if len(strings.Split(image, "@")) == 2 {
+			imageOverride.NewName = strings.Split(image, "@")[0]
+			imageOverride.Digest = strings.Split(image, "@")[1]
+		} else if len(strings.Split(image, ":")) == 2 {
+			imageOverride.NewName = strings.Split(image, ":")[0]
+			imageOverride.NewTag = strings.Split(image, ":")[1]
+		} else {
+			panic("image override must be reference by tag or manifest digest: " + image)
 		}
-
-		imageOverride.NewName = strings.Split(image, "@")[0]
-		imageOverride.Digest = strings.Split(image, "@")[1]
 	}
 
 	return imageOverride
@@ -315,9 +318,8 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 	images := []types.Image{}
 	for _, component := range append(quay.Spec.Components, v1.Component{Kind: "base", Managed: true}) {
 		if component.Managed {
-			imageOverride := componentImageFor(component.Kind)
-			if imageOverride.Digest != "" {
-				images = append(images, imageOverride)
+			if image := componentImageFor(component.Kind); image.NewName != "" || image.Digest != "" {
+				images = append(images, componentImageFor(component.Kind))
 			}
 		}
 	}
