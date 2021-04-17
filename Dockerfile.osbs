@@ -12,7 +12,7 @@ FROM registry.redhat.io/ubi8:latest
 
 LABEL com.redhat.component="quay-operator-container"
 LABEL name="quay/quay-operator-rhel8"
-LABEL version="v3.5.0"
+LABEL version="v3.5.1"
 LABEL display-name="Red Hat Quay Operator"
 LABEL io.k8s.display-name="Red Hat Quay Operator"
 LABEL summary="Red Hat Quay Operator"
