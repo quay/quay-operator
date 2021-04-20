@@ -11,7 +11,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbac "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -205,8 +204,6 @@ func TestFlattenSecret(t *testing.T) {
 
 var quayComponents = map[string][]client.Object{
 	"base": {
-		&rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: "quay-serviceaccount"}},
-		&rbac.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "quay-secret-writer"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
@@ -216,6 +213,7 @@ var quayComponents = map[string][]client.Object{
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cluster-service-ca"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor-credentials"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-registry-managed-secret-keys"}},
+		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 	},
 	"clair": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clair-config-secret"}},
