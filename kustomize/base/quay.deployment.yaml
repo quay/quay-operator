@@ -14,6 +14,7 @@ spec:
       labels:
         quay-component: quay-app
     spec:
+      serviceAccountName: quay-app
       volumes:
         - name: configvolume
           secret:

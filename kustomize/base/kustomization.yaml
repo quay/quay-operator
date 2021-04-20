@@ -4,8 +4,7 @@ kind: Kustomization
 commonLabels:
   app: quay
 resources: 
-  - ./quay.role.yaml
-  - ./quay.rolebinding.yaml
+  - ./quay.serviceaccount.yaml
   - ./quay.deployment.yaml
   - ./quay.service.yaml
   - ./upgrade.deployment.yaml
