@@ -223,6 +223,7 @@ var quayComponents = map[string][]client.Object{
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
+		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
 	},
 	"postgres": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "postgres-bootstrap"}},
@@ -236,6 +237,7 @@ var quayComponents = map[string][]client.Object{
 	"redis": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
+		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
 	},
 	"objectstorage": {
 		&objectbucket.ObjectBucketClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-datastorage"}},

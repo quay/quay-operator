@@ -16,6 +16,7 @@ spec:
       labels:
         quay-component: quay-mirror
     spec:
+      serviceAccountName: quay-app
       volumes:
         - name: configvolume
           secret:
