@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	prometheusv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
@@ -131,6 +132,16 @@ func decode(bytes []byte) interface{} {
 	_ = yaml.Unmarshal(bytes, &value)
 
 	return value
+}
+
+// EnsureCreationOrder sorts the given slice of Kubernetes objects so that
+// when created in order, `Deployments` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
+func EnsureCreationOrder(objects []client.Object) []client.Object {
+	sort.Slice(objects, func(i, j int) bool {
+		return objects[i].GetObjectKind().GroupVersionKind().String() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}.String()
+	})
+
+	return objects
 }
 
 // ModelFor returns an empty Kubernetes object instance for the given `GroupVersionKind`.
