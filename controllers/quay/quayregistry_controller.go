@@ -272,7 +272,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	for _, obj := range deploymentObjects {
+	for _, obj := range kustomize.EnsureCreationOrder(deploymentObjects) {
 		// For metrics and dashboards to work, we need to deploy the Grafana ConfigMap
 		// in the `openshift-config-managed` namespace and add the label
 		// `openshift.io/cluster-monitoring: true` to the registry namespace
