@@ -13,8 +13,8 @@ on:
         rdequired: true
       quay_release:
         description: 'version of quay (eg. v3.6.0)'
-        default: ''
-      quay_release:
+        default: 'v3.6.0-alpha.8'
+      clair_release:
         description: 'version of clair (eg. 4.0.5)'
         default: '4.0.5'
       jira:
@@ -43,7 +43,7 @@ jobs:
         env:
           RELEASE: ${{ github.event.inputs.tag }}
         run: |
-          make prepare-release RELEASE="${RELEASE#v}"
+          make prepare-release RELEASE="${RELEASE#v}" QUAY_RELEASE="${{ github.event.inputs.quay_release }}" CLAIR_RELEASE="${{ github.event.inputs.clair_release }}"
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v3.5.1
         with:
