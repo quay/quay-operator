@@ -2,9 +2,11 @@
 (Red Hat Customer Portal)[https://access.redhat.com/documentation/en-us/red_hat_quay/3/html/red_hat_quay_release_notes/index]
 
 
-<a name="v3.6.0-alpha.5"></a>
-## [v3.6.0-alpha.5] - 2021-04-20
+<a name="v3.6.0-alpha.4"></a>
+## [v3.6.0-alpha.4] - 2021-04-23
 ### Chore
+- [9ce1df7](https://github.com/quay/quay-operator/commit/9ce1df7fcd5055ac39d70ebb7fccd97c94b0e6e4): set quay and clair releases (PROJQUAY-1486)
+- [0b22f4d](https://github.com/quay/quay-operator/commit/0b22f4dd5cc449d655526bdd4d8f8bfbda5873ca): fix chglog params (PROJQUAY-1486)
 - [5b4bf55](https://github.com/quay/quay-operator/commit/5b4bf556135a301a9b9c34f4553e56cc606634e6): correct version sent to prepare-release (PROJQUAY-1486)
 - [337ac92](https://github.com/quay/quay-operator/commit/337ac924207b870f46c74fcb0ddddf793c4625b7): correct version sent to prepare-release (PROJQUAY-1486)
 - [ea63cf5](https://github.com/quay/quay-operator/commit/ea63cf514330f8c914eca320d22d59aa58786d39): correct version sent to prepare-release (PROJQUAY-1486)
@@ -14,8 +16,14 @@
 ### Feature
 - [c58d804](https://github.com/quay/quay-operator/commit/c58d80472d7a2bab69ccf0dc18f0049d115201aa): Allow image tags to be used in place of digest (PROJQUAY-1890)
 ### Kustomize
+- [558f167](https://github.com/quay/quay-operator/commit/558f1670eec919859b0f6ec5bf2918bdc6e8d482): prevent race conditions by sorting k8s objects before creation (PROJQUAY-1915)
+- [e2978f5](https://github.com/quay/quay-operator/commit/e2978f591a08126ca0d764fafc8e135f02a4e273): add ServiceAccounts for managed components (PROJQUAY-1909)
 - [51859ca](https://github.com/quay/quay-operator/commit/51859ca093ffd8b743e78fa2ccdfda344f5dee28): use separate ServiceAccount for Quay app pods (PROJQUAY-1909)
 ### Pull Requests
+- Merge pull request [#449](https://github.com/quay/quay-operator/issues/449) from thomasmckay/1486-prepare-release
+- Merge pull request [#448](https://github.com/quay/quay-operator/issues/448) from thomasmckay/1486-fix-makefile-4
+- Merge pull request [#446](https://github.com/quay/quay-operator/issues/446) from alecmerdler/PROJQUAY-1915
+- Merge pull request [#445](https://github.com/quay/quay-operator/issues/445) from alecmerdler/PROJQUAY-1909
 - Merge pull request [#444](https://github.com/quay/quay-operator/issues/444) from alecmerdler/PROJQUAY-1909
 - Merge pull request [#443](https://github.com/quay/quay-operator/issues/443) from thomasmckay/1486-fix-makefile-3
 - Merge pull request [#441](https://github.com/quay/quay-operator/issues/441) from thomasmckay/1486-fix-makefile-2
@@ -45,7 +53,7 @@
 - Merge pull request [#428](https://github.com/quay/quay-operator/issues/428) from thomasmckay/1486-release-1
 
 
-[Unreleased]: https://github.com/quay/quay-operator/compare/v3.6.0-alpha.5...HEAD
-[v3.6.0-alpha.5]: https://github.com/quay/quay-operator/compare/v3.6.0-alpha.3...v3.6.0-alpha.5
+[Unreleased]: https://github.com/quay/quay-operator/compare/v3.6.0-alpha.4...HEAD
+[v3.6.0-alpha.4]: https://github.com/quay/quay-operator/compare/v3.6.0-alpha.3...v3.6.0-alpha.4
 [v3.6.0-alpha.3]: https://github.com/quay/quay-operator/compare/v3.6.0-alpha.2...v3.6.0-alpha.3
 [v3.6.0-alpha.2]: https://github.com/quay/quay-operator/compare/v3.6.0-alpha.1...v3.6.0-alpha.2
