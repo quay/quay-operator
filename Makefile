@@ -79,8 +79,10 @@ else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
-# Same commands as in the prepare-release github action. When bumping to a new y-stream, update
-# both this Makefile and the github action.
+# This target called from the prepare-release github action.
+# RELEASE       - quay-operator tag (eg. v3.6.0-alpha.4)
+# QUAY_RELEASE  - quay version
+# CLAIR_RELEASE - clair version
 prepare-release:
 	sed -i "s/createdAt:.*/createdAt: `date --utc +'%Y-%m-%d %k:%m UTC'`/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
 	sed -i "s/olm\.skipRange:.*/olm\.skipRange: \">=3.5.x <$(RELEASE)\"/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
@@ -88,7 +90,8 @@ prepare-release:
 	sed -i "s/containerImage:.*/containerImage: quay.io\/projectquay\/quay-operator:v$(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
 	sed -i "s/^  name: quay-operator.*/  name: quay-operator.v$(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
 	sed -i "s/image: quay.io\/projectquay\/quay-operator.*/image: quay.io\/projectquay\/quay-operator:v$(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/value: quay.io\/projectquay\/quay:.*/value: quay.io\/projectquay\/quay:v$(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
+	sed -i "s/value: quay.io\/projectquay\/quay:.*/value: quay.io\/projectquay\/quay:$(QUAY_RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
+	sed -i "s/value: quay.io\/projectquay\/clair:.*/value: quay.io\/projectquay\/clair:$(CLAIR_RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
 	sed -i "s/^  version: .*/  version: $(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
 ifneq (,$(findstring alpha,$(RELEASE)))
 	sed -i "s/operators.operatorframework.io.bundle.channel.default.v1.*/operators.operatorframework.io.bundle.channel.default.v1: preview-3.6/" bundle/upstream/metadata/annotations.yaml
