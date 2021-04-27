@@ -64,6 +64,8 @@ var requiredComponents = []ComponentKind{
 	ComponentRoute,
 }
 
+const ManagedKeysName = "quay-registry-managed-secret-keys"
+
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
 	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace which contains the base Quay config and extra certs.
@@ -375,8 +377,6 @@ func RemoveOwnerReference(quay *QuayRegistry, obj client.Object) (client.Object,
 
 	return obj, nil
 }
-
-const ManagedKeysName = "quay-registry-managed-secret-keys"
 
 // ManagedKeysSecretNameFor returns the name of the `Secret` in which generated secret keys are stored.
 func ManagedKeysSecretNameFor(quay *QuayRegistry) string {

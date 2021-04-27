@@ -2,7 +2,6 @@ package kustomize
 
 import (
 	"fmt"
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,7 +79,9 @@ var fieldGroupForTests = []struct {
 		"postgres",
 		"postgres",
 		quayRegistry("test"),
-		quaycontext.QuayRegistryContext{},
+		quaycontext.QuayRegistryContext{
+			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
+		},
 		&database.DatabaseFieldGroup{
 			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
 			DbConnectionArgs: &database.DbConnectionArgsStruct{
@@ -168,15 +169,6 @@ func TestFieldGroupFor(t *testing.T) {
 
 			assert.True(len(secscanFieldGroup.SecurityScannerV4PSK) > 0, test.name)
 			secscanFieldGroup.SecurityScannerV4PSK = "abc123"
-		} else if test.name == "postgres" {
-			databaseFieldGroup := fieldGroup.(*database.DatabaseFieldGroup)
-			dbURI, err := url.Parse(databaseFieldGroup.DbUri)
-			assert.Nil(err, test.name)
-
-			password, _ := dbURI.User.Password()
-			assert.True(len(password) > 0, test.name)
-			dbURI.User = url.UserPassword(dbURI.User.Username(), "postgres")
-			databaseFieldGroup.DbUri = dbURI.String()
 		}
 
 		expected, err := yaml.Marshal(test.expected)

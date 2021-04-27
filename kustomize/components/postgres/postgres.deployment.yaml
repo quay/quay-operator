@@ -6,8 +6,6 @@ metadata:
     quay-component: postgres
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       quay-component: postgres

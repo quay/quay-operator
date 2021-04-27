@@ -389,6 +389,26 @@ var inflateTests = []struct {
 		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
 		nil,
 	},
+	{
+		"PostgresManagedDbUriExists",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{
+			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
+		},
+		&corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+			},
+		},
+		withComponents([]string{"base", "postgres"}),
+		nil,
+	},
 }
 
 func TestInflate(t *testing.T) {
@@ -421,11 +441,32 @@ func TestInflate(t *testing.T) {
 			if strings.Contains(objectMeta.GetName(), v1.ManagedKeysSecretNameFor(test.quayRegistry)) {
 				managedKeys := obj.(*corev1.Secret)
 
-				assert.Equal(test.ctx.DatabaseSecretKey, string(managedKeys.Data["DATABASE_SECRET_KEY"]), test.name)
-				assert.Equal(test.ctx.SecretKey, string(managedKeys.Data["SECRET_KEY"]), test.name)
+				if test.ctx.DatabaseSecretKey == "" {
+					assert.Greater(len(string(managedKeys.Data["DATABASE_SECRET_KEY"])), 0, test.name)
+					assert.Greater(len(config["DATABASE_SECRET_KEY"].(string)), 0, test.name)
+				} else {
+					assert.Equal(test.ctx.DatabaseSecretKey, string(managedKeys.Data["DATABASE_SECRET_KEY"]), test.name)
+					assert.Equal(test.ctx.DatabaseSecretKey, config["DATABASE_SECRET_KEY"], test.name)
+				}
+				assert.Equal(string(managedKeys.Data["DATABASE_SECRET_KEY"]), config["DATABASE_SECRET_KEY"], test.name)
 
-				assert.Equal(test.ctx.DatabaseSecretKey, config["DATABASE_SECRET_KEY"], test.name)
-				assert.Equal(test.ctx.SecretKey, config["SECRET_KEY"], test.name)
+				if test.ctx.SecretKey == "" {
+					assert.Greater(len(string(managedKeys.Data["SECRET_KEY"])), 0, test.name)
+					assert.Greater(len(config["SECRET_KEY"].(string)), 0, test.name)
+				} else {
+					assert.Equal(test.ctx.SecretKey, string(managedKeys.Data["SECRET_KEY"]), test.name)
+					assert.Equal(test.ctx.SecretKey, config["SECRET_KEY"], test.name)
+				}
+				assert.Equal(string(managedKeys.Data["SECRET_KEY"]), config["SECRET_KEY"], test.name)
+
+				if test.ctx.DbUri == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentPostgres) {
+					assert.Greater(len(string(managedKeys.Data["DB_URI"])), 0, test.name)
+					assert.Greater(len(config["DB_URI"].(string)), 0, test.name)
+				} else {
+					assert.Equal(test.ctx.DbUri, string(managedKeys.Data["DB_URI"]), test.name)
+					assert.Equal(test.ctx.DbUri, config["DB_URI"], test.name)
+				}
+				assert.Equal(string(managedKeys.Data["DB_URI"]), config["DB_URI"], test.name)
 			}
 		}
 	}

@@ -30,8 +30,7 @@ import (
 var underTest = false
 
 const (
-	secretKeySecretName = "quay-registry-managed-secret-keys"
-	secretKeyLength     = 80
+	secretKeyLength = 80
 
 	clairService = "clair-app"
 	// FIXME: Ensure this includes the `QuayRegistry` name prefix when we add `builder` managed component.
@@ -81,16 +80,8 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 		if err != nil {
 			return nil, err
 		}
-		user := quay.GetName() + "-quay-database"
-		name := quay.GetName() + "-quay-database"
-		host := strings.Join([]string{quay.GetName(), "quay-database"}, "-")
-		port := "5432"
-		password, err := generateRandomString(32)
-		if err != nil {
-			return nil, err
-		}
 
-		fieldGroup.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
+		fieldGroup.DbUri = ctx.DbUri
 
 		return fieldGroup, nil
 	case v1.ComponentObjectStorage:
@@ -150,6 +141,7 @@ func BaseConfig() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
+		"SETUP_COMPLETE":                     true,
 		"FEATURE_MAILING":                    false,
 		"REGISTRY_TITLE":                     registryTitle,
 		"REGISTRY_TITLE_SHORT":               registryTitle,
