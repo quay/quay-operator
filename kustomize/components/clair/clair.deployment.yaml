@@ -38,15 +38,16 @@ spec:
               name: certs
           startupProbe:
             tcpSocket:
-              port: 8080
+              port: clair-intro
             periodSeconds: 10
             failureThreshold: 300
           readinessProbe:
             tcpSocket:
               port: 8080
           livelinessProbe:
-            tcpSocket:
-              port: 8080
+            httpGet:
+              port: clair-intro
+              path: /healthz
       restartPolicy: Always
       volumes:
         - name: config
