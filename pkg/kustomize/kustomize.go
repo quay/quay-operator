@@ -280,6 +280,7 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 					LiteralSources: []string{
 						"DATABASE_SECRET_KEY=" + ctx.DatabaseSecretKey,
 						"SECRET_KEY=" + ctx.SecretKey,
+						"DB_URI=" + ctx.DbUri,
 					},
 				},
 			},
@@ -421,6 +422,7 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 
 	// Generate or pull out the `SECRET_KEY` and `DATABASE_SECRET_KEY`. Since these must be stable across
 	// runs of the same config, we store them (and re-read them) from a specialized `Secret`.
+	// TODO(alecmerdler): Refector these three blocks...
 	if ctx.DatabaseSecretKey == "" {
 		if key, found := parsedUserConfig["DATABASE_SECRET_KEY"]; found {
 			log.Info("`DATABASE_SECRET_KEY` found in user-provided config")
@@ -437,6 +439,7 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 			ctx.DatabaseSecretKey = databaseSecretKey
 		}
 	}
+	parsedUserConfig["DATABASE_SECRET_KEY"] = ctx.DatabaseSecretKey
 
 	if ctx.SecretKey == "" {
 		if key, found := parsedUserConfig["SECRET_KEY"]; found {
@@ -454,10 +457,27 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 			ctx.SecretKey = secretKey
 		}
 	}
-
-	parsedUserConfig["SETUP_COMPLETE"] = true
-	parsedUserConfig["DATABASE_SECRET_KEY"] = ctx.DatabaseSecretKey
 	parsedUserConfig["SECRET_KEY"] = ctx.SecretKey
+
+	if ctx.DbUri == "" && v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) {
+		if _, found := parsedUserConfig["DB_URI"]; found {
+			return nil, fmt.Errorf("`postgres` component marked as managed, but `DB_URI` found in user-provided config")
+		} else {
+			log.Info("`DB_URI` not found in config, generating new one")
+
+			user := quay.GetName() + "-quay-database"
+			name := quay.GetName() + "-quay-database"
+			host := quay.GetName() + "-quay-database"
+			port := "5432"
+			password, err := generateRandomString(secretKeyLength)
+			if err != nil {
+				return nil, err
+			}
+
+			ctx.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
+		}
+	}
+	parsedUserConfig["DB_URI"] = ctx.DbUri
 
 	for field, value := range BaseConfig() {
 		if _, ok := parsedUserConfig[field]; !ok {
