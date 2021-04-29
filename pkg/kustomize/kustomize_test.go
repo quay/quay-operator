@@ -9,6 +9,7 @@ import (
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -219,6 +220,7 @@ var quayComponents = map[string][]client.Object{
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clair-config-secret"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
+		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
@@ -247,6 +249,10 @@ var quayComponents = map[string][]client.Object{
 	},
 	"mirror": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror"}},
+		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror"}},
+	},
+	"horizontalpodautoscaler": {
+		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 	},
 }
 
@@ -277,6 +283,7 @@ var inflateTests = []struct {
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "mirror", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
 				},
 			},
 		},
@@ -288,7 +295,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
+		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler"}),
 		nil,
 	},
 	{
@@ -301,6 +308,7 @@ var inflateTests = []struct {
 					{Kind: "redis", Managed: false},
 					{Kind: "objectstorage", Managed: false},
 					{Kind: "mirror", Managed: false},
+					{Kind: "horizontalpodautoscaler", Managed: false},
 				},
 			},
 		},
