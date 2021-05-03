@@ -159,10 +159,10 @@ func BaseConfig() map[string]interface{} {
 
 // EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for secure communication with clients,
 // and generates a TLS certificate/key pair if they are not provided.
-func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, tlsCert, tlsKey []byte) ([]byte, []byte, error) {
+func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) ([]byte, []byte, error) {
 	fieldGroup, err := FieldGroupFor(ctx, "route", quay)
 	if err != nil {
-		return tlsCert, tlsKey, err
+		return ctx.TLSCert, ctx.TLSKey, err
 	}
 
 	routeFieldGroup := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
@@ -176,17 +176,17 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, t
 		hosts = append(hosts, strings.Split(ctx.BuildManagerHostname, ":")[0])
 	}
 
-	if tlsCert == nil && tlsKey == nil {
+	if ctx.TLSCert == nil || ctx.TLSKey == nil {
 		return cert.GenerateSelfSignedCertKey(routeFieldGroup.ServerHostname, []net.IP{}, hosts)
-	}
-
-	for _, host := range hosts {
-		if valid, validationErr := shared.ValidateCertPairWithHostname(tlsCert, tlsKey, host, fieldGroupNameFor("route")); !valid {
-			return nil, nil, fmt.Errorf("provided certificate/key pair not valid for host '%s': %s", host, validationErr.String())
+	} else {
+		for _, host := range hosts {
+			if valid, validationErr := shared.ValidateCertPairWithHostname(ctx.TLSCert, ctx.TLSKey, host, fieldGroupNameFor("route")); !valid {
+				return nil, nil, fmt.Errorf("provided certificate/key pair not valid for host '%s': %s", host, validationErr.String())
+			}
 		}
 	}
 
-	return tlsCert, tlsKey, nil
+	return ctx.TLSCert, ctx.TLSKey, nil
 }
 
 // ContainsComponentConfig accepts a full `config.yaml` and determines if it contains

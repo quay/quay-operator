@@ -425,9 +425,11 @@ func TestEnsureTLSFor(t *testing.T) {
 		quayContext := quaycontext.QuayRegistryContext{
 			ServerHostname:       test.serverHostname,
 			BuildManagerHostname: test.buildManagerHostname,
+			TLSCert:              test.providedCertKeyPair[0],
+			TLSKey:               test.providedCertKeyPair[1],
 		}
 
-		tlsCert, tlsKey, err := EnsureTLSFor(&quayContext, quayRegistry, test.providedCertKeyPair[0], test.providedCertKeyPair[1])
+		tlsCert, tlsKey, err := EnsureTLSFor(&quayContext, quayRegistry)
 
 		assert.Equal(test.expectedErr, err, test.name)
 

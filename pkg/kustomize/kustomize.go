@@ -287,6 +287,17 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 		},
 		{
 			GeneratorArgs: types.GeneratorArgs{
+				Name: v1.QuayConfigTLSSecretName,
+				KvPairSources: types.KvPairSources{
+					LiteralSources: []string{
+						"ssl.cert=" + string(ctx.TLSCert),
+						"ssl.key=" + string(ctx.TLSKey),
+					},
+				},
+			},
+		},
+		{
+			GeneratorArgs: types.GeneratorArgs{
 				Name: "quay-config-editor-credentials",
 				KvPairSources: types.KvPairSources{
 					LiteralSources: []string{
@@ -499,14 +510,14 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 		}
 	}
 
-	log.Info("Ensuring `ssl.cert` and `ssl.key` pair for Quay app TLS")
-	tlsCert, tlsKey, err := EnsureTLSFor(ctx, quay, baseConfigBundle.Data["ssl.cert"], baseConfigBundle.Data["ssl.key"])
+	log.Info("Ensuring TLS cert/key pair for Quay app")
+	tlsCert, tlsKey, err := EnsureTLSFor(ctx, quay)
 	if err != nil {
 		return nil, err
 	}
 
-	componentConfigFiles["ssl.cert"] = tlsCert
-	componentConfigFiles["ssl.key"] = tlsKey
+	ctx.TLSCert = tlsCert
+	ctx.TLSKey = tlsKey
 
 	kustomization, err := KustomizationFor(ctx, quay, componentConfigFiles)
 	check(err)

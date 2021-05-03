@@ -39,7 +39,11 @@ const (
 	GrafanaDashboardConfigNamespace = "openshift-config-managed"
 )
 
-func (r *QuayRegistryReconciler) checkManagedKeys(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+// FeatureDetection is a method which should return an updated `QuayRegistryContext` after performing a feature detection task.
+// TODO(alecmerdler): Refactor all "feature detection" functions to use a common function interface...
+type FeatureDetection func(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error)
+
+func (r *QuayRegistryReconciler) checkManagedKeys(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
 	var secrets corev1.SecretList
 	listOptions := &client.ListOptions{
 		Namespace: quay.GetNamespace(),
@@ -64,7 +68,62 @@ func (r *QuayRegistryReconciler) checkManagedKeys(ctx *quaycontext.QuayRegistryC
 	return ctx, quay, nil
 }
 
-func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+func (r *QuayRegistryReconciler) checkManagedTLS(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+	providedTLSCert := configBundle["ssl.cert"]
+	providedTLSKey := configBundle["ssl.key"]
+
+	if providedTLSCert != nil && providedTLSKey != nil {
+		r.Log.Info("provided TLS cert/key pair in `configBundleSecret` will be stored in persistent `Secret`")
+		ctx.TLSCert = providedTLSCert
+		ctx.TLSKey = providedTLSKey
+
+		return ctx, quay, nil
+	}
+
+	var secrets corev1.SecretList
+	listOptions := &client.ListOptions{
+		Namespace: quay.GetNamespace(),
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			kustomize.QuayRegistryNameLabel: quay.GetName(),
+		}),
+	}
+
+	if err := r.List(context.Background(), &secrets, listOptions); err != nil {
+		return ctx, quay, err
+	}
+
+	for _, secret := range secrets.Items {
+		if v1.IsManagedTLSSecretFor(quay, &secret) {
+			ctx.TLSCert = secret.Data["ssl.cert"]
+			ctx.TLSKey = secret.Data["ssl.key"]
+			break
+		}
+	}
+
+	if ctx.TLSCert == nil || ctx.TLSKey == nil {
+		r.Log.Info("existing TLS cert/key pair not found, one will be generated")
+	}
+
+	return ctx, quay, nil
+}
+
+func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+	// NOTE: The `route` component is unique because we allow users to set the `SERVER_HOSTNAME` field instead of controlling the entire fieldgroup.
+	// This value is then passed to the created `Route` using a Kustomize variable.
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(configBundle["config.yaml"], &config); err != nil {
+		return ctx, quay, err
+	}
+
+	fieldGroup, err := hostsettings.NewHostSettingsFieldGroup(config)
+	if err != nil {
+		return ctx, quay, err
+	}
+
+	if fieldGroup.ServerHostname != "" {
+		ctx.ServerHostname = fieldGroup.ServerHostname
+	}
+
 	fakeRoute, err := v1.EnsureOwnerReference(quay, &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      quay.GetName() + "-test-route",
@@ -101,21 +160,7 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegis
 			return ctx, quay, err
 		}
 
-		// NOTE: The `route` component is unique because we allow users to set the `SERVER_HOSTNAME` field instead of controlling the entire fieldgroup.
-		// This value is then passed to the created `Route` using a Kustomize variable.
-		var config map[string]interface{}
-		if err := yaml.Unmarshal(rawConfig, &config); err != nil {
-			return ctx, quay, err
-		}
-
-		fieldGroup, err := hostsettings.NewHostSettingsFieldGroup(config)
-		if err != nil {
-			return ctx, quay, err
-		}
-
-		if fieldGroup.ServerHostname != "" {
-			ctx.ServerHostname = fieldGroup.ServerHostname
-		} else {
+		if ctx.ServerHostname == "" {
 			ctx.ServerHostname = strings.Join([]string{
 				strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
 				ctx.ClusterHostname},
@@ -136,7 +181,7 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegis
 	return ctx, quay, nil
 }
 
-func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
 	datastoreName := types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.GetName() + "-quay-datastore"}
 	var objectBucketClaims objectbucket.ObjectBucketClaimList
 	if err := r.Client.List(context.Background(), &objectBucketClaims); err == nil {
@@ -192,9 +237,9 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(ctx *quayconte
 }
 
 // TODO: Improve this once `builds` is a managed component.
-func (r *QuayRegistryReconciler) checkBuildManagerAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+func (r *QuayRegistryReconciler) checkBuildManagerAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
 	var config map[string]interface{}
-	if err := yaml.Unmarshal(rawConfig, &config); err != nil {
+	if err := yaml.Unmarshal(configBundle["config.yaml"], &config); err != nil {
 		return ctx, quay, err
 	}
 
@@ -208,7 +253,7 @@ func (r *QuayRegistryReconciler) checkBuildManagerAvailable(ctx *quaycontext.Qua
 // Validates if the monitoring component can be run. We assume that we are
 // running in an Openshift environment with cluster monitoring enabled for our
 // monitoring component to work
-func (r *QuayRegistryReconciler) checkMonitoringAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, rawConfig []byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+func (r *QuayRegistryReconciler) checkMonitoringAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
 	if len(r.WatchNamespace) > 0 {
 		msg := "monitoring is only supported in AllNamespaces mode. Disabling component monitoring"
 		r.Log.Info(msg)

@@ -64,7 +64,10 @@ var requiredComponents = []ComponentKind{
 	ComponentRoute,
 }
 
-const ManagedKeysName = "quay-registry-managed-secret-keys"
+const (
+	ManagedKeysName         = "quay-registry-managed-secret-keys"
+	QuayConfigTLSSecretName = "quay-config-tls"
+)
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
@@ -385,6 +388,10 @@ func ManagedKeysSecretNameFor(quay *QuayRegistry) string {
 
 func IsManagedKeysSecretFor(quay *QuayRegistry, secret *corev1.Secret) bool {
 	return strings.Contains(secret.GetName(), quay.GetName()+"-"+ManagedKeysName)
+}
+
+func IsManagedTLSSecretFor(quay *QuayRegistry, secret *corev1.Secret) bool {
+	return strings.Contains(secret.GetName(), quay.GetName()+"-"+QuayConfigTLSSecretName)
 }
 
 func init() {

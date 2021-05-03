@@ -18,14 +18,19 @@ spec:
     spec:
       serviceAccountName: quay-app
       volumes:
-        - name: configvolume
-          secret:
-            secretName: quay-config-secret
+        - name: config
+          projected:
+            sources:
+            - secret:
+                name: quay-config-secret
+            - secret:
+                name: quay-config-tls
         - name: extra-ca-certs
           projected:
             sources:
               - configMap:
                   name: cluster-service-ca
+              # FIXME(alecmerdler): Have this read from `quay-config-tls` instead...
               - secret:
                   name: quay-config-secret
                   items:
@@ -78,7 +83,7 @@ spec:
               port: 8443
               scheme: HTTPS
           volumeMounts:
-            - name: configvolume
+            - name: config
               readOnly: false
               mountPath: /conf/stack
             - name: extra-ca-certs
