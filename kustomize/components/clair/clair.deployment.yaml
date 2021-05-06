@@ -16,7 +16,7 @@ spec:
     spec:
       serviceAccountName: clair-app
       containers:
-        - image: quay.io/projectquay/clair@sha256:5fec3cf459159eabe2e4e1089687e25f638183a7e9bed1ecea8724e0597f8a14
+        - image: quay.io/projectquay/clair@sha256:77ffab0e44458d5725f2e9e5f2f57bda74b3bd073030611ca7cf5d753130c858
           imagePullPolicy: IfNotPresent
           name: clair-app
           env:

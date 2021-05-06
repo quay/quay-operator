@@ -27,7 +27,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - redhatcop.redhat.io.quay.redhat.com
+  - redhatcop.redhat.io
   resources:
   - quayecosystems
   verbs:
@@ -39,7 +39,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - redhatcop.redhat.io.quay.redhat.com
+  - redhatcop.redhat.io
   resources:
   - quayecosystems/status
   verbs:

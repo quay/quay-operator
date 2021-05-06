@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package v1alpha1 contains API Schema definitions for the redhatcop.redhat.io v1alpha1 API group
 // +kubebuilder:object:generate=true
-// +groupName=redhatcop.redhat.io.quay.redhat.com
+// +groupName=redhatcop.redhat.io
 package v1alpha1
 
 import (

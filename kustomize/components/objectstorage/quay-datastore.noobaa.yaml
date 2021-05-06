@@ -4,11 +4,12 @@ metadata:
   name: noobaa
   namespace: openshift-storage
 spec:
- dbResources:
-   requests:
-     cpu: '0.1'
-     memory: 1Gi
- coreResources:
-   requests:
-     cpu: '0.1'
-     memory: 1Gi
+  dbType: postgres
+  dbResources:
+    requests:
+      cpu: '0.1'
+      memory: 1Gi
+  coreResources:
+    requests:
+      cpu: '0.1'
+      memory: 1Gi

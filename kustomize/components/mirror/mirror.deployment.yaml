@@ -30,25 +30,24 @@ spec:
             sources:
               - configMap:
                   name: cluster-service-ca
-              # FIXME(alecmerdler): Have this read from `quay-config-tls` instead...
               - secret:
-                  name: quay-config-secret
+                  name: quay-config-tls
                   items:
                     - key: ssl.cert
                       path: quay-ssl.cert
       initContainers:
         - name: quay-mirror-init
-          image: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
+          image: quay.io/projectquay/quay@sha256:5660d7174218e1cb21bf6ef406602dbe8c01c878c630a9f310fe3e5560d4c2cd
           command:
             - /bin/sh
             - -c
-            - curl $QUAY_APP_SERVICE_HOST
+            - curl $QUAY_APP_SERVICE_HOST --connect-timeout 360
           env:
             - name: QUAY_APP_SERVICE_HOST
               value: $(QUAY_APP_SERVICE_HOST)
       containers:
         - name: quay-mirror
-          image: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
+          image: quay.io/projectquay/quay@sha256:5660d7174218e1cb21bf6ef406602dbe8c01c878c630a9f310fe3e5560d4c2cd
           command: ["/quay-registry/quay-entrypoint.sh"]
           args: ["repomirror-nomigrate"]
           env:
