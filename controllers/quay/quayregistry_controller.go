@@ -603,7 +603,6 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// patchNamespaceForMonitoring Adds the cluster-monitoring label to the namespace if needed
 func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(ctx context.Context, quay v1.QuayRegistry) error {
 	var ns corev1.Namespace
 	err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
@@ -618,9 +617,6 @@ func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(ctx context.Context
 		labels[k] = v
 	}
 
-	// We only add the `cluster-monitoring` label when it's not already present. In this case
-	// We also add another label to make sure we clean up correctly
-	// i.e remove the label only when we added it
 	if val, ok := labels[ClusterMonitoringLabelKey]; !ok || val != "true" {
 		labels[ClusterMonitoringLabelKey] = "true"
 		labels[QuayOperatorManagedLabelKey] = "true"
@@ -634,8 +630,6 @@ func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(ctx context.Context
 	return nil
 }
 
-// cleanupNamespaceLabels Cleans up the monitoring label if we added it on the namespace
-// This runs as part of the finalizer which is invoked when a registry is deleted
 func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, quay *v1.QuayRegistry) error {
 	var ns corev1.Namespace
 	err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
@@ -653,7 +647,6 @@ func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, qua
 		return err
 	}
 
-	// Only update if we had initially added the label and this is the last QuayRegistry in the namespace
 	if ns.Labels != nil && ns.Labels[QuayOperatorManagedLabelKey] != "" && len(quayRegistryList.Items) == 1 {
 		updatedNs := ns.DeepCopy()
 		labels := make(map[string]string)
@@ -672,30 +665,42 @@ func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, qua
 	return nil
 }
 
-// cleanupGrafanaConfigMap cleans up the monitoring config map that is created in the `openshift-config-managed` namespace
-// This runs as part of the finalizer which is invoked when a registry is deleted
 func (r *QuayRegistryReconciler) cleanupGrafanaConfigMap(ctx context.Context, quay *v1.QuayRegistry) error {
 	var grafanaConfigMap corev1.ConfigMap
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetName() + "-" + GrafanaDashboardConfigMapNameSuffix, Namespace: GrafanaDashboardConfigNamespace}, &grafanaConfigMap); err == nil || !errors.IsNotFound(err) {
+	grafanaConfigMapName := types.NamespacedName{
+		Name:      quay.GetName() + "-" + GrafanaDashboardConfigMapNameSuffix,
+		Namespace: GrafanaDashboardConfigNamespace}
+
+	if err := r.Client.Get(ctx, grafanaConfigMapName, &grafanaConfigMap); err == nil || !errors.IsNotFound(err) {
 		return r.Client.Delete(ctx, &grafanaConfigMap)
 	}
+
 	return nil
 }
 
-// finalizeQuay runs the Cleanup operations when a `QuayRegistry` is deleted
 func (r *QuayRegistryReconciler) finalizeQuay(ctx context.Context, quay *v1.QuayRegistry) error {
+	// NOTE: `controller-runtime` hangs rather than return "forbidden" error if insufficient RBAC permissions, so we use `WatchNamespace` to skip (https://github.com/kubernetes-sigs/controller-runtime/issues/550).
+	if r.WatchNamespace != "" {
+		r.Log.Info("not running in all-namespaces mode, skipping finalizer step: namespace label cleanup")
+	} else {
+		r.Log.Info("cleaning up namespace labels")
 
-	r.Log.Info("cleaning up namespace labels")
-	if err := r.cleanupNamespaceLabels(ctx, quay); err != nil {
-		return err
+		if err := r.cleanupNamespaceLabels(ctx, quay); err != nil {
+			return err
+		}
+		r.Log.Info("successfully cleaned up namespace labels")
 	}
-	r.Log.Info("successfully cleaned up namespace labels")
 
-	r.Log.Info("cleaning up grafana config map")
-	if err := r.cleanupGrafanaConfigMap(ctx, quay); err != nil {
-		return err
+	// NOTE: `controller-runtime` hangs rather than return "forbidden" error if insufficient RBAC permissions, so we use `WatchNamespace` to skip (https://github.com/kubernetes-sigs/controller-runtime/issues/550).
+	if r.WatchNamespace != "" {
+		r.Log.Info("not running in all-namespaces mode, skipping finalizer step: Grafana `ConfigMap` cleanup")
+	} else {
+		r.Log.Info("cleaning up Grafana `ConfigMap`")
+		if err := r.cleanupGrafanaConfigMap(ctx, quay); err != nil {
+			return err
+		}
+		r.Log.Info("successfully cleaned up grafana config map")
 	}
-	r.Log.Info("successfully cleaned up grafana config map")
 
 	return nil
 }
