@@ -1,9 +1,8 @@
 package kustomize
 
 import (
-	"net"
+	"fmt"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -319,94 +318,106 @@ func TestContainsComponentConfig(t *testing.T) {
 	}
 }
 
+func certKeyPairFor(hostname string, alternateHostnames []string) [][]byte {
+	cert, key, err := cert.GenerateSelfSignedCertKey(hostname, nil, alternateHostnames)
+	if err != nil {
+		panic(err)
+	}
+
+	return [][]byte{cert, key}
+}
+
+var ensureTLSForTests = []struct {
+	name                 string
+	routeManaged         bool
+	serverHostname       string
+	buildManagerHostname string
+	providedCertKeyPair  [][]byte
+	expectedErr          error
+}{
+	{
+		"ManagedRouteNoHostnameNoCerts",
+		true,
+		"",
+		"",
+		[][]byte{nil, nil},
+		nil,
+	},
+	{
+		"ManagedRouteProvidedHostnameProvidedIncorrectCerts",
+		true,
+		"registry.company.com",
+		"",
+		certKeyPairFor("nonexistent.company.com", nil),
+		fmt.Errorf("provided certificate/key pair not valid for host 'registry.company.com': x509: certificate is valid for nonexistent.company.com, not registry.company.com"),
+	},
+	{
+		"ManagedRouteProvidedHostnameNoCerts",
+		true,
+		"registry.company.com",
+		"",
+		[][]byte{nil, nil},
+		nil,
+	},
+	{
+		"ManagedRouteProvidedHostnameProvidedCerts",
+		true,
+		"registry.company.com",
+		"",
+		certKeyPairFor("registry.company.com", nil),
+		nil,
+	},
+	{
+		"ManagedRouteProvidedBuildmanagerHostnameProvidedIncorrectCerts",
+		true,
+		"registry.company.com",
+		"builds.company.com",
+		certKeyPairFor("registry.company.com", nil),
+		fmt.Errorf("provided certificate/key pair not valid for host 'builds.company.com': x509: certificate is valid for registry.company.com, not builds.company.com"),
+	},
+	{
+		"ManagedRouteProvidedBuildmanagerHostnameProvidedCerts",
+		true,
+		"registry.company.com",
+		"builds.company.com",
+		certKeyPairFor("registry.company.com", []string{"builds.company.com"}),
+		nil,
+	},
+	{
+		"ManagedRouteProvidedBuildmanagerHostnameNoCerts",
+		true,
+		"registry.company.com",
+		"builds.company.com",
+		[][]byte{nil, nil},
+		nil,
+	},
+}
+
 func TestEnsureTLSFor(t *testing.T) {
+	assert := assert.New(t)
 
-	emptyCert := []byte{}
-	serverHostname := "serverhostname.com"
-	builderHostname := "builderhostname.com"
-	quayRegistry := quayRegistry("test")
-
-	quayContextWithoutBuilder := &quaycontext.QuayRegistryContext{
-		ServerHostname: serverHostname,
-	}
-	quayContextWithBuilder := &quaycontext.QuayRegistryContext{
-		BuildManagerHostname: builderHostname,
-		ServerHostname:       serverHostname,
-	}
-
-	svc := quayRegistry.GetName() + "-quay-app"
-	hostsWithoutBuilder := []string{
-		serverHostname,
-		svc,
-		strings.Join([]string{svc, quayRegistry.GetNamespace(), "svc"}, "."),
-		strings.Join([]string{svc, quayRegistry.GetNamespace(), "svc", "cluster", "local"}, "."),
-	}
-	// Generate certs without builder hostname in SAN
-	pubWithoutBuilder, privWithoutBuilder, err := cert.GenerateSelfSignedCertKey(serverHostname, []net.IP{}, hostsWithoutBuilder)
-	if err != nil {
-		t.Errorf(err.Error())
-	}
-
-	// Generate certs with builder hostname in SAN
-	hostsWithBuilder := append(hostsWithoutBuilder, builderHostname)
-	pubWithBuilder, privWithBuilder, err := cert.GenerateSelfSignedCertKey(serverHostname, []net.IP{}, hostsWithBuilder)
-	if err != nil {
-		t.Errorf(err.Error())
-	}
-
-	t.Run("Quay context has buildman hostname. Certs are empty, Operator should generate own.", func(t *testing.T) {
-		assert := assert.New(t)
-		// Empty certs, should generate own
-		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithBuilder, quayRegistry, emptyCert, emptyCert)
-		if err != nil {
-			t.Errorf(err.Error())
+	for _, test := range ensureTLSForTests {
+		quayRegistry := quayRegistry("test")
+		quayContext := quaycontext.QuayRegistryContext{
+			ServerHostname:       test.serverHostname,
+			BuildManagerHostname: test.buildManagerHostname,
 		}
-		assert.NotEqual(recPublicKey, emptyCert)
-		assert.NotEqual(recPrivateKey, emptyCert)
-	})
 
-	t.Run("Quay context has buildman hostname. Certs do not contain buildman hostname. Operator should generate own.", func(t *testing.T) {
-		assert := assert.New(t)
-		// Buildman missing from certs, should generate own
-		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithBuilder, quayRegistry, pubWithoutBuilder, privWithoutBuilder)
-		if err != nil {
-			t.Errorf(err.Error())
+		tlsCert, tlsKey, err := EnsureTLSFor(&quayContext, quayRegistry, test.providedCertKeyPair[0], test.providedCertKeyPair[1])
+
+		assert.Equal(test.expectedErr, err, test.name)
+
+		if test.expectedErr == nil {
+			if test.providedCertKeyPair[0] != nil && test.providedCertKeyPair[1] != nil {
+				assert.Equal(string(test.providedCertKeyPair[0]), string(tlsCert), test.name)
+				assert.Equal(string(test.providedCertKeyPair[1]), string(tlsKey), test.name)
+			}
+
+			shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.serverHostname, fieldGroupNameFor("route"))
+
+			if test.buildManagerHostname != "" {
+				shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.buildManagerHostname, fieldGroupNameFor("route"))
+			}
 		}
-		assert.NotEqual(recPublicKey, pubWithoutBuilder)
-		assert.NotEqual(recPrivateKey, privWithoutBuilder)
-	})
-
-	t.Run("Quay context has buildman hostname. Certs contain buildman hostname. Operator should not generate own.", func(t *testing.T) {
-		assert := assert.New(t)
-		// Buildman present in certs, should not generate
-		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithBuilder, quayRegistry, pubWithBuilder, privWithBuilder)
-		if err != nil {
-			t.Errorf(err.Error())
-		}
-		assert.Equal(recPublicKey, pubWithBuilder)
-		assert.Equal(recPrivateKey, privWithBuilder)
-	})
-
-	t.Run("Quay context does not have buildman hostname. Certs do not contain buildman hostname. Operator should not generate own.", func(t *testing.T) {
-		assert := assert.New(t)
-		// Buildman not in certs, not in context, should not generate
-		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithoutBuilder, quayRegistry, pubWithoutBuilder, privWithoutBuilder)
-		if err != nil {
-			t.Errorf(err.Error())
-		}
-		assert.Equal(recPublicKey, pubWithoutBuilder)
-		assert.Equal(recPrivateKey, privWithoutBuilder)
-	})
-
-	t.Run("Quay context does not have buildman hostname. Certs contain buildman hostname. Operator should not generate own.", func(t *testing.T) {
-		assert := assert.New(t)
-		// Buildman not in certs, not in context, should not generate
-		recPublicKey, recPrivateKey, err := EnsureTLSFor(quayContextWithoutBuilder, quayRegistry, pubWithBuilder, privWithBuilder)
-		if err != nil {
-			t.Errorf(err.Error())
-		}
-		assert.Equal(recPublicKey, pubWithBuilder)
-		assert.Equal(recPrivateKey, privWithBuilder)
-	})
-
+	}
 }
