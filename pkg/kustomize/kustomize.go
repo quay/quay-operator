@@ -459,11 +459,9 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 	}
 	parsedUserConfig["SECRET_KEY"] = ctx.SecretKey
 
-	if ctx.DbUri == "" && v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) {
-		if _, found := parsedUserConfig["DB_URI"]; found {
-			return nil, fmt.Errorf("`postgres` component marked as managed, but `DB_URI` found in user-provided config")
-		} else {
-			log.Info("`DB_URI` not found in config, generating new one")
+	if ctx.DbUri == "" {
+		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) {
+			log.Info("managed `DB_URI` not found in config, generating new one")
 
 			user := quay.GetName() + "-quay-database"
 			name := quay.GetName() + "-quay-database"
@@ -475,6 +473,10 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 			}
 
 			ctx.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
+		} else {
+			if dbURI, found := parsedUserConfig["DB_URI"]; found {
+				ctx.DbUri = dbURI.(string)
+			}
 		}
 	}
 	parsedUserConfig["DB_URI"] = ctx.DbUri
