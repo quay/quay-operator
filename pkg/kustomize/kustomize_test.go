@@ -417,6 +417,27 @@ var inflateTests = []struct {
 		withComponents([]string{"base", "postgres"}),
 		nil,
 	},
+	{
+		"PostgresUnmanagedDbUriExists",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: false},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{},
+		&corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(map[string]interface{}{
+					"SERVER_HOSTNAME": "quay.io",
+					"DB_URI":          "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
+				}),
+			},
+		},
+		withComponents([]string{"base"}),
+		nil,
+	},
 }
 
 func TestInflate(t *testing.T) {
