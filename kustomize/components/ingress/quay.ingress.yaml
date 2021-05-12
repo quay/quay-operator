@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quay
+  annotations: {}
+spec:
+  rules:
+  - host: $(SERVER_HOSTNAME)
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: quay-app
+          servicePort: https

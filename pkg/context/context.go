@@ -3,6 +3,7 @@ package context
 // QuayRegistryContext contains additional information accrued and consumed during the reconcile loop of a `QuayRegistry`.
 type QuayRegistryContext struct {
 	// External Access
+	SupportsIngresses    bool
 	SupportsRoutes       bool
 	ClusterHostname      string
 	ServerHostname       string

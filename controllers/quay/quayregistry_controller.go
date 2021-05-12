@@ -170,6 +170,13 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 	}
 
+	quayContext, updatedQuay, err = r.checkIngressesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentIngress) {
+		msg := fmt.Sprintf("could not check for `Ingress` API: %s", err)
+
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonRouteComponentDependencyError, msg)
+	}
+
 	quayContext, updatedQuay, err = r.checkRoutesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
 	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentRoute) {
 		msg := fmt.Sprintf("could not check for `Routes` API: %s", err)
