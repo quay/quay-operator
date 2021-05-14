@@ -24,8 +24,6 @@ Prerequsites: Install `kubebuilder`
 ```sh
 $ go test -v ./...
 ```
-
-
 ### Config Editor
 
 The Quay Operator deploys a "config-editor" server which provides a rich UI experience for modifying Quay's `config.yaml` bundle. The "config-editor" server then sends a payload to an endpoint exposed by the Operator pod itself, which triggers a re-deploy. Obviously, this won't work during local development when the controller is running on your own machine but deploying to a remote Kubernetes cluster. To solve this, you can use a tool like `ngrok` to expose a local server to the internet.
@@ -50,3 +48,44 @@ Point the browser to localhost:8080 to access the config UI
 
 The credentials for the Config editor can be found in the secret `<prefix>-config-secret-<random-suffix>`
 eg: `test-quay-config-secret-tk88ffkdmt`
+
+### Quay.io Branch 
+
+For running the `quayio` legacy branch of Quay, there are some extra steps to get everything working. 
+(NOTE: there are better ways to do this, but this is the fastest/easiest).
+
+1. Modify the `users` field of the `SecurityContextContstraints` for `anyuid` to include the Quay `ServiceAccount`:
+
+```yaml
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: anyuid
+users:
+  - 'system:serviceaccount:<namespace>:<quayregistry-name>-quay-app'
+```
+
+2. Create a `RoleBinding` to allow the Quay `ServiceAccount` to view `Secrets` in its namespace:
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quay-view
+  namespace: <namespace>
+subjects:
+  - kind: ServiceAccount
+    name: <quayregistry-name>-quay-app
+    namespace: <namespace>
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  # NOTE: The `view` role does not include `Secrets`...
+  name: edit
+```
+
+3. The `spec.configBundleSecret` must include the following field (from legacy behavior requiring a user to exist in the database before startup):
+
+```yaml
+SERVICE_LOG_ACCOUNT_ID: 12345
+```
