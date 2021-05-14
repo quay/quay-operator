@@ -11,13 +11,16 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
+	"github.com/quay/quay-operator/pkg/kustomize"
 )
 
 func newQuayRegistry(name, namespace string) *v1.QuayRegistry {
@@ -41,11 +44,29 @@ func newQuayRegistry(name, namespace string) *v1.QuayRegistry {
 	return quay
 }
 
-func newConfigBundle(name, namespace string) corev1.Secret {
+func newConfigBundle(name, namespace string, withCerts bool) corev1.Secret {
 	config := map[string]interface{}{
 		"ENTERPRISE_LOGO_URL": "/static/img/quay-horizontal-color.svg",
 		"FEATURE_SUPER_USERS": true,
 		"SERVER_HOSTNAME":     "quay-app.quay-enterprise",
+	}
+
+	data := map[string][]byte{
+		"config.yaml": encode(config),
+	}
+
+	if withCerts {
+		cert, key, err := cert.GenerateSelfSignedCertKey(
+			config["SERVER_HOSTNAME"].(string),
+			nil,
+			[]string{config["SERVER_HOSTNAME"].(string)})
+
+		if err != nil {
+			panic(err)
+		}
+
+		data["ssl.cert"] = cert
+		data["ssl.key"] = key
 	}
 
 	return corev1.Secret{
@@ -53,9 +74,7 @@ func newConfigBundle(name, namespace string) corev1.Secret {
 			Name:      name,
 			Namespace: namespace,
 		},
-		Data: map[string][]byte{
-			"config.yaml": encode(config),
-		},
+		Data: data,
 	}
 }
 
@@ -139,7 +158,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 					Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
 					Namespace: quayRegistry.GetNamespace()},
 				&configBundleSecret)).
-				Should(Succeed())
+				To(Succeed())
 		})
 
 		It("will reference the same `configBundleSecret` when reconciled again", func() {
@@ -163,7 +182,33 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 					Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
 					Namespace: quayRegistry.GetNamespace()},
 				&configBundleSecret)).
-				Should(Succeed())
+				To(Succeed())
+		})
+
+		It("should generate a self-signed TLS cert/key pair in a new `Secret`", func() {
+			// Reconcile again to get past defaulting step
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
+
+			var secrets corev1.SecretList
+			listOptions := client.ListOptions{
+				Namespace: namespace,
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					kustomize.QuayRegistryNameLabel: quayRegistryName.Name,
+				})}
+
+			Expect(k8sClient.List(context.Background(), &secrets, &listOptions)).To(Succeed())
+
+			found := false
+			for _, secret := range secrets.Items {
+				if v1.IsManagedTLSSecretFor(quayRegistry, &secret) {
+					found = true
+
+					Expect(secret.Data).To(HaveKey("ssl.cert"))
+					Expect(secret.Data).To(HaveKey("ssl.key"))
+				}
+			}
+
+			Expect(found).To(BeTrue())
 		})
 	})
 
@@ -211,7 +256,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 	When("it references a `configBundleSecret` that does exist", func() {
 		BeforeEach(func() {
 			quayRegistry = newQuayRegistry("test-registry", namespace)
-			configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace, true)
 			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
 			quayRegistryName = types.NamespacedName{
 				Name:      quayRegistry.Name,
@@ -262,12 +307,37 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 				return updatedQuayRegistry.Status.CurrentVersion
 			}, time.Second*30).Should(Equal(v1.QuayVersionCurrent))
 		})
+
+		It("should copy the provided TLS cert/key pair into a new `Secret`", func() {
+			var secrets corev1.SecretList
+			listOptions := client.ListOptions{
+				Namespace: namespace,
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					kustomize.QuayRegistryNameLabel: quayRegistryName.Name,
+				})}
+
+			Expect(k8sClient.List(context.Background(), &secrets, &listOptions)).To(Succeed())
+
+			found := false
+			for _, secret := range secrets.Items {
+				if v1.IsManagedTLSSecretFor(quayRegistry, &secret) {
+					found = true
+
+					Expect(secret.Data).To(HaveKey("ssl.cert"))
+					Expect(secret.Data["ssl.cert"]).To(Equal(configBundle.Data["ssl.cert"]))
+					Expect(secret.Data).To(HaveKey("ssl.key"))
+					Expect(secret.Data["ssl.key"]).To(Equal(configBundle.Data["ssl.key"]))
+				}
+			}
+
+			Expect(found).To(BeTrue())
+		})
 	})
 
 	When("the current version in the `status` block is the same as the Operator", func() {
 		BeforeEach(func() {
 			quayRegistry = newQuayRegistry("test-registry", namespace)
-			configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace, true)
 			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
 			quayRegistryName = types.NamespacedName{
 				Name:      quayRegistry.Name,
@@ -297,7 +367,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 	When("the current version in the `status` block is upgradable", func() {
 		BeforeEach(func() {
 			quayRegistry = newQuayRegistry("test-registry", namespace)
-			configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace, true)
 			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
 			quayRegistryName = types.NamespacedName{
 				Name:      quayRegistry.Name,
@@ -361,7 +431,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 				Name:      quayRegistry.Name,
 				Namespace: quayRegistry.Namespace,
 			}
-			configBundle = newConfigBundle("quay-config-secret-abc123", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace, true)
 			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
 			quayRegistry.Spec.Components = nil
 

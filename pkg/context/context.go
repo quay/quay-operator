@@ -8,6 +8,10 @@ type QuayRegistryContext struct {
 	ServerHostname       string
 	BuildManagerHostname string
 
+	// TLS
+	TLSCert []byte
+	TLSKey  []byte
+
 	// Object Storage
 	SupportsObjectStorage    bool
 	ObjectStorageInitialized bool

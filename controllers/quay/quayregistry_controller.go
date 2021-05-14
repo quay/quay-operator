@@ -72,6 +72,8 @@ type QuayRegistryReconciler struct {
 	Scheme         *runtime.Scheme
 	EventRecorder  record.EventRecorder
 	WatchNamespace string
+
+	// TODO(alecmerdler): Somehow generalize feature detection functions so that they can match a type signature and be iterated over...
 }
 
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
@@ -163,21 +165,28 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
 
-	quayContext, updatedQuay, err := r.checkManagedKeys(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	quayContext, updatedQuay, err := r.checkManagedKeys(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
 	if err != nil {
 		msg := fmt.Sprintf("unable to retrieve managed keys `Secret`: %s", err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 	}
 
-	quayContext, updatedQuay, err = r.checkRoutesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	quayContext, updatedQuay, err = r.checkManagedTLS(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
+	if err != nil {
+		msg := fmt.Sprintf("unable to retrieve managed TLS `Secret`: %s", err)
+
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
+	}
+
+	quayContext, updatedQuay, err = r.checkRoutesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
 	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentRoute) {
 		msg := fmt.Sprintf("could not check for `Routes` API: %s", err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonRouteComponentDependencyError, msg)
 	}
 
-	quayContext, updatedQuay, err = r.checkObjectBucketClaimsAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	quayContext, updatedQuay, err = r.checkObjectBucketClaimsAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
 	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentObjectStorage) {
 		msg := fmt.Sprintf("could not check for `ObjectBucketClaims` API: %s", err)
 		if _, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg); err != nil {
@@ -187,14 +196,14 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{RequeueAfter: time.Millisecond * 1000}, nil
 	}
 
-	quayContext, updatedQuay, err = r.checkBuildManagerAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	quayContext, updatedQuay, err = r.checkBuildManagerAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
 	if err != nil {
 		msg := fmt.Sprintf("could not check for build manager support: %s", err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg)
 	}
 
-	quayContext, updatedQuay, err = r.checkMonitoringAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data["config.yaml"])
+	quayContext, updatedQuay, err = r.checkMonitoringAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
 	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentMonitoring) {
 		msg := fmt.Sprintf("could not check for monitoring support: %s", err)
 
