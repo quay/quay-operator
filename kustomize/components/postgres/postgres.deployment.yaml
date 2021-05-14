@@ -51,21 +51,6 @@ spec:
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS
               value: "2000"
-          startupProbe:
-            exec:
-              command: 
-                - /usr/libexec/check-container
-            periodSeconds: 10
-            failureThreshold: 20
-          readinessProbe:
-            exec:
-              command: 
-                - /usr/libexec/check-container
-          livelinessProbe:
-            exec:
-              command: 
-                - /usr/libexec/check-container
-                - --live
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/pgsql/data

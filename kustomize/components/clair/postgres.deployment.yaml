@@ -37,21 +37,6 @@ spec:
               value: postgres
             - name: POSTGRESQL_ADMIN_PASSWORD
               value: postgres
-          startupProbe:
-            exec:
-              command: 
-                - /usr/libexec/check-container
-            periodSeconds: 10
-            failureThreshold: 20
-          readinessProbe:
-            exec:
-              command: 
-                - /usr/libexec/check-container
-          livelinessProbe:
-            exec:
-              command: 
-                - /usr/libexec/check-container
-                - --live
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/pgsql/data
