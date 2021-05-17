@@ -89,3 +89,10 @@ spec:
             - name: extra-ca-certs
               readOnly: true
               mountPath: /conf/stack/extra_ca_certs
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
