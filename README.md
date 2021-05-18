@@ -96,12 +96,12 @@ $ kubectl create -f ./bundle/upstream/manifests/*.crd.yaml
 
 **Run the controller**:
 ```sh
-$ go run main.go
+$ make run
 ```
 
 **Tests**:
 ```sh
-$ go test -v ./...
+$ make test
 ```
 
 **Building custom `CatalogSource`**:
