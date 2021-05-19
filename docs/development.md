@@ -84,8 +84,10 @@ roleRef:
   name: edit
 ```
 
-3. The `spec.configBundleSecret` must include the following field (from legacy behavior requiring a user to exist in the database before startup):
+3. The `config.yaml` entry supplied in `spec.configBundleSecret` must include the following field (from legacy behavior requiring a user to exist in the database before startup):
 
 ```yaml
 SERVICE_LOG_ACCOUNT_ID: 12345
 ```
+
+4. With managed `objectstorage` using RHOCS, the cluster service CA certificate needs to be included manually in `spec.configBundleSecret` (due to legacy behavior of Quay) under the key `extra_ca_certs_cluster-service-ca.crt`.
