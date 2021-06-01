@@ -5,7 +5,7 @@ go 1.12
 require (
 	github.com/coreos/prometheus-operator v0.28.0
 	github.com/go-logr/logr v0.3.0
-	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20200610144127-e2eec875d6d1
+	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20210311161930-4bea5edaff58
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.3
 	github.com/openshift/api v3.9.0+incompatible
