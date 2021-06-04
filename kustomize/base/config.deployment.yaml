@@ -15,9 +15,13 @@ spec:
         quay-component: quay-config-editor
     spec:
       volumes:
-        - name: config-bundle
-          secret:
-            secretName: quay-config-secret
+        - name: config
+          projected:
+            sources:
+            - secret:
+                name: quay-config-secret
+            - secret:
+                name: quay-config-tls
         - name: extra-ca-certs
           configMap:
             name: cluster-service-ca
@@ -55,7 +59,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.annotations['quay-managed-fieldgroups']
           volumeMounts:
-            - name: config-bundle
+            - name: config
               mountPath: /conf/stack
             - name: extra-ca-certs
               mountPath: /conf/stack/extra_ca_certs
