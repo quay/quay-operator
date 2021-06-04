@@ -10,13 +10,5 @@ resources:
   - ./postgres.persistentvolumeclaim.yaml
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
-vars:
-  - name: CLAIR_SERVICE_HOST
-    objref:
-      kind: Service
-      apiVersion: v1
-      name: clair-app
-patchesStrategicMerge:
-  - ./upgrade.deployment.patch.yaml
 secretGenerator:
   - name: clair-config-secret

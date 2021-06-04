@@ -250,47 +250,43 @@ func RequiredComponent(component ComponentKind) bool {
 	return false
 }
 
-// EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`
-// and returns a new `QuayRegistry` copy.
+// EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`.
+// Returns an error if a component was declared as managed but is not supported in the current k8s cluster.
 func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) (*QuayRegistry, error) {
 	updatedQuay := quay.DeepCopy()
 	if updatedQuay.Spec.Components == nil {
 		updatedQuay.Spec.Components = []Component{}
 	}
 
-	if ComponentIsManaged(updatedQuay.Spec.Components, ComponentRoute) && !ctx.SupportsRoutes {
-		return nil, errors.New("cannot use `route` component when `Route` API not available")
+	type componentCheck struct {
+		check bool
+		msg   string
 	}
-
-	if ComponentIsManaged(updatedQuay.Spec.Components, ComponentObjectStorage) && !ctx.SupportsObjectStorage {
-		return nil, errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available")
-	}
-
-	if ComponentIsManaged(updatedQuay.Spec.Components, ComponentMonitoring) && !ctx.SupportsMonitoring {
-		return nil, errors.New("cannot use `monitoring` component when `Prometheus` API not available")
+	componentChecks := map[ComponentKind]componentCheck{
+		ComponentRoute:         {ctx.SupportsRoutes, "cannot use `route` component when `Route` API not available"},
+		ComponentObjectStorage: {ctx.SupportsObjectStorage, "cannot use `ObjectStorage` component when `ObjectStorage` API not available"},
+		ComponentMonitoring:    {ctx.SupportsMonitoring, "cannot use `monitoring` component when `Prometheus` API not available"},
 	}
 
 	for _, component := range allComponents {
+		componentCheck, checkExists := componentChecks[component]
+		if (checkExists && !componentCheck.check) && ComponentIsManaged(quay.Spec.Components, component) {
+			return quay, errors.New(componentCheck.msg)
+		}
+
 		found := false
-		for _, definedComponent := range quay.Spec.Components {
-			if component == definedComponent.Kind {
+		for _, declaredComponent := range quay.Spec.Components {
+			if component == declaredComponent.Kind {
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			if component == ComponentRoute && !ctx.SupportsRoutes {
-				continue
-			}
-			if component == ComponentObjectStorage && !ctx.SupportsObjectStorage {
-				continue
-			}
-			if component == ComponentMonitoring && !ctx.SupportsMonitoring {
-				continue
-			}
-
-			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{Kind: component, Managed: true})
+			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{
+				Kind:    component,
+				Managed: !checkExists || componentCheck.check,
+			})
 		}
 	}
 
@@ -313,7 +309,6 @@ func EnsureRegistryEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegi
 			ctx.ClusterHostname},
 			".")
 	}
-	// TODO: Retrieve load balancer IP from `Service`
 
 	return updatedQuay, quay.Status.RegistryEndpoint == updatedQuay.Status.RegistryEndpoint
 }
@@ -328,7 +323,6 @@ func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *Quay
 			ctx.ClusterHostname},
 			".")
 	}
-	// TODO: Retrieve load balancer IP from `Service`
 
 	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
 }
