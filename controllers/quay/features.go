@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
+	"encoding/pem"
 	"fmt"
 	"strings"
 	"time"
@@ -73,35 +76,13 @@ func (r *QuayRegistryReconciler) checkManagedTLS(ctx *quaycontext.QuayRegistryCo
 	providedTLSKey := configBundle["ssl.key"]
 
 	if providedTLSCert != nil && providedTLSKey != nil {
-		r.Log.Info("provided TLS cert/key pair in `configBundleSecret` will be stored in persistent `Secret`")
+		r.Log.Info("provided TLS cert/key pair in `configBundleSecret` will be used")
 		ctx.TLSCert = providedTLSCert
 		ctx.TLSKey = providedTLSKey
 
 		return ctx, quay, nil
-	}
-
-	var secrets corev1.SecretList
-	listOptions := &client.ListOptions{
-		Namespace: quay.GetNamespace(),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			kustomize.QuayRegistryNameLabel: quay.GetName(),
-		}),
-	}
-
-	if err := r.List(context.Background(), &secrets, listOptions); err != nil {
-		return ctx, quay, err
-	}
-
-	for _, secret := range secrets.Items {
-		if v1.IsManagedTLSSecretFor(quay, &secret) {
-			ctx.TLSCert = secret.Data["ssl.cert"]
-			ctx.TLSKey = secret.Data["ssl.key"]
-			break
-		}
-	}
-
-	if ctx.TLSCert == nil || ctx.TLSKey == nil {
-		r.Log.Info("existing TLS cert/key pair not found, one will be generated")
+	} else {
+		r.Log.Info("TLS cert/key pair not provided, will use default cluster wildcard cert")
 	}
 
 	return ctx, quay, nil
@@ -168,6 +149,16 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegis
 		}
 
 		r.Log.Info("detected router canonical hostname: " + ctx.ClusterHostname)
+
+		// TODO(alecmerdler): Try to fetch the wildcard cert from the `ConfigMap` at `openshift-config-managed/default-ingress-cert`...
+		clusterWildcardCert, err := getCertificatesPEM(fakeRoute.(*routev1.Route).Spec.Host + ":443")
+		if err != nil {
+			return ctx, quay, err
+		}
+
+		ctx.ClusterWildcardCert = clusterWildcardCert
+
+		r.Log.Info("detected cluster wildcard certificate for " + ctx.ClusterHostname)
 
 		if err := r.Client.Delete(context.Background(), fakeRoute); err != nil {
 			return ctx, quay, err
@@ -301,4 +292,27 @@ func configEditorCredentialsSecretFrom(objs []client.Object) string {
 	}
 
 	return ""
+}
+
+// Taken from https://stackoverflow.com/questions/46735347/how-can-i-fetch-a-certificate-from-a-url
+func getCertificatesPEM(address string) ([]byte, error) {
+	conn, err := tls.Dial("tcp", address, &tls.Config{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	var b bytes.Buffer
+	for _, cert := range conn.ConnectionState().PeerCertificates {
+		err := pem.Encode(&b, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: cert.Raw,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return b.Bytes(), nil
 }

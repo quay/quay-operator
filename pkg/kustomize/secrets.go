@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -20,7 +19,6 @@ import (
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
 	"github.com/quay/config-tool/pkg/lib/shared"
 	"gopkg.in/yaml.v3"
-	"k8s.io/client-go/util/cert"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
@@ -108,7 +106,7 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 		return fieldGroup, nil
 	case v1.ComponentRoute:
 		fieldGroup := &hostsettings.HostSettingsFieldGroup{
-			ExternalTlsTermination: false,
+			ExternalTlsTermination: true,
 			PreferredUrlScheme:     "https",
 			ServerHostname:         ctx.ServerHostname,
 		}
@@ -125,6 +123,8 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 	case v1.ComponentHPA:
 		return nil, nil
 	case v1.ComponentMonitoring:
+		return nil, nil
+	case v1.ComponentTLS:
 		return nil, nil
 	default:
 		return nil, errors.New("unknown component: " + string(component))
@@ -157,8 +157,7 @@ func BaseConfig() map[string]interface{} {
 	}
 }
 
-// EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for secure communication with clients,
-// and generates a TLS certificate/key pair if they are not provided.
+// EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for secure communication with clients.
 func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) ([]byte, []byte, error) {
 	fieldGroup, err := FieldGroupFor(ctx, "route", quay)
 	if err != nil {
@@ -176,9 +175,7 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) (
 		hosts = append(hosts, strings.Split(ctx.BuildManagerHostname, ":")[0])
 	}
 
-	if ctx.TLSCert == nil || ctx.TLSKey == nil {
-		return cert.GenerateSelfSignedCertKey(routeFieldGroup.ServerHostname, []net.IP{}, hosts)
-	} else {
+	if ctx.TLSCert != nil && ctx.TLSKey != nil {
 		for _, host := range hosts {
 			if valid, validationErr := shared.ValidateCertPairWithHostname(ctx.TLSCert, ctx.TLSKey, host, fieldGroupNameFor("route")); !valid {
 				return nil, nil, fmt.Errorf("provided certificate/key pair not valid for host '%s': %s", host, validationErr.String())
@@ -222,6 +219,8 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Com
 		}
 	case v1.ComponentMonitoring:
 		return false, nil
+	case v1.ComponentTLS:
+		fields = []string{"EXTERNAL_TLS_TERMINATION"}
 	default:
 		panic("unknown component: " + component.Kind)
 	}
@@ -253,6 +252,8 @@ func fieldGroupNameFor(component v1.ComponentKind) string {
 	case v1.ComponentHPA:
 		return ""
 	case v1.ComponentMonitoring:
+		return ""
+	case v1.ComponentTLS:
 		return ""
 	default:
 		panic("unknown component: " + component)
@@ -353,7 +354,6 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []
 			DeliveryInterval: "1m",
 			PollInterval:     "5m",
 			Webhook: &webhook.Config{
-				// NOTE: This can't be the in-cluster service hostname because the `passthrough` TLS certs are only valid for external `SERVER_HOSTNAME`.
 				Target:   "https://" + quayHostname + "/secscan/notification",
 				Callback: "http://" + quay.GetName() + "-" + clairService + "/notifier/api/v1/notifications",
 			},

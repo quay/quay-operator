@@ -16,12 +16,8 @@ spec:
     spec:
       volumes:
         - name: config
-          projected:
-            sources:
-            - secret:
-                name: quay-config-secret
-            - secret:
-                name: quay-config-tls
+          secret:
+            secretName: quay-config-secret
         - name: extra-ca-certs
           configMap:
             name: cluster-service-ca

@@ -19,7 +19,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1beta1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -32,6 +31,7 @@ import (
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
+	"github.com/quay/quay-operator/pkg/middleware"
 )
 
 const (
@@ -264,6 +264,17 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 		return nil, err
 	}
 
+	quayConfigTLSSources := []string{}
+	if ctx.ClusterWildcardCert != nil {
+		quayConfigTLSSources = append(quayConfigTLSSources, "ocp-cluster-wildcard.cert="+string(ctx.ClusterWildcardCert))
+	}
+	if ctx.TLSCert != nil {
+		quayConfigTLSSources = append(quayConfigTLSSources, "ssl.cert="+string(ctx.TLSCert))
+	}
+	if ctx.TLSKey != nil {
+		quayConfigTLSSources = append(quayConfigTLSSources, "ssl.key="+string(ctx.TLSKey))
+	}
+
 	generatedSecrets := []types.SecretArgs{
 		{
 			GeneratorArgs: types.GeneratorArgs{
@@ -289,10 +300,7 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 			GeneratorArgs: types.GeneratorArgs{
 				Name: v1.QuayConfigTLSSecretName,
 				KvPairSources: types.KvPairSources{
-					LiteralSources: []string{
-						"ssl.cert=" + string(ctx.TLSCert),
-						"ssl.key=" + string(ctx.TLSKey),
-					},
+					LiteralSources: quayConfigTLSSources,
 				},
 			},
 		},
@@ -381,43 +389,6 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 			},
 		},
 	}, nil
-}
-
-// flattenSecret takes all Quay config fields in given secret and combines them under `config.yaml` key.
-func flattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
-	flattenedSecret := configBundle.DeepCopy()
-
-	var flattenedConfig map[string]interface{}
-	if err := yaml.Unmarshal(configBundle.Data["config.yaml"], &flattenedConfig); err != nil {
-		return nil, err
-	}
-
-	isConfigField := func(field string) bool {
-		return strings.Contains(field, ".config.yaml")
-	}
-
-	for key, file := range configBundle.Data {
-		if isConfigField(key) {
-			var valueYAML map[string]interface{}
-			if err := yaml.Unmarshal(file, &valueYAML); err != nil {
-				return nil, err
-			}
-
-			for configKey, configValue := range valueYAML {
-				flattenedConfig[configKey] = configValue
-			}
-			delete(flattenedSecret.Data, key)
-		}
-	}
-
-	flattenedConfigYAML, err := yaml.Marshal(flattenedConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	flattenedSecret.Data["config.yaml"] = []byte(flattenedConfigYAML)
-
-	return flattenedSecret, nil
 }
 
 // Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
@@ -520,7 +491,9 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 	ctx.TLSKey = tlsKey
 
 	kustomization, err := KustomizationFor(ctx, quay, componentConfigFiles)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
 
 	var overlay string
 	if rolloutBlocked(quay) {
@@ -531,23 +504,26 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 		overlay = overlayDir()
 	}
 	resources, err := generate(kustomization, overlay, componentConfigFiles)
-	check(err)
-
-	for index, resource := range resources {
-		objectMeta, err := meta.Accessor(resource)
-		check(err)
-
-		if strings.Contains(objectMeta.GetName(), configSecretPrefix+"-") {
-			configBundleSecret, err := flattenSecret(resource.(*corev1.Secret))
-			check(err)
-
-			resources[index] = configBundleSecret
-		}
+	if err != nil {
+		return nil, err
 	}
 
-	for _, resource := range resources {
+	for index, resource := range resources {
+		obj, err := middleware.Process(ctx, quay, resource)
+		if err != nil {
+			return nil, err
+		}
+
+		resources[index] = obj
+	}
+
+	for index, resource := range resources {
 		resource, err = v1.EnsureOwnerReference(quay, resource)
-		check(err)
+		if err != nil {
+			return nil, err
+		}
+
+		resources[index] = resource
 	}
 
 	return resources, err

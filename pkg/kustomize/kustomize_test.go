@@ -19,6 +19,7 @@ import (
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
+	"github.com/quay/quay-operator/pkg/middleware"
 )
 
 var kustomizationForTests = []struct {
@@ -189,7 +190,7 @@ func TestFlattenSecret(t *testing.T) {
 		},
 	}
 
-	flattenedSecret, err := flattenSecret(secret)
+	flattenedSecret, err := middleware.FlattenSecret(secret)
 
 	assert.Nil(err)
 	assert.Equal(2, len(flattenedSecret.Data))
