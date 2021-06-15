@@ -132,7 +132,7 @@ var fieldGroupForTests = []struct {
 		},
 		&hostsettings.HostSettingsFieldGroup{
 			ServerHostname:         "test-quay-ns.apps.example.com",
-			ExternalTlsTermination: false,
+			ExternalTlsTermination: true,
 			PreferredUrlScheme:     "https",
 		},
 	},

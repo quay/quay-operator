@@ -532,6 +532,10 @@ func (r *QuayEcosystemReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if canHandleExternalAccess(quayEcosystem) {
 		log.Info("attempting to migrate external access", "type", quayEcosystem.Spec.Quay.ExternalAccess.Type)
 
+		// NOTE: Assume that if using edge `Route`, there is no custom TLS cert/key pair.
+		// Docs state that custom TLS can be provided to an edge `Route`: (https://access.redhat.com/documentation/en-us/red_hat_quay/3.3/html/deploy_red_hat_quay_on_openshift_with_quay_operator/customizing_your_red_hat_quay_cluster#user_provided_certificates)
+		// But this doesn't seem to be implemented: (https://sourcegraph.com/github.com/quay/quay-operator@v1/-/blob/pkg/controller/quayecosystem/resources/routes.go#L64).
+
 		for _, field := range (&hostsettings.HostSettingsFieldGroup{}).Fields() {
 			if field != "SERVER_HOSTNAME" {
 				delete(baseConfig, field)
@@ -709,7 +713,8 @@ func canHandleExternalAccess(q redhatcop.QuayEcosystem) bool {
 	return q.Spec.Quay.ExternalAccess != nil &&
 		q.Spec.Quay.ExternalAccess.Type == redhatcop.RouteExternalAccessType &&
 		q.Spec.Quay.ExternalAccess.TLS != nil &&
-		q.Spec.Quay.ExternalAccess.TLS.Termination == redhatcop.PassthroughTLSTerminationType
+		(q.Spec.Quay.ExternalAccess.TLS.Termination == redhatcop.PassthroughTLSTerminationType ||
+			q.Spec.Quay.ExternalAccess.TLS.Termination == redhatcop.EdgeTLSTerminationType)
 }
 
 func canHandleRedis(q redhatcop.QuayEcosystem) bool {

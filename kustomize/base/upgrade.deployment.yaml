@@ -19,12 +19,8 @@ spec:
       serviceAccountName: quay-app
       volumes:
         - name: config
-          projected:
-            sources:
-            - secret:
-                name: quay-config-secret
-            - secret:
-                name: quay-config-tls
+          secret:
+            secretName: quay-config-secret
         - name: extra-ca-certs
           configMap:
             name: cluster-service-ca
@@ -64,21 +60,21 @@ spec:
           startupProbe:
             httpGet:
               path: /health/instance
-              port: 8443
-              scheme: HTTPS
+              port: 8080
+              scheme: HTTP
             timeoutSeconds: 20
             periodSeconds: 15
             failureThreshold: 10
           readinessProbe:
             httpGet:
               path: /health/instance
-              port: 8443
-              scheme: HTTPS
+              port: 8080
+              scheme: HTTP
           livelinessProbe:
             httpGet:
               path: /health/instance
-              port: 8443
-              scheme: HTTPS
+              port: 8080
+              scheme: HTTP
           volumeMounts:
             - name: config
               readOnly: false

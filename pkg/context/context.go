@@ -9,8 +9,9 @@ type QuayRegistryContext struct {
 	BuildManagerHostname string
 
 	// TLS
-	TLSCert []byte
-	TLSKey  []byte
+	ClusterWildcardCert []byte
+	TLSCert             []byte
+	TLSKey              []byte
 
 	// Object Storage
 	SupportsObjectStorage    bool

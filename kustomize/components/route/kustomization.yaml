@@ -7,10 +7,6 @@ resources:
   - ./quay.route.yaml
   - ./config.route.yaml
   - ./builder.route.yaml
-patchesStrategicMerge:
-  # Switch `Service` to `type: ClusterIP`
-  - ./quay.service.patch.yaml
-  - ./config.service.patch.yaml
 configurations:
   - ./route.varreferences.yaml
 # NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them

@@ -276,9 +276,9 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Info("inflating QuayRegistry into Kubernetes objects using Kustomize")
 	deploymentObjects, err := kustomize.Inflate(quayContext, updatedQuay, &configBundle, log)
 	if err != nil {
-		log.Error(err, "could not inflate QuayRegistry into Kubernetes objects")
+		msg := fmt.Sprintf("could not inflate QuayRegistry into Kubernetes objects: %s", err)
 
-		return ctrl.Result{}, nil
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonComponentCreationFailed, msg)
 	}
 
 	for _, obj := range kustomize.EnsureCreationOrder(deploymentObjects) {

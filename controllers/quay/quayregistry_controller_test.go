@@ -185,7 +185,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 				To(Succeed())
 		})
 
-		It("should generate a self-signed TLS cert/key pair in a new `Secret`", func() {
+		It("should not generate a self-signed TLS cert/key pair in a new `Secret`", func() {
 			// Reconcile again to get past defaulting step
 			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
 
@@ -203,8 +203,8 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 				if v1.IsManagedTLSSecretFor(quayRegistry, &secret) {
 					found = true
 
-					Expect(secret.Data).To(HaveKey("ssl.cert"))
-					Expect(secret.Data).To(HaveKey("ssl.key"))
+					Expect(secret.Data).NotTo(HaveKey("ssl.cert"))
+					Expect(secret.Data).NotTo(HaveKey("ssl.key"))
 				}
 			}
 

@@ -2,13 +2,15 @@ kind: Route
 apiVersion: route.openshift.io/v1
 metadata:
   name: quay
+  labels:
+    quay-component: quay-app-route
 spec:
   host: $(SERVER_HOSTNAME)
   to:
     kind: Service
     name: quay-app
   port:
-    targetPort: https
+    targetPort: http
   tls:
-    termination: passthrough
+    termination: edge
     insecureEdgeTerminationPolicy: Redirect

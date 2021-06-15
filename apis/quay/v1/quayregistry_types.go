@@ -45,6 +45,7 @@ const (
 	ComponentRoute                       = "route"
 	ComponentMirror                      = "mirror"
 	ComponentMonitoring                  = "monitoring"
+	ComponentTLS                         = "tls"
 )
 
 var allComponents = []ComponentKind{
@@ -56,6 +57,7 @@ var allComponents = []ComponentKind{
 	ComponentRoute,
 	ComponentMirror,
 	ComponentMonitoring,
+	ComponentTLS,
 }
 
 var requiredComponents = []ComponentKind{
@@ -259,18 +261,19 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 	}
 
 	type componentCheck struct {
-		check bool
+		check func() bool
 		msg   string
 	}
 	componentChecks := map[ComponentKind]componentCheck{
-		ComponentRoute:         {ctx.SupportsRoutes, "cannot use `route` component when `Route` API not available"},
-		ComponentObjectStorage: {ctx.SupportsObjectStorage, "cannot use `ObjectStorage` component when `ObjectStorage` API not available"},
-		ComponentMonitoring:    {ctx.SupportsMonitoring, "cannot use `monitoring` component when `Prometheus` API not available"},
+		ComponentRoute:         {func() bool { return ctx.SupportsRoutes }, "cannot use `route` component when `Route` API not available"},
+		ComponentTLS:           {func() bool { return ctx.SupportsRoutes && ctx.TLSCert == nil && ctx.TLSKey == nil }, "cannot use `tls` component when `Route` API not available or TLS cert/key pair is provided"},
+		ComponentObjectStorage: {func() bool { return ctx.SupportsObjectStorage }, "cannot use `ObjectStorage` component when `ObjectStorage` API not available"},
+		ComponentMonitoring:    {func() bool { return ctx.SupportsMonitoring }, "cannot use `monitoring` component when `Prometheus` API not available"},
 	}
 
 	for _, component := range allComponents {
 		componentCheck, checkExists := componentChecks[component]
-		if (checkExists && !componentCheck.check) && ComponentIsManaged(quay.Spec.Components, component) {
+		if (checkExists && !componentCheck.check()) && ComponentIsManaged(quay.Spec.Components, component) {
 			return quay, errors.New(componentCheck.msg)
 		}
 
@@ -285,7 +288,7 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 		if !found {
 			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{
 				Kind:    component,
-				Managed: !checkExists || componentCheck.check,
+				Managed: !checkExists || componentCheck.check(),
 			})
 		}
 	}
