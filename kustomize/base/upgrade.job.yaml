@@ -1,21 +1,17 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: batch/v1
+kind: Job
 metadata:
   name: quay-app-upgrade
   labels:
     quay-component: quay-app-upgrade
 spec:
-  replicas: 0
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      quay-component: quay-app-upgrade
   template:
     metadata:
+      name: quay-app-upgrade
       labels:
         quay-component: quay-app-upgrade
     spec:
+      restartPolicy: OnFailure
       volumes:
         - name: configvolume
           secret:
@@ -26,6 +22,7 @@ spec:
       containers:
         - name: quay-app-upgrade
           image: quay.io/projectquay/quay@sha256:46334210eeb21aa6205215d1c4dbc40ea3381887c21a05d0bc47203c8f938987
+          args: ["migrate", "head"]
           env:
             - name: QE_K8S_CONFIG_SECRET
               # FIXME: Using `vars` is kinda ugly because it's basically templating, but this needs to be the generated `Secret` name...
@@ -56,17 +53,6 @@ spec:
             limits:
               cpu: 2000m
               memory: 8Gi
-          readinessProbe:
-            exec:
-              command:
-                - curl
-                - '-k'
-                - 'https://localhost:8443/health/instance'
-            initialDelaySeconds: 30
-            timeoutSeconds: 20
-            periodSeconds: 15
-            successThreshold: 1
-            failureThreshold: 3
           volumeMounts:
             - name: configvolume
               readOnly: false
