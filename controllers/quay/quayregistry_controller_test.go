@@ -82,20 +82,6 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 		Expect(refs[0].Name).To(Equal(quayRegistry.GetName()))
 	}
 
-	// progressUpgradeDeployment sets the `status` manually because `envtest` only runs apiserver, not controllers.
-	progressUpgradeDeployment := func() error {
-		var upgradeDeployment appsv1.Deployment
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: namespace}, &upgradeDeployment)
-		if err != nil {
-			return err
-		}
-
-		upgradeDeployment.Status.Replicas = 1
-		upgradeDeployment.Status.ReadyReplicas = 1
-
-		return k8sClient.Status().Update(context.Background(), &upgradeDeployment)
-	}
-
 	BeforeEach(func() {
 		namespace = randIdentifier(16)
 
@@ -253,8 +239,6 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 		})
 
 		It("reports the current version in the `status` block", func() {
-			Expect(progressUpgradeDeployment()).Should(Succeed())
-
 			var updatedQuayRegistry v1.QuayRegistry
 
 			Eventually(func() v1.QuayVersion {
@@ -315,7 +299,6 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 		It("successfully performs an upgrade", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Requeue).To(BeFalse())
-			Expect(progressUpgradeDeployment()).Should(Succeed())
 
 			var updatedQuayRegistry v1.QuayRegistry
 

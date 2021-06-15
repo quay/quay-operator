@@ -171,7 +171,7 @@ var quayComponents = map[string][]runtime.Object{
 		&rbac.Role{ObjectMeta: metav1.ObjectMeta{Name: "quay-serviceaccount"}},
 		&rbac.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "quay-secret-writer"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
-		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
+		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
