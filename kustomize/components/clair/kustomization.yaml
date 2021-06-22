@@ -13,7 +13,5 @@ vars:
       kind: Service
       apiVersion: v1
       name: clair-app
-patchesStrategicMerge:
-  - ./upgrade.deployment.patch.yaml
 secretGenerator:
   - name: clair-config-secret

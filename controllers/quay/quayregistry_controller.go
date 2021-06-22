@@ -28,7 +28,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/tidwall/sjson"
 	"gopkg.in/yaml.v2"
-	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -332,23 +332,17 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		go func(quayRegistry *v1.QuayRegistry) {
 			err = wait.Poll(upgradePollInterval, upgradePollTimeout, func() (bool, error) {
-				log.Info("checking Quay upgrade deployment readiness")
+				log.Info("checking Quay upgrade `Job` completion")
 
-				var upgradeDeployment appsv1.Deployment
-				err = r.Client.Get(ctx, types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: quayRegistry.GetNamespace()}, &upgradeDeployment)
+				var upgradeJob batchv1.Job
+				err = r.Client.Get(ctx, types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: quayRegistry.GetNamespace()}, &upgradeJob)
 				if err != nil {
-					log.Error(err, "could not retrieve Quay upgrade deployment during upgrade")
+					log.Error(err, "could not retrieve Quay upgrade `Job`")
 
 					return false, err
 				}
 
-				if upgradeDeployment.Spec.Size() < 1 {
-					log.Info("upgrade deployment scaled down, skipping check")
-
-					return true, nil
-				}
-
-				if upgradeDeployment.Status.ReadyReplicas > 0 {
+				if upgradeJob.Status.Succeeded > 0 {
 					log.Info("Quay upgrade complete, updating `status.currentVersion`")
 
 					updatedQuay, _ := v1.EnsureRegistryEndpoint(quayContext, updatedQuay, userProvidedConfig)
@@ -382,16 +376,16 @@ func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 					return true, nil
 				}
+
 				return false, nil
 			})
 
 			if err != nil {
-				log.Error(err, "Quay upgrade deployment never reached ready phase")
+				log.Error(err, "Quay upgrade `Job` never completed")
 			}
 		}(updatedQuay.DeepCopy())
 	}
 
-	// Add finalizer for this CR
 	if !controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
 		controllerutil.AddFinalizer(updatedQuay, QuayOperatorFinalizer)
 		err = r.Update(ctx, updatedQuay)

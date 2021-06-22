@@ -8,7 +8,7 @@ resources:
   - ./quay.rolebinding.yaml
   - ./quay.deployment.yaml
   - ./quay.service.yaml
-  - ./upgrade.deployment.yaml
+  - ./upgrade.job.yaml
   - ./cluster-service-ca.configmap.yaml
   - ./config.deployment.yaml
   - ./config.service.yaml
