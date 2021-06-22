@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -83,17 +84,16 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 	}
 
 	// progressUpgradeDeployment sets the `status` manually because `envtest` only runs apiserver, not controllers.
-	progressUpgradeDeployment := func() error {
-		var upgradeDeployment appsv1.Deployment
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: namespace}, &upgradeDeployment)
+	progressUpgradeJob := func() error {
+		var upgradeJob batchv1.Job
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: namespace}, &upgradeJob)
 		if err != nil {
-			return err
+			return nil
 		}
 
-		upgradeDeployment.Status.Replicas = 1
-		upgradeDeployment.Status.ReadyReplicas = 1
+		upgradeJob.Status.Succeeded = 1
 
-		return k8sClient.Status().Update(context.Background(), &upgradeDeployment)
+		return k8sClient.Status().Update(context.Background(), &upgradeJob)
 	}
 
 	BeforeEach(func() {
@@ -253,7 +253,7 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 		})
 
 		It("reports the current version in the `status` block", func() {
-			Expect(progressUpgradeDeployment()).Should(Succeed())
+			Expect(progressUpgradeJob()).To(Succeed())
 
 			var updatedQuayRegistry v1.QuayRegistry
 
@@ -315,9 +315,9 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 		})
 
 		It("successfully performs an upgrade", func() {
+			Expect(progressUpgradeJob()).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.Requeue).To(BeFalse())
-			Expect(progressUpgradeDeployment()).Should(Succeed())
 
 			var updatedQuayRegistry v1.QuayRegistry
 

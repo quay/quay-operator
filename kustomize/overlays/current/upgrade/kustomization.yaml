@@ -6,6 +6,5 @@ commonAnnotations:
 bases:
   - ../../../tmp
 patchesStrategicMerge:
-  # Scale the app deployment to 0 pods in order to run all migrations present in the new container image using the "upgrade" deployment.
+  # Scale the app deployment to 0 pods in order to run all migrations present in the new container image using the "upgrade" `Job`.
   - ./quay.deployment.patch.yaml
-  - ./upgrade.deployment.patch.yaml
