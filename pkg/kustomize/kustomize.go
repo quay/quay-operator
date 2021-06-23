@@ -498,7 +498,7 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 	var overlay string
 	if rolloutBlocked(quay) {
 		overlay = configEditorOnlyOverlay()
-	} else if quay.Status.CurrentVersion == "" {
+	} else if quay.Status.CurrentVersion != v1.QuayVersionCurrent {
 		overlay = upgradeOverlayDir()
 	} else {
 		overlay = overlayDir()
