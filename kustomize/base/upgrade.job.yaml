@@ -54,7 +54,6 @@ spec:
             limits:
               cpu: 2000m
               memory: 8Gi
-          # FIXME(alecmerdler): Need to determine healthcheck for alembic...
           volumeMounts:
             - name: config
               readOnly: false

@@ -267,6 +267,7 @@ func withComponents(components []string) []client.Object {
 	return selectedComponents
 }
 
+// TODO(alecmerdler): Test image overrides...
 var inflateTests = []struct {
 	name         string
 	quayRegistry *v1.QuayRegistry
