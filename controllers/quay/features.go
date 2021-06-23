@@ -172,59 +172,64 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegis
 	return ctx, quay, nil
 }
 
-func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
-	datastoreName := types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.GetName() + "-quay-datastore"}
-	var objectBucketClaims objectbucket.ObjectBucketClaimList
-	if err := r.Client.List(context.Background(), &objectBucketClaims); err == nil {
-		r.Log.Info("cluster supports `ObjectBucketClaims` API")
-
-		ctx.SupportsObjectStorage = true
-
-		found := false
-		for _, obc := range objectBucketClaims.Items {
-			if obc.GetNamespace()+"/"+obc.GetName() == datastoreName.String() {
-				found = true
-				r.Log.Info("`ObjectBucketClaim` exists")
-
-				var datastoreSecret corev1.Secret
-				if err = r.Client.Get(context.Background(), datastoreName, &datastoreSecret); err != nil {
-					r.Log.Error(err, "unable to retrieve Quay datastore `Secret`")
-
-					return ctx, quay, err
-				}
-
-				var datastoreConfig corev1.ConfigMap
-				if err = r.Client.Get(context.Background(), datastoreName, &datastoreConfig); err != nil {
-					r.Log.Error(err, "unable to retrieve Quay datastore `ConfigMap`")
-
-					return ctx, quay, err
-				}
-
-				r.Log.Info("found `ObjectBucketClaim` and credentials `Secret`, `ConfigMap`")
-
-				host := string(datastoreConfig.Data[datastoreBucketHostKey])
-				if strings.Contains(host, ".svc") && !strings.Contains(host, ".svc.cluster.local") {
-					r.Log.Info("`ObjectBucketClaim` is using in-cluster endpoint, ensuring we use the fully qualified domain name")
-					host = strings.ReplaceAll(host, ".svc", ".svc.cluster.local")
-				}
-
-				ctx.StorageBucketName = string(datastoreConfig.Data[datastoreBucketNameKey])
-				ctx.StorageHostname = host
-				ctx.StorageAccessKey = string(datastoreSecret.Data[datastoreAccessKey])
-				ctx.StorageSecretKey = string(datastoreSecret.Data[datastoreSecretKey])
-				ctx.ObjectStorageInitialized = true
-			}
-		}
-
-		if !found {
-			r.Log.Info("`ObjectBucketClaim` not found")
-		}
-
-	} else if err != nil {
-		r.Log.Info("cluster does not support `ObjectBucketClaim` API")
+// checkObjectBucketClaimsAvailable verifies if ObjectBucketClaim objects are supported by the
+// cluster. If supported then attempt to load bucket related info in provided QuayRegistryContext.
+// TODO(rmarasch): Pass in a context.Context here so we can timeout.
+// TODO(rmarasch): Can't we do a Get() instead of a List() with regards to ObjectBucketClaims?
+func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
+	qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte,
+) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+	ctx := context.Background()
+	datastoreName := types.NamespacedName{
+		Namespace: quay.GetNamespace(),
+		Name:      quay.GetName() + "-quay-datastore",
 	}
 
-	return ctx, quay, nil
+	var objectBucketClaims objectbucket.ObjectBucketClaimList
+	if err := r.List(ctx, &objectBucketClaims); err != nil {
+		r.Log.Info("cluster does not support `ObjectBucketClaim` API")
+		return qctx, quay, nil
+	}
+	r.Log.Info("cluster supports `ObjectBucketClaims` API")
+	qctx.SupportsObjectStorage = true
+
+	for _, obc := range objectBucketClaims.Items {
+		claimName := fmt.Sprintf("%s/%s", obc.GetNamespace(), obc.GetName())
+		if claimName != datastoreName.String() {
+			continue
+		}
+
+		r.Log.Info("`ObjectBucketClaim` exists")
+		var datastoreSecret corev1.Secret
+		if err := r.Get(ctx, datastoreName, &datastoreSecret); err != nil {
+			r.Log.Error(err, "unable to retrieve Quay datastore `Secret`")
+			return qctx, quay, err
+		}
+
+		var datastoreConfig corev1.ConfigMap
+		if err := r.Get(ctx, datastoreName, &datastoreConfig); err != nil {
+			r.Log.Error(err, "unable to retrieve Quay datastore `ConfigMap`")
+			return qctx, quay, err
+		}
+
+		r.Log.Info("found `ObjectBucketClaim` and credentials `Secret`, `ConfigMap`")
+		host := string(datastoreConfig.Data[datastoreBucketHostKey])
+		if strings.Contains(host, ".svc") && !strings.Contains(host, ".svc.cluster.local") {
+			r.Log.Info("`ObjectBucketClaim` is using in-cluster endpoint, ensuring " +
+				"we use the fully qualified domain name")
+			host = strings.ReplaceAll(host, ".svc", ".svc.cluster.local")
+		}
+
+		qctx.StorageHostname = host
+		qctx.StorageBucketName = string(datastoreConfig.Data[datastoreBucketNameKey])
+		qctx.StorageAccessKey = string(datastoreSecret.Data[datastoreAccessKey])
+		qctx.StorageSecretKey = string(datastoreSecret.Data[datastoreSecretKey])
+		qctx.ObjectStorageInitialized = true
+		return qctx, quay, nil
+	}
+
+	r.Log.Info("`ObjectBucketClaim` not found")
+	return qctx, quay, nil
 }
 
 // TODO: Improve this once `builds` is a managed component.
