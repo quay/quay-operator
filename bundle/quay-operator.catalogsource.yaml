@@ -4,4 +4,4 @@ metadata:
   name: quay-operator-tng
 spec:
   sourceType: grpc
-  image: quay.io/projectquay/quay-operator-index
+  image: quay.io/projectquay/quay-operator-catalog
