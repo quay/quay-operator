@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -200,7 +199,7 @@ func (r *QuayRegistryReconciler) checkBuildManagerAvailable(ctx *quaycontext.Qua
 	return ctx, quay, nil
 }
 
-func configEditorCredentialsSecretFrom(objs []runtime.Object) string {
+func configEditorCredentialsSecretFrom(objs []client.Object) string {
 	for _, obj := range objs {
 		objectMeta, _ := meta.Accessor(obj)
 		groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()

@@ -69,8 +69,7 @@ type QuayEcosystemReconciler struct {
 // +kubebuilder:rbac:groups=redhatcop.redhat.io,resources=quayecosystems,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=redhatcop.redhat.io,resources=quayecosystems/status,verbs=get;update;patch
 
-func (r *QuayEcosystemReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *QuayEcosystemReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("quayecosystem", req.NamespacedName)
 
 	log.Info("begin reconcile")

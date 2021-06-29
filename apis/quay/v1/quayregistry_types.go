@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
@@ -312,7 +312,7 @@ func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *Quay
 }
 
 // EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
-func EnsureOwnerReference(quay *QuayRegistry, obj runtime.Object) (runtime.Object, error) {
+func EnsureOwnerReference(quay *QuayRegistry, obj client.Object) (client.Object, error) {
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
