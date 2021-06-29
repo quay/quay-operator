@@ -56,7 +56,7 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func(done Done) {
-	testLogger = zap.LoggerTo(GinkgoWriter, true)
+	testLogger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 	logf.SetLogger(testLogger)
 	testEventRecorder = record.NewFakeRecorder(100)
 
