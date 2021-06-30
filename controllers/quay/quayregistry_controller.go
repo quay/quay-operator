@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -64,8 +63,7 @@ type QuayRegistryReconciler struct {
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
 
-func (r *QuayRegistryReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("quayregistry", req.NamespacedName)
 
 	log.Info("begin reconcile")
@@ -351,7 +349,7 @@ func decode(bytes []byte) interface{} {
 	return value
 }
 
-func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj k8sruntime.Object, quay v1.QuayRegistry) error {
+func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj client.Object, quay v1.QuayRegistry) error {
 	objectMeta, _ := meta.Accessor(obj)
 	groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
 

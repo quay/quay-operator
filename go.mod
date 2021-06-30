@@ -3,8 +3,8 @@ module github.com/quay/quay-operator
 go 1.1
 
 require (
-	github.com/go-logr/logr v0.1.0
-	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20200610144127-e2eec875d6d1
+	github.com/go-logr/logr v0.3.0
+	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20210311161930-4bea5edaff58
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.3
 	github.com/openshift/api v3.9.0+incompatible
@@ -14,10 +14,10 @@ require (
 	github.com/stretchr/testify v1.6.1
 	gopkg.in/yaml.v2 v2.3.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
-	k8s.io/api v0.17.2
-	k8s.io/apimachinery v0.17.2
-	k8s.io/client-go v0.17.2
-	sigs.k8s.io/controller-runtime v0.5.0
+	k8s.io/api v0.20.2
+	k8s.io/apimachinery v0.20.2
+	k8s.io/client-go v0.20.2
+	sigs.k8s.io/controller-runtime v0.8.2
 	sigs.k8s.io/kustomize/api v0.5.0
 	sigs.k8s.io/yaml v1.2.0
 )

@@ -92,7 +92,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 			Expect(k8sClient.Create(context.Background(), quayEnterpriseConfigSecret)).Should(Succeed())
 			Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-			result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 		})
 
 		It("should not return an error", func() {
@@ -136,7 +136,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 				Expect(k8sClient.Delete(context.Background(), quayEnterpriseConfigSecret)).Should(Succeed())
 				Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-				result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+				result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 			})
 
 			It("does not attempt migration", func() {
@@ -161,7 +161,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 				JustBeforeEach(func() {
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -214,7 +214,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 					Expect(k8sClient.Create(context.Background(), oldDatabase)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -245,7 +245,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -265,7 +265,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 				JustBeforeEach(func() {
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -289,7 +289,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -309,7 +309,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 				JustBeforeEach(func() {
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -335,7 +335,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -355,7 +355,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 				JustBeforeEach(func() {
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -379,7 +379,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
@@ -399,7 +399,7 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 				JustBeforeEach(func() {
 					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
 
-					result, err = controller.Reconcile(reconcile.Request{NamespacedName: quayEcosystemName})
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
 				})
 
 				It("does not return an error", func() {
