@@ -50,9 +50,9 @@ type ObjectBucketClaimSpec struct {
 	// +optional
 	AdditionalConfig map[string]string `json:"additionalConfig,omitempty"`
 
-	// ObjectBucketName is the name of the object bucket resource.  This is the authoritative
-	// determintaion for binding.
-	ObjectBucketName string
+	// ObjectBucketName is the name of the object bucket resource. This is the authoritative
+	// determination for binding.
+	ObjectBucketName string `json:"objectBucketName,omitempty"`
 }
 
 // ObjectBucketClaimStatusPhase is set by the controller to save the state of the provisioning process.
@@ -81,6 +81,7 @@ type ObjectBucketClaimStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:openapi-gen=true
+// +kubebuilder:resource:shortName=obc;obcs
 // +kubebuilder:printcolumn:name="StorageClass",type="string",JSONPath=".spec.storageClassName",description="StorageClass"
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Phase"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
