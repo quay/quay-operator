@@ -74,14 +74,7 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 		// Infer managed/unmanaged components from the given `config.yaml`.
 		newComponents := []v1.Component{}
 		for _, component := range quay.Spec.Components {
-			contains, err := kustomize.ContainsComponentConfig(reconfigureRequest.Config, component)
-
-			if err != nil {
-				log.Error(err, "failed to check `config.yaml` for component fieldgroup", "component", component.Kind)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
+			contains := kustomize.ContainsComponentConfig(reconfigureRequest.Config, component)
 			if contains {
 				log.Info("marking component as unmanaged", "component", component.Kind)
 				newComponents = append(newComponents, v1.Component{Kind: component.Kind, Managed: false})
