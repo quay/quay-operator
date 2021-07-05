@@ -4,6 +4,8 @@ metadata:
   name: quay-database
   labels:
     quay-component: postgres
+  annotations:
+    quay-component: postgres
 spec:
   replicas: 1
   selector:

@@ -4,6 +4,8 @@ metadata:
   name: quay-mirror
   labels:
     quay-component: quay-mirror
+  annotations:
+    quay-component: mirror
 spec:
   replicas: 1
   strategy:

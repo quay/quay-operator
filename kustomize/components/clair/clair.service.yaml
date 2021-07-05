@@ -4,6 +4,8 @@ metadata:
   name: clair-app
   labels:
     quay-component: clair-app
+  annotations:
+    quay-component: clair
 spec:
   ports:
     - name: clair-http

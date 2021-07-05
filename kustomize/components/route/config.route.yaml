@@ -4,6 +4,8 @@ metadata:
   name: quay-config-editor
   labels:
     quay-component: quay-config-route
+  annotations:
+    quay-component: route
 spec:
   to:
     kind: Service

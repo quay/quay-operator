@@ -2,6 +2,8 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
   name: quay-alerts-rolebinding
+  annotations:
+    quay-component: monitoring
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
