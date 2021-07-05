@@ -125,6 +125,13 @@ type Condition struct {
 	LastTransitionTime metav1.Time            `json:"lastTransitionTime,omitempty"`
 }
 
+// ComponentCondition is a component specific condition. Each component is composed by a set of
+// other objects (Deployments, Services, etc).
+type ComponentCondition struct {
+	Condition
+	Component string `json:"component"`
+}
+
 // QuayRegistryStatus defines the observed state of QuayRegistry.
 type QuayRegistryStatus struct {
 	// CurrentVersion is the actual version of Quay that is actively deployed.
@@ -140,6 +147,8 @@ type QuayRegistryStatus struct {
 	ConfigEditorCredentialsSecret string `json:"configEditorCredentialsSecret,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
+	// ComponentConditions holds the current condition for all component objects.
+	ComponentConditions []ComponentCondition `json:"componentConditions"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
@@ -328,6 +337,26 @@ func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *Quay
 	}
 
 	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
+}
+
+// Owns verifies if a QuayRegistry object owns provided Object.
+func Owns(quay QuayRegistry, obj client.Object) bool {
+	for _, owref := range obj.GetOwnerReferences() {
+		if owref.Kind != "QuayRegistry" {
+			continue
+		}
+		if owref.Name != quay.GetName() {
+			continue
+		}
+		if owref.APIVersion != GroupVersion.String() {
+			continue
+		}
+		if owref.UID != quay.UID {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 // EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
