@@ -91,6 +91,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&quaycontroller.QuayRegistryStatusReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("QuayRegistryStatus"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistryStatus")
+		os.Exit(1)
+	}
+
 	if err = (&redhatcopcontroller.QuayEcosystemReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("QuayEcosystem"),
