@@ -4,6 +4,8 @@ metadata:
   name: quay-config-editor
   labels:
     quay-component: quay-config-editor
+  annotations:
+    component: "route"
 spec:
   type: ClusterIP
   selector:

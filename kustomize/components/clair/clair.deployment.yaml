@@ -4,6 +4,8 @@ metadata:
   labels:
     quay-component: clair-app
   name: clair-app
+  annotations:
+    component: "clair"
 spec:
   replicas: 1
   selector:

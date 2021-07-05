@@ -4,6 +4,8 @@ metadata:
   name: quay-redis
   labels:
     quay-component: redis
+  annotations:
+    component: "redis"
 spec:
   replicas: 1
   selector:
