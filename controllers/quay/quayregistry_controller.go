@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	prometheusv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
@@ -72,6 +73,7 @@ type QuayRegistryReconciler struct {
 	Scheme         *runtime.Scheme
 	EventRecorder  record.EventRecorder
 	WatchNamespace string
+	Mtx            *sync.Mutex
 
 	// TODO(alecmerdler): Somehow generalize feature detection functions so that they can match a type signature and be iterated over...
 }
@@ -80,6 +82,9 @@ type QuayRegistryReconciler struct {
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
 
 func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
+
 	log := r.Log.WithValues("quayregistry", req.NamespacedName)
 
 	log.Info("begin reconcile")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,6 +38,7 @@ type ConditionFetcher func(context.Context, qv1.QuayRegistry) (map[string][]qv1.
 type QuayRegistryStatusReconciler struct {
 	Client client.Client
 	Log    logr.Logger
+	Mtx    *sync.Mutex
 }
 
 // NewQuayRegistryStatusReconciler returns a new QuayRegistryStatusController configured to use
@@ -58,6 +60,9 @@ func (q *QuayRegistryStatusReconciler) SetupWithManager(mgr ctrl.Manager) error 
 func (q *QuayRegistryStatusReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request,
 ) (ctrl.Result, error) {
+	q.Mtx.Lock()
+	defer q.Mtx.Unlock()
+
 	log := q.Log.WithValues("quayregistrystatus", req.NamespacedName)
 	reschedule := ctrl.Result{RequeueAfter: time.Minute}
 
@@ -109,6 +114,7 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 		}
 		log.Error(err, "unexpected error updating component conditions")
 	}
+	log.Info("quay components conditions reconciled")
 	return reschedule, nil
 }
 
