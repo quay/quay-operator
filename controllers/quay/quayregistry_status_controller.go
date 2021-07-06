@@ -106,7 +106,9 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 	reg.Status.ComponentConditions = allconds
 	if err := q.Client.Status().Update(ctx, &reg); err != nil {
 		log.Error(err, "unexpected error updating component conditions")
+		return reschedule, nil
 	}
+
 	log.Info("quay components conditions reconciled")
 	return reschedule, nil
 }
