@@ -21,6 +21,12 @@ import (
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
+const (
+	// all objects that are deployed as part of any of our components must contain this
+	// annotation. it is used when evaluating the conditions for all the components.
+	quayComponentAnnotation = "quay-operator/component"
+)
+
 // ConditionFetcher is a function capable of returning a list of conditions for a Quay component.
 type ConditionFetcher func(context.Context, qv1.QuayRegistry) ([]qv1.ComponentCondition, error)
 
@@ -112,7 +118,7 @@ func (q *QuayRegistryStatusReconciler) faultyRouteConditions(
 
 	var conds []qv1.ComponentCondition
 	for _, rt := range list.Items {
-		component, ok := rt.Annotations["component"]
+		component, ok := rt.Annotations[quayComponentAnnotation]
 		if !qv1.Owns(reg, &rt) || !ok {
 			continue
 		}
@@ -173,7 +179,7 @@ func (q *QuayRegistryStatusReconciler) faultyDeploymentConditions(
 
 	var conds []qv1.ComponentCondition
 	for _, dep := range list.Items {
-		component, ok := dep.Annotations["component"]
+		component, ok := dep.Annotations[quayComponentAnnotation]
 		if !qv1.Owns(reg, &dep) || !ok {
 			continue
 		}
@@ -229,7 +235,7 @@ func (q *QuayRegistryStatusReconciler) faultyObjectBucketClaimConditions(
 
 	var conds []qv1.ComponentCondition
 	for _, obc := range list.Items {
-		component, ok := obc.Annotations["component"]
+		component, ok := obc.Annotations[quayComponentAnnotation]
 		if !qv1.Owns(reg, &obc) || !ok {
 			continue
 		}
@@ -265,7 +271,7 @@ func (q *QuayRegistryStatusReconciler) faultyJobConditions(
 
 	var conds []qv1.ComponentCondition
 	for _, job := range list.Items {
-		component, ok := job.Annotations["component"]
+		component, ok := job.Annotations[quayComponentAnnotation]
 		if !qv1.Owns(reg, &job) || !ok {
 			continue
 		}

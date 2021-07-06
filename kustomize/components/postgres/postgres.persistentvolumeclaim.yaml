@@ -4,8 +4,6 @@ metadata:
   name: quay-database
   labels:
     quay-component: postgres
-  annotations:
-    component: "postgres"
 spec:
   accessModes:
     - ReadWriteOnce

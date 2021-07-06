@@ -4,8 +4,6 @@ metadata:
   name: clair-postgres
   labels:
     quay-component: clair-postgres
-  annotations:
-    component: "clair"
 spec:
   type: ClusterIP
   ports:

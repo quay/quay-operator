@@ -2,8 +2,8 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: quay-postgres-init
-  annotations:
-    component: "postgres"
+  labels:
+    quay-component: postgres
 spec:
   template:
     metadata:

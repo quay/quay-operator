@@ -4,8 +4,6 @@ metadata:
   name: quay-app-upgrade
   labels:
     quay-component: quay-app-upgrade
-  annotations:
-    component: quay
 spec:
   template:
     metadata:
