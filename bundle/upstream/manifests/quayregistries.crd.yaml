@@ -53,6 +53,28 @@ spec:
           status:
             description: QuayRegistryStatus defines the observed state of QuayRegistry.
             properties:
+              componentConditions:
+                description: Component Conditions shows the conditions in a per component basis
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      lastTransitionTime:
+                        format: date-time
+                        type: string
+                      lastUpdateTime:
+                        format: date-time
+                        type: string
+                      message:
+                        type: string
+                      reason:
+                        type: string
+                      status:
+                        type: string
+                      type:
+                        type: string
               conditions:
                 description: Conditions represent the conditions that a QuayRegistry can have.
                 items:
