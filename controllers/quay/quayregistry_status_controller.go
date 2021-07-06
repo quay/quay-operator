@@ -3,13 +3,13 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -98,10 +98,7 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 		}
 	}
 
-	// XXX there must be a different way of checking if both are equal without using
-	// reflection and without having to write it ourselves. Anyways, if the conditions
-	// remain the same no update is needed.
-	if reflect.DeepEqual(reg.Status.ComponentConditions, allconds) {
+	if equality.Semantic.DeepEqual(reg.Status.ComponentConditions, allconds) {
 		log.Info("quay components conditions reconciled (no changes)")
 		return reschedule, nil
 	}
