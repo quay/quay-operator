@@ -102,16 +102,12 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 	// reflection and without having to write it ourselves. Anyways, if the conditions
 	// remain the same no update is needed.
 	if reflect.DeepEqual(reg.Status.ComponentConditions, allconds) {
+		log.Info("quay components conditions reconciled (no changes)")
 		return reschedule, nil
 	}
 
 	reg.Status.ComponentConditions = allconds
 	if err := q.Client.Status().Update(ctx, &reg); err != nil {
-		if errors.IsConflict(err) {
-			// XXX unfortunately we are competing with the main QuayRegistry
-			// reconciler, i.e. no need for logging this out.
-			return reschedule, nil
-		}
 		log.Error(err, "unexpected error updating component conditions")
 	}
 	log.Info("quay components conditions reconciled")
