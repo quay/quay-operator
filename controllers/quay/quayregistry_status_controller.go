@@ -27,8 +27,9 @@ const (
 	quayComponentLabel = "quay-component"
 )
 
-// ConditionFetcher is a function capable of returning a list of conditions for a Quay component.
-type ConditionFetcher func(context.Context, qv1.QuayRegistry) ([]qv1.ComponentCondition, error)
+// ConditionFetcher is a function capable of returning a map of conditions indexed by component
+// name.
+type ConditionFetcher func(context.Context, qv1.QuayRegistry) (map[string][]qv1.Condition, error)
 
 // QuayRegistryStatusReconciler updates status for QuayRegistry components. This status Reconciler
 // has to live in a different controller to avoid having to have a resync period in the main Quay
@@ -53,7 +54,7 @@ func (q *QuayRegistryStatusReconciler) SetupWithManager(mgr ctrl.Manager) error 
 }
 
 // Reconcile is called for reconcile status for a given QuayRegistry components. This function
-// always rescheduled the same event at the return, that makes this to run from time to time.
+// always rescheduled the same event on return, that makes this to run from time to time.
 func (q *QuayRegistryStatusReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request,
 ) (ctrl.Result, error) {
@@ -71,19 +72,25 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 		return reschedule, nil
 	}
 
-	var allconds []qv1.ComponentCondition
+	allconds := map[string][]qv1.Condition{}
 	for _, fn := range []ConditionFetcher{
 		q.faultyDeploymentConditions,
 		q.faultyRouteConditions,
 		q.faultyObjectBucketClaimConditions,
 		q.faultyJobConditions,
 	} {
-		conds, err := fn(ctx, reg)
+		conditions, err := fn(ctx, reg)
 		if err != nil {
 			log.Error(err, "error retrieving QuayRegistry component conditions")
 			return reschedule, nil
 		}
-		allconds = append(allconds, conds...)
+		for cname, conds := range conditions {
+			if _, ok := allconds[cname]; ok {
+				allconds[cname] = append(allconds[cname], conds...)
+				continue
+			}
+			allconds[cname] = conds
+		}
 	}
 
 	// XXX there must be a different way of checking if both are equal without using
@@ -107,16 +114,16 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 
 // faultyRouteConditions returns all conditions for Routes that were not admitted yet by any
 // reason. Looks for RouteAdmitted condition among the list of Route current conditions. Converts
-// RouteAdmitted conditions into a ComponentConditions before return.
+// RouteAdmitted conditions into quayv1 Conditions before return.
 func (q *QuayRegistryStatusReconciler) faultyRouteConditions(
 	ctx context.Context, reg qv1.QuayRegistry,
-) ([]qv1.ComponentCondition, error) {
+) (map[string][]qv1.Condition, error) {
 	var list routev1.RouteList
 	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
 		return nil, err
 	}
 
-	var conds []qv1.ComponentCondition
+	conds := map[string][]qv1.Condition{}
 	for _, rt := range list.Items {
 		component, ok := rt.Labels[quayComponentLabel]
 		if !qv1.Owns(reg, &rt) || !ok {
@@ -138,16 +145,16 @@ func (q *QuayRegistryStatusReconciler) faultyRouteConditions(
 			if !cond.LastTransitionTime.IsZero() {
 				lastTransition = *cond.LastTransitionTime
 			}
-			conds = append(conds, qv1.ComponentCondition{
-				Component: component,
-				Condition: qv1.Condition{
+			conds[component] = append(
+				conds[component],
+				qv1.Condition{
 					Type:               qv1.ConditionType(cond.Type),
 					Status:             metav1.ConditionStatus(cond.Status),
 					Reason:             qv1.ConditionReason(cond.Reason),
 					Message:            msg,
 					LastTransitionTime: lastTransition,
 				},
-			})
+			)
 		}
 	}
 	return conds, nil
@@ -168,16 +175,16 @@ func (q *QuayRegistryStatusReconciler) ingressAdmittedCondition(
 }
 
 // faultyDeploymentConditions returns the faulty conditions present in any of the component
-// deployments. Evaluate the Deployment status by its Available condition.
+// Deployments. Evaluate the Deployment status by its Available condition.
 func (q *QuayRegistryStatusReconciler) faultyDeploymentConditions(
 	ctx context.Context, reg qv1.QuayRegistry,
-) ([]qv1.ComponentCondition, error) {
+) (map[string][]qv1.Condition, error) {
 	var list appsv1.DeploymentList
 	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
 		return nil, err
 	}
 
-	var conds []qv1.ComponentCondition
+	conds := map[string][]qv1.Condition{}
 	for _, dep := range list.Items {
 		component, ok := dep.Labels[quayComponentLabel]
 		if !qv1.Owns(reg, &dep) || !ok {
@@ -194,9 +201,9 @@ func (q *QuayRegistryStatusReconciler) faultyDeploymentConditions(
 		}
 
 		msg := fmt.Sprintf("Deployment %s: %s", dep.Name, cond.Message)
-		conds = append(conds, qv1.ComponentCondition{
-			Component: component,
-			Condition: qv1.Condition{
+		conds[component] = append(
+			conds[component],
+			qv1.Condition{
 				Type:               qv1.ConditionType(cond.Type),
 				Status:             metav1.ConditionStatus(cond.Status),
 				Reason:             qv1.ConditionReason(cond.Reason),
@@ -204,7 +211,7 @@ func (q *QuayRegistryStatusReconciler) faultyDeploymentConditions(
 				LastUpdateTime:     cond.LastUpdateTime,
 				LastTransitionTime: cond.LastTransitionTime,
 			},
-		})
+		)
 	}
 	return conds, nil
 }
@@ -227,13 +234,13 @@ func (q *QuayRegistryStatusReconciler) deployAvailableCondition(
 // condition if it is not set to ObjectBucketClaimStatusPhaseBound.
 func (q *QuayRegistryStatusReconciler) faultyObjectBucketClaimConditions(
 	ctx context.Context, reg qv1.QuayRegistry,
-) ([]qv1.ComponentCondition, error) {
+) (map[string][]qv1.Condition, error) {
 	var list ocsv1a1.ObjectBucketClaimList
 	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
 		return nil, err
 	}
 
-	var conds []qv1.ComponentCondition
+	conds := map[string][]qv1.Condition{}
 	for _, obc := range list.Items {
 		component, ok := obc.Labels[quayComponentLabel]
 		if !qv1.Owns(reg, &obc) || !ok {
@@ -246,30 +253,30 @@ func (q *QuayRegistryStatusReconciler) faultyObjectBucketClaimConditions(
 		}
 
 		msg := fmt.Sprintf("ObjectBucketClaim %s reporing phase %q", obc.Name, phase)
-		conds = append(conds, qv1.ComponentCondition{
-			Component: component,
-			Condition: qv1.Condition{
+		conds[component] = append(
+			conds[component],
+			qv1.Condition{
 				Type:    "ObjectBucketClaimPhase",
 				Status:  metav1.ConditionFalse,
 				Reason:  "ObjectBucketClaimNotBound",
 				Message: msg,
 			},
-		})
+		)
 	}
 	return conds, nil
 }
 
 // faultyJobConditions looks for Jobs owned by provided QuayRegistry and filters possible faulty
-// conditions from it. Converts JobCondition into ComponentCondition before returning.
+// conditions from it. Converts JobConditions into quayv1 Conditions before returning.
 func (q *QuayRegistryStatusReconciler) faultyJobConditions(
 	ctx context.Context, reg qv1.QuayRegistry,
-) ([]qv1.ComponentCondition, error) {
+) (map[string][]qv1.Condition, error) {
 	var list batchv1.JobList
 	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
 		return nil, err
 	}
 
-	var conds []qv1.ComponentCondition
+	conds := map[string][]qv1.Condition{}
 	for _, job := range list.Items {
 		component, ok := job.Labels[quayComponentLabel]
 		if !qv1.Owns(reg, &job) || !ok {
@@ -282,16 +289,16 @@ func (q *QuayRegistryStatusReconciler) faultyJobConditions(
 		}
 
 		msg := fmt.Sprintf("Job %s: %s", job.Name, cond.Message)
-		conds = append(conds, qv1.ComponentCondition{
-			Component: component,
-			Condition: qv1.Condition{
+		conds[component] = append(
+			conds[component],
+			qv1.Condition{
 				Type:               qv1.ConditionType(cond.Type),
 				Status:             metav1.ConditionStatus(cond.Status),
 				Reason:             qv1.ConditionReason(cond.Reason),
 				Message:            msg,
 				LastTransitionTime: cond.LastTransitionTime,
 			},
-		})
+		)
 	}
 	return conds, nil
 }

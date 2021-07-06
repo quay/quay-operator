@@ -125,13 +125,6 @@ type Condition struct {
 	LastTransitionTime metav1.Time            `json:"lastTransitionTime,omitempty"`
 }
 
-// ComponentCondition is a component specific condition. Each component is composed by a set of
-// other objects (Deployments, Services, etc).
-type ComponentCondition struct {
-	Condition
-	Component string `json:"component"`
-}
-
 // QuayRegistryStatus defines the observed state of QuayRegistry.
 type QuayRegistryStatus struct {
 	// CurrentVersion is the actual version of Quay that is actively deployed.
@@ -148,7 +141,7 @@ type QuayRegistryStatus struct {
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
 	// ComponentConditions holds the current condition for all component objects.
-	ComponentConditions []ComponentCondition `json:"componentConditions"`
+	ComponentConditions map[string][]Condition `json:"componentConditions"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
