@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: quay-app
   labels:
-    quay-component: quay-app
+    quay-component: base
 spec:
   replicas: 1
   selector:

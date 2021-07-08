@@ -4,6 +4,7 @@ metadata:
   name: grafana-dashboard-quay
   namespace: openshift-config-managed
   labels:
+    quay-component: monitoring
     console.openshift.io/dashboard: "true"
 data:
   quay.json: |-

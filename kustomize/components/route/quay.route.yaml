@@ -3,7 +3,7 @@ apiVersion: route.openshift.io/v1
 metadata:
   name: quay
   labels:
-    quay-component: quay-app-route
+    quay-component: route
 spec:
   host: $(SERVER_HOSTNAME)
   to:

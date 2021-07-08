@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: quay-config-editor
   labels:
-    quay-component: quay-config-editor
+    quay-component: route
 spec:
   type: ClusterIP
   selector:

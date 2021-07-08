@@ -2,6 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   labels:
+    quay-component: monitoring
     prometheus: k8s
     role: alert-rules
   name: quay-prometheus-rules

@@ -3,7 +3,7 @@ apiVersion: route.openshift.io/v1
 metadata:
   name: quay-config-editor
   labels:
-    quay-component: quay-config-route
+    quay-component: route
 spec:
   to:
     kind: Service

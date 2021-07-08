@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: clair-app
   labels:
-    quay-component: clair-app
+    quay-component: clair
 spec:
   ports:
     - name: clair-http

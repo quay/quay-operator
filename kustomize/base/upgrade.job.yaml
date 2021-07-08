@@ -3,7 +3,7 @@ kind: Job
 metadata:
   name: quay-app-upgrade
   labels:
-    quay-component: quay-app-upgrade
+    quay-component: base
 spec:
   template:
     metadata:

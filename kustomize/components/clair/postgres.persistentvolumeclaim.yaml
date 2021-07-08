@@ -3,7 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: clair-postgres
   labels:
-    quay-component: clair-postgres
+    quay-component: clair
 spec:
   accessModes:
     - ReadWriteOnce
