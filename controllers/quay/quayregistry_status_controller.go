@@ -24,8 +24,8 @@ import (
 
 const (
 	// all objects that are deployed as part of any of our components must contain this
-	// label. it is used when evaluating the conditions for all the components.
-	quayComponentLabel = "quay-component"
+	// annotation. it is used when evaluating the conditions for all the components.
+	quayComponentAnnotation = "quay-component"
 )
 
 // ConditionFetcher is a function capable of returning a map of conditions indexed by component
@@ -132,7 +132,7 @@ func (q *QuayRegistryStatusReconciler) faultyRouteConditions(
 
 	conds := map[string][]qv1.Condition{}
 	for _, rt := range list.Items {
-		component, ok := rt.Labels[quayComponentLabel]
+		component, ok := rt.Annotations[quayComponentAnnotation]
 		if !qv1.Owns(reg, &rt) || !ok {
 			continue
 		}
@@ -193,7 +193,7 @@ func (q *QuayRegistryStatusReconciler) faultyDeploymentConditions(
 
 	conds := map[string][]qv1.Condition{}
 	for _, dep := range list.Items {
-		component, ok := dep.Labels[quayComponentLabel]
+		component, ok := dep.Annotations[quayComponentAnnotation]
 		if !qv1.Owns(reg, &dep) || !ok {
 			continue
 		}
@@ -249,7 +249,7 @@ func (q *QuayRegistryStatusReconciler) faultyObjectBucketClaimConditions(
 
 	conds := map[string][]qv1.Condition{}
 	for _, obc := range list.Items {
-		component, ok := obc.Labels[quayComponentLabel]
+		component, ok := obc.Annotations[quayComponentAnnotation]
 		if !qv1.Owns(reg, &obc) || !ok {
 			continue
 		}
@@ -285,7 +285,7 @@ func (q *QuayRegistryStatusReconciler) faultyJobConditions(
 
 	conds := map[string][]qv1.Condition{}
 	for _, job := range list.Items {
-		component, ok := job.Labels[quayComponentLabel]
+		component, ok := job.Annotations[quayComponentAnnotation]
 		if !qv1.Owns(reg, &job) || !ok {
 			continue
 		}
