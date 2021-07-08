@@ -4,6 +4,8 @@ metadata:
   name: quay-postgres-init
   labels:
     quay-component: postgres
+  annotations:
+    quay-component: postgres
 spec:
   template:
     metadata:

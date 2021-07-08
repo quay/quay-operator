@@ -3,6 +3,8 @@ kind: NooBaa
 metadata:
   name: noobaa
   namespace: openshift-storage
+  annotations:
+    quay-component: objectstorage
 spec:
   dbType: postgres
   dbResources:

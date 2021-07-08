@@ -4,6 +4,8 @@ metadata:
   name: quay
   labels:
     quay-component: quay-app-route
+  annotations:
+    quay-component: route
 spec:
   host: $(SERVER_HOSTNAME)
   to:

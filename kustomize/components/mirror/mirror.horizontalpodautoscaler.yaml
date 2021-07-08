@@ -2,6 +2,8 @@ apiVersion: autoscaling/v2beta2
 kind: HorizontalPodAutoscaler
 metadata:
   name: quay-mirror
+  annotations:
+    quay-component: mirror
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

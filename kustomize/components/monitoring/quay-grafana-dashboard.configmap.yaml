@@ -5,6 +5,8 @@ metadata:
   namespace: openshift-config-managed
   labels:
     console.openshift.io/dashboard: "true"
+  annotations:
+    quay-component: monitoring
 data:
   quay.json: |-
     {
