@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: quay-config-editor
   labels:
-    quay-component: base
+    quay-component: quay-config-editor
 spec:
   replicas: 1
   selector:

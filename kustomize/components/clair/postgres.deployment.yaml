@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: clair-postgres
   labels:
-    quay-component: clair
+    quay-component: clair-postgres
 spec:
   replicas: 1
   strategy:

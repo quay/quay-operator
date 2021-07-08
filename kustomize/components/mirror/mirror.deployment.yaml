@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: quay-mirror
   labels:
-    quay-component: mirror
+    quay-component: quay-mirror
 spec:
   replicas: 1
   strategy:

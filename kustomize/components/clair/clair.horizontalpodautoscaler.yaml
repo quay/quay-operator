@@ -2,8 +2,6 @@ apiVersion: autoscaling/v2beta2
 kind: HorizontalPodAutoscaler
 metadata:
   name: clair-app
-  labels:
-    quay-component: clair
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

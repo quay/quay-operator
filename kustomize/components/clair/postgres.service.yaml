@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: clair-postgres
   labels:
-    quay-component: clair
+    quay-component: clair-postgres
 spec:
   type: ClusterIP
   ports:

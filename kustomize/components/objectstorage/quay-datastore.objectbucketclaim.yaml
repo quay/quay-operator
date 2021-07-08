@@ -3,7 +3,7 @@ kind: ObjectBucketClaim
 metadata:
   name: quay-datastore
   labels:
-    quay-component: objectstorage
+    quay-component: quay-datastore
 spec:
   generateBucketName: quay-datastore
   storageClassName: openshift-storage.noobaa.io

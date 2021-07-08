@@ -4,5 +4,3 @@ metadata:
   name: cluster-service-ca
   annotations:
     service.beta.openshift.io/inject-cabundle: 'true'
-  labels:
-    quay-component: base
