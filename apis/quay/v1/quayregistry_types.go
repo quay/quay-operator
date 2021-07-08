@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -125,6 +126,20 @@ type Condition struct {
 	LastTransitionTime metav1.Time            `json:"lastTransitionTime,omitempty"`
 }
 
+// ComponentConditions holds a list of conditions in a per component basis.
+type ComponentConditions struct {
+	Base                    []Condition `json:"base,omitempty"`
+	Postgres                []Condition `json:"postgres,omitempty"`
+	Clair                   []Condition `json:"clair,omitempty"`
+	Redis                   []Condition `json:"redis,omitempty"`
+	HorizontalPodAutoscaler []Condition `json:"horizontalpodautoscaler,omitempty"`
+	ObjectStorage           []Condition `json:"objectstorage,omitempty"`
+	Route                   []Condition `json:"route,omitempty"`
+	Mirror                  []Condition `json:"mirror,omitempty"`
+	Monitoring              []Condition `json:"monitoring,omitempty"`
+	TLS                     []Condition `json:"tls,omitempty"`
+}
+
 // QuayRegistryStatus defines the observed state of QuayRegistry.
 type QuayRegistryStatus struct {
 	// CurrentVersion is the actual version of Quay that is actively deployed.
@@ -141,7 +156,7 @@ type QuayRegistryStatus struct {
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
 	// ComponentConditions holds the current condition for all component objects.
-	ComponentConditions map[string][]Condition `json:"componentConditions"`
+	ComponentConditions ComponentConditions `json:"componentConditions"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
@@ -350,6 +365,19 @@ func Owns(quay QuayRegistry, obj client.Object) bool {
 		return true
 	}
 	return false
+}
+
+// MapToComponentConditions converts a map into a ComponentConditions object.
+func MapToComponentConditions(allconds map[string][]Condition) (ComponentConditions, error) {
+	var cc ComponentConditions
+	dt, err := json.Marshal(allconds)
+	if err != nil {
+		return cc, err
+	}
+	if err := json.Unmarshal(dt, &cc); err != nil {
+		return cc, err
+	}
+	return cc, nil
 }
 
 // EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
