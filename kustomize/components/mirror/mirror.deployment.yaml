@@ -56,24 +56,6 @@ spec:
             - name: ENSURE_NO_MIGRATION
               value: "true"
           # TODO: Determine if we need to set resource requirements
-          startupProbe:
-            httpGet:
-              path: /health/instance
-              port: 8080
-              scheme: HTTP
-            timeoutSeconds: 20
-            periodSeconds: 15
-            failureThreshold: 10
-          readinessProbe:
-            httpGet:
-              path: /health/instance
-              port: 8080
-              scheme: HTTP
-          livelinessProbe:
-            httpGet:
-              path: /health/instance
-              port: 8080
-              scheme: HTTP
           volumeMounts:
             - name: config
               readOnly: false
