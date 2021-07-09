@@ -53,7 +53,7 @@ spec:
           status:
             description: QuayRegistryStatus defines the observed state of QuayRegistry.
             properties:
-              componentConditions:
+              unhealthyComponents:
                 description: Component Conditions shows the conditions in a per component basis
                 type: object
                 properties:

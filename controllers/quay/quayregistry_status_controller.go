@@ -98,18 +98,18 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 		}
 	}
 
-	cc, err := qv1.MapToComponentConditions(allconds)
+	uc, err := qv1.MapToUnhealthyComponents(allconds)
 	if err != nil {
 		log.Error(err, "error creating component conditions")
 		return reschedule, nil
 	}
 
-	if equality.Semantic.DeepEqual(reg.Status.ComponentConditions, cc) {
+	if equality.Semantic.DeepEqual(reg.Status.UnhealthyComponents, uc) {
 		log.Info("quay components conditions reconciled (no changes)")
 		return reschedule, nil
 	}
 
-	reg.Status.ComponentConditions = cc
+	reg.Status.UnhealthyComponents = uc
 	if err := q.Client.Status().Update(ctx, &reg); err != nil {
 		log.Error(err, "unexpected error updating component conditions")
 		return reschedule, nil

@@ -126,8 +126,8 @@ type Condition struct {
 	LastTransitionTime metav1.Time            `json:"lastTransitionTime,omitempty"`
 }
 
-// ComponentConditions holds a list of conditions in a per component basis.
-type ComponentConditions struct {
+// UnhealthyComponents holds a list of unhealthy conditions in a per component basis.
+type UnhealthyComponents struct {
 	Base                    []Condition `json:"base,omitempty"`
 	Postgres                []Condition `json:"postgres,omitempty"`
 	Clair                   []Condition `json:"clair,omitempty"`
@@ -156,7 +156,7 @@ type QuayRegistryStatus struct {
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
 	// ComponentConditions holds the current condition for all component objects.
-	ComponentConditions ComponentConditions `json:"componentConditions"`
+	UnhealthyComponents UnhealthyComponents `json:"unhealthyComponents"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
@@ -367,17 +367,17 @@ func Owns(quay QuayRegistry, obj client.Object) bool {
 	return false
 }
 
-// MapToComponentConditions converts a map into a ComponentConditions object.
-func MapToComponentConditions(allconds map[string][]Condition) (ComponentConditions, error) {
-	var cc ComponentConditions
+// MapToUnhealthyComponents converts a map into a UnhealthyComponents object.
+func MapToUnhealthyComponents(allconds map[string][]Condition) (UnhealthyComponents, error) {
+	var uc UnhealthyComponents
 	dt, err := json.Marshal(allconds)
 	if err != nil {
-		return cc, err
+		return uc, err
 	}
-	if err := json.Unmarshal(dt, &cc); err != nil {
-		return cc, err
+	if err := json.Unmarshal(dt, &uc); err != nil {
+		return uc, err
 	}
-	return cc, nil
+	return uc, nil
 }
 
 // EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
