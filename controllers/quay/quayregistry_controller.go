@@ -124,20 +124,18 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if quay.Spec.ConfigBundleSecret == "" {
 		log.Info("`spec.configBundleSecret` is unset. Creating base `Secret`")
 
-		baseConfigBundle, err := v1.EnsureOwnerReference(&quay, &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: quay.GetName() + "-config-bundle-",
-				Namespace:    quay.GetNamespace(),
+		baseConfigBundle := v1.EnsureOwnerReference(
+			&quay,
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: quay.GetName() + "-config-bundle-",
+					Namespace:    quay.GetNamespace(),
+				},
+				Data: map[string][]byte{
+					"config.yaml": encode(kustomize.BaseConfig()),
+				},
 			},
-			Data: map[string][]byte{
-				"config.yaml": encode(kustomize.BaseConfig()),
-			},
-		})
-		if err != nil {
-			msg := fmt.Sprintf("unable to add owner reference to base config bundle `Secret`: %s", err)
-
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-		}
+		)
 
 		if err := r.Client.Create(ctx, baseConfigBundle); err != nil {
 			msg := fmt.Sprintf("unable to create base config bundle `Secret`: %s", err)
@@ -474,19 +472,10 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj c
 		"Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
 	log.Info("creating/updating object")
 
-	obj, err := v1.EnsureOwnerReference(&quay, obj)
-	if err != nil {
-		log.Error(err, "could not ensure `ownerReferences` before creating object", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
-		return err
-	}
-
+	obj = v1.EnsureOwnerReference(&quay, obj)
 	// Remove owner reference to prevent cross-namespace owner reference
 	if isGrafanaConfigMap(obj) {
-		obj, err = v1.RemoveOwnerReference(&quay, obj)
-		if err != nil {
-			log.Error(err, "could not remove `ownerReferences` before creating object", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
-			return err
-		}
+		obj = v1.RemoveOwnerReference(&quay, obj)
 	}
 
 	// managedFields cannot be set on a PATCH.
