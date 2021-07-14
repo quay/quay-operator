@@ -518,12 +518,7 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 	}
 
 	for index, resource := range resources {
-		resource, err = v1.EnsureOwnerReference(quay, resource)
-		if err != nil {
-			return nil, err
-		}
-
-		resources[index] = resource
+		resources[index] = v1.EnsureOwnerReference(quay, resource)
 	}
 
 	return resources, err

@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -330,52 +329,50 @@ func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *Quay
 	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
 }
 
-// EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
-func EnsureOwnerReference(quay *QuayRegistry, obj client.Object) (client.Object, error) {
-	objectMeta, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	hasOwnerRef := false
-	for _, ownerRef := range objectMeta.GetOwnerReferences() {
-		if ownerRef.Name == quay.GetName() &&
-			ownerRef.Kind == "QuayRegistry" &&
-			ownerRef.APIVersion == GroupVersion.String() &&
-			ownerRef.UID == quay.UID {
-			hasOwnerRef = true
+// EnsureOwnerReference adds QuayRegistry as an `ownerReference` to the given object (if it does
+// not already have it).
+func EnsureOwnerReference(quay *QuayRegistry, obj client.Object) client.Object {
+	for _, ownerRef := range obj.GetOwnerReferences() {
+		if ownerRef.Name != quay.GetName() {
+			continue
 		}
+		if ownerRef.Kind != "QuayRegistry" {
+			continue
+		}
+		if ownerRef.APIVersion != GroupVersion.String() {
+			continue
+		}
+		if ownerRef.UID != quay.UID {
+			continue
+		}
+		return obj
 	}
 
-	if !hasOwnerRef {
-		objectMeta.SetOwnerReferences(append(objectMeta.GetOwnerReferences(), metav1.OwnerReference{
-			APIVersion: GroupVersion.String(),
-			Kind:       "QuayRegistry",
-			Name:       quay.GetName(),
-			UID:        quay.GetUID(),
-		}))
-	}
-
-	return obj, nil
+	obj.SetOwnerReferences(
+		append(
+			obj.GetOwnerReferences(),
+			metav1.OwnerReference{
+				APIVersion: GroupVersion.String(),
+				Kind:       "QuayRegistry",
+				Name:       quay.GetName(),
+				UID:        quay.GetUID(),
+			},
+		),
+	)
+	return obj
 }
 
-// RemoveOwnerReference removes the `ownerReference` of `QuayRegistry` on the given object.
-func RemoveOwnerReference(quay *QuayRegistry, obj client.Object) (client.Object, error) {
-	filteredOwnerReferences := []metav1.OwnerReference{}
-
-	objectMeta, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, ownerRef := range objectMeta.GetOwnerReferences() {
-		if ownerRef.Name != quay.GetName() {
-			filteredOwnerReferences = append(filteredOwnerReferences, ownerRef)
+// RemoveOwnerReference removes QuayRegistry from the owner references in a given object.
+func RemoveOwnerReference(quay *QuayRegistry, obj client.Object) client.Object {
+	newrefs := []metav1.OwnerReference{}
+	for _, ownerRef := range obj.GetOwnerReferences() {
+		if ownerRef.Name == quay.GetName() {
+			continue
 		}
+		newrefs = append(newrefs, ownerRef)
 	}
-	objectMeta.SetOwnerReferences(filteredOwnerReferences)
-
-	return obj, nil
+	obj.SetOwnerReferences(newrefs)
+	return obj
 }
 
 // ManagedKeysSecretNameFor returns the name of the `Secret` in which generated secret keys are stored.

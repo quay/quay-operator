@@ -105,17 +105,20 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegis
 		ctx.ServerHostname = fieldGroup.ServerHostname
 	}
 
-	fakeRoute, err := v1.EnsureOwnerReference(quay, &routev1.Route{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      quay.GetName() + "-test-route",
-			Namespace: quay.GetNamespace(),
+	fakeRoute := v1.EnsureOwnerReference(
+		quay, &routev1.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      quay.GetName() + "-test-route",
+				Namespace: quay.GetNamespace(),
+			},
+			Spec: routev1.RouteSpec{
+				To: routev1.RouteTargetReference{
+					Kind: "Service",
+					Name: "none",
+				},
+			},
 		},
-		Spec: routev1.RouteSpec{To: routev1.RouteTargetReference{Kind: "Service", Name: "none"}},
-	})
-
-	if err != nil {
-		return ctx, quay, err
-	}
+	)
 
 	if err := r.Client.Create(context.Background(), fakeRoute); err == nil || errors.IsAlreadyExists(err) {
 		r.Log.Info("cluster supports `Routes` API")
