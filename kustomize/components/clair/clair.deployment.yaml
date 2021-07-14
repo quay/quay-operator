@@ -15,6 +15,19 @@ spec:
         quay-component: clair-app
     spec:
       serviceAccountName: clair-app
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            quay-component: clair-app
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            quay-component: clair-app
       containers:
         - image: quay.io/projectquay/clair@sha256:77ffab0e44458d5725f2e9e5f2f57bda74b3bd073030611ca7cf5d753130c858
           imagePullPolicy: IfNotPresent

@@ -14,6 +14,19 @@ spec:
       labels:
         quay-component: quay-app
     spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            quay-component: quay-app
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            quay-component: quay-app
       serviceAccountName: quay-app
       volumes:
         - name: config
