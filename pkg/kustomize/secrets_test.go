@@ -330,14 +330,8 @@ func TestContainsComponentConfig(t *testing.T) {
 		err := yaml.Unmarshal([]byte(test.rawConfig), &fullConfig)
 		assert.Nil(err, test.name)
 
-		contains, err := ContainsComponentConfig(fullConfig, v1.Component{Kind: test.component, Managed: test.managed})
-
-		if test.expectedError != nil {
-			assert.NotNil(err, test.name)
-		} else {
-			assert.Nil(err, test.name)
-			assert.Equal(test.expected, contains, test.name)
-		}
+		contains := ContainsComponentConfig(fullConfig, v1.Component{Kind: test.component, Managed: test.managed})
+		assert.Equal(test.expected, contains, test.name)
 	}
 }
 

@@ -242,16 +242,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	updatedQuay.Status.Conditions = v1.RemoveCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked)
 
 	for _, component := range updatedQuay.Spec.Components {
-		contains, err := kustomize.ContainsComponentConfig(userProvidedConfig, component)
-		if err != nil {
-			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, err.Error())
-			if err != nil {
-				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-
-				return ctrl.Result{}, nil
-			}
-		}
-
+		contains := kustomize.ContainsComponentConfig(userProvidedConfig, component)
 		if component.Managed && contains {
 			msg := fmt.Sprintf("%s component marked as managed, but `configBundleSecret` contains required fields", component.Kind)
 

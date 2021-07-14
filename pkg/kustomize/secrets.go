@@ -186,10 +186,9 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) (
 	return ctx.TLSCert, ctx.TLSKey, nil
 }
 
-// ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
-// the fieldgroup for the given component by comparing it with the fieldgroup defaults.
-// TODO: Replace this with function from `config-tool` library once implemented.
-func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Component) (bool, error) {
+// ContainsComponentConfig accepts a full `config.yaml` and determines if it contains the
+// fieldgroup for the given component by comparing it with the fieldgroup defaults.
+func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Component) bool {
 	fields := []string{}
 
 	switch component.Kind {
@@ -203,7 +202,7 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Com
 		fields = (&distributedstorage.DistributedStorageFieldGroup{}).Fields()
 	case v1.ComponentHPA:
 		// HorizontalPodAutoscaler has no associated config fieldgroup.
-		return false, nil
+		return false
 	case v1.ComponentMirror:
 		fields = (&repomirror.RepoMirrorFieldGroup{}).Fields()
 	case v1.ComponentRoute:
@@ -218,7 +217,7 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Com
 			}
 		}
 	case v1.ComponentMonitoring:
-		return false, nil
+		return false
 	case v1.ComponentTLS:
 		fields = []string{"EXTERNAL_TLS_TERMINATION"}
 	default:
@@ -228,11 +227,10 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Com
 	// FIXME: Only checking for the existance of a single field
 	for _, field := range fields {
 		if _, ok := fullConfig[field]; ok {
-			return true, nil
+			return true
 		}
 	}
-
-	return false, nil
+	return false
 }
 
 func fieldGroupNameFor(component v1.ComponentKind) string {
