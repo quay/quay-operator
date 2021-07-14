@@ -4,6 +4,8 @@ metadata:
   name: quay-app
   labels:
     quay-component: quay-app
+  annotations:
+    quay-component: base
 spec:
   type: ClusterIP
   ports:

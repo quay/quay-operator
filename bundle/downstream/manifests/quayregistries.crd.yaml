@@ -53,6 +53,200 @@ spec:
           status:
             description: QuayRegistryStatus defines the observed state of QuayRegistry.
             properties:
+              unhealthyComponents:
+                description: Component Conditions shows the conditions in a per component basis
+                type: object
+                properties:
+                  base:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  postgres:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  clair:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  redis:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  horizontalpodautoscaler:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  objectstorage:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  route:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  mirror:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  monitoring:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
+                  tls:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lastTransitionTime:
+                          format: date-time
+                          type: string
+                        lastUpdateTime:
+                          format: date-time
+                          type: string
+                        message:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        type:
+                          type: string
               conditions:
                 description: Conditions represent the conditions that a QuayRegistry can have.
                 items:

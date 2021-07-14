@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   labels:
     quay-component: clair-app
+  annotations:
+    quay-component: clair
   name: clair-app
 spec:
   replicas: 1

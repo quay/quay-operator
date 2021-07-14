@@ -4,6 +4,8 @@ metadata:
   name: quay-builder
   labels:
     quay-component: quay-builder-route
+  annotations:
+    quay-component: route
 spec:
   host: $(BUILDMAN_HOSTNAME)
   to:

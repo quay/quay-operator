@@ -5,6 +5,8 @@ metadata:
     prometheus: k8s
     role: alert-rules
   name: quay-prometheus-rules
+  annotations:
+    quay-component: monitoring
 spec:
   groups:
     - name: quay-alerts.rules

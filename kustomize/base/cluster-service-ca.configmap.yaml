@@ -3,4 +3,5 @@ kind: ConfigMap
 metadata:
   name: cluster-service-ca
   annotations:
+    quay-component: base
     service.beta.openshift.io/inject-cabundle: 'true'

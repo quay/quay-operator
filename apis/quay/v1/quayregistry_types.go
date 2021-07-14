@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -125,6 +126,20 @@ type Condition struct {
 	LastTransitionTime metav1.Time            `json:"lastTransitionTime,omitempty"`
 }
 
+// UnhealthyComponents holds a list of unhealthy conditions in a per component basis.
+type UnhealthyComponents struct {
+	Base                    []Condition `json:"base,omitempty"`
+	Postgres                []Condition `json:"postgres,omitempty"`
+	Clair                   []Condition `json:"clair,omitempty"`
+	Redis                   []Condition `json:"redis,omitempty"`
+	HorizontalPodAutoscaler []Condition `json:"horizontalpodautoscaler,omitempty"`
+	ObjectStorage           []Condition `json:"objectstorage,omitempty"`
+	Route                   []Condition `json:"route,omitempty"`
+	Mirror                  []Condition `json:"mirror,omitempty"`
+	Monitoring              []Condition `json:"monitoring,omitempty"`
+	TLS                     []Condition `json:"tls,omitempty"`
+}
+
 // QuayRegistryStatus defines the observed state of QuayRegistry.
 type QuayRegistryStatus struct {
 	// CurrentVersion is the actual version of Quay that is actively deployed.
@@ -140,6 +155,8 @@ type QuayRegistryStatus struct {
 	ConfigEditorCredentialsSecret string `json:"configEditorCredentialsSecret,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
+	// ComponentConditions holds the current condition for all component objects.
+	UnhealthyComponents UnhealthyComponents `json:"unhealthyComponents"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
@@ -328,6 +345,39 @@ func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *Quay
 	}
 
 	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
+}
+
+// Owns verifies if a QuayRegistry object owns provided Object.
+func Owns(quay QuayRegistry, obj client.Object) bool {
+	for _, owref := range obj.GetOwnerReferences() {
+		if owref.Kind != "QuayRegistry" {
+			continue
+		}
+		if owref.Name != quay.GetName() {
+			continue
+		}
+		if owref.APIVersion != GroupVersion.String() {
+			continue
+		}
+		if owref.UID != quay.UID {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// MapToUnhealthyComponents converts a map into a UnhealthyComponents object.
+func MapToUnhealthyComponents(allconds map[string][]Condition) (UnhealthyComponents, error) {
+	var uc UnhealthyComponents
+	dt, err := json.Marshal(allconds)
+	if err != nil {
+		return uc, err
+	}
+	if err := json.Unmarshal(dt, &uc); err != nil {
+		return uc, err
+	}
+	return uc, nil
 }
 
 // EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.

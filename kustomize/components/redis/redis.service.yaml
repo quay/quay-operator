@@ -4,6 +4,8 @@ metadata:
   name: quay-redis
   labels:
     quay-component: redis
+  annotations:
+    quay-component: redis
 spec:
   ports:
     - port: 6379

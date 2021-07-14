@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -104,11 +105,13 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 	BeforeEach(func() {
 		namespace = randIdentifier(16)
 
+		var mtx sync.Mutex
 		controller = &QuayRegistryReconciler{
 			Client:        k8sClient,
 			Log:           testLogger,
 			Scheme:        scheme.Scheme,
 			EventRecorder: testEventRecorder,
+			Mtx:           &mtx,
 		}
 
 		Expect(k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})).Should(Succeed())
