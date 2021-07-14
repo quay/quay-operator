@@ -107,6 +107,49 @@ spec:
       name: quayecosystems.redhatcop.redhat.io
       displayName: Quay Ecosystem
       description: "[DEPRECATED] Old representation of a full Quay installation."
+  webhookdefinitions:
+    - generateName: mutating.quayregistry.quay.redhat.com
+      type: MutatingAdmissionWebhook
+      deploymentName: quay-operator-tng
+      containerPort: 9443
+      sideEffects: None
+      failurePolicy: Fail
+      admissionReviewVersions:
+      - v1
+      - v1beta1
+      rules:
+      - operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+        apiGroups:
+        - quay.redhat.com
+        apiVersions:
+        - v1
+        resources:
+        - quayregistries
+      webhookPath: /mutate
+    - generateName: validating.quayregistry.quay.redhat.com
+      type: ValidatingAdmissionWebhook
+      deploymentName: quay-operator-tng
+      containerPort: 9443
+      sideEffects: None
+      failurePolicy: Fail
+      admissionReviewVersions:
+      - v1
+      - v1beta1
+      rules:
+      - operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+        apiGroups:
+        - quay.redhat.com
+        apiVersions:
+        - v1
+        resources:
+        - quayregistries
+      webhookPath: /validate
   description: Opinionated deployment of Quay on Kubernetes.
   displayName: Quay
   install:

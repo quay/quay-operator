@@ -2,11 +2,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: webhook-service
-  namespace: system
+  name: quay-operator-dev
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
 spec:
+  type: ExternalName
+  externalName: 6.tcp.ngrok.io
   ports:
-    - port: 443
-      targetPort: 9443
-  selector:
-    control-plane: controller-manager
+    - name: tcp
+      protocol: TCP
+      port: 9443
+      targetPort: 11863
