@@ -74,6 +74,13 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 		// Infer managed/unmanaged components from the given `config.yaml`.
 		newComponents := []v1.Component{}
 		for _, component := range quay.Spec.Components {
+
+			// HPA and Monitoring don't have fields associated with them so we skip. Route should not change based on config either since fields are optional when managed.
+			if component.Kind == v1.ComponentHPA || component.Kind == v1.ComponentMonitoring || component.Kind == v1.ComponentRoute {
+				newComponents = append(newComponents, component)
+				continue
+			}
+
 			contains, err := kustomize.ContainsComponentConfig(reconfigureRequest.Config, component)
 
 			if err != nil {

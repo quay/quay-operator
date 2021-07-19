@@ -252,24 +252,15 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 
-		if component.Managed && contains {
+		if component.Managed && contains && component.Kind != v1.ComponentRoute {
 			msg := fmt.Sprintf("%s component marked as managed, but `configBundleSecret` contains required fields", component.Kind)
 
-			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-			if err != nil {
-				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 
-				return ctrl.Result{}, nil
-			}
 		} else if !component.Managed && v1.RequiredComponent(component.Kind) && !contains {
 			msg := fmt.Sprintf("required component `%s` marked as unmanaged, but `configBundleSecret` is missing necessary fields", component.Kind)
 
-			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-			if err != nil {
-				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-
-				return ctrl.Result{}, nil
-			}
+			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 		}
 	}
 
