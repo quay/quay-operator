@@ -1,7 +1,6 @@
 package kustomize
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -35,6 +34,7 @@ import (
 )
 
 const (
+	// QuayRegistryNameLabel is the label we add to all objects created through Kustomize.
 	QuayRegistryNameLabel = "quay-operator/quayregistry"
 
 	configSecretPrefix                = "quay-config-secret"
@@ -42,12 +42,9 @@ const (
 	buildManagerHostnameAnnotation    = "quay-buildmanager-hostname"
 	managedFieldGroupsAnnotation      = "quay-managed-fieldgroups"
 	operatorServiceEndpointAnnotation = "quay-operator-service-endpoint"
-
-	podNamespaceKey = "MY_POD_NAMESPACE"
-
-	componentImagePrefix = "RELATED_IMAGE_COMPONENT_"
-
-	configEditorUser = "quayconfig"
+	podNamespaceKey                   = "MY_POD_NAMESPACE"
+	componentImagePrefix              = "RELATED_IMAGE_COMPONENT_"
+	configEditorUser                  = "quayconfig"
 )
 
 // componentImageFor checks for an environment variable indicating which component container image
@@ -69,17 +66,20 @@ func componentImageFor(component v1.ComponentKind) types.Image {
 	imageOverride := types.Image{
 		Name: defaultImagesFor[component],
 	}
+
 	image := os.Getenv(envVarFor[component])
-	if image != "" {
-		if len(strings.Split(image, "@")) == 2 {
-			imageOverride.NewName = strings.Split(image, "@")[0]
-			imageOverride.Digest = strings.Split(image, "@")[1]
-		} else if len(strings.Split(image, ":")) == 2 {
-			imageOverride.NewName = strings.Split(image, ":")[0]
-			imageOverride.NewTag = strings.Split(image, ":")[1]
-		} else {
-			panic("image override must be reference by tag or manifest digest: " + image)
-		}
+	if image == "" {
+		return imageOverride
+	}
+
+	if len(strings.Split(image, "@")) == 2 {
+		imageOverride.NewName = strings.Split(image, "@")[0]
+		imageOverride.Digest = strings.Split(image, "@")[1]
+	} else if len(strings.Split(image, ":")) == 2 {
+		imageOverride.NewName = strings.Split(image, ":")[0]
+		imageOverride.NewTag = strings.Split(image, ":")[1]
+	} else {
+		panic("image override must be reference by tag or manifest digest: " + image)
 	}
 
 	return imageOverride
@@ -88,7 +88,6 @@ func componentImageFor(component v1.ComponentKind) types.Image {
 func kustomizeDir() string {
 	_, filename, _, _ := runtime.Caller(0)
 	path := filepath.Join(filepath.Dir(filename))
-
 	return filepath.Join(path, "..", "..", "kustomize")
 }
 
@@ -109,10 +108,8 @@ func configEditorOnlyOverlay() string {
 }
 
 func rolloutBlocked(quay *v1.QuayRegistry) bool {
-	if cond := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeRolloutBlocked); cond != nil && cond.Status == metav1.ConditionTrue {
-		return true
-	}
-	return false
+	cond := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeRolloutBlocked)
+	return cond != nil && cond.Status == metav1.ConditionTrue
 }
 
 func check(err error) {
@@ -123,135 +120,213 @@ func check(err error) {
 
 func encode(value interface{}) []byte {
 	yamlified, _ := yaml.Marshal(value)
-
 	return yamlified
 }
 
 func decode(bytes []byte) interface{} {
 	var value interface{}
 	_ = yaml.Unmarshal(bytes, &value)
-
 	return value
 }
 
-// EnsureCreationOrder sorts the given slice of Kubernetes objects so that
-// when created in order, `Deployments` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
+// EnsureCreationOrder sorts the given slice of Kubernetes objects so that when created in order,
+// `Deployments` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
 func EnsureCreationOrder(objects []client.Object) []client.Object {
-	sort.Slice(objects, func(i, j int) bool {
-		return objects[i].GetObjectKind().GroupVersionKind().String() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}.String()
-	})
-
+	sort.Slice(
+		objects,
+		func(i, j int) bool {
+			objType := objects[i].GetObjectKind().GroupVersionKind()
+			deploy := schema.GroupVersionKind{
+				Group:   "apps",
+				Version: "v1",
+				Kind:    "Deployment",
+			}
+			return objType.String() != deploy.String()
+		},
+	)
 	return objects
 }
 
 // ModelFor returns an empty Kubernetes object instance for the given `GroupVersionKind`.
 // Example: Calling with `core.v1.Secret` GVK returns an empty `corev1.Secret` instance.
-func ModelFor(gvk schema.GroupVersionKind) client.Object {
-	switch gvk.String() {
-	case schema.GroupVersionKind{Version: "v1", Kind: "Namespace"}.String():
+// This function returns nil if the GVK is not mapped to a concrete implementation.
+func ModelFor(gvk resid.Gvk) client.Object {
+	switch gvk {
+	case resid.Gvk{
+		Version: "v1",
+		Kind:    "Namespace",
+	}:
 		return &corev1.Namespace{}
-	case schema.GroupVersionKind{Version: "v1", Kind: "Secret"}.String():
+	case resid.Gvk{
+		Version: "v1",
+		Kind:    "Secret",
+	}:
 		return &corev1.Secret{}
-	case schema.GroupVersionKind{Version: "v1", Kind: "Service"}.String():
+	case resid.Gvk{
+		Version: "v1",
+		Kind:    "Service",
+	}:
 		return &corev1.Service{}
-	case schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}.String():
+	case resid.Gvk{
+		Version: "v1",
+		Kind:    "ConfigMap",
+	}:
 		return &corev1.ConfigMap{}
-	case schema.GroupVersionKind{Version: "v1", Kind: "ServiceAccount"}.String():
+	case resid.Gvk{
+		Version: "v1",
+		Kind:    "ServiceAccount",
+	}:
 		return &corev1.ServiceAccount{}
-	case schema.GroupVersionKind{Version: "v1", Kind: "PersistentVolumeClaim"}.String():
+	case resid.Gvk{
+		Version: "v1",
+		Kind:    "PersistentVolumeClaim",
+	}:
 		return &corev1.PersistentVolumeClaim{}
-	case schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}.String():
+	case resid.Gvk{
+		Group:   "apps",
+		Version: "v1",
+		Kind:    "Deployment",
+	}:
 		return &apps.Deployment{}
-	case schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "Role"}.String():
+	case resid.Gvk{
+		Group:   "rbac.authorization.k8s.io",
+		Version: "v1beta1",
+		Kind:    "Role",
+	}:
 		return &rbac.Role{}
-	case schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "RoleBinding"}.String():
+	case resid.Gvk{
+		Group:   "rbac.authorization.k8s.io",
+		Version: "v1beta1",
+		Kind:    "RoleBinding",
+	}:
 		return &rbac.RoleBinding{}
-	case schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}.String():
+	case resid.Gvk{
+		Group:   "route.openshift.io",
+		Version: "v1",
+		Kind:    "Route",
+	}:
 		return &route.Route{}
-	case schema.GroupVersionKind{Group: "objectbucket.io", Version: "v1alpha1", Kind: "ObjectBucketClaim"}.String():
+	case resid.Gvk{
+		Group:   "objectbucket.io",
+		Version: "v1alpha1",
+		Kind:    "ObjectBucketClaim",
+	}:
 		return &objectbucket.ObjectBucketClaim{}
-	case schema.GroupVersionKind{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscaler"}.String():
+	case resid.Gvk{
+		Group:   "autoscaling",
+		Version: "v2beta2",
+		Kind:    "HorizontalPodAutoscaler",
+	}:
 		return &autoscaling.HorizontalPodAutoscaler{}
-	case schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String():
+	case resid.Gvk{
+		Group:   "batch",
+		Version: "v1",
+		Kind:    "Job",
+	}:
 		return &batchv1.Job{}
-	case schema.GroupVersionKind{Group: "monitoring.coreos.com", Version: "v1", Kind: "ServiceMonitor"}.String():
+	case resid.Gvk{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "ServiceMonitor",
+	}:
 		return &prometheusv1.ServiceMonitor{}
-	case schema.GroupVersionKind{Group: "monitoring.coreos.com", Version: "v1", Kind: "PrometheusRule"}.String():
+	case resid.Gvk{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "PrometheusRule",
+	}:
 		return &prometheusv1.PrometheusRule{}
 	default:
-		panic(fmt.Sprintf("Missing model for GVK %s", gvk.String()))
+		return nil
 	}
 }
 
 // generate uses Kustomize as a library to build the runtime objects to be applied to a cluster.
-func generate(kustomization *types.Kustomization, overlay string, quayConfigFiles map[string][]byte) ([]client.Object, error) {
+func generate(
+	kustomization *types.Kustomization, overlay string, quayConfigFiles map[string][]byte,
+) ([]client.Object, error) {
 	fSys := filesys.MakeEmptyDirInMemory()
-	err := filepath.Walk(kustomizeDir(), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	if err := filepath.Walk(
+		kustomizeDir(),
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 
-		if !info.IsDir() {
+			if info.IsDir() {
+				return nil
+			}
+
 			f, err := ioutil.ReadFile(path)
 			if err != nil {
 				return err
 			}
 
-			err = fSys.WriteFile(path, f)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	check(err)
+			return fSys.WriteFile(path, f)
+		},
+	); err != nil {
+		return nil, err
+	}
 
 	// Write `kustomization.yaml` to filesystem
 	kustomizationFile, err := yaml.Marshal(kustomization)
-	check(err)
-	err = fSys.WriteFile(filepath.Join(appDir(), "kustomization.yaml"), kustomizationFile)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := fSys.WriteFile(
+		filepath.Join(appDir(), "kustomization.yaml"),
+		kustomizationFile,
+	); err != nil {
+		return nil, err
+	}
 
 	// Add all Quay config files to directory to be included in the generated `Secret`
 	for fileName, file := range quayConfigFiles {
-		check(err)
-		err = fSys.WriteFile(filepath.Join(appDir(), "bundle", fileName), file)
-		check(err)
+		if err = fSys.WriteFile(
+			filepath.Join(appDir(), "bundle", fileName),
+			file,
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	opts := &krusty.Options{}
 	k := krusty.MakeKustomizer(fSys, opts)
 	resMap, err := k.Run(overlay)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
 
 	output := []client.Object{}
 	for _, resource := range resMap.Resources() {
 		resourceJSON, err := resource.MarshalJSON()
-		check(err)
-
-		obj := ModelFor(schema.GroupVersionKind{
-			Group:   resource.GetGvk().Group,
-			Version: resource.GetGvk().Version,
-			Kind:    resource.GetGvk().Kind,
-		})
-
-		if obj == nil {
-			panic("TODO: Not implemented for GroupVersionKind: " + resource.GetGvk().String())
+		if err != nil {
+			return nil, err
 		}
 
-		err = json.Unmarshal(resourceJSON, obj)
-		check(err)
+		obj := ModelFor(resource.GetGvk())
+		if obj == nil {
+			return nil, fmt.Errorf("unmapped GVK: %s", resource.GetGvk().String())
+		}
+
+		if err = json.Unmarshal(resourceJSON, obj); err != nil {
+			return nil, err
+		}
 
 		output = append(output, obj)
 	}
-
 	return output, nil
 }
 
 // KustomizationFor takes a `QuayRegistry` object and generates a Kustomization for it.
-func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) (*types.Kustomization, error) {
+func KustomizationFor(
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+	quayConfigFiles map[string][]byte,
+) (*types.Kustomization, error) {
 	if quay == nil {
-		return nil, errors.New("given QuayRegistry should not be nil")
+		return nil, fmt.Errorf("given QuayRegistry should not be nil")
 	}
 
 	configFiles := []string{}
@@ -265,14 +340,25 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 	}
 
 	quayConfigTLSSources := []string{}
-	if ctx.ClusterWildcardCert != nil {
-		quayConfigTLSSources = append(quayConfigTLSSources, "ocp-cluster-wildcard.cert="+string(ctx.ClusterWildcardCert))
+	if qctx.ClusterWildcardCert != nil {
+		quayConfigTLSSources = append(
+			quayConfigTLSSources,
+			fmt.Sprintf("ocp-cluster-wildcard.cert=%s", qctx.ClusterWildcardCert),
+		)
 	}
-	if ctx.TLSCert != nil {
-		quayConfigTLSSources = append(quayConfigTLSSources, "ssl.cert="+string(ctx.TLSCert))
+
+	if qctx.TLSCert != nil {
+		quayConfigTLSSources = append(
+			quayConfigTLSSources,
+			fmt.Sprintf("ssl.cert=%s", qctx.TLSCert),
+		)
 	}
-	if ctx.TLSKey != nil {
-		quayConfigTLSSources = append(quayConfigTLSSources, "ssl.key="+string(ctx.TLSKey))
+
+	if qctx.TLSKey != nil {
+		quayConfigTLSSources = append(
+			quayConfigTLSSources,
+			fmt.Sprintf("ssl.key=%s", qctx.TLSKey),
+		)
 	}
 
 	generatedSecrets := []types.SecretArgs{
@@ -289,9 +375,18 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 				Name: v1.ManagedKeysName,
 				KvPairSources: types.KvPairSources{
 					LiteralSources: []string{
-						"DATABASE_SECRET_KEY=" + ctx.DatabaseSecretKey,
-						"SECRET_KEY=" + ctx.SecretKey,
-						"DB_URI=" + ctx.DbUri,
+						fmt.Sprintf(
+							"DATABASE_SECRET_KEY=%s",
+							qctx.DatabaseSecretKey,
+						),
+						fmt.Sprintf(
+							"SECRET_KEY=%s",
+							qctx.SecretKey,
+						),
+						fmt.Sprintf(
+							"DB_URI=%s",
+							qctx.DBURI,
+						),
 					},
 				},
 			},
@@ -309,8 +404,8 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 				Name: "quay-config-editor-credentials",
 				KvPairSources: types.KvPairSources{
 					LiteralSources: []string{
-						"username=" + configEditorUser,
-						"password=" + configEditorPassword,
+						fmt.Sprintf("username=%s", configEditorUser),
+						fmt.Sprintf("password=%s", configEditorPassword),
 					},
 				},
 			},
@@ -371,8 +466,8 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 		},
 		CommonAnnotations: map[string]string{
 			managedFieldGroupsAnnotation:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
-			registryHostnameAnnotation:        ctx.ServerHostname,
-			buildManagerHostnameAnnotation:    strings.Split(ctx.BuildManagerHostname, ":")[0],
+			registryHostnameAnnotation:        qctx.ServerHostname,
+			buildManagerHostnameAnnotation:    strings.Split(qctx.BuildManagerHostname, ":")[0],
 			operatorServiceEndpointAnnotation: operatorServiceEndpoint(),
 		},
 		// NOTE: Using `vars` in Kustomize is kinda ugly because it's basically templating, so don't abuse them
@@ -391,60 +486,56 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 	}, nil
 }
 
-// Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
-func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, log logr.Logger) ([]client.Object, error) {
-	// Each managed component brings its own generated `config.yaml` fields
-	// which are accumulated under the key `<component>.config.yaml` and then added to the base `Secret`.
-	componentConfigFiles := baseConfigBundle.DeepCopy().Data
+// Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a
+// Quay deployment.
+func Inflate(
+	ctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+	configBundle *corev1.Secret,
+	log logr.Logger,
+) ([]client.Object, error) {
+	var err error
 
-	var parsedUserConfig map[string]interface{}
-	if err := yaml.Unmarshal(baseConfigBundle.Data["config.yaml"], &parsedUserConfig); err != nil {
+	// Each managed component brings its own generated `config.yaml` fields which are
+	// accumulated under the key `<component>.config.yaml` and then added to the base
+	// `Secret`.
+	componentConfigFiles := configBundle.DeepCopy().Data
+
+	var config map[string]interface{}
+	if err = yaml.Unmarshal(configBundle.Data["config.yaml"], &config); err != nil {
 		return nil, err
 	}
 
-	// Generate or pull out the `SECRET_KEY` and `DATABASE_SECRET_KEY`. Since these must be stable across
-	// runs of the same config, we store them (and re-read them) from a specialized `Secret`.
-	// TODO(alecmerdler): Refector these three blocks...
+	// Generate or pull out the `SECRET_KEY` and `DATABASE_SECRET_KEY`. Since these must be
+	// stable across runs of the same config, we store them (and re-read them) from a
+	// specialized `Secret`. TODO(alecmerdler): Refector these three blocks...
 	if ctx.DatabaseSecretKey == "" {
-		if key, found := parsedUserConfig["DATABASE_SECRET_KEY"]; found {
+		ctx.DatabaseSecretKey, err = generateRandomString(secretKeyLength)
+		if err != nil {
+			return nil, err
+		}
+		if key, found := config["DATABASE_SECRET_KEY"]; found {
 			log.Info("`DATABASE_SECRET_KEY` found in user-provided config")
-
 			ctx.DatabaseSecretKey = key.(string)
-		} else {
-			log.Info("`DATABASE_SECRET_KEY` not found in user-provided config, generating new one")
-
-			databaseSecretKey, err := generateRandomString(secretKeyLength)
-			if err != nil {
-				return nil, err
-			}
-
-			ctx.DatabaseSecretKey = databaseSecretKey
 		}
 	}
-	parsedUserConfig["DATABASE_SECRET_KEY"] = ctx.DatabaseSecretKey
+	config["DATABASE_SECRET_KEY"] = ctx.DatabaseSecretKey
 
 	if ctx.SecretKey == "" {
-		if key, found := parsedUserConfig["SECRET_KEY"]; found {
+		ctx.SecretKey, err = generateRandomString(secretKeyLength)
+		if err != nil {
+			return nil, err
+		}
+		if key, found := config["SECRET_KEY"]; found {
 			log.Info("`SECRET_KEY` found in user-provided config")
-
 			ctx.SecretKey = key.(string)
-		} else {
-			log.Info("`SECRET_KEY` not found in user-provided config, generating new one")
-
-			secretKey, err := generateRandomString(secretKeyLength)
-			if err != nil {
-				return nil, err
-			}
-
-			ctx.SecretKey = secretKey
 		}
 	}
-	parsedUserConfig["SECRET_KEY"] = ctx.SecretKey
+	config["SECRET_KEY"] = ctx.SecretKey
 
-	if ctx.DbUri == "" {
+	if ctx.DBURI == "" {
 		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) {
 			log.Info("managed `DB_URI` not found in config, generating new one")
-
 			user := quay.GetName() + "-quay-database"
 			name := quay.GetName() + "-quay-database"
 			host := quay.GetName() + "-quay-database"
@@ -454,41 +545,40 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 				return nil, err
 			}
 
-			ctx.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
+			ctx.DBURI = fmt.Sprintf(
+				"postgresql://%s:%s@%s:%s/%s", user, password, host, port, name,
+			)
 		} else {
-			if dbURI, found := parsedUserConfig["DB_URI"]; found {
-				ctx.DbUri = dbURI.(string)
+			if dbURI, found := config["DB_URI"]; found {
+				ctx.DBURI = dbURI.(string)
 			}
 		}
 	}
-	parsedUserConfig["DB_URI"] = ctx.DbUri
+	config["DB_URI"] = ctx.DBURI
 
 	for field, value := range BaseConfig() {
-		if _, ok := parsedUserConfig[field]; !ok {
-			parsedUserConfig[field] = value
+		if _, ok := config[field]; !ok {
+			config[field] = value
 		}
 	}
-	componentConfigFiles["config.yaml"] = encode(parsedUserConfig)
+	componentConfigFiles["config.yaml"] = encode(config)
 
 	for _, component := range quay.Spec.Components {
-		if component.Managed {
-			fieldGroup, err := FieldGroupFor(ctx, component.Kind, quay)
-			if err != nil {
-				return nil, err
-			}
-
-			componentConfigFiles[string(component.Kind)+".config.yaml"] = encode(fieldGroup)
+		if !component.Managed {
+			continue
 		}
+
+		fieldGroup, err := FieldGroupFor(ctx, component.Kind, quay)
+		if err != nil {
+			return nil, err
+		}
+		componentConfigFiles[string(component.Kind)+".config.yaml"] = encode(fieldGroup)
 	}
 
 	log.Info("Ensuring TLS cert/key pair for Quay app")
-	tlsCert, tlsKey, err := EnsureTLSFor(ctx, quay)
-	if err != nil {
+	if err := EnsureTLSFor(ctx, quay); err != nil {
 		return nil, err
 	}
-
-	ctx.TLSCert = tlsCert
-	ctx.TLSKey = tlsKey
 
 	kustomization, err := KustomizationFor(ctx, quay, componentConfigFiles)
 	if err != nil {
@@ -513,17 +603,11 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 		if err != nil {
 			return nil, err
 		}
-
 		resources[index] = obj
 	}
 
 	for index, resource := range resources {
-		resource, err = v1.EnsureOwnerReference(quay, resource)
-		if err != nil {
-			return nil, err
-		}
-
-		resources[index] = resource
+		resources[index] = v1.EnsureOwnerReference(quay, resource)
 	}
 
 	return resources, err

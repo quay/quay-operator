@@ -80,7 +80,7 @@ var fieldGroupForTests = []struct {
 		"postgres",
 		quayRegistry("test"),
 		quaycontext.QuayRegistryContext{
-			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
+			DBURI: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
 		},
 		&database.DatabaseFieldGroup{
 			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
@@ -418,7 +418,6 @@ var ensureTLSForTests = []struct {
 
 func TestEnsureTLSFor(t *testing.T) {
 	assert := assert.New(t)
-
 	for _, test := range ensureTLSForTests {
 		quayRegistry := quayRegistry("test")
 
@@ -429,21 +428,27 @@ func TestEnsureTLSFor(t *testing.T) {
 			TLSKey:               test.providedCertKeyPair[1],
 		}
 
-		tlsCert, tlsKey, err := EnsureTLSFor(&quayContext, quayRegistry)
-
+		err := EnsureTLSFor(&quayContext, quayRegistry)
 		assert.Equal(test.expectedErr, err, test.name)
-
-		if test.expectedErr == nil {
-			if test.providedCertKeyPair[0] != nil && test.providedCertKeyPair[1] != nil {
-				assert.Equal(string(test.providedCertKeyPair[0]), string(tlsCert), test.name)
-				assert.Equal(string(test.providedCertKeyPair[1]), string(tlsKey), test.name)
-			}
-
-			shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.serverHostname, fieldGroupNameFor("route"))
-
-			if test.buildManagerHostname != "" {
-				shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.buildManagerHostname, fieldGroupNameFor("route"))
-			}
+		if test.expectedErr != nil {
+			continue
 		}
+
+		shared.ValidateCertPairWithHostname(
+			quayContext.TLSCert,
+			quayContext.TLSKey,
+			test.serverHostname,
+			fieldGroupNameFor("route"),
+		)
+		if test.buildManagerHostname == "" {
+			continue
+		}
+
+		shared.ValidateCertPairWithHostname(
+			quayContext.TLSCert,
+			quayContext.TLSKey,
+			test.buildManagerHostname,
+			fieldGroupNameFor("route"),
+		)
 	}
 }

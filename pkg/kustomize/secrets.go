@@ -24,22 +24,25 @@ import (
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
-// underTest can be switched on/off to ensure deterministic random string generation for testing output.
+// underTest can be switched on/off to ensure deterministic random string generation for testing
+// output.
 var underTest = false
 
 const (
 	secretKeyLength = 80
-
-	clairService = "clair-app"
-	// FIXME: Ensure this includes the `QuayRegistry` name prefix when we add `builder` managed component.
-	buildmanRoute = "quay-builder"
+	clairService    = "clair-app"
+	buildmanRoute   = "quay-builder"
 )
 
 // FieldGroupFor generates and returns the correct config field group for the given component.
-func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentKind, quay *v1.QuayRegistry) (shared.FieldGroup, error) {
+func FieldGroupFor(
+	ctx *quaycontext.QuayRegistryContext, component v1.ComponentKind, quay *v1.QuayRegistry,
+) (shared.FieldGroup, error) {
 	switch component {
 	case v1.ComponentClair:
-		fieldGroup, err := securityscanner.NewSecurityScannerFieldGroup(map[string]interface{}{})
+		fieldGroup, err := securityscanner.NewSecurityScannerFieldGroup(
+			map[string]interface{}{},
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -51,11 +54,12 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 		psk := base64.StdEncoding.EncodeToString([]byte(preSharedKey))
 
 		fieldGroup.FeatureSecurityScanner = true
-		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + clairService + ":80"
+		fieldGroup.SecurityScannerV4Endpoint = fmt.Sprintf(
+			"http://%s-%s:80", quay.GetName(), clairService,
+		)
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 		fieldGroup.SecurityScannerNotifications = true
 		fieldGroup.SecurityScannerV4PSK = psk
-
 		return fieldGroup, nil
 	case v1.ComponentRedis:
 		fieldGroup, err := redis.NewRedisFieldGroup(map[string]interface{}{})
@@ -71,7 +75,6 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 			Host: strings.Join([]string{quay.GetName(), "quay-redis"}, "-"),
 			Port: 6379,
 		}
-
 		return fieldGroup, nil
 	case v1.ComponentPostgres:
 		fieldGroup, err := database.NewDatabaseFieldGroup(map[string]interface{}{})
@@ -79,30 +82,30 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 			return nil, err
 		}
 
-		fieldGroup.DbUri = ctx.DbUri
-
+		fieldGroup.DbUri = ctx.DBURI
 		return fieldGroup, nil
 	case v1.ComponentObjectStorage:
-		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
-			FeatureProxyStorage:                true,
-			DistributedStoragePreference:       []string{"local_us"},
-			DistributedStorageDefaultLocations: []string{"local_us"},
-			DistributedStorageConfig: map[string]*distributedstorage.DistributedStorageDefinition{
-				"local_us": {
-					Name: "RHOCSStorage",
-					Args: &shared.DistributedStorageArgs{
-						Hostname:    ctx.StorageHostname,
-						IsSecure:    true,
-						Port:        443,
-						BucketName:  ctx.StorageBucketName,
-						AccessKey:   ctx.StorageAccessKey,
-						SecretKey:   ctx.StorageSecretKey,
-						StoragePath: "/datastorage/registry",
-					},
+		dscfg := map[string]*distributedstorage.DistributedStorageDefinition{
+			"local_us": {
+				Name: "RHOCSStorage",
+				Args: &shared.DistributedStorageArgs{
+					Hostname:    ctx.StorageHostname,
+					IsSecure:    true,
+					Port:        443,
+					BucketName:  ctx.StorageBucketName,
+					AccessKey:   ctx.StorageAccessKey,
+					SecretKey:   ctx.StorageSecretKey,
+					StoragePath: "/datastorage/registry",
 				},
 			},
 		}
 
+		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
+			FeatureProxyStorage:                true,
+			DistributedStoragePreference:       []string{"local_us"},
+			DistributedStorageDefaultLocations: []string{"local_us"},
+			DistributedStorageConfig:           dscfg,
+		}
 		return fieldGroup, nil
 	case v1.ComponentRoute:
 		fieldGroup := &hostsettings.HostSettingsFieldGroup{
@@ -110,7 +113,6 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 			PreferredUrlScheme:     "https",
 			ServerHostname:         ctx.ServerHostname,
 		}
-
 		return fieldGroup, nil
 	case v1.ComponentMirror:
 		fieldGroup := &repomirror.RepoMirrorFieldGroup{
@@ -118,7 +120,6 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 			RepoMirrorInterval:  30,
 			RepoMirrorTlsVerify: true,
 		}
-
 		return fieldGroup, nil
 	case v1.ComponentHPA:
 		return nil, nil
@@ -157,39 +158,45 @@ func BaseConfig() map[string]interface{} {
 	}
 }
 
-// EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for secure communication with clients.
-func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) ([]byte, []byte, error) {
-	fieldGroup, err := FieldGroupFor(ctx, "route", quay)
-	if err != nil {
-		return ctx.TLSCert, ctx.TLSKey, err
+// EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for
+// secure communication with clients.
+func EnsureTLSFor(qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) error {
+	if qctx.TLSCert == nil || qctx.TLSKey == nil {
+		return nil
 	}
 
+	fieldGroup, err := FieldGroupFor(qctx, "route", quay)
+	if err != nil {
+		return err
+	}
 	routeFieldGroup := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
 
-	hosts := []string{
-		routeFieldGroup.ServerHostname,
-	}
-
+	hosts := []string{routeFieldGroup.ServerHostname}
 	// Only add BUILDMAN_HOSTNAME as host if provided.
-	if ctx.BuildManagerHostname != "" {
-		hosts = append(hosts, strings.Split(ctx.BuildManagerHostname, ":")[0])
+	if qctx.BuildManagerHostname != "" {
+		hosts = append(hosts, strings.Split(qctx.BuildManagerHostname, ":")[0])
 	}
 
-	if ctx.TLSCert != nil && ctx.TLSKey != nil {
-		for _, host := range hosts {
-			if valid, validationErr := shared.ValidateCertPairWithHostname(ctx.TLSCert, ctx.TLSKey, host, fieldGroupNameFor("route")); !valid {
-				return nil, nil, fmt.Errorf("provided certificate/key pair not valid for host '%s': %s", host, validationErr.String())
-			}
+	for _, host := range hosts {
+		if valid, validationErr := shared.ValidateCertPairWithHostname(
+			qctx.TLSCert, qctx.TLSKey, host, fieldGroupNameFor("route"),
+		); !valid {
+			return fmt.Errorf(
+				"provided certificate/key pair not valid for host '%s': %s",
+				host,
+				validationErr.String(),
+			)
 		}
 	}
-
-	return ctx.TLSCert, ctx.TLSKey, nil
+	return nil
 }
 
 // ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
 // the fieldgroup for the given component by comparing it with the fieldgroup defaults.
 // TODO: Replace this with function from `config-tool` library once implemented.
-func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Component) (bool, error) {
+func ContainsComponentConfig(
+	fullConfig map[string]interface{}, component v1.Component,
+) (bool, error) {
 	fields := []string{}
 
 	switch component.Kind {
@@ -252,12 +259,17 @@ func fieldGroupNameFor(component v1.ComponentKind) string {
 }
 
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
-func componentConfigFilesFor(component v1.ComponentKind, quay *v1.QuayRegistry, configFiles map[string][]byte) (map[string][]byte, error) {
+func componentConfigFilesFor(
+	component v1.ComponentKind, quay *v1.QuayRegistry, configFiles map[string][]byte,
+) (map[string][]byte, error) {
 	switch component {
 	case v1.ComponentPostgres:
 		dbConfig, ok := configFiles["postgres.config.yaml"]
 		if !ok {
-			return nil, fmt.Errorf("cannot generate managed component config file for `postgres` if `postgres.config.yaml` is missing")
+			return nil, fmt.Errorf(
+				"cannot generate managed component config file for `postgres` " +
+					"if `postgres.config.yaml` is missing",
+			)
 		}
 
 		var fieldGroup database.DatabaseFieldGroup

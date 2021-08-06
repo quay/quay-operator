@@ -401,7 +401,7 @@ var inflateTests = []struct {
 		nil,
 	},
 	{
-		"PostgresManagedDbUriExists",
+		"PostgresManagedDBURIExists",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -410,7 +410,7 @@ var inflateTests = []struct {
 			},
 		},
 		quaycontext.QuayRegistryContext{
-			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
+			DBURI: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
 		},
 		&corev1.Secret{
 			Data: map[string][]byte{
@@ -421,7 +421,7 @@ var inflateTests = []struct {
 		nil,
 	},
 	{
-		"PostgresUnmanagedDbUriExists",
+		"PostgresUnmanagedDBURIExists",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -491,12 +491,12 @@ func TestInflate(t *testing.T) {
 				}
 				assert.Equal(string(managedKeys.Data["SECRET_KEY"]), config["SECRET_KEY"], test.name)
 
-				if test.ctx.DbUri == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentPostgres) {
+				if test.ctx.DBURI == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentPostgres) {
 					assert.Greater(len(string(managedKeys.Data["DB_URI"])), 0, test.name)
 					assert.Greater(len(config["DB_URI"].(string)), 0, test.name)
 				} else {
-					assert.Equal(test.ctx.DbUri, string(managedKeys.Data["DB_URI"]), test.name)
-					assert.Equal(test.ctx.DbUri, config["DB_URI"], test.name)
+					assert.Equal(test.ctx.DBURI, string(managedKeys.Data["DB_URI"]), test.name)
+					assert.Equal(test.ctx.DBURI, config["DB_URI"], test.name)
 				}
 				assert.Equal(string(managedKeys.Data["DB_URI"]), config["DB_URI"], test.name)
 			}

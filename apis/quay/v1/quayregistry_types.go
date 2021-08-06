@@ -18,12 +18,11 @@ package v1
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"os"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -269,9 +268,11 @@ func RequiredComponent(component ComponentKind) bool {
 	return false
 }
 
-// EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`.
-// Returns an error if a component was declared as managed but is not supported in the current k8s cluster.
-func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) (*QuayRegistry, error) {
+// EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`. Returns
+// an error if a component was declared as managed but is not supported in the current k8s cluster.
+func EnsureDefaultComponents(
+	qctx *quaycontext.QuayRegistryContext, quay *QuayRegistry,
+) (*QuayRegistry, error) {
 	updatedQuay := quay.DeepCopy()
 	if updatedQuay.Spec.Components == nil {
 		updatedQuay.Spec.Components = []Component{}
@@ -282,16 +283,42 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 		msg   string
 	}
 	componentChecks := map[ComponentKind]componentCheck{
-		ComponentRoute:         {func() bool { return ctx.SupportsRoutes }, "cannot use `route` component when `Route` API not available"},
-		ComponentTLS:           {func() bool { return ctx.SupportsRoutes && ctx.TLSCert == nil && ctx.TLSKey == nil }, "cannot use `tls` component when `Route` API not available or TLS cert/key pair is provided"},
-		ComponentObjectStorage: {func() bool { return ctx.SupportsObjectStorage }, "cannot use `ObjectStorage` component when `ObjectStorage` API not available"},
-		ComponentMonitoring:    {func() bool { return ctx.SupportsMonitoring }, "cannot use `monitoring` component when `Prometheus` API not available"},
+		ComponentRoute: {
+			func() bool {
+				return qctx.SupportsRoutes
+			},
+			"cannot use `route` component when `Route` API not available",
+		},
+		ComponentTLS: {
+			func() bool {
+				noTLS := qctx.TLSCert == nil && qctx.TLSKey == nil
+				return qctx.SupportsRoutes && noTLS
+			},
+			"cannot use `tls` component when `Route` API not available or " +
+				"TLS cert/key pair is provided",
+		},
+		ComponentObjectStorage: {
+			func() bool {
+				return qctx.SupportsObjectStorage
+			},
+			"cannot use `ObjectStorage` component when `ObjectStorage` API not " +
+				"available",
+		},
+		ComponentMonitoring: {
+			func() bool {
+				return qctx.SupportsMonitoring
+			},
+			"cannot use `monitoring` component when `Prometheus` API not available",
+		},
 	}
 
 	for _, component := range allComponents {
-		componentCheck, checkExists := componentChecks[component]
-		if (checkExists && !componentCheck.check()) && ComponentIsManaged(quay.Spec.Components, component) {
-			return quay, errors.New(componentCheck.msg)
+		componentOK := true
+		if cmpcheck, ok := componentChecks[component]; ok {
+			componentOK = cmpcheck.check()
+			if !componentOK && ComponentIsManaged(quay.Spec.Components, component) {
+				return quay, fmt.Errorf(cmpcheck.msg)
+			}
 		}
 
 		found := false
@@ -302,12 +329,17 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 			}
 		}
 
-		if !found {
-			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{
-				Kind:    component,
-				Managed: !checkExists || componentCheck.check(),
-			})
+		if found {
+			continue
 		}
+
+		updatedQuay.Spec.Components = append(
+			updatedQuay.Spec.Components,
+			Component{
+				Kind:    component,
+				Managed: componentOK,
+			},
+		)
 	}
 
 	return updatedQuay, nil
@@ -380,52 +412,43 @@ func MapToUnhealthyComponents(allconds map[string][]Condition) (UnhealthyCompone
 	return uc, nil
 }
 
-// EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
-func EnsureOwnerReference(quay *QuayRegistry, obj client.Object) (client.Object, error) {
-	objectMeta, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	hasOwnerRef := false
-	for _, ownerRef := range objectMeta.GetOwnerReferences() {
+// EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have
+// one.
+func EnsureOwnerReference(quay *QuayRegistry, obj client.Object) client.Object {
+	refs := obj.GetOwnerReferences()
+	for _, ownerRef := range refs {
 		if ownerRef.Name == quay.GetName() &&
 			ownerRef.Kind == "QuayRegistry" &&
 			ownerRef.APIVersion == GroupVersion.String() &&
 			ownerRef.UID == quay.UID {
-			hasOwnerRef = true
+			return obj
 		}
 	}
 
-	if !hasOwnerRef {
-		objectMeta.SetOwnerReferences(append(objectMeta.GetOwnerReferences(), metav1.OwnerReference{
-			APIVersion: GroupVersion.String(),
-			Kind:       "QuayRegistry",
-			Name:       quay.GetName(),
-			UID:        quay.GetUID(),
-		}))
-	}
-
-	return obj, nil
+	obj.SetOwnerReferences(
+		append(
+			refs,
+			metav1.OwnerReference{
+				APIVersion: GroupVersion.String(),
+				Kind:       "QuayRegistry",
+				Name:       quay.GetName(),
+				UID:        quay.GetUID(),
+			},
+		),
+	)
+	return obj
 }
 
 // RemoveOwnerReference removes the `ownerReference` of `QuayRegistry` on the given object.
-func RemoveOwnerReference(quay *QuayRegistry, obj client.Object) (client.Object, error) {
+func RemoveOwnerReference(quay *QuayRegistry, obj client.Object) client.Object {
 	filteredOwnerReferences := []metav1.OwnerReference{}
-
-	objectMeta, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, ownerRef := range objectMeta.GetOwnerReferences() {
+	for _, ownerRef := range obj.GetOwnerReferences() {
 		if ownerRef.Name != quay.GetName() {
 			filteredOwnerReferences = append(filteredOwnerReferences, ownerRef)
 		}
 	}
-	objectMeta.SetOwnerReferences(filteredOwnerReferences)
-
-	return obj, nil
+	obj.SetOwnerReferences(filteredOwnerReferences)
+	return obj
 }
 
 // ManagedKeysSecretNameFor returns the name of the `Secret` in which generated secret keys are stored.
