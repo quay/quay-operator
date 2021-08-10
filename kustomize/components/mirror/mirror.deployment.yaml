@@ -4,6 +4,8 @@ metadata:
   name: quay-mirror
   labels:
     quay-component: quay-mirror
+  annotations:
+    quay-component: mirror
 spec:
   replicas: 1
   strategy:
@@ -56,24 +58,6 @@ spec:
             - name: ENSURE_NO_MIGRATION
               value: "true"
           # TODO: Determine if we need to set resource requirements
-          startupProbe:
-            httpGet:
-              path: /health/instance
-              port: 8080
-              scheme: HTTP
-            timeoutSeconds: 20
-            periodSeconds: 15
-            failureThreshold: 10
-          readinessProbe:
-            httpGet:
-              path: /health/instance
-              port: 8080
-              scheme: HTTP
-          livelinessProbe:
-            httpGet:
-              path: /health/instance
-              port: 8080
-              scheme: HTTP
           volumeMounts:
             - name: config
               readOnly: false
@@ -81,3 +65,10 @@ spec:
             - name: extra-ca-certs
               readOnly: true
               mountPath: /conf/stack/extra_ca_certs
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi

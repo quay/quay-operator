@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	prometheusv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
@@ -72,6 +73,7 @@ type QuayRegistryReconciler struct {
 	Scheme         *runtime.Scheme
 	EventRecorder  record.EventRecorder
 	WatchNamespace string
+	Mtx            *sync.Mutex
 
 	// TODO(alecmerdler): Somehow generalize feature detection functions so that they can match a type signature and be iterated over...
 }
@@ -80,6 +82,9 @@ type QuayRegistryReconciler struct {
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
 
 func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
+
 	log := r.Log.WithValues("quayregistry", req.NamespacedName)
 
 	log.Info("begin reconcile")
@@ -252,24 +257,15 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 
-		if component.Managed && contains {
+		if component.Managed && contains && component.Kind != v1.ComponentRoute {
 			msg := fmt.Sprintf("%s component marked as managed, but `configBundleSecret` contains required fields", component.Kind)
 
-			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-			if err != nil {
-				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 
-				return ctrl.Result{}, nil
-			}
 		} else if !component.Managed && v1.RequiredComponent(component.Kind) && !contains {
 			msg := fmt.Sprintf("required component `%s` marked as unmanaged, but `configBundleSecret` is missing necessary fields", component.Kind)
 
-			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-			if err != nil {
-				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-
-				return ctrl.Result{}, nil
-			}
+			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 		}
 	}
 

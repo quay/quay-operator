@@ -285,7 +285,7 @@ var containsComponentConfigTests = []struct {
 		"route",
 		true,
 		`SERVER_HOSTNAME: registry.skynet.com`,
-		false,
+		true,
 		nil,
 	},
 	{

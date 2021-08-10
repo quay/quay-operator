@@ -4,6 +4,8 @@ metadata:
   name: quay-config-editor
   labels:
     quay-component: quay-config-editor
+  annotations:
+    quay-component: base
 spec:
   type: ClusterIP
   ports:

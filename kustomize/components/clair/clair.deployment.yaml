@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   labels:
     quay-component: clair-app
+  annotations:
+    quay-component: clair
   name: clair-app
 spec:
   replicas: 1
@@ -48,6 +50,13 @@ spec:
             httpGet:
               port: clair-intro
               path: /healthz
+          resources:
+            requests:
+              cpu: 2000m
+              memory: 2Gi
+            limits:
+              cpu: 4000m
+              memory: 16Gi
       restartPolicy: Always
       volumes:
         - name: config

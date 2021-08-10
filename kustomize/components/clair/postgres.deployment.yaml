@@ -4,6 +4,8 @@ metadata:
   name: clair-postgres
   labels:
     quay-component: clair-postgres
+  annotations:
+    quay-component: clair
 spec:
   replicas: 1
   strategy:
@@ -40,3 +42,7 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/pgsql/data
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi

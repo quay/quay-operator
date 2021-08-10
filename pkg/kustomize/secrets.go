@@ -208,15 +208,6 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Com
 		fields = (&repomirror.RepoMirrorFieldGroup{}).Fields()
 	case v1.ComponentRoute:
 		fields = (&hostsettings.HostSettingsFieldGroup{}).Fields()
-
-		if component.Managed {
-			for i, field := range fields {
-				// SERVER_HOSTNAME is a special field which we allow when using managed `route` component.
-				if field == "SERVER_HOSTNAME" {
-					fields = append(fields[:i], fields[i+1:]...)
-				}
-			}
-		}
 	case v1.ComponentMonitoring:
 		return false, nil
 	case v1.ComponentTLS:

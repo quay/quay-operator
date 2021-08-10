@@ -4,6 +4,8 @@ metadata:
   name: quay-datastore
   labels:
     quay-component: quay-datastore
+  annotations:
+    quay-component: objectstorage
 spec:
   generateBucketName: quay-datastore
   storageClassName: openshift-storage.noobaa.io

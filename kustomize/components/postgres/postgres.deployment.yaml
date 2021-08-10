@@ -4,6 +4,8 @@ metadata:
   name: quay-database
   labels:
     quay-component: postgres
+  annotations:
+    quay-component: postgres
 spec:
   replicas: 1
   selector:
@@ -54,3 +56,7 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/pgsql/data
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
