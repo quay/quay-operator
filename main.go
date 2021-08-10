@@ -22,11 +22,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	quay "github.com/quay/quay-operator/apis/quay/v1"
@@ -74,20 +76,34 @@ func main() {
 		LeaderElection:     enableLeaderElection,
 		LeaderElectionID:   "7daa4ab6.quay.redhat.com",
 		Namespace:          namespace,
+		ClientDisableCacheFor: []client.Object{
+			&quay.QuayRegistry{},
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
+	var mtx sync.Mutex
 	if err = (&quaycontroller.QuayRegistryReconciler{
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("QuayRegistry"),
 		Scheme:         mgr.GetScheme(),
 		EventRecorder:  mgr.GetEventRecorderFor("quayregistry-controller"),
 		WatchNamespace: namespace,
+		Mtx:            &mtx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistry")
+		os.Exit(1)
+	}
+
+	if err = (&quaycontroller.QuayRegistryStatusReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("QuayRegistryStatus"),
+		Mtx:    &mtx,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistryStatus")
 		os.Exit(1)
 	}
 
