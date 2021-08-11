@@ -1,6 +1,4 @@
 /*
-
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -29,12 +27,16 @@ import (
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
+// QuayVersion is a type for the QuayVersion. Could also be a string.
 type QuayVersion string
 
+// QuayVersionCurrent holds the current QuayVersion as read from the environment variable.
 var QuayVersionCurrent QuayVersion = QuayVersion(os.Getenv("QUAY_VERSION"))
 
+// ComponentKind is just a string identifying a component type, such as 'redis', 'postgres', etc.
 type ComponentKind string
 
+// Follow a list of all known QuayRegistry components.
 const (
 	ComponentBase          ComponentKind = "base"
 	ComponentPostgres                    = "postgres"
@@ -67,7 +69,12 @@ var requiredComponents = []ComponentKind{
 }
 
 const (
-	ManagedKeysName         = "quay-registry-managed-secret-keys"
+	// ManagedKeysName holds the prefix to the secret where we store secret data about a given
+	// QuayRegistry instance.
+	ManagedKeysName = "quay-registry-managed-secret-keys"
+
+	// QuayConfigTLSSecretName holds the prefix to the secret where we store TLS data about a
+	//given QuayRegistry instance.
 	QuayConfigTLSSecretName = "quay-config-tls"
 )
 
@@ -88,21 +95,23 @@ type Component struct {
 	Managed bool `json:"managed"`
 }
 
+// ConditionType represents a condition string. QuayRegistries will contain Conditions on their
+// status, each condition is of one type, e.g. Available or RolloutBlocked.
 type ConditionType string
 
+// Defines all known Condition Types.
 const (
 	ConditionTypeAvailable      ConditionType = "Available"
 	ConditionTypeRolloutBlocked ConditionType = "RolloutBlocked"
-	// TODO: Add more useful conditions.
 )
 
+// ConditionReason represents a reason why a QuayRegistry is in a given ConditionType.
 type ConditionReason string
 
+// Defines a list of all known ConditionReasons.
 const (
-	// ConditionTypeAvailable
-	ConditionReasonHealthChecksPassing  ConditionReason = "HealthChecksPassing"
-	ConditionReasonMigrationsInProgress ConditionReason = "MigrationsInProgress"
-	// ConditionTypeRolloutBlocked
+	ConditionReasonHealthChecksPassing                   ConditionReason = "HealthChecksPassing"
+	ConditionReasonMigrationsInProgress                  ConditionReason = "MigrationsInProgress"
 	ConditionReasonComponentsCreationSuccess             ConditionReason = "ComponentsCreationSuccess"
 	ConditionReasonUpgradeUnsupported                    ConditionReason = "UpgradeUnsupported"
 	ConditionReasonComponentCreationFailed               ConditionReason = "ComponentCreationFailed"
@@ -348,22 +357,32 @@ func EnsureRegistryEndpoint(
 	quay *QuayRegistry,
 	config map[string]interface{},
 ) (*QuayRegistry, bool) {
-	updatedQuay := quay.DeepCopy()
+	qcopy := quay.DeepCopy()
 
 	if config == nil {
 		config = map[string]interface{}{}
 	}
 
 	if serverHostname, ok := config["SERVER_HOSTNAME"]; ok {
-		updatedQuay.Status.RegistryEndpoint = "https://" + serverHostname.(string)
-	} else if ctx.SupportsRoutes {
-		updatedQuay.Status.RegistryEndpoint = "https://" + strings.Join([]string{
-			strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
-			ctx.ClusterHostname},
-			".")
+		qcopy.Status.RegistryEndpoint = fmt.Sprintf(
+			"https://%s",
+			serverHostname.(string),
+		)
+		equal := quay.Status.RegistryEndpoint == qcopy.Status.RegistryEndpoint
+		return qcopy, equal
 	}
 
-	return updatedQuay, quay.Status.RegistryEndpoint == updatedQuay.Status.RegistryEndpoint
+	if ctx.SupportsRoutes {
+		qcopy.Status.RegistryEndpoint = fmt.Sprintf(
+			"https://%s-quay-%s.%s",
+			qcopy.GetName(),
+			qcopy.GetNamespace(),
+			ctx.ClusterHostname,
+		)
+	}
+
+	equal := quay.Status.RegistryEndpoint == qcopy.Status.RegistryEndpoint
+	return qcopy, equal
 }
 
 // EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field and returns `ok` if it was unchanged.
@@ -457,10 +476,14 @@ func ManagedKeysSecretNameFor(quay *QuayRegistry) string {
 	return strings.Join([]string{quay.GetName(), ManagedKeysName}, "-")
 }
 
+// IsManagedKeysSecretFor returns true if provided secret holds secret  informations about provided
+// QuayRegistry instance.
 func IsManagedKeysSecretFor(quay *QuayRegistry, secret *corev1.Secret) bool {
 	return strings.Contains(secret.GetName(), quay.GetName()+"-"+ManagedKeysName)
 }
 
+// IsManagedTLSSecretFor returns true if provided secret holds TLS related config for provided
+// QuayRegistry instance.
 func IsManagedTLSSecretFor(quay *QuayRegistry, secret *corev1.Secret) bool {
 	return strings.Contains(secret.GetName(), quay.GetName()+"-"+QuayConfigTLSSecretName)
 }
