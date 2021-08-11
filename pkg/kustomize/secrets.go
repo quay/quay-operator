@@ -264,7 +264,10 @@ func fieldGroupNameFor(component v1.ComponentKind) string {
 
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
 func componentConfigFilesFor(
-	component v1.ComponentKind, quay *v1.QuayRegistry, configFiles map[string][]byte,
+	qctx *quaycontext.QuayRegistryContext,
+	component v1.ComponentKind,
+	quay *v1.QuayRegistry,
+	configFiles map[string][]byte,
 ) (map[string][]byte, error) {
 	switch component {
 	case v1.ComponentPostgres:
@@ -289,16 +292,11 @@ func componentConfigFilesFor(
 		databaseUsername := dbURI.User.Username()
 		databasePassword, _ := dbURI.User.Password()
 		databaseName := dbURI.Path[1:]
-		databaseRootPassword, err := generateRandomString(32)
-		if err != nil {
-			return nil, err
-		}
-
 		return map[string][]byte{
 			"database-username":      []byte(databaseUsername),
 			"database-password":      []byte(databasePassword),
 			"database-name":          []byte(databaseName),
-			"database-root-password": []byte(databaseRootPassword),
+			"database-root-password": []byte(qctx.PostgresRootPassword),
 		}, nil
 	case v1.ComponentClair:
 		quayHostname := ""

@@ -342,6 +342,14 @@ func KustomizationFor(
 		qctx.ConfigEditorPassword = configEditorPassword
 	}
 
+	if qctx.PostgresRootPassword == "" {
+		rootpw, err := generateRandomString(32)
+		if err != nil {
+			return nil, err
+		}
+		qctx.PostgresRootPassword = rootpw
+	}
+
 	quayConfigTLSSources := []string{}
 	if qctx.ClusterWildcardCert != nil {
 		quayConfigTLSSources = append(
@@ -398,6 +406,10 @@ func KustomizationFor(
 							"CONFIG_EDITOR_PASSWORD=%s",
 							qctx.ConfigEditorPassword,
 						),
+						fmt.Sprintf(
+							"POSTGRES_ROOT_PASSWORD=%s",
+							qctx.PostgresRootPassword,
+						),
 					},
 				},
 			},
@@ -432,21 +444,37 @@ func KustomizationFor(
 	componentPaths := []string{}
 	managedFieldGroups := []string{}
 	for _, component := range quay.Spec.Components {
-		if component.Managed {
-			componentPaths = append(componentPaths, filepath.Join("..", "components", string(component.Kind)))
-			managedFieldGroups = append(managedFieldGroups, fieldGroupNameFor(component.Kind))
+		if !component.Managed {
+			continue
+		}
 
-			componentConfigFiles, err := componentConfigFilesFor(component.Kind, quay, quayConfigFiles)
-			if componentConfigFiles == nil || err != nil {
-				continue
-			}
+		componentPaths = append(
+			componentPaths,
+			filepath.Join("..", "components", string(component.Kind)),
+		)
+		managedFieldGroups = append(
+			managedFieldGroups,
+			fieldGroupNameFor(component.Kind),
+		)
 
-			sources := []string{}
-			for filename, fileValue := range componentConfigFiles {
-				sources = append(sources, strings.Join([]string{filename, string(fileValue)}, "="))
-			}
+		componentConfigFiles, err := componentConfigFilesFor(
+			qctx, component.Kind, quay, quayConfigFiles,
+		)
+		if componentConfigFiles == nil || err != nil {
+			continue
+		}
 
-			generatedSecrets = append(generatedSecrets, types.SecretArgs{
+		sources := []string{}
+		for filename, fileValue := range componentConfigFiles {
+			sources = append(
+				sources,
+				strings.Join([]string{filename, string(fileValue)}, "="),
+			)
+		}
+
+		generatedSecrets = append(
+			generatedSecrets,
+			types.SecretArgs{
 				GeneratorArgs: types.GeneratorArgs{
 					Name:     string(component.Kind) + "-config-secret",
 					Behavior: "merge",
@@ -454,8 +482,8 @@ func KustomizationFor(
 						LiteralSources: sources,
 					},
 				},
-			})
-		}
+			},
+		)
 	}
 
 	images := []types.Image{}

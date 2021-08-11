@@ -29,7 +29,8 @@ type QuayRegistryContext struct {
 	SecretKey         string
 
 	// Database
-	DBURI string
+	DBURI                string
+	PostgresRootPassword string
 
 	// Stores Clair PSK so we can reuse
 	ClairSecurityScannerV4PSK string

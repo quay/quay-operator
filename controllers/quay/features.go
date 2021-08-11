@@ -40,6 +40,7 @@ const (
 	dbURI                     = "DB_URI"
 	clairSecurityScannerV4PSK = "CLAIR_SECURITY_SCANNER_V4_PSK"
 	configEditorPassword      = "CONFIG_EDITOR_PASSWORD"
+	postgresRootPassword      = "POSTGRES_ROOT_PASSWORD"
 
 	// GrafanaDashboardConfigNamespace holds the namespace where grafana configs live.
 	GrafanaDashboardConfigNamespace = "openshift-config-managed"
@@ -78,6 +79,7 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 		qctx.DBURI = string(secret.Data[dbURI])
 		qctx.ClairSecurityScannerV4PSK = string(secret.Data[clairSecurityScannerV4PSK])
 		qctx.ConfigEditorPassword = string(secret.Data[configEditorPassword])
+		qctx.PostgresRootPassword = string(secret.Data[postgresRootPassword])
 		return qctx, quay, nil
 	}
 
