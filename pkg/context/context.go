@@ -33,6 +33,9 @@ type QuayRegistryContext struct {
 
 	// Stores Clair PSK so we can reuse
 	ClairSecurityScannerV4PSK string
+
+	// Stores ConfigEditorPassword for reuse
+	ConfigEditorPassword string
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.

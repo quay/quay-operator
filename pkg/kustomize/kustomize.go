@@ -334,9 +334,12 @@ func KustomizationFor(
 		configFiles = append(configFiles, filepath.Join("bundle", key))
 	}
 
-	configEditorPassword, err := generateRandomString(16)
-	if err != nil {
-		return nil, err
+	if qctx.ConfigEditorPassword == "" {
+		configEditorPassword, err := generateRandomString(16)
+		if err != nil {
+			return nil, err
+		}
+		qctx.ConfigEditorPassword = configEditorPassword
 	}
 
 	quayConfigTLSSources := []string{}
@@ -391,6 +394,10 @@ func KustomizationFor(
 							"CLAIR_SECURITY_SCANNER_V4_PSK=%s",
 							qctx.ClairSecurityScannerV4PSK,
 						),
+						fmt.Sprintf(
+							"CONFIG_EDITOR_PASSWORD=%s",
+							qctx.ConfigEditorPassword,
+						),
 					},
 				},
 			},
@@ -408,8 +415,14 @@ func KustomizationFor(
 				Name: "quay-config-editor-credentials",
 				KvPairSources: types.KvPairSources{
 					LiteralSources: []string{
-						fmt.Sprintf("username=%s", configEditorUser),
-						fmt.Sprintf("password=%s", configEditorPassword),
+						fmt.Sprintf(
+							"username=%s",
+							configEditorUser,
+						),
+						fmt.Sprintf(
+							"password=%s",
+							qctx.ConfigEditorPassword,
+						),
 					},
 				},
 			},
