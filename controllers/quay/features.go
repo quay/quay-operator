@@ -35,9 +35,10 @@ const (
 	datastoreAccessKey     = "AWS_ACCESS_KEY_ID"
 	datastoreSecretKey     = "AWS_SECRET_ACCESS_KEY"
 
-	databaseSecretKey = "DATABASE_SECRET_KEY"
-	secretKey         = "SECRET_KEY"
-	dbURI             = "DB_URI"
+	databaseSecretKey         = "DATABASE_SECRET_KEY"
+	secretKey                 = "SECRET_KEY"
+	dbURI                     = "DB_URI"
+	clairSecurityScannerV4PSK = "CLAIR_SECURITY_SCANNER_V4_PSK"
 
 	// GrafanaDashboardConfigNamespace holds the namespace where grafana configs live.
 	GrafanaDashboardConfigNamespace = "openshift-config-managed"
@@ -74,6 +75,7 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 		qctx.DatabaseSecretKey = string(secret.Data[databaseSecretKey])
 		qctx.SecretKey = string(secret.Data[secretKey])
 		qctx.DBURI = string(secret.Data[dbURI])
+		qctx.ClairSecurityScannerV4PSK = string(secret.Data[clairSecurityScannerV4PSK])
 		return qctx, quay, nil
 	}
 

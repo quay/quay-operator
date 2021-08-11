@@ -387,6 +387,10 @@ func KustomizationFor(
 							"DB_URI=%s",
 							qctx.DBURI,
 						),
+						fmt.Sprintf(
+							"CLAIR_SECURITY_SCANNER_V4_PSK=%s",
+							qctx.ClairSecurityScannerV4PSK,
+						),
 					},
 				},
 			},

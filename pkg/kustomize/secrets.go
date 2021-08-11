@@ -47,11 +47,15 @@ func FieldGroupFor(
 			return nil, err
 		}
 
-		preSharedKey, err := generateRandomString(32)
-		if err != nil {
-			return nil, err
+		if ctx.ClairSecurityScannerV4PSK == "" {
+			preSharedKey, err := generateRandomString(32)
+			if err != nil {
+				return nil, err
+			}
+			ctx.ClairSecurityScannerV4PSK = base64.StdEncoding.EncodeToString(
+				[]byte(preSharedKey),
+			)
 		}
-		psk := base64.StdEncoding.EncodeToString([]byte(preSharedKey))
 
 		fieldGroup.FeatureSecurityScanner = true
 		fieldGroup.SecurityScannerV4Endpoint = fmt.Sprintf(
@@ -59,7 +63,7 @@ func FieldGroupFor(
 		)
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 		fieldGroup.SecurityScannerNotifications = true
-		fieldGroup.SecurityScannerV4PSK = psk
+		fieldGroup.SecurityScannerV4PSK = ctx.ClairSecurityScannerV4PSK
 		return fieldGroup, nil
 	case v1.ComponentRedis:
 		fieldGroup, err := redis.NewRedisFieldGroup(map[string]interface{}{})

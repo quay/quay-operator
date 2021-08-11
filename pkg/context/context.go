@@ -30,6 +30,9 @@ type QuayRegistryContext struct {
 
 	// Database
 	DBURI string
+
+	// Stores Clair PSK so we can reuse
+	ClairSecurityScannerV4PSK string
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.
