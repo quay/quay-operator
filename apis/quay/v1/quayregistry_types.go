@@ -223,10 +223,6 @@ type QuayRegistryList struct {
 	Items           []QuayRegistry `json:"items"`
 }
 
-func EnsureComponents(components []Component) []Component {
-	return append(components, components[0])[1 : len(components)+1]
-}
-
 // ComponentsMatch returns true if both set of components are equivalent, and false otherwise.
 func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 	if len(firstComponents) != len(secondComponents) {
@@ -345,8 +341,13 @@ func EnsureDefaultComponents(
 	return updatedQuay, nil
 }
 
-// EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was unchanged.
-func EnsureRegistryEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry, config map[string]interface{}) (*QuayRegistry, bool) {
+// EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was
+// unchanged.
+func EnsureRegistryEndpoint(
+	ctx *quaycontext.QuayRegistryContext,
+	quay *QuayRegistry,
+	config map[string]interface{},
+) (*QuayRegistry, bool) {
 	updatedQuay := quay.DeepCopy()
 
 	if config == nil {

@@ -220,6 +220,59 @@ func (r *QuayRegistryReconciler) validateComponentsConfig(
 	return nil
 }
 
+// verifyMigrationJob checks if database migration job has been finished. Once the migration is
+// ended moves the status to Available.
+func (r *QuayRegistryReconciler) verifyMigrationJob(
+	ctx context.Context, quay *v1.QuayRegistry,
+) (ctrl.Result, error) {
+	log := r.Log.WithValues(
+		"quayregistry",
+		types.NamespacedName{
+			Name:      quay.GetName(),
+			Namespace: quay.GetNamespace(),
+		},
+	)
+	log.Info("checking Quay upgrade `Job` completion")
+
+	nsn := types.NamespacedName{
+		Name:      quay.GetName() + "-quay-app-upgrade",
+		Namespace: quay.GetNamespace(),
+	}
+	var upgradeJob batchv1.Job
+	if err := r.Client.Get(ctx, nsn, &upgradeJob); err != nil {
+		log.Error(err, "could't retrieve Quay upgrade Job")
+		return ctrl.Result{}, err
+	}
+
+	if upgradeJob.Status.Succeeded == 0 {
+		log.Info("Quay upgrade `Job` not finished")
+		return ctrl.Result{
+			RequeueAfter: 10 * time.Second,
+		}, nil
+	}
+
+	log.Info("Upgrade complete, updating `status.currentVersion`")
+
+	condition := v1.Condition{
+		Type:               v1.ConditionTypeAvailable,
+		Status:             metav1.ConditionTrue,
+		Reason:             v1.ConditionReasonHealthChecksPassing,
+		Message:            "all registry component healthchecks passing",
+		LastUpdateTime:     metav1.Now(),
+		LastTransitionTime: metav1.Now(),
+	}
+	quay.Status.Conditions = v1.SetCondition(quay.Status.Conditions, condition)
+	quay.Status.CurrentVersion = v1.QuayVersionCurrent
+
+	if err := r.Client.Status().Update(ctx, quay); err != nil {
+		log.Error(err, "could not update QuayRegistry status with current version")
+		return ctrl.Result{}, err
+	}
+
+	log.Info("successfully updated `status` after Quay upgrade")
+	return ctrl.Result{}, nil
+}
+
 // Reconcile is called everytime an update or resync event happens in a QuayRegistry object.
 func (r *QuayRegistryReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request,
@@ -248,13 +301,10 @@ func (r *QuayRegistryReconciler) Reconcile(
 		return ctrl.Result{}, r.handleQuayRegistryDeletion(ctx, updatedQuay)
 	}
 
-	// if the migration is in progress we simply skip this reconcile loop. XXX this is not
-	// right as we can stay forever in migration state if this operator dies by any reason.
-	// needs to be refactored.
+	// if the migration is in progress we simply check the current status for the migration.
 	available := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeAvailable)
 	if available != nil && available.Reason == v1.ConditionReasonMigrationsInProgress {
-		log.Info("migrations in progress, skipping reconcile")
-		return ctrl.Result{}, nil
+		return r.verifyMigrationJob(ctx, updatedQuay)
 	}
 
 	// if there is no config bundle set create one with the default config and sets it in
@@ -446,78 +496,22 @@ func (r *QuayRegistryReconciler) Reconcile(
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// XXX here be dragons. we spawn a new go routine and we don't care about its health. this
-	// may cause the QuayRegistry to be stuck in Migration status.
+	// if the version has been updated there is a job in progress to migrate the database
+	// to the new version, on this case just set the status to MigrationsInProgress and
+	// return.
 	if updatedQuay.Status.CurrentVersion != v1.QuayVersionCurrent {
-		if updatedQuay, err = r.updateWithCondition(
+		return r.reconcileWithCondition(
 			updatedQuay,
 			v1.ConditionTypeAvailable,
 			metav1.ConditionFalse,
 			v1.ConditionReasonMigrationsInProgress,
 			"running database migrations",
-		); err != nil {
-			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-			return ctrl.Result{}, nil
-		}
-
-		go func(quay *v1.QuayRegistry) {
-			if err = wait.Poll(
-				upgradePollInterval,
-				upgradePollTimeout,
-				func() (bool, error) {
-					nsn := types.NamespacedName{
-						Name:      quay.GetName() + "-quay-app-upgrade",
-						Namespace: quay.GetNamespace(),
-					}
-					log.Info("checking Quay upgrade `Job` completion")
-
-					var upgradeJob batchv1.Job
-					if err = r.Client.Get(ctx, nsn, &upgradeJob); err != nil {
-						log.Error(err, "could't retrieve Quay upgrade Job")
-						return false, err
-					}
-
-					if upgradeJob.Status.Succeeded == 0 {
-						return false, nil
-					}
-
-					log.Info("Upgrade complete, updating `status.currentVersion`")
-
-					updatedQuay, _ := v1.EnsureRegistryEndpoint(
-						quayContext, updatedQuay, userProvidedConfig,
-					)
-					msg := "all registry component healthchecks passing"
-					condition := v1.Condition{
-						Type:               v1.ConditionTypeAvailable,
-						Status:             metav1.ConditionTrue,
-						Reason:             v1.ConditionReasonHealthChecksPassing,
-						Message:            msg,
-						LastUpdateTime:     metav1.Now(),
-						LastTransitionTime: metav1.Now(),
-					}
-					updatedQuay.Status.Conditions = v1.SetCondition(updatedQuay.Status.Conditions, condition)
-					updatedQuay.Status.CurrentVersion = v1.QuayVersionCurrent
-					r.EventRecorder.Event(updatedQuay, corev1.EventTypeNormal, string(v1.ConditionReasonHealthChecksPassing), msg)
-
-					if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
-						log.Error(err, "could not update QuayRegistry status with current version")
-						return true, err
-					}
-
-					updatedQuay.Spec.Components = v1.EnsureComponents(updatedQuay.Spec.Components)
-					if err = r.Client.Update(ctx, updatedQuay); err != nil {
-						log.Error(err, "could not update QuayRegistry spec to complete upgrade")
-						return true, err
-					}
-
-					log.Info("successfully updated `status` after Quay upgrade")
-					return true, nil
-				},
-			); err != nil {
-				log.Error(err, "Quay upgrade `Job` never completed")
-			}
-		}(updatedQuay.DeepCopy())
+		)
 	}
+
+	// we should be good to go, sets up the registry endpoints in the quay object and
+	// make sure it contains the finalizer.
+	updatedQuay, _ = v1.EnsureRegistryEndpoint(quayContext, updatedQuay, userProvidedConfig)
 
 	if !controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
 		controllerutil.AddFinalizer(updatedQuay, QuayOperatorFinalizer)
