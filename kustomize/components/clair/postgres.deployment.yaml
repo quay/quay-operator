@@ -7,7 +7,6 @@ metadata:
   annotations:
     quay-component: clair
 spec:
-  replicas: 1
   strategy:
     type: Recreate
   selector:

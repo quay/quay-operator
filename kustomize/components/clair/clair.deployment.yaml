@@ -7,7 +7,6 @@ metadata:
     quay-component: clair
   name: clair-app
 spec:
-  replicas: 1
   selector:
     matchLabels:
       quay-component: clair-app
