@@ -95,12 +95,13 @@ func main() {
 	mgr, err := ctrl.NewManager(
 		ctrl.GetConfigOrDie(),
 		ctrl.Options{
-			Scheme:             scheme,
-			MetricsBindAddress: args.MetricsAddress,
-			Port:               9443,
-			LeaderElection:     args.LeaderElection,
-			LeaderElectionID:   "7daa4ab6.quay.redhat.com",
-			Namespace:          args.Namespace,
+			Scheme:                scheme,
+			MetricsBindAddress:    args.MetricsAddress,
+			Port:                  9443,
+			LeaderElection:        args.LeaderElection,
+			LeaderElectionID:      "7daa4ab6.quay.redhat.com",
+			Namespace:             args.Namespace,
+			ClientDisableCacheFor: []client.Object{&quay.QuayRegistry{}},
 		},
 	)
 	if err != nil {
