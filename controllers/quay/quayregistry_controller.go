@@ -33,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	prometheusv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/go-logr/logr"
@@ -131,57 +132,55 @@ func (r *QuayRegistryReconciler) createConfigBundle(
 
 // loadQuayRegistryContext verifies if necessary features work and populate provided
 // QuayRegistryContext while doing so. It checks if database credentials exist, if TLS certs
-// have been provided, if the cluster supports Routes and ObjectBucketClaims. Returns a Duration
-// in case the error can be "retried" or an error.
+// have been provided, if the cluster supports Routes and ObjectBucketClaims.
 func (r *QuayRegistryReconciler) loadQuayRegistryContext(
 	ctx context.Context,
 	qctx *quaycontext.QuayRegistryContext,
 	quay *v1.QuayRegistry,
 	bundle corev1.Secret,
-) (time.Duration, error) {
+) error {
 	var err error
-	var zero time.Duration
 
 	if qctx, quay, err = r.checkManagedKeys(
 		ctx, qctx, quay, bundle.Data,
 	); err != nil {
-		return zero, fmt.Errorf("unable to retrieve managed keys `Secret`: %w", err)
+		return fmt.Errorf("unable to retrieve managed keys `Secret`: %w", err)
 	}
 
 	if qctx, quay, err = r.checkManagedTLS(
 		ctx, qctx, quay, bundle.Data,
 	); err != nil {
-		return zero, fmt.Errorf("unable to retrieve managed TLS `Secret`: %w", err)
+		return fmt.Errorf("unable to retrieve managed TLS `Secret`: %w", err)
 	}
 
 	managedRT := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentRoute)
 	if qctx, quay, err = r.checkRoutesAvailable(
 		ctx, qctx, quay, bundle.Data,
 	); err != nil && managedRT {
-		return zero, fmt.Errorf("could not check for `Routes` API: %w", err)
+		return fmt.Errorf("could not check for `Routes` API: %w", err)
 	}
 
 	managedOS := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentObjectStorage)
 	if qctx, quay, err = r.checkObjectBucketClaimsAvailable(
 		ctx, qctx, quay, bundle.Data,
 	); err != nil && managedOS {
-		return time.Second, fmt.Errorf("could not check `ObjectBucketClaims` API: %w", err)
+		return fmt.Errorf("could not check `ObjectBucketClaims` API: %w", err)
 	}
 
 	if qctx, quay, err = r.checkBuildManagerAvailable(
 		ctx, qctx, quay, bundle.Data,
 	); err != nil {
-		return zero, fmt.Errorf("could not check for build manager support: %w", err)
+		return fmt.Errorf("could not check for build manager support: %w", err)
 	}
 
 	managedMN := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentMonitoring)
 	if qctx, quay, err = r.checkMonitoringAvailable(
 		ctx, qctx, quay, bundle.Data,
 	); err != nil && managedMN {
-		return zero, fmt.Errorf("could not check for monitoring support: %w", err)
+		return fmt.Errorf("could not check for monitoring support: %w", err)
 	}
 
-	return zero, nil
+	return nil
 }
 
 // validateComponentsConfig checks if we have configuration for all mandatory components. This
@@ -224,7 +223,7 @@ func (r *QuayRegistryReconciler) validateComponentsConfig(
 // ended moves the status to Available.
 func (r *QuayRegistryReconciler) verifyMigrationJob(
 	ctx context.Context, quay *v1.QuayRegistry,
-) (ctrl.Result, error) {
+) error {
 	log := r.Log.WithValues(
 		"quayregistry",
 		types.NamespacedName{
@@ -241,14 +240,12 @@ func (r *QuayRegistryReconciler) verifyMigrationJob(
 	var upgradeJob batchv1.Job
 	if err := r.Client.Get(ctx, nsn, &upgradeJob); err != nil {
 		log.Error(err, "could't retrieve Quay upgrade Job")
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if upgradeJob.Status.Succeeded == 0 {
 		log.Info("Quay upgrade `Job` not finished")
-		return ctrl.Result{
-			RequeueAfter: 10 * time.Second,
-		}, nil
+		return nil
 	}
 
 	log.Info("Upgrade complete, updating `status.currentVersion`")
@@ -266,11 +263,11 @@ func (r *QuayRegistryReconciler) verifyMigrationJob(
 
 	if err := r.Client.Status().Update(ctx, quay); err != nil {
 		log.Error(err, "could not update QuayRegistry status with current version")
-		return ctrl.Result{}, err
+		return err
 	}
 
 	log.Info("successfully updated `status` after Quay upgrade")
-	return ctrl.Result{}, nil
+	return nil
 }
 
 // Reconcile is called everytime an update or resync event happens in a QuayRegistry object.
@@ -280,17 +277,20 @@ func (r *QuayRegistryReconciler) Reconcile(
 	r.Mtx.Lock()
 	defer r.Mtx.Unlock()
 
+	var stop = ctrl.Result{}
+	var reenqueue = ctrl.Result{RequeueAfter: time.Minute}
 	var err error
+
 	log := r.Log.WithValues("quayregistry", req.NamespacedName)
 	log.Info("begin reconcile")
 
 	var quay v1.QuayRegistry
 	if err = r.Client.Get(ctx, req.NamespacedName, &quay); err != nil {
 		if errors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return stop, nil
 		}
 		log.Error(err, "unable to retrieve QuayRegistry")
-		return ctrl.Result{}, err
+		return reenqueue, err
 	}
 	updatedQuay := quay.DeepCopy()
 	quayContext := quaycontext.NewQuayRegistryContext()
@@ -298,13 +298,13 @@ func (r *QuayRegistryReconciler) Reconcile(
 	// if quay instance is flagged to be deleted get rid of related objects.
 	if !quay.GetDeletionTimestamp().IsZero() {
 		log.Info("QuayRegistry is flagged for deletion, finalizing it")
-		return ctrl.Result{}, r.handleQuayRegistryDeletion(ctx, updatedQuay)
+		return stop, r.handleQuayRegistryDeletion(ctx, updatedQuay)
 	}
 
 	// if the migration is in progress we simply check the current status for the migration.
 	available := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeAvailable)
 	if available != nil && available.Reason == v1.ConditionReasonMigrationsInProgress {
-		return r.verifyMigrationJob(ctx, updatedQuay)
+		return reenqueue, r.verifyMigrationJob(ctx, updatedQuay)
 	}
 
 	// if there is no config bundle set create one with the default config and sets it in
@@ -322,7 +322,7 @@ func (r *QuayRegistryReconciler) Reconcile(
 			)
 		}
 		log.Info("successfully updated `spec.configBundleSecret`")
-		return ctrl.Result{}, nil
+		return reenqueue, nil
 	}
 	nsn := types.NamespacedName{
 		Namespace: quay.GetNamespace(),
@@ -348,24 +348,21 @@ func (r *QuayRegistryReconciler) Reconcile(
 	// here we attempt to verify if the cluster supports all our dependencies such as
 	// Routes, ObjectBucketClaims, etc. loadQuayRegistryContext loads information about
 	// our dependencies into the provided QuayRegistryContext.
-	if retryDelay, err := r.loadQuayRegistryContext(
+	if err := r.loadQuayRegistryContext(
 		ctx, quayContext, updatedQuay, configBundle,
 	); err != nil {
-		if _, nerr := r.updateWithCondition(
+		return r.reconcileWithCondition(
 			&quay,
 			v1.ConditionTypeRolloutBlocked,
 			metav1.ConditionTrue,
 			v1.ConditionReasonObjectStorageComponentDependencyError,
 			err.Error(),
-		); err != nil {
-			log.Error(nerr, "failed to update `conditions` of `QuayRegistry`")
-		}
-		return ctrl.Result{RequeueAfter: retryDelay}, nil
+		)
 	}
 
 	if updatedQuay, err = v1.EnsureDefaultComponents(quayContext, updatedQuay); err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
-		return ctrl.Result{}, nil
+		return reenqueue, nil
 	}
 
 	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
@@ -373,7 +370,7 @@ func (r *QuayRegistryReconciler) Reconcile(
 		if err = r.Client.Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `spec.components` to include defaults")
 		}
-		return ctrl.Result{}, nil
+		return reenqueue, nil
 	}
 
 	// verify now if we have all the needed configuration for the components. If a component
@@ -487,7 +484,7 @@ func (r *QuayRegistryReconciler) Reconcile(
 		"all objects created/updated successfully",
 	); err != nil {
 		log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-		return ctrl.Result{}, nil
+		return reenqueue, nil
 	}
 
 	managedOS := v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage")
@@ -516,11 +513,11 @@ func (r *QuayRegistryReconciler) Reconcile(
 	if !controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
 		controllerutil.AddFinalizer(updatedQuay, QuayOperatorFinalizer)
 		if err = r.Update(ctx, updatedQuay); err != nil {
-			return ctrl.Result{}, err
+			return reenqueue, err
 		}
 	}
 
-	return ctrl.Result{}, nil
+	return reenqueue, nil
 }
 
 // updateGrafanaDashboardData parses the Grafana Dashboard ConfigMap and updates the title and
@@ -657,34 +654,18 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 	updatedQuay.Status.Conditions = v1.SetCondition(q.Status.Conditions, condition)
 	updatedQuay.Status.LastUpdate = time.Now().UTC().String()
 
-	eventType := corev1.EventTypeNormal
-	if s == metav1.ConditionTrue {
-		eventType = corev1.EventTypeWarning
-	}
+	// XXX this context should be received by argument.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	// FIXME: Need to pause here because race condition between updating `conditions`
-	// multiple times changes `resourceVersion`... XXX (ricardo) this makes no sense.
-	time.Sleep(1000 * time.Millisecond)
-
-	// Fetch first to ensure we have the right `resourceVersion` for updates.
-	nsn := types.NamespacedName{Namespace: q.GetNamespace(), Name: q.GetName()}
-	var currentQuay v1.QuayRegistry
-	if err := r.Client.Get(context.Background(), nsn, &currentQuay); err != nil {
+	if err := r.Client.Status().Update(ctx, updatedQuay); err != nil {
 		return nil, err
 	}
-	updatedQuay.SetResourceVersion(currentQuay.GetResourceVersion())
-
-	if err := r.Client.Status().Update(context.Background(), updatedQuay); err != nil {
-		return nil, err
-	}
-
-	// FIXME: Events are not being recorded during testing, making it hard to debug...
-	r.EventRecorder.Event(updatedQuay, eventType, string(reason), msg)
 	return updatedQuay, nil
 }
 
 // reconcileWithCondition sets the given condition on the `QuayRegistry` and returns a reconcile
-// result.
+// result rescheduling the next event for the QuayRegistry in one minute.
 func (r *QuayRegistryReconciler) reconcileWithCondition(
 	q *v1.QuayRegistry,
 	t v1.ConditionType,
@@ -693,7 +674,7 @@ func (r *QuayRegistryReconciler) reconcileWithCondition(
 	msg string,
 ) (ctrl.Result, error) {
 	_, err := r.updateWithCondition(q, t, s, reason, msg)
-	return ctrl.Result{}, err
+	return ctrl.Result{RequeueAfter: time.Minute}, err
 }
 
 // SetupWithManager initializes the controller manager. Register all needed schemes.
@@ -715,6 +696,7 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&quayredhatcomv1.QuayRegistry{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Complete(r)
 }
 

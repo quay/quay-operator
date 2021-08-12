@@ -38,9 +38,8 @@ import (
 )
 
 var (
-	scheme     = runtime.NewScheme()
-	setupLog   = ctrl.Log.WithName("setup")
-	syncPeriod = time.Minute
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
@@ -102,7 +101,6 @@ func main() {
 			LeaderElection:     args.LeaderElection,
 			LeaderElectionID:   "7daa4ab6.quay.redhat.com",
 			Namespace:          args.Namespace,
-			SyncPeriod:         &syncPeriod,
 		},
 	)
 	if err != nil {
