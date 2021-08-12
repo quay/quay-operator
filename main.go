@@ -116,6 +116,12 @@ func main() {
 		EventRecorder:  mgr.GetEventRecorderFor("quayregistry-controller"),
 		WatchNamespace: args.Namespace,
 		Mtx:            &mtx,
+		ReEnqueueOnError: ctrl.Result{
+			RequeueAfter: 20 * time.Second,
+		},
+		ReEnqueueOnSuccess: ctrl.Result{
+			RequeueAfter: time.Minute,
+		},
 	}
 	if err = qyrec.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistry")

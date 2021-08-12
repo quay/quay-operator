@@ -69,11 +69,14 @@ const (
 type QuayRegistryReconciler struct {
 	client.Client
 
-	Log            logr.Logger
-	Scheme         *runtime.Scheme
-	EventRecorder  record.EventRecorder
-	WatchNamespace string
-	Mtx            *sync.Mutex
+	Log                logr.Logger
+	Scheme             *runtime.Scheme
+	EventRecorder      record.EventRecorder
+	WatchNamespace     string
+	Mtx                *sync.Mutex
+	ReEnqueueOnError   ctrl.Result
+	ReEnqueueOnSuccess ctrl.Result
+	DoNotReEnqueue     ctrl.Result
 }
 
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
@@ -277,41 +280,45 @@ func (r *QuayRegistryReconciler) Reconcile(
 	r.Mtx.Lock()
 	defer r.Mtx.Unlock()
 
-	var stop = ctrl.Result{}
-	var reenqueue = ctrl.Result{RequeueAfter: time.Minute}
 	var err error
-
 	log := r.Log.WithValues("quayregistry", req.NamespacedName)
 	log.Info("begin reconcile")
 
 	var quay v1.QuayRegistry
 	if err = r.Client.Get(ctx, req.NamespacedName, &quay); err != nil {
 		if errors.IsNotFound(err) {
-			return stop, nil
+			return r.DoNotReEnqueue, nil
 		}
-		log.Error(err, "unable to retrieve QuayRegistry")
-		return reenqueue, err
+		log.Error(err, "unable to retrieve quay registry")
+		return r.ReEnqueueOnError, nil
 	}
 	updatedQuay := quay.DeepCopy()
 	quayContext := quaycontext.NewQuayRegistryContext()
 
 	// if quay instance is flagged to be deleted get rid of related objects.
 	if !quay.GetDeletionTimestamp().IsZero() {
-		log.Info("QuayRegistry is flagged for deletion, finalizing it")
-		return stop, r.handleQuayRegistryDeletion(ctx, updatedQuay)
+		log.Info("quay registry is flagged for deletion, finalizing it")
+		if err := r.handleQuayRegistryDeletion(ctx, updatedQuay); err != nil {
+			log.Error(err, "error finalizing quay registry")
+			return r.ReEnqueueOnError, nil
+		}
+		return r.DoNotReEnqueue, nil
 	}
 
 	// if the migration is in progress we simply check the current status for the migration.
 	available := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeAvailable)
 	if available != nil && available.Reason == v1.ConditionReasonMigrationsInProgress {
-		return reenqueue, r.verifyMigrationJob(ctx, updatedQuay)
+		if err := r.verifyMigrationJob(ctx, updatedQuay); err != nil {
+			log.Error(err, "error verifying migration job status")
+		}
+		return r.ReEnqueueOnError, nil
 	}
 
 	// if there is no config bundle set create one with the default config and sets it in
 	// the quay object. If this operation succeeds the QuayRegistry object will be updated
 	// and a new event will eventually come in.
 	if quay.Spec.ConfigBundleSecret == "" {
-		log.Info("`spec.configBundleSecret` is unset. Creating base `Secret`")
+		log.Info("spec config bundle secret is unset, creating it")
 		if err = r.createConfigBundle(ctx, updatedQuay); err != nil {
 			return r.reconcileWithCondition(
 				&quay,
@@ -321,8 +328,8 @@ func (r *QuayRegistryReconciler) Reconcile(
 				err.Error(),
 			)
 		}
-		log.Info("successfully updated `spec.configBundleSecret`")
-		return reenqueue, nil
+		log.Info("successfully updated spec config bundle secret`")
+		return r.ReEnqueueOnError, nil
 	}
 	nsn := types.NamespacedName{
 		Namespace: quay.GetNamespace(),
@@ -331,17 +338,16 @@ func (r *QuayRegistryReconciler) Reconcile(
 
 	var configBundle corev1.Secret
 	if err = r.Get(ctx, nsn, &configBundle); err != nil {
-		msg := fmt.Sprintf(
-			"unable to retrieve referenced `configBundleSecret`: %s, error: %s",
-			quay.Spec.ConfigBundleSecret,
-			err,
-		)
 		return r.reconcileWithCondition(
 			&quay,
 			v1.ConditionTypeRolloutBlocked,
 			metav1.ConditionTrue,
 			v1.ConditionReasonConfigInvalid,
-			msg,
+			fmt.Sprintf(
+				"unable to retrieve config bundle secret %q: %s",
+				quay.Spec.ConfigBundleSecret,
+				err,
+			),
 		)
 	}
 
@@ -361,16 +367,16 @@ func (r *QuayRegistryReconciler) Reconcile(
 	}
 
 	if updatedQuay, err = v1.EnsureDefaultComponents(quayContext, updatedQuay); err != nil {
-		log.Error(err, "could not ensure default `spec.components`")
-		return reenqueue, nil
+		log.Error(err, "could not ensure default spec.components")
+		return r.ReEnqueueOnError, nil
 	}
 
 	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
-		log.Info("updating QuayRegistry `spec.components` to include defaults")
+		log.Info("updating quay registry spec.components to include defaults")
 		if err = r.Client.Update(ctx, updatedQuay); err != nil {
-			log.Error(err, "failed to update `spec.components` to include defaults")
+			log.Error(err, "failed to update spec.components to include defaults")
 		}
-		return reenqueue, nil
+		return r.ReEnqueueOnError, nil
 	}
 
 	// verify now if we have all the needed configuration for the components. If a component
@@ -389,16 +395,15 @@ func (r *QuayRegistryReconciler) Reconcile(
 		updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked,
 	)
 
-	log.Info("inflating QuayRegistry into Kubernetes objects using Kustomize")
+	log.Info("inflating quay registry objects using kustomize")
 	deploymentObjects, err := kustomize.Inflate(quayContext, updatedQuay, &configBundle, log)
 	if err != nil {
-		msg := fmt.Sprintf("could't inflate QuayRegistry into Kubernetes objects: %s", err)
 		return r.reconcileWithCondition(
 			&quay,
 			v1.ConditionTypeRolloutBlocked,
 			metav1.ConditionTrue,
 			v1.ConditionReasonComponentCreationFailed,
-			msg,
+			fmt.Sprintf("could't inflate quay registry objects: %s", err),
 		)
 	}
 
@@ -412,7 +417,7 @@ func (r *QuayRegistryReconciler) Reconcile(
 			if obj, err = r.updateGrafanaDashboardData(
 				obj, updatedQuay.GetName(), updatedQuay.GetNamespace(),
 			); err != nil {
-				msg := fmt.Sprintf("Unable to update Grafana title %s", err)
+				msg := fmt.Sprintf("unable to update grafana title %s", err)
 				return r.reconcileWithCondition(
 					&quay,
 					v1.ConditionTypeRolloutBlocked,
@@ -483,14 +488,14 @@ func (r *QuayRegistryReconciler) Reconcile(
 		v1.ConditionReasonComponentsCreationSuccess,
 		"all objects created/updated successfully",
 	); err != nil {
-		log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-		return reenqueue, nil
+		log.Error(err, "failed to update conditions of quay registry")
+		return r.ReEnqueueOnError, nil
 	}
 
 	managedOS := v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage")
 	if managedOS && !quayContext.ObjectStorageInitialized {
-		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
-		return ctrl.Result{Requeue: true}, nil
+		r.Log.Info("requeuing to populate values for managed component: objectstorage")
+		return r.ReEnqueueOnError, nil
 	}
 
 	// if the version has been updated there is a job in progress to migrate the database
@@ -513,11 +518,12 @@ func (r *QuayRegistryReconciler) Reconcile(
 	if !controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
 		controllerutil.AddFinalizer(updatedQuay, QuayOperatorFinalizer)
 		if err = r.Update(ctx, updatedQuay); err != nil {
-			return reenqueue, err
+			log.Error(err, "unable to update quay registry after adding finalizer")
+			return r.ReEnqueueOnError, nil
 		}
 	}
 
-	return reenqueue, nil
+	return r.ReEnqueueOnSuccess, nil
 }
 
 // updateGrafanaDashboardData parses the Grafana Dashboard ConfigMap and updates the title and
@@ -667,14 +673,22 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 // reconcileWithCondition sets the given condition on the `QuayRegistry` and returns a reconcile
 // result rescheduling the next event for the QuayRegistry in one minute.
 func (r *QuayRegistryReconciler) reconcileWithCondition(
-	q *v1.QuayRegistry,
+	quay *v1.QuayRegistry,
 	t v1.ConditionType,
 	s metav1.ConditionStatus,
 	reason v1.ConditionReason,
 	msg string,
 ) (ctrl.Result, error) {
-	_, err := r.updateWithCondition(q, t, s, reason, msg)
-	return ctrl.Result{RequeueAfter: time.Minute}, err
+	if _, err := r.updateWithCondition(quay, t, s, reason, msg); err != nil {
+		r.Log.WithValues(
+			"quayregistry",
+			types.NamespacedName{
+				Name:      quay.GetName(),
+				Namespace: quay.GetNamespace(),
+			},
+		).Error(err, "error updating condition")
+	}
+	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
 // SetupWithManager initializes the controller manager. Register all needed schemes.
