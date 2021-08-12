@@ -17,7 +17,7 @@ import (
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbac "k8s.io/api/rbac/v1beta1"
+	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -190,13 +190,13 @@ func ModelFor(gvk resid.Gvk) client.Object {
 		return &apps.Deployment{}
 	case resid.Gvk{
 		Group:   "rbac.authorization.k8s.io",
-		Version: "v1beta1",
+		Version: "v1",
 		Kind:    "Role",
 	}:
 		return &rbac.Role{}
 	case resid.Gvk{
 		Group:   "rbac.authorization.k8s.io",
-		Version: "v1beta1",
+		Version: "v1",
 		Kind:    "RoleBinding",
 	}:
 		return &rbac.RoleBinding{}
