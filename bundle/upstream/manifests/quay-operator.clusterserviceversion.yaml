@@ -28,7 +28,8 @@ metadata:
               {"kind": "horizontalpodautoscaler", "managed": true},
               {"kind": "route", "managed": true},
               {"kind": "mirror", "managed": true},
-              {"kind": "monitoring", "managed": true}
+              {"kind": "monitoring", "managed": true},
+              {"kind": "tls", "managed": true}
             ]
           }
         }
