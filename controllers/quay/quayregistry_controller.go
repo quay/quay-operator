@@ -348,7 +348,14 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				if upgradeJob.Status.Succeeded > 0 {
 					log.Info("Quay upgrade complete, updating `status.currentVersion`")
 
-					updatedQuay, _ := v1.EnsureRegistryEndpoint(quayContext, updatedQuay, userProvidedConfig)
+					var freshQuay v1.QuayRegistry
+					if err := r.Client.Get(ctx, req.NamespacedName, &freshQuay); err != nil {
+						log.Error(err, "could not retrieve QuayRegistry")
+						return false, err
+					}
+					qcopy := freshQuay.DeepCopy()
+
+					qcopy, _ = v1.EnsureRegistryEndpoint(quayContext, qcopy, userProvidedConfig)						
 					msg := "all registry component healthchecks passing"
 					condition := v1.Condition{
 						Type:               v1.ConditionTypeAvailable,
@@ -358,21 +365,19 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 						LastUpdateTime:     metav1.Now(),
 						LastTransitionTime: metav1.Now(),
 					}
-					updatedQuay.Status.Conditions = v1.SetCondition(updatedQuay.Status.Conditions, condition)
-					updatedQuay.Status.CurrentVersion = v1.QuayVersionCurrent
-					r.EventRecorder.Event(updatedQuay, corev1.EventTypeNormal, string(v1.ConditionReasonHealthChecksPassing), msg)
+					qcopy.Status.Conditions = v1.SetCondition(qcopy.Status.Conditions, condition)
+					qcopy.Status.CurrentVersion = v1.QuayVersionCurrent
+					r.EventRecorder.Event(qcopy, corev1.EventTypeNormal, string(v1.ConditionReasonHealthChecksPassing), msg)
 
-					if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
+					if err = r.Client.Status().Update(ctx, qcopy); err != nil {
 						log.Error(err, "could not update QuayRegistry status with current version")
-
-						return true, err
+						return false, nil
 					}
 
-					updatedQuay.Spec.Components = v1.EnsureComponents(updatedQuay.Spec.Components)
-					if err = r.Client.Update(ctx, updatedQuay); err != nil {
+					qcopy.Spec.Components = v1.EnsureComponents(qcopy.Spec.Components)
+					if err = r.Client.Update(ctx, qcopy); err != nil {
 						log.Error(err, "could not update QuayRegistry spec to complete upgrade")
-
-						return true, err
+						return false, nil
 					}
 
 					log.Info("successfully updated `status` after Quay upgrade")
