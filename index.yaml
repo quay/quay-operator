@@ -6,7 +6,7 @@ entries:
     created: "2020-06-09T08:56:58.723313-04:00"
     description: A Helm Chart for the Quay Operator
     digest: 60626fbc1fa50e6de9943045c5aa6faa97753b258294adf70a0362626829b3e3
-    home: https://github.com/redhat-cop/quay-operator
+    home: https://github.com/quay/quay-operator
     icon: https://cdn.freebiesupply.com/logos/thumbs/2x/quay-1-logo.png
     keywords:
     - operator
@@ -17,7 +17,7 @@ entries:
       name: sabre1041
     name: quay-operator
     sources:
-    - https://github.com/redhat-cop/quay-operator
+    - https://github.com/quay/quay-operator
     type: application
     urls:
     - https://quay.github.io/quay-operator/quay-operator-1.1.1.tgz
@@ -27,7 +27,7 @@ entries:
     created: "2020-06-09T08:56:58.722451-04:00"
     description: A Helm Chart for the Quay Operator
     digest: 32fdc9b7198e81f372c022f1345f537baae9ffb36c92f31cc8e88fcd1c59066e
-    home: https://github.com/redhat-cop/quay-operator
+    home: https://github.com/quay/quay-operator
     icon: https://cdn.freebiesupply.com/logos/thumbs/2x/quay-1-logo.png
     keywords:
     - operator
@@ -38,7 +38,7 @@ entries:
       name: sabre1041
     name: quay-operator
     sources:
-    - https://github.com/redhat-cop/quay-operator
+    - https://github.com/quay/quay-operator
     type: application
     urls:
     - https://quay.github.io/quay-operator/quay-operator-1.1.0.tgz
@@ -48,7 +48,7 @@ entries:
     created: "2020-06-09T08:56:58.720795-04:00"
     description: A Helm Chart for the Quay Operator
     digest: 0ab9716d7b788ecd67e829f19913ca86984fb8a446463ee4c70318c012c7c9a2
-    home: https://github.com/redhat-cop/quay-operator
+    home: https://github.com/quay/quay-operator
     icon: https://cdn.freebiesupply.com/logos/thumbs/2x/quay-1-logo.png
     keywords:
     - operator
@@ -59,7 +59,7 @@ entries:
       name: sabre1041
     name: quay-operator
     sources:
-    - https://github.com/redhat-cop/quay-operator
+    - https://github.com/quay/quay-operator
     type: application
     urls:
     - https://quay.github.io/quay-operator/quay-operator-1.0.0.tgz
