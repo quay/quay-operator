@@ -405,61 +405,47 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 	// Generate or pull out the `SECRET_KEY` and `DATABASE_SECRET_KEY`. Since these must be stable across
 	// runs of the same config, we store them (and re-read them) from a specialized `Secret`.
 	// TODO(alecmerdler): Refector these three blocks...
-	if ctx.DatabaseSecretKey == "" {
-		if key, found := parsedUserConfig["DATABASE_SECRET_KEY"]; found {
-			log.Info("`DATABASE_SECRET_KEY` found in user-provided config")
-
-			ctx.DatabaseSecretKey = key.(string)
-		} else {
-			log.Info("`DATABASE_SECRET_KEY` not found in user-provided config, generating new one")
-
-			databaseSecretKey, err := generateRandomString(secretKeyLength)
-			if err != nil {
-				return nil, err
-			}
-
-			ctx.DatabaseSecretKey = databaseSecretKey
+	if key, found := parsedUserConfig["DATABASE_SECRET_KEY"].(string); found && len(key) > 0 {
+		log.Info("`DATABASE_SECRET_KEY` found in user-provided config")
+		ctx.DatabaseSecretKey = key
+	} else if ctx.DatabaseSecretKey == "" {
+		log.Info("`DATABASE_SECRET_KEY` not found in user-provided config, generating new one")
+		databaseSecretKey, err := generateRandomString(secretKeyLength)
+		if err != nil {
+			return nil, err
 		}
+		ctx.DatabaseSecretKey = databaseSecretKey
 	}
 	parsedUserConfig["DATABASE_SECRET_KEY"] = ctx.DatabaseSecretKey
 
-	if ctx.SecretKey == "" {
-		if key, found := parsedUserConfig["SECRET_KEY"]; found {
-			log.Info("`SECRET_KEY` found in user-provided config")
-
-			ctx.SecretKey = key.(string)
-		} else {
-			log.Info("`SECRET_KEY` not found in user-provided config, generating new one")
-
-			secretKey, err := generateRandomString(secretKeyLength)
-			if err != nil {
-				return nil, err
-			}
-
-			ctx.SecretKey = secretKey
+	if key, found := parsedUserConfig["SECRET_KEY"].(string); found && len(key) > 0 {
+		log.Info("`SECRET_KEY` found in user-provided config")
+		ctx.SecretKey = key
+	} else if ctx.SecretKey == "" {
+		log.Info("`SECRET_KEY` not found in user-provided config, generating new one")
+		secretKey, err := generateRandomString(secretKeyLength)
+		if err != nil {
+			return nil, err
 		}
+		ctx.SecretKey = secretKey
 	}
 	parsedUserConfig["SECRET_KEY"] = ctx.SecretKey
 
-	if ctx.DbUri == "" {
-		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) {
-			log.Info("managed `DB_URI` not found in config, generating new one")
-
-			user := quay.GetName() + "-quay-database"
-			name := quay.GetName() + "-quay-database"
-			host := quay.GetName() + "-quay-database"
-			port := "5432"
-			password, err := generateRandomString(secretKeyLength)
-			if err != nil {
-				return nil, err
-			}
-
-			ctx.DbUri = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", user, password, host, port, name)
-		} else {
-			if dbURI, found := parsedUserConfig["DB_URI"]; found {
-				ctx.DbUri = dbURI.(string)
-			}
+	if dbURI, found := parsedUserConfig["DB_URI"].(string); found && len(dbURI) > 0 {
+		ctx.DbUri = dbURI
+	} else if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) && len(ctx.DbUri) == 0 {
+		log.Info("managed `DB_URI` not found in config, generating new one")
+		user := quay.GetName() + "-quay-database"
+		name := quay.GetName() + "-quay-database"
+		host := quay.GetName() + "-quay-database"
+		port := "5432"
+		password, err := generateRandomString(secretKeyLength)
+		if err != nil {
+			return nil, err
 		}
+		ctx.DbUri = fmt.Sprintf(
+			"postgresql://%s:%s@%s:%s/%s", user, password, host, port, name,
+		)
 	}
 	parsedUserConfig["DB_URI"] = ctx.DbUri
 
