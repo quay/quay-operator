@@ -264,6 +264,14 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 		return nil, err
 	}
 
+	if ctx.DbRootPw == "" {
+		rootpw, err := generateRandomString(32)
+		if err != nil {
+			return nil, err
+		}
+		ctx.DbRootPw = rootpw
+	}
+
 	quayConfigTLSSources := []string{}
 	if ctx.ClusterWildcardCert != nil {
 		quayConfigTLSSources = append(quayConfigTLSSources, "ocp-cluster-wildcard.cert="+string(ctx.ClusterWildcardCert))
@@ -292,6 +300,7 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 						"DATABASE_SECRET_KEY=" + ctx.DatabaseSecretKey,
 						"SECRET_KEY=" + ctx.SecretKey,
 						"DB_URI=" + ctx.DbUri,
+						"DB_ROOT_PW=" + ctx.DbRootPw,
 					},
 				},
 			},
@@ -324,7 +333,7 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 			componentPaths = append(componentPaths, filepath.Join("..", "components", string(component.Kind)))
 			managedFieldGroups = append(managedFieldGroups, fieldGroupNameFor(component.Kind))
 
-			componentConfigFiles, err := componentConfigFilesFor(component.Kind, quay, quayConfigFiles)
+			componentConfigFiles, err := componentConfigFilesFor(ctx, component.Kind, quay, quayConfigFiles)
 			if componentConfigFiles == nil || err != nil {
 				continue
 			}
