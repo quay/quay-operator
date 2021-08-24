@@ -29,7 +29,8 @@ type QuayRegistryContext struct {
 	SecretKey         string
 
 	// Database
-	DbUri string
+	DbUri    string
+	DbRootPw string
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.
