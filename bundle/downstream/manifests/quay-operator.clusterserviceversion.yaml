@@ -5,7 +5,7 @@ metadata:
     olm.skipRange: ">=3.4.x <3.5.0"
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.5.0
+    containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.6.0
     createdAt: 2021-03-16 12:03 UTC
     description: Opinionated deployment of Red Hat Quay on Kubernetes.
     quay-version: 3.5.0
@@ -36,7 +36,7 @@ metadata:
     operators.operatorframework.io/internal-objects: |-
       ["quayecosystems.redhatcop.redhat.io"]
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-  name: quay-operator.v3.5.0
+  name: quay-operator.v3.6.0
   namespace: placeholder
 spec:
   customresourcedefinitions:
@@ -152,7 +152,7 @@ spec:
   install:
     spec:
       deployments:
-      - name: quay-operator.v3.5.0
+      - name: quay-operator.v3.6.0
         spec:
           replicas: 1
           selector:
@@ -166,7 +166,7 @@ spec:
             spec:
               containers:
               - name: quay-operator
-                image: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.5.0
+                image: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.6.0
                 command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'
@@ -188,13 +188,13 @@ spec:
                     fieldRef:
                       fieldPath: metadata.annotations['quay-version']
                 - name: RELATED_IMAGE_COMPONENT_QUAY
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-rhel8:v3.5.0
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-rhel8:v3.6.0
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-clair-rhel8:v3.5.0
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-clair-rhel8:v3.6.0
                 - name: RELATED_IMAGE_COMPONENT_BUILDER
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-rhel8:v3.5.0
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-rhel8:v3.6.0
                 - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos-rhel8:v3.5.0
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos-rhel8:v3.6.0
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES
                   value: registry.redhat.io/rhel8/postgresql-10:1
                 - name: RELATED_IMAGE_COMPONENT_REDIS

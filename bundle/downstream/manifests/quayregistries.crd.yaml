@@ -8,7 +8,7 @@ metadata:
 spec:
   group: quay.redhat.com
   names:
-    kind: QuayRegistry
+    kind: QuayRegistryf
     listKind: QuayRegistryList
     plural: quayregistries
     singular: quayregistry
