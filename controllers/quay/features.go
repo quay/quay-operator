@@ -38,6 +38,7 @@ const (
 	databaseSecretKey = "DATABASE_SECRET_KEY"
 	secretKey         = "SECRET_KEY"
 	dbURI             = "DB_URI"
+	dbRootPw          = "DB_ROOT_PW"
 
 	GrafanaDashboardConfigNamespace = "openshift-config-managed"
 )
@@ -64,6 +65,7 @@ func (r *QuayRegistryReconciler) checkManagedKeys(ctx *quaycontext.QuayRegistryC
 			ctx.DatabaseSecretKey = string(secret.Data[databaseSecretKey])
 			ctx.SecretKey = string(secret.Data[secretKey])
 			ctx.DbUri = string(secret.Data[dbURI])
+			ctx.DbRootPw = string(secret.Data[dbRootPw])
 			break
 		}
 	}
