@@ -242,6 +242,11 @@ func (q *QuayRegistryStatusReconciler) deployAvailableCondition(
 func (q *QuayRegistryStatusReconciler) faultyObjectBucketClaimConditions(
 	ctx context.Context, reg qv1.QuayRegistry,
 ) (map[string][]qv1.Condition, error) {
+
+	if !qv1.ComponentIsManaged(reg.Spec.Components, qv1.ComponentObjectStorage) {
+		return map[string][]qv1.Condition{}, nil
+	}
+
 	var list ocsv1a1.ObjectBucketClaimList
 	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
 		return nil, err
