@@ -130,7 +130,10 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegis
 
 			if len(fakeRoute.(*routev1.Route).Status.Ingress) > 0 {
 				ctx.SupportsRoutes = true
-				ctx.ClusterHostname = fakeRoute.(*routev1.Route).Status.Ingress[0].RouterCanonicalHostname
+				routerName := fakeRoute.(*routev1.Route).Status.Ingress[0].RouterName
+				routerCanonicalHostname := fakeRoute.(*routev1.Route).Status.Ingress[0].RouterCanonicalHostname
+				ctx.ClusterHostname = strings.TrimPrefix(routerCanonicalHostname, "router-"+routerName+".")
+				r.Log.Info("Detected cluster hostname " + ctx.ClusterHostname)
 
 				return true, nil
 			}
