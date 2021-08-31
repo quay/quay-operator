@@ -283,9 +283,15 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 	}
 	componentChecks := map[ComponentKind]componentCheck{
 		ComponentRoute:         {func() bool { return ctx.SupportsRoutes }, "cannot use `route` component when `Route` API not available"},
-		ComponentTLS:           {func() bool { return ctx.SupportsRoutes && ctx.TLSCert == nil && ctx.TLSKey == nil }, "cannot use `tls` component when `Route` API not available or TLS cert/key pair is provided"},
+		ComponentTLS:           {func() bool { return ctx.SupportsRoutes }, "cannot use `tls` component when `Route` API not available"},
 		ComponentObjectStorage: {func() bool { return ctx.SupportsObjectStorage }, "cannot use `ObjectStorage` component when `ObjectStorage` API not available"},
 		ComponentMonitoring:    {func() bool { return ctx.SupportsMonitoring }, "cannot use `monitoring` component when `Prometheus` API not available"},
+	}
+
+	componentManaged := map[ComponentKind]componentCheck{
+		ComponentTLS: {
+			check: func() bool { return ctx.TLSCert == nil && ctx.TLSKey == nil },
+		},
 	}
 
 	for _, component := range allComponents {
@@ -302,10 +308,15 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 			}
 		}
 
+		managed := !checkExists || componentCheck.check()
+		if _, ok := componentManaged[component]; ok {
+			managed = managed && componentManaged[component].check()
+		}
+
 		if !found {
 			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{
 				Kind:    component,
-				Managed: !checkExists || componentCheck.check(),
+				Managed: managed,
 			})
 		}
 	}
