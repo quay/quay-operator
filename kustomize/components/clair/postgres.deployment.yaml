@@ -18,6 +18,7 @@ spec:
       labels:
         quay-component: clair-postgres
     spec:
+      terminationGracePeriodSeconds: 180
       serviceAccountName: clair-postgres
       volumes:
         - name: postgres-data

@@ -8,6 +8,8 @@ metadata:
     quay-component: postgres
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       quay-component: postgres
@@ -16,6 +18,7 @@ spec:
       labels:
         quay-component: postgres
     spec:
+      terminationGracePeriodSeconds: 180
       serviceAccountName: quay-database
       volumes:
         - name: postgres-data
