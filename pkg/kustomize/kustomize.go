@@ -104,6 +104,10 @@ func upgradeOverlayDir() string {
 	return filepath.Join(kustomizeDir(), "overlays", "current", "upgrade")
 }
 
+func unmanagedTLSOverlayDir() string {
+	return filepath.Join(kustomizeDir(), "overlays", "current", "unmanaged-tls")
+}
+
 func configEditorOnlyOverlay() string {
 	return filepath.Join(kustomizeDir(), "overlays", "current", "config-only")
 }
@@ -486,6 +490,8 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 		overlay = configEditorOnlyOverlay()
 	} else if quay.Status.CurrentVersion != v1.QuayVersionCurrent {
 		overlay = upgradeOverlayDir()
+	} else if !v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentTLS) {
+		overlay = unmanagedTLSOverlayDir()
 	} else {
 		overlay = overlayDir()
 	}
