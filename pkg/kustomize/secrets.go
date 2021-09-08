@@ -105,8 +105,10 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 
 		return fieldGroup, nil
 	case v1.ComponentRoute:
+		// sets tls termination in the load balancer if no cert has been provided.
+		terminateExternally := len(ctx.TLSCert) == 0 && len(ctx.TLSKey) == 0
 		fieldGroup := &hostsettings.HostSettingsFieldGroup{
-			ExternalTlsTermination: true,
+			ExternalTlsTermination: terminateExternally,
 			PreferredUrlScheme:     "https",
 			ServerHostname:         ctx.ServerHostname,
 		}

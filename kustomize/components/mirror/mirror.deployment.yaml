@@ -21,15 +21,15 @@ spec:
       serviceAccountName: quay-app
       volumes:
         - name: config
-          secret:
-            secretName: quay-config-secret
-        - name: extra-ca-certs
           projected:
             sources:
-              - configMap:
-                  name: cluster-service-ca
+              - secret:
+                  name: quay-config-secret
               - secret:
                   name: quay-config-tls
+        - name: extra-ca-certs
+          configMap:
+            name: cluster-service-ca
       initContainers:
         - name: quay-mirror-init
           image: quay.io/projectquay/quay@sha256:5660d7174218e1cb21bf6ef406602dbe8c01c878c630a9f310fe3e5560d4c2cd

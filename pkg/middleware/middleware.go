@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -40,19 +41,33 @@ func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj cl
 		return configBundleSecret, nil
 	}
 
-	// Add TLS cert/key pair to managed `Route`
-	if routeObj, ok := obj.(*route.Route); ok &&
-		!v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentTLS) &&
-		(quayComponentLabel == "quay-app-route" || quayComponentLabel == "quay-builder-route") {
-		routeObj.Spec.TLS = &route.TLSConfig{
-			Certificate: string(ctx.TLSCert),
-			Key:         string(ctx.TLSKey),
-		}
-
-		return routeObj, nil
+	rt, ok := obj.(*route.Route)
+	if !ok {
+		return obj, nil
 	}
 
-	return obj, nil
+	// if we are managing TLS we can simply return the original route as no change is needed.
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentTLS) {
+		return obj, nil
+	}
+
+	if quayComponentLabel != "quay-app-route" && quayComponentLabel != "quay-builder-route" {
+		return obj, nil
+	}
+
+	// if we are not managing TLS then user has provided its own key pair. on this case we
+	// set up the route as passthrough thus delegating TLS termination to the pods. as quay
+	// builders route uses GRPC we do not change its route's target port.
+	rt.Spec.TLS = &route.TLSConfig{
+		Termination:                   route.TLSTerminationPassthrough,
+		InsecureEdgeTerminationPolicy: route.InsecureEdgeTerminationPolicyRedirect,
+	}
+	if quayComponentLabel == "quay-app-route" {
+		rt.Spec.Port = &route.RoutePort{
+			TargetPort: intstr.Parse("https"),
+		}
+	}
+	return rt, nil
 }
 
 // flattenSecret takes all Quay config fields in given secret and combines them under `config.yaml` key.
