@@ -106,7 +106,7 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 				continue
 			}
 
-			contains, err := kustomize.ContainsComponentConfig(reconfigureRequest.Config, component)
+			contains, err := kustomize.ContainsComponentConfig(reconfigureRequest.Config, reconfigureRequest.Certs, component)
 
 			if err != nil {
 				log.Error(err, "failed to check `config.yaml` for component fieldgroup", "component", component.Kind)

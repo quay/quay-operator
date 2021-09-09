@@ -189,7 +189,7 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) (
 // ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
 // the fieldgroup for the given component by comparing it with the fieldgroup defaults.
 // TODO: Replace this with function from `config-tool` library once implemented.
-func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Component) (bool, error) {
+func ContainsComponentConfig(fullConfig map[string]interface{}, certs map[string][]byte, component v1.Component) (bool, error) {
 	fields := []string{}
 
 	switch component.Kind {
@@ -211,7 +211,11 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, component v1.Com
 	case v1.ComponentMonitoring:
 		return false, nil
 	case v1.ComponentTLS:
-		fields = []string{"EXTERNAL_TLS_TERMINATION"}
+		_, keyPresent := certs["ssl.key"]
+		_, certPresent := certs["ssl.cert"]
+		if certPresent && keyPresent {
+			return true, nil
+		}
 	default:
 		panic("unknown component: " + component.Kind)
 	}
