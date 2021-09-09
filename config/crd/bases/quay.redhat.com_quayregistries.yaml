@@ -117,3 +117,4 @@ spec:
                 description: RegistryEndpoint is the external access point for the Quay
                   registry.
                 type: string
+              
