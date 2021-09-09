@@ -327,10 +327,11 @@ func TestContainsComponentConfig(t *testing.T) {
 
 	for _, test := range containsComponentConfigTests {
 		var fullConfig map[string]interface{}
+		var certs map[string][]byte
 		err := yaml.Unmarshal([]byte(test.rawConfig), &fullConfig)
 		assert.Nil(err, test.name)
 
-		contains, err := ContainsComponentConfig(fullConfig, v1.Component{Kind: test.component, Managed: test.managed})
+		contains, err := ContainsComponentConfig(fullConfig, certs, v1.Component{Kind: test.component, Managed: test.managed})
 
 		if test.expectedError != nil {
 			assert.NotNil(err, test.name)

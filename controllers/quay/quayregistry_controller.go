@@ -244,10 +244,18 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
+	userProvidedCerts := map[string][]byte{}
+	if _, ok := configBundle.Data["ssl.cert"]; ok {
+		userProvidedCerts["ssl.cert"] = configBundle.Data["ssl.cert"]
+	}
+	if _, ok := configBundle.Data["ssl.key"]; ok {
+		userProvidedCerts["ssl.key"] = configBundle.Data["ssl.key"]
+	}
+
 	updatedQuay.Status.Conditions = v1.RemoveCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked)
 
 	for _, component := range updatedQuay.Spec.Components {
-		contains, err := kustomize.ContainsComponentConfig(userProvidedConfig, component)
+		contains, err := kustomize.ContainsComponentConfig(userProvidedConfig, userProvidedCerts, component)
 		if err != nil {
 			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, err.Error())
 			if err != nil {
