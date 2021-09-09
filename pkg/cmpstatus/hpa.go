@@ -39,33 +39,35 @@ func (h *HPA) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, e
 		}, nil
 	}
 
-	nsn := types.NamespacedName{
-		Namespace: reg.Namespace,
-		Name:      fmt.Sprintf("%s-quay-app", reg.Name),
-	}
+	for _, hpasuffix := range []string{"quay-app", "clair-app", "quay-mirror"} {
+		nsn := types.NamespacedName{
+			Namespace: reg.Namespace,
+			Name:      fmt.Sprintf("%s-%s", reg.Name, hpasuffix),
+		}
 
-	var hpa asv2b2.HorizontalPodAutoscaler
-	if err := h.Client.Get(ctx, nsn, &hpa); err != nil {
-		if errors.IsNotFound(err) {
+		var hpa asv2b2.HorizontalPodAutoscaler
+		if err := h.Client.Get(ctx, nsn, &hpa); err != nil {
+			if errors.IsNotFound(err) {
+				return qv1.Condition{
+					Type:           qv1.ComponentHPAReady,
+					Status:         metav1.ConditionFalse,
+					Reason:         qv1.ConditionReasonComponentNotReady,
+					Message:        "Horizontal pod autoscaler not found",
+					LastUpdateTime: metav1.NewTime(time.Now()),
+				}, nil
+			}
+			return zero, err
+		}
+
+		if !qv1.Owns(reg, &hpa) {
 			return qv1.Condition{
 				Type:           qv1.ComponentHPAReady,
 				Status:         metav1.ConditionFalse,
 				Reason:         qv1.ConditionReasonComponentNotReady,
-				Message:        "Horizontal pod autoscaler not found",
+				Message:        "Horizontal pod autoscaler not owned by QuayRegistry",
 				LastUpdateTime: metav1.NewTime(time.Now()),
 			}, nil
 		}
-		return zero, err
-	}
-
-	if !qv1.Owns(reg, &hpa) {
-		return qv1.Condition{
-			Type:           qv1.ComponentHPAReady,
-			Status:         metav1.ConditionFalse,
-			Reason:         qv1.ConditionReasonComponentNotReady,
-			Message:        "Horizontal pod autoscaler not owned by QuayRegistry",
-			LastUpdateTime: metav1.NewTime(time.Now()),
-		}, nil
 	}
 
 	return qv1.Condition{

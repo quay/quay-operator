@@ -226,6 +226,32 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
+				&asv2b2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-mirror",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+				},
+				&asv2b2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-clair-app",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+				},
 				&monv1.PrometheusRule{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-prometheus-rules",
@@ -501,6 +527,32 @@ func TestEvaluate(t *testing.T) {
 				&asv2b2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+				},
+				&asv2b2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-mirror",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+				},
+				&asv2b2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-clair-app",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								Kind:       "QuayRegistry",
@@ -830,6 +882,32 @@ func TestEvaluate(t *testing.T) {
 				&asv2b2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+				},
+				&asv2b2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-mirror",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+				},
+				&asv2b2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-clair-app",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								Kind:       "QuayRegistry",
