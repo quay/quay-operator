@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -68,9 +69,12 @@ var processTests = []struct {
 				Labels: map[string]string{"quay-component": "quay-app-route"},
 			},
 			Spec: route.RouteSpec{
+				Port: &route.RoutePort{
+					TargetPort: intstr.Parse("https"),
+				},
 				TLS: &route.TLSConfig{
-					Certificate: tlsCert,
-					Key:         tlsKey,
+					Termination:                   route.TLSTerminationPassthrough,
+					InsecureEdgeTerminationPolicy: route.InsecureEdgeTerminationPolicyRedirect,
 				},
 			},
 		},
@@ -92,17 +96,17 @@ var processTests = []struct {
 		},
 		&route.Route{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{"quay-component": "quay-app-route"},
+				Labels: map[string]string{"quay-component": "quay-builder-route"},
 			},
 		},
 		&route.Route{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{"quay-component": "quay-app-route"},
+				Labels: map[string]string{"quay-component": "quay-builder-route"},
 			},
 			Spec: route.RouteSpec{
 				TLS: &route.TLSConfig{
-					Certificate: tlsCert,
-					Key:         tlsKey,
+					Termination:                   route.TLSTerminationPassthrough,
+					InsecureEdgeTerminationPolicy: route.InsecureEdgeTerminationPolicyRedirect,
 				},
 			},
 		},

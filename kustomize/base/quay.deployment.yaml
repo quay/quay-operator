@@ -19,8 +19,12 @@ spec:
       serviceAccountName: quay-app
       volumes:
         - name: config
-          secret:
-            secretName: quay-config-secret
+          projected:
+            sources:
+            - secret:
+                name: quay-config-secret
+            - secret:
+                name: quay-config-tls
         - name: extra-ca-certs
           configMap:
             name: cluster-service-ca
