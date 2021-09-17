@@ -3,7 +3,7 @@ kind: Subscription
 metadata:
   name: quay-operator-tng
 spec:
-  channel: preview-3.6
+  channel: alpha
   installPlanApproval: Automatic
   name: quay-operator-tng
   source: quay-operator-tng
