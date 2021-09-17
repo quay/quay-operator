@@ -1,0 +1,41 @@
+---
+name: OLM Publish
+
+on:
+  push:
+    branch:
+      - master
+
+jobs:
+  publish-olm-images:
+    name: Publish OLM Images
+    runs-on: 'ubuntu-latest'
+    env:
+      BUNDLE_TAG: quay.io/projectquay/quay-operator-bundle:latest
+      INDEX_TAG: quay.io/projectquay/quay-operator-index:latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Build Bundle Image
+        run: docker build -t "${BUNDLE_TAG}" -f ./bundle/Dockerfile ./bundle/upstream
+
+      - name: Push Bundle Image
+        env:
+          QUAY_USER: projectquay+quay_github
+        run: |
+          echo "::add-mask::${{ secrets.QUAY_TOKEN }}"
+          docker login -u "${QUAY_USER}" -p '${{ secrets.QUAY_TOKEN }}' quay.io
+          docker push "${BUNDLE_TAG}"
+
+      - name: Build Catalog Index
+        env:
+          OPM_DOWNLOAD_URL: https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.6/
+          OPM: opm-linux
+        run: |
+          wget "${OPM_DOWNLOAD_URL}/${OPM}.tar.gz"
+          tar xvf "${OPM}.tar.gz"
+          ./opm index add --build-tool docker --bundles "${BUNDLE_TAG}" --tag "${INDEX_TAG}"
+
+      - name: Push Catalog Index Image
+        run: docker push "${INDEX_TAG}"
