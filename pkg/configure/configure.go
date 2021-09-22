@@ -100,18 +100,27 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 		newComponents := []v1.Component{}
 		for _, component := range quay.Spec.Components {
 
+			var contains bool
 			// HPA and Monitoring don't have fields associated with them so we skip. Route should not change based on config either since fields are optional when managed.
 			if component.Kind == v1.ComponentHPA || component.Kind == v1.ComponentMonitoring || component.Kind == v1.ComponentRoute {
 				newComponents = append(newComponents, component)
 				continue
 			}
 
+			// For the reset, infer from the presence of fields
 			contains, err := kustomize.ContainsComponentConfig(reconfigureRequest.Config, reconfigureRequest.Certs, component)
-
 			if err != nil {
 				log.Error(err, "failed to check `config.yaml` for component fieldgroup", "component", component.Kind)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
+			}
+
+			// Mirror we infer based on the value of FEATURE_REPO_MIRROR
+			if component.Kind == v1.ComponentMirror {
+				enabled, ok := reconfigureRequest.Config["FEATURE_REPO_MIRROR"]
+				if ok && enabled.(bool) {
+					contains = false
+				}
 			}
 
 			if contains {

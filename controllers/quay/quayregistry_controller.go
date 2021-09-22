@@ -265,7 +265,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 
-		if component.Managed && contains && component.Kind != v1.ComponentRoute {
+		if component.Managed && contains && component.Kind != v1.ComponentRoute && component.Kind != v1.ComponentMirror {
 			msg := fmt.Sprintf("%s component marked as managed, but `configBundleSecret` contains required fields", component.Kind)
 
 			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
