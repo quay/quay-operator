@@ -1,0 +1,33 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: quay-operator-mutating-webhook-local
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+  - name: mutating.quayregistries.quay.redhat.com
+    sideEffects: None
+    clientConfig:
+      url: "https://4.tcp.ngrok.io:19531/mutate"
+
+    reinvocationPolicy: Never
+    rules:
+      - operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        apiGroups:
+          - quay.redhat.com
+        apiVersions:
+          - v1
+        resources:
+          - quayregistries
+        scope: "*"
+    matchPolicy: Equivalent
+    namespaceSelector: {}
+    admissionReviewVersions:
+      - v1
+      - v1beta1
+    failurePolicy: Fail
+    objectSelector: {}
+    timeoutSeconds: 10
