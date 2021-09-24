@@ -1,5 +1,0 @@
-channels:
-- currentCSV: quay-operator.v3.5.7
-  name: alpha
-defaultChannel: alpha
-packageName: quay-tng
