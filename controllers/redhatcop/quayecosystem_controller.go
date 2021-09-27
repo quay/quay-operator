@@ -208,6 +208,9 @@ func (r *QuayEcosystemReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			}
 		}
 		postgresDeployment.Spec.Template.Spec.Containers[0].Env = envVars
+		postgresDeployment.Spec.Strategy = appsv1.DeploymentStrategy{
+			Type: appsv1.RecreateDeploymentStrategyType,
+		}
 
 		if err := r.Client.Update(ctx, &postgresDeployment); err != nil {
 			msg := "failed to update managed Postgres `Deployment` with `POSTGRESQL_ADMIN_PASSWORD` environment variable"
