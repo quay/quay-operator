@@ -65,6 +65,7 @@ var requiredComponents = []ComponentKind{
 	ComponentPostgres,
 	ComponentObjectStorage,
 	ComponentRoute,
+	ComponentRedis,
 }
 
 const (
