@@ -440,10 +440,13 @@ func TestEnsureTLSFor(t *testing.T) {
 				assert.Equal(string(test.providedCertKeyPair[1]), string(tlsKey), test.name)
 			}
 
-			shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.serverHostname, fieldGroupNameFor("route"))
+			fgn, err := v1.FieldGroupNameFor(v1.ComponentRoute)
+			assert.Nil(err, "error not nil: %s", err)
+
+			shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.serverHostname, fgn)
 
 			if test.buildManagerHostname != "" {
-				shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.buildManagerHostname, fieldGroupNameFor("route"))
+				shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.buildManagerHostname, fgn)
 			}
 		}
 	}

@@ -177,9 +177,14 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) (
 		hosts = append(hosts, strings.Split(ctx.BuildManagerHostname, ":")[0])
 	}
 
+	fgn, err := v1.FieldGroupNameFor(v1.ComponentRoute)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting group name for component: %w", err)
+	}
+
 	if ctx.TLSCert != nil && ctx.TLSKey != nil {
 		for _, host := range hosts {
-			if valid, validationErr := shared.ValidateCertPairWithHostname(ctx.TLSCert, ctx.TLSKey, host, fieldGroupNameFor("route")); !valid {
+			if valid, validationErr := shared.ValidateCertPairWithHostname(ctx.TLSCert, ctx.TLSKey, host, fgn); !valid {
 				return nil, nil, fmt.Errorf("provided certificate/key pair not valid for host '%s': %s", host, validationErr.String())
 			}
 		}
@@ -230,31 +235,6 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, certs map[string
 	}
 
 	return false, nil
-}
-
-func fieldGroupNameFor(component v1.ComponentKind) string {
-	switch component {
-	case v1.ComponentClair:
-		return "SecurityScanner"
-	case v1.ComponentPostgres:
-		return "Database"
-	case v1.ComponentRedis:
-		return "Redis"
-	case v1.ComponentObjectStorage:
-		return "DistributedStorage"
-	case v1.ComponentRoute:
-		return "HostSettings"
-	case v1.ComponentMirror:
-		return "RepoMirror"
-	case v1.ComponentHPA:
-		return ""
-	case v1.ComponentMonitoring:
-		return ""
-	case v1.ComponentTLS:
-		return ""
-	default:
-		panic("unknown component: " + component)
-	}
 }
 
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
