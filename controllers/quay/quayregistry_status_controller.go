@@ -111,6 +111,10 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 
 	reg.Status.UnhealthyComponents = uc
 	if err := q.Client.Status().Update(ctx, &reg); err != nil {
+		if errors.IsConflict(err) {
+			log.Info("skipping status reconcile due to conflict, will retry")
+			return reschedule, nil
+		}
 		log.Error(err, "unexpected error updating component conditions")
 		return reschedule, nil
 	}
