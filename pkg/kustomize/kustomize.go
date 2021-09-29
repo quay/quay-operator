@@ -40,7 +40,6 @@ const (
 	configSecretPrefix                = "quay-config-secret"
 	registryHostnameAnnotation        = "quay-registry-hostname"
 	buildManagerHostnameAnnotation    = "quay-buildmanager-hostname"
-	managedFieldGroupsAnnotation      = "quay-managed-fieldgroups"
 	operatorServiceEndpointAnnotation = "quay-operator-service-endpoint"
 
 	podNamespaceKey = "MY_POD_NAMESPACE"
@@ -331,11 +330,9 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 	}
 
 	componentPaths := []string{}
-	managedFieldGroups := []string{}
 	for _, component := range quay.Spec.Components {
 		if component.Managed {
 			componentPaths = append(componentPaths, filepath.Join("..", "components", string(component.Kind)))
-			managedFieldGroups = append(managedFieldGroups, fieldGroupNameFor(component.Kind))
 
 			componentConfigFiles, err := componentConfigFilesFor(ctx, component.Kind, quay, quayConfigFiles)
 			if componentConfigFiles == nil || err != nil {
@@ -383,7 +380,6 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 			QuayRegistryNameLabel: quay.GetName(),
 		},
 		CommonAnnotations: map[string]string{
-			managedFieldGroupsAnnotation:      strings.ReplaceAll(strings.Join(managedFieldGroups, ","), ",,", ","),
 			registryHostnameAnnotation:        ctx.ServerHostname,
 			buildManagerHostnameAnnotation:    strings.Split(ctx.BuildManagerHostname, ":")[0],
 			operatorServiceEndpointAnnotation: operatorServiceEndpoint(),

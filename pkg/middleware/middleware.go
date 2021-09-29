@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	route "github.com/openshift/api/route/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -15,7 +16,10 @@ import (
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
-const configSecretPrefix = "quay-config-secret"
+const (
+	configSecretPrefix    = "quay-config-secret"
+	fieldGroupsAnnotation = "quay-managed-fieldgroups"
+)
 
 // Process applies any additional middleware steps to a managed k8s object that cannot be accomplished using
 // the Kustomize toolchain.
@@ -39,6 +43,22 @@ func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj cl
 		delete(configBundleSecret.Data, "ssl.key")
 
 		return configBundleSecret, nil
+	}
+
+	// we have to set a special annotation in the config editor deployment. this annotation is
+	// then used as an environment variable and consumed by the app.
+	if dep, ok := obj.(*appsv1.Deployment); ok {
+		if !strings.Contains(dep.GetName(), "quay-config-editor") {
+			return obj, nil
+		}
+
+		fgns, err := v1.FieldGroupNamesForManagedComponents(quay)
+		if err != nil {
+			return nil, err
+		}
+
+		dep.Spec.Template.Annotations[fieldGroupsAnnotation] = strings.Join(fgns, ",")
+		return dep, nil
 	}
 
 	rt, ok := obj.(*route.Route)
