@@ -73,22 +73,7 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 			return
 		}
 
-		var oldSecret corev1.Secret
-		nsn.Name = quay.Spec.ConfigBundleSecret
-		if err := k8sClient.Get(context.Background(), nsn, &oldSecret); err != nil {
-			log.Error(
-				err,
-				"failed to fetch QuayRegistry config bundle",
-				"name",
-				quay.Spec.ConfigBundleSecret,
-				"namespace",
-				reconfigureRequest.Namespace,
-			)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		newSecret := createUpdatedSecret(reconfigureRequest, oldSecret)
+		newSecret := createUpdatedSecret(reconfigureRequest)
 		if err := k8sClient.Create(context.Background(), &newSecret); err != nil {
 			log.Error(err, "failed to create new config bundle secret")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -159,7 +144,7 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 
 // createUpdatedSecret takes the reconfigureRequest and the oldSecret and coalesces them into a
 // new secret.
-func createUpdatedSecret(reconfigureRequest request, oldSecret corev1.Secret) corev1.Secret {
+func createUpdatedSecret(reconfigureRequest request) corev1.Secret {
 	secretData := make(map[string][]byte)
 
 	if len(reconfigureRequest.Namespace) == 0 {
@@ -179,13 +164,6 @@ func createUpdatedSecret(reconfigureRequest request, oldSecret corev1.Secret) co
 		secretData[certName] = encodedCert
 
 		log.Println("including cert in secret: " + certName)
-	}
-
-	for prop, value := range oldSecret.Data {
-		if _, ok := secretData[prop]; ok {
-			continue
-		}
-		secretData[prop] = value
 	}
 
 	newSecret := corev1.Secret{
