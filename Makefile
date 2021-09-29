@@ -23,7 +23,7 @@ manager: generate fmt vet
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet manifests
-	QUAY_VERSION=dev go run main.go
+	QUAY_VERSION=dev go run main.go  --cert-dir ${PWD}/config/webhook
 
 # Install CRDs into a cluster
 install: manifests
@@ -55,7 +55,7 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 # Build the docker image
-docker-build: test
+docker-build: 
 	docker build . -t ${IMG}
 
 # Push the docker image

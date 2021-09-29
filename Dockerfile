@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod vendor -o
 
 FROM scratch
 WORKDIR /workspace
-COPY --from=builder /workspace/manager manager
+COPY --from=builder /workspace/manager /manager
 COPY kustomize/ kustomize/
 
-ENTRYPOINT ["/workspace/manager"]
+ENTRYPOINT ["/manager"]

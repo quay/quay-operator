@@ -1,7 +1,8 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: quay-operator-tng
+  name: quay-operator-catalog
+  namespace: openshift-operators
 spec:
   sourceType: grpc
-  image: quay.io/projectquay/quay-operator-index
+  image: quay.io/jonathankingfc/quay-operator:dev-index

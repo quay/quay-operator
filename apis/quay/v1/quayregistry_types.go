@@ -81,6 +81,8 @@ type QuayRegistrySpec struct {
 	Components []Component `json:"components,omitempty"`
 }
 
+var GroupVersionKind = metav1.GroupVersionKind{Group: "quay.redhat.com", Version: "v1", Kind: "QuayRegistry"}
+
 // Component describes how the Operator should handle a backing Quay service.
 type Component struct {
 	// Kind is the unique name of this type of component.

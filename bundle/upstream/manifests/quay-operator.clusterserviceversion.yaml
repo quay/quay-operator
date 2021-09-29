@@ -128,7 +128,7 @@ spec:
             spec:
               containers:
               - name: quay-operator
-                image: quay.io/projectquay/quay-operator:v3.6.0-alpha.4
+                image: quay.io/jonathankingfc/quay-operator:dev
                 command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'

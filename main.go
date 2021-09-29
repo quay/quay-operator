@@ -32,10 +32,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	quay "github.com/quay/quay-operator/apis/quay/v1"
+
 	redhatcop "github.com/quay/quay-operator/apis/redhatcop/v1alpha1"
 	quaycontroller "github.com/quay/quay-operator/controllers/quay"
 	redhatcopcontroller "github.com/quay/quay-operator/controllers/redhatcop"
 	"github.com/quay/quay-operator/pkg/configure"
+	"github.com/quay/quay-operator/pkg/webhook"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -60,25 +62,29 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var namespace string
+	var certDir string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&certDir, "cert-dir", "", "Path to directory containing TLS certificates for webhook and reconfiguration endpoints.")
 	flag.StringVar(&namespace, "namespace", "", "The Kubernetes namespace that the controller will watch.")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "7daa4ab6.quay.redhat.com",
-		Namespace:          namespace,
+		Scheme:                     scheme,
+		MetricsBindAddress:         metricsAddr,
+		Port:                       9443,
+		LeaderElection:             enableLeaderElection,
+		LeaderElectionID:           "7daa4ab6.quay.redhat.com",
+		Namespace:                  namespace,
+		LeaderElectionResourceLock: "configmaps",
 		ClientDisableCacheFor: []client.Object{
 			&quay.QuayRegistry{},
 		},
+		CertDir: certDir,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -113,6 +119,11 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayEcosystem")
+		os.Exit(1)
+	}
+
+	if err = webhook.SetupWebhooks(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "QuayRegistry")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
