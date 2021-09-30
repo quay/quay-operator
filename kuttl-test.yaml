@@ -1,0 +1,10 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+testDirs:
+  - ./tests/e2e
+timeout: 120
+crdDir: ./bundle/upstream/manifests
+commands:
+  - command: go run main.go
+    background: true
+    skipLogOutput: true

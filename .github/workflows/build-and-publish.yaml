@@ -1,10 +1,7 @@
 ---
 name: Build and Publish Images
 
-on:
-  push:
-    branches:
-      - redhat-3.5
+on: ['push', 'pull_request']
 
 jobs:
   quay-image:

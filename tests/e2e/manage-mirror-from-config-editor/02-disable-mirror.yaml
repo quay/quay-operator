@@ -1,0 +1,15 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: skynet
+spec:
+  components:
+    - kind: clair
+      managed: false
+    - kind: objectstorage
+      managed: false
+    - kind: horizontalpodautoscaler
+      managed: false
+    - kind: mirror
+      managed: true
+  configBundleSecret: config-bundle-secret
