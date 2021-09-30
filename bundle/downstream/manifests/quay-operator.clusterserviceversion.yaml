@@ -2,13 +2,13 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    olm.skipRange: ">=3.4.x <3.5.7"
+    olm.skipRange: ">=3.4.x <3.5.8"
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.5.7
-    createdAt: 2021-09-09 20:09 UTC
+    containerImage: quay.io/projectquay/quay-operator:3.5
+    createdAt: 2021-09-17 21:09 UTC
     description: Opinionated deployment of Red Hat Quay on Kubernetes.
-    quay-version: 3.5.7
+    quay-version: 3.5.8
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
     alm-examples: |-
@@ -36,7 +36,7 @@ metadata:
     operators.operatorframework.io/internal-objects: |-
       ["quayecosystems.redhatcop.redhat.io"]
     operators.openshift.io/infrastructure-features: '["Disconnected"]'
-  name: quay-operator.v3.5.7
+  name: quay-operator.v3.5.8
   namespace: placeholder
 spec:
   customresourcedefinitions:
@@ -151,7 +151,7 @@ spec:
   install:
     spec:
       deployments:
-      - name: quay-operator.v3.5.7
+      - name: quay-operator.v3.5.8
         spec:
           replicas: 1
           selector:
@@ -165,7 +165,7 @@ spec:
             spec:
               containers:
               - name: quay-operator
-                image: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-operator-rhel8:v3.5.7
+                image: quay.io/projectquay/quay-operator:3.5
                 command:
                 - /workspace/manager
                 - '--namespace=$(WATCH_NAMESPACE)'
@@ -187,17 +187,17 @@ spec:
                     fieldRef:
                       fieldPath: metadata.annotations['quay-version']
                 - name: RELATED_IMAGE_COMPONENT_QUAY
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-rhel8:v3.5.7
+                  value: quay.io/projectquay/quay:3.5
                 - name: RELATED_IMAGE_COMPONENT_CLAIR
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-clair-rhel8:v3.5.7
+                  value: quay.io/projectquay/clair:3.5
                 - name: RELATED_IMAGE_COMPONENT_BUILDER
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-rhel8:v3.5.7
+                  value: quay.io/projectquay/quay-builder:3.5
                 - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos-rhel8:v3.5.7
+                  value: quay.io/projectquay/quay-builder-qemu:v3.5
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES
-                  value: registry.redhat.io/rhel8/postgresql-10:1
+                  value: centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33
                 - name: RELATED_IMAGE_COMPONENT_REDIS
-                  value: registry.redhat.io/rhel8/redis-5:1
+                  value: centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542
               serviceAccountName: quay-operator
       permissions:
       - rules:
@@ -315,5 +315,5 @@ spec:
     matchLabels:
       alm-owner-quay-operator: quay-operator
       operated-by: quay-operator
-  version: 3.5.7
+  version: 3.5.8
   replaces: quay-operator.v3.5.6
