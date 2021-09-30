@@ -1,0 +1,166 @@
+---
+name: E2E Nightly
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to run tests from. Defaults to redhat-3.5'
+        required: false
+      tag:
+        description: 'quay-operator-index tag. Defaults to 3.5-unstable'
+        required: false
+  schedule:
+    - cron: '30 5 * * *'
+
+jobs:
+  deploy:
+    name: Deploy the operator
+    runs-on: 'ubuntu-latest'
+    env:
+      BRANCH: ${{ github.event.inputs.branch || 'redhat-3.5' }}
+      TAG: ${{ github.event.inputs.tag || '3.5-unstable' }}
+      CATALOG_PATH: ./bundle/quay-operator.catalogsource.yaml
+      OG_PATH: ./bundle/quay-operator.operatorgroup.yaml
+      SUBSCRIPTION_PATH: ./bundle/quay-operator.subscription.yaml
+      QUAY_SAMPLE_PATH: ./config/samples/managed.quayregistry.yaml
+      OPERATOR_PKG_NAME: quay-operator-test
+      NAMESPACE: quay-operator-e2e-nightly
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - name: Setup catalog source yaml
+        uses: mikefarah/yq@master
+        env:
+          CATALOG_IMAGE: quay.io/projectquay/quay-operator-index:${{ env.TAG }}
+        with:
+          cmd: |
+            yq e -i '
+              .spec.image = env(CATALOG_IMAGE) |
+              .metadata.name = env(OPERATOR_PKG_NAME)
+              ' ${CATALOG_PATH}
+
+      - name: Create catalog source
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: create -n openshift-marketplace -f ${{ env.CATALOG_PATH }}
+
+      - name: Setup operator group yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq e -i '.spec.targetNamespaces[0] = env(NAMESPACE)' ${OG_PATH}
+
+      - name: Create operator group
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: create -n ${{ env.NAMESPACE }} -f ${{ env.OG_PATH }}
+
+      - name: Setup subscription yaml
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            yq e -i '
+              .spec.channel = "test" |
+              .spec.startingCSV = env(OPERATOR_PKG_NAME) |
+              .spec.name = env(OPERATOR_PKG_NAME) |
+              .spec.source = env(OPERATOR_PKG_NAME)
+              ' ${SUBSCRIPTION_PATH}
+
+      - name: Create subscription
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: create -n ${{ env.NAMESPACE }} -f ${{ env.SUBSCRIPTION_PATH }}
+
+      - name: Deploy Quay
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: create -n ${{ env.NAMESPACE }} -f ${{ env.QUAY_SAMPLE_PATH }}
+
+      - name: Wait for it...
+        run: sleep 30s
+
+      - name: Ensure database rollout
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-database --timeout=3m
+
+      - name: Ensure redis rollout
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-redis --timeout=3m
+
+      - name: Ensure config editor rollout
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-config-editor --timeout=3m
+
+      - name: Ensure Quay rollout
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-app --timeout=3m
+
+      - name: Ensure mirror rollout
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-mirror --timeout=3m
+
+      - name: Delete Quay deployment
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        if: always()
+        with:
+          args: delete -n ${{ env.NAMESPACE }} -f ${{ env.QUAY_SAMPLE_PATH }}
+
+      - name: Delete subscription
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        if: always()
+        with:
+          args: delete -n ${{ env.NAMESPACE }} -f ${{ env.SUBSCRIPTION_PATH }}
+
+      - name: Delete operator group
+        uses: actions-hub/kubectl@master
+        if: always()
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: delete -n ${{ env.NAMESPACE }} -f ${{ env.OG_PATH }}
+
+      - name: Delete CSV
+        uses: actions-hub/kubectl@master
+        if: always()
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: delete -n ${{ env.NAMESPACE }} csv ${{ env.OPERATOR_PKG_NAME }}
+
+      - name: Delete catalog source
+        uses: actions-hub/kubectl@master
+        if: always()
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: delete -n openshift-marketplace -f ${{ env.CATALOG_PATH }}
