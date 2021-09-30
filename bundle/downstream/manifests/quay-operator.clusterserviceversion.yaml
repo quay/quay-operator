@@ -316,4 +316,4 @@ spec:
       alm-owner-quay-operator: quay-operator
       operated-by: quay-operator
   version: 3.5.8
-  replaces: quay-operator.v3.5.6
+  replaces: quay-operator.v3.5.7
