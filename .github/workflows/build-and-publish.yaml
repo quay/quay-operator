@@ -46,7 +46,8 @@ jobs:
       digest: ${{ steps.set-output.outputs.digest }}
     env:
       IMAGE_REGISTRY: quay.io/projectquay
-      TAG: 3.5-unstable
+      TAG: ${{needs.set-version.outputs.tag}}
+    needs: set-version
     steps:
       - name: Pull Image
         id: pull-image
@@ -78,7 +79,8 @@ jobs:
       digest: ${{ steps.set-output.outputs.digest }}
     env:
       IMAGE_REGISTRY: quay.io/projectquay
-      TAG: 3.5-unstable
+      TAG: ${{needs.set-version.outputs.tag}}
+    needs: set-version
     steps:
       - name: Pull Image
         id: pull-image
@@ -142,7 +144,8 @@ jobs:
       OPERATOR_NAME: quay-operator-test
       BUNDLE: quay.io/projectquay/quay-operator-bundle
       INDEX: quay.io/projectquay/quay-operator-index
-      TAG: 3.5-unstable
+      TAG: ${{needs.set-version.outputs.tag}}
+    needs: set-version
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
