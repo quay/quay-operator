@@ -30,7 +30,7 @@ jobs:
       digest: ${{ steps.set-output.outputs.digest }}
     env:
       IMAGE_REGISTRY: quay.io/projectquay
-      TAG: 3.5-unstable
+      TAG: nightly
     steps:
       - name: Pull Image
         id: pull-image
@@ -62,13 +62,14 @@ jobs:
       digest: ${{ steps.set-output.outputs.digest }}
     env:
       IMAGE_REGISTRY: quay.io/projectquay
+      TAG: main
     steps:
       - name: Pull Image
         id: pull-image
-        run: docker pull "${IMAGE_REGISTRY}"/quay-builder-qemu:latest
+        run: docker pull "${IMAGE_REGISTRY}"/quay-builder-qemu:"${TAG}"
       - name: Set Output
         id: set-output
-        run: echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE_REGISTRY}/quay-builder-qemu:latest)"
+        run: echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE_REGISTRY}/quay-builder-qemu:${TAG})"
 
   operator-image:
     name: Publish Operator Image
