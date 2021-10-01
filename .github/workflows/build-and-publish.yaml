@@ -111,7 +111,8 @@ jobs:
     outputs:
       digest: ${{ steps.set-output.outputs.digest }}
     env:
-      OPERATOR_IMAGE: quay.io/projectquay/quay-operator:3.5-unstable
+      OPERATOR_IMAGE: quay.io/projectquay/quay-operator:${{needs.set-version.outputs.tag}}
+    needs: set-version
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
