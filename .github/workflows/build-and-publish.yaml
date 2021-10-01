@@ -3,6 +3,7 @@ name: Build and Publish Images
 
 on:
   push:
+    # NOTE: if you trigger this on your branch, ensure its name follows the redhat-X.Y format!
     branches:
       - redhat-** # IMPORTANT! this must match the .jobs.set-version.env.BRANCH_PREFIX env (save the **).
 
