@@ -239,6 +239,60 @@ var _ = Describe("Reconciling a QuayEcosystem", func() {
 		})
 
 		When("the external access component", func() {
+			Context("uses key and cert", func() {
+				JustBeforeEach(func() {
+					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
+					quayConfig := types.NamespacedName{
+						Name:      quayEnterpriseConfigSecretName,
+						Namespace: quayEcosystem.Namespace,
+					}
+
+					var secret corev1.Secret
+					Expect(k8sClient.Get(context.Background(), quayConfig, &secret)).Should(Succeed())
+					secret.Data["ssl.key"] = []byte(" ")
+					secret.Data["ssl.cert"] = []byte(" ")
+					Expect(k8sClient.Update(context.Background(), &secret)).Should(Succeed())
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
+				})
+
+				It("does not return an error", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Requeue).To(BeFalse())
+				})
+
+				It("marks `route` component as managed", func() {
+					var quayRegistry v1.QuayRegistry
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &quayRegistry)).Should(Succeed())
+					Expect(quayRegistry.Spec.Components).NotTo(ContainElement(v1.Component{Kind: "route", Managed: false}))
+					Expect(quayRegistry.Spec.Components).To(ContainElement(v1.Component{Kind: "tls", Managed: false}))
+				})
+			})
+
+			Context("is using http protocol", func() {
+				JustBeforeEach(func() {
+					quayEcosystem.Spec.Quay.ExternalAccess = &redhatcop.ExternalAccess{
+						Type: redhatcop.RouteExternalAccessType,
+						TLS: &redhatcop.TLSExternalAccess{
+							Termination: redhatcop.NoneTLSTerminationType,
+						},
+					}
+					Expect(k8sClient.Create(context.Background(), quayEcosystem)).Should(Succeed())
+					result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayEcosystemName})
+				})
+
+				It("does not return an error", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result.Requeue).To(BeFalse())
+				})
+
+				It("marks `route` component as unmanaged", func() {
+					var quayRegistry v1.QuayRegistry
+					Expect(k8sClient.Get(context.Background(), quayRegistryName, &quayRegistry)).Should(Succeed())
+					Expect(quayRegistry.Spec.Components).NotTo(ContainElement(v1.Component{Kind: "tls", Managed: false}))
+					Expect(quayRegistry.Spec.Components).NotTo(ContainElement(v1.Component{Kind: "tls", Managed: true}))
+				})
+			})
+
 			Context("is unsupported for migration", func() {
 				JustBeforeEach(func() {
 					quayEcosystem.Spec.Quay.ExternalAccess = &redhatcop.ExternalAccess{Type: redhatcop.LoadBalancerExternalAccessType}

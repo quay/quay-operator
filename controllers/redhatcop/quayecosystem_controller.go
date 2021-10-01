@@ -535,6 +535,21 @@ func (r *QuayEcosystemReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if canHandleExternalAccess(quayEcosystem) {
 		log.Info("attempting to migrate external access", "type", quayEcosystem.Spec.Quay.ExternalAccess.Type)
 
+		// if user has provided their own certs we gonna configure TLS as unmanaged. this
+		// should happen most of the times, exception made when quay is acessed directly
+		// without any kind of key (plain http). if not cert and key were found then we
+		// gonna migrate it using a Route with "edge" termination.
+		_, hasKey := configBundle.Data["ssl.key"]
+		_, hasCrt := configBundle.Data["ssl.cert"]
+		if hasKey && hasCrt {
+			quayRegistry.Spec.Components = append(
+				quayRegistry.Spec.Components, quay.Component{
+					Kind:    "tls",
+					Managed: false,
+				},
+			)
+		}
+
 		// NOTE: Assume that if using edge `Route`, there is no custom TLS cert/key pair.
 		// Docs state that custom TLS can be provided to an edge `Route`: (https://access.redhat.com/documentation/en-us/red_hat_quay/3.3/html/deploy_red_hat_quay_on_openshift_with_quay_operator/customizing_your_red_hat_quay_cluster#user_provided_certificates)
 		// But this doesn't seem to be implemented: (https://sourcegraph.com/github.com/quay/quay-operator@v1/-/blob/pkg/controller/quayecosystem/resources/routes.go#L64).
@@ -712,12 +727,15 @@ func canHandleDatabase(q redhatcop.QuayEcosystem) bool {
 	return q.Spec.Quay.Database.Server == "" && q.Spec.Quay.Database.VolumeSize != ""
 }
 
+// canHandleExternalAccess returs true if the operator can manage quay's external access. This is
+// useful while migrating from a QuayEcosystem and we need to determine if we set Route component
+// as managed or unmanaged. We will set Route component to managed if QuayEcosystem has external
+// access configured using an OpenShift's Route object.
 func canHandleExternalAccess(q redhatcop.QuayEcosystem) bool {
-	return q.Spec.Quay.ExternalAccess != nil &&
-		q.Spec.Quay.ExternalAccess.Type == redhatcop.RouteExternalAccessType &&
-		q.Spec.Quay.ExternalAccess.TLS != nil &&
-		(q.Spec.Quay.ExternalAccess.TLS.Termination == redhatcop.PassthroughTLSTerminationType ||
-			q.Spec.Quay.ExternalAccess.TLS.Termination == redhatcop.EdgeTLSTerminationType)
+	if q.Spec.Quay.ExternalAccess == nil {
+		return false
+	}
+	return q.Spec.Quay.ExternalAccess.Type == redhatcop.RouteExternalAccessType
 }
 
 func canHandleRedis(q redhatcop.QuayEcosystem) bool {
