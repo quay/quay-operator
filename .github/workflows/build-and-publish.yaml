@@ -30,7 +30,7 @@ jobs:
       digest: ${{ steps.set-output.outputs.digest }}
     env:
       IMAGE_REGISTRY: quay.io/projectquay
-      TAG: 3.5-unstable
+      TAG: nightly
     steps:
       - name: Pull Image
         id: pull-image
