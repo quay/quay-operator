@@ -31,14 +31,6 @@ jobs:
         id: format-tag
         run: echo "::set-output name=tag::${{ steps.version-from-branch.outputs.version }}${{ env.TAG_SUFFIX }}"
 
-  echo-job:
-    name: echo tag
-    needs: set-version
-    runs-on: 'ubuntu-latest'
-    steps:
-      - name: echo
-        run: echo "${{needs.set-version.outputs.tag}}"
-
   quay-image:
     name: Calculate Quay Image Digest
     runs-on: 'ubuntu-latest'
