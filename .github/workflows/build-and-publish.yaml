@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - redhat-** # IMPORTANT! this must match the .jobs.set-version.env.BRANCH_PREFIX env (save the **).
-      - build-workflow-branch-trigger
 
 jobs:
   set-version:
