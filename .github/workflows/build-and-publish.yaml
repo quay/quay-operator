@@ -4,9 +4,42 @@ name: Build and Publish Images
 on:
   push:
     branches:
-      - redhat-3.5
+      - redhat-** # IMPORTANT! this must match the .jobs.set-version.env.BRANCH_PREFIX env (save the **).
+      - build-workflow-branch-trigger
 
 jobs:
+  set-version:
+    name: Set version from branch name
+    env:
+      BRANCH_PREFIX: redhat- # IMPORTANT! this must match the .on.push.branches prefix!
+      REGISTRY: quay.io/projectquay
+      REPO_NAME: ${{ github.event.repository.name }}
+      TAG_SUFFIX: -unstable
+    outputs:
+      tag: ${{ steps.format-tag.outputs.tag }}
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Format version
+        id: version-from-branch
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "::set-output name=version::${BRANCH_NAME/${{ env.BRANCH_PREFIX }}/}"
+
+      - name: Format tag with version
+        id: format-tag
+        run: echo "::set-output name=tag::${{ steps.version-from-branch.outputs.version }}${{ env.TAG_SUFFIX }}"
+
+  echo-job:
+    name: echo tag
+    needs: set-version
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: echo
+        run: echo "${{needs.set-version.outputs.tag}}"
+
   quay-image:
     name: Calculate Quay Image Digest
     runs-on: 'ubuntu-latest'
