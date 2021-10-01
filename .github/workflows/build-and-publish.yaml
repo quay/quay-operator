@@ -139,13 +139,12 @@ jobs:
   operator-index-images:
     name: Publish Catalog Index Image
     runs-on: 'ubuntu-latest'
-    needs: [quay-image, clair-image, builder-image, qemu-builder-image, operator-image]
+    needs: [quay-image, clair-image, builder-image, qemu-builder-image, operator-image, set-version]
     env:
       OPERATOR_NAME: quay-operator-test
       BUNDLE: quay.io/projectquay/quay-operator-bundle
       INDEX: quay.io/projectquay/quay-operator-index
       TAG: ${{needs.set-version.outputs.tag}}
-    needs: set-version
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
