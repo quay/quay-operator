@@ -26,6 +26,7 @@ jobs:
       QUAY_SAMPLE_PATH: ./config/samples/managed.quayregistry.yaml
       OPERATOR_PKG_NAME: quay-operator-test
       NAMESPACE: quay-operator-e2e-nightly
+      WAIT_TIMEOUT: 10m
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -95,35 +96,35 @@ jobs:
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-database --timeout=3m
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-database --timeout=${{ env.WAIT_TIMEOUT }}
 
       - name: Ensure redis rollout
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-redis --timeout=3m
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-redis --timeout=${{ env.WAIT_TIMEOUT }}
 
       - name: Ensure config editor rollout
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-config-editor --timeout=3m
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-config-editor --timeout=${{ env.WAIT_TIMEOUT }}
 
       - name: Ensure Quay rollout
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-app --timeout=3m
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-app --timeout=${{ env.WAIT_TIMEOUT }}
 
       - name: Ensure mirror rollout
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         with:
-          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-mirror --timeout=3m
+          args: rollout -n ${{ env.NAMESPACE }} status deployment skynet-quay-mirror --timeout=${{ env.WAIT_TIMEOUT }}
 
       - name: Delete Quay deployment
         uses: actions-hub/kubectl@master
