@@ -191,7 +191,7 @@ jobs:
         id: bundle-image
         run: |
           docker pull "${OPERATOR_IMAGE}"
-          echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.BUNDLE }}:${{ env.TAG })"
+          echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.BUNDLE }}:${{ env.TAG }})"
 
       - name: Publish Catalog Index
         env:
