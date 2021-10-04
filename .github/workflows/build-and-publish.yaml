@@ -159,6 +159,12 @@ jobs:
           push: true
           tags: ${{ env.BUNDLE }}:${{ env.TAG }}
 
+      - name: Get bundle image digest
+        id: bundle-image
+        run: |
+          docker pull "${OPERATOR_IMAGE}"
+          echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.BUNDLE }}:${{ env.TAG })"
+
       - name: Publish Catalog Index
         env:
           OPM_DOWNLOAD_URL: https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.6/
@@ -166,5 +172,5 @@ jobs:
         run: |
           wget -q "${OPM_DOWNLOAD_URL}/${OPM_TAR}"
           tar xvf "${OPM_TAR}"
-          ./opm index add --build-tool docker --bundles "${BUNDLE}:${TAG}" --tag "${INDEX}:${TAG}"
+          ./opm index add --build-tool docker --bundles "${{steps.bundle-image.outputs.digest}}" --tag "${INDEX}:${TAG}"
           docker push "${INDEX}:${TAG}"
