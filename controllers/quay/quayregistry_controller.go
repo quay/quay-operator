@@ -120,9 +120,9 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if available := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeAvailable); available != nil && available.Reason == v1.ConditionReasonMigrationsInProgress {
+	created := v1.GetCondition(quay.Status.Conditions, v1.ConditionComponentsCreated)
+	if created != nil && created.Reason == v1.ConditionReasonMigrationsInProgress {
 		log.Info("migrations in progress, skipping reconcile")
-
 		return ctrl.Result{}, nil
 	}
 
@@ -320,7 +320,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.reconcileWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, c.Message)
 	}
 
-	updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionFalse, v1.ConditionReasonComponentsCreationSuccess, "all objects created/updated successfully")
+	updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionFalse, v1.ConditionReasonComponentsCreationSuccess, "All objects created/updated successfully")
 	if err != nil {
 		log.Error(err, "failed to update `conditions` of `QuayRegistry`")
 
@@ -334,7 +334,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if updatedQuay.Status.CurrentVersion != v1.QuayVersionCurrent {
-		updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionTypeAvailable, metav1.ConditionFalse, v1.ConditionReasonMigrationsInProgress, "running database migrations")
+		updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionComponentsCreated, metav1.ConditionFalse, v1.ConditionReasonMigrationsInProgress, "running database migrations")
 		if err != nil {
 			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
 
@@ -364,11 +364,11 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 					qcopy := freshQuay.DeepCopy()
 
 					qcopy, _ = v1.EnsureRegistryEndpoint(quayContext, qcopy, userProvidedConfig)
-					msg := "all registry component healthchecks passing"
+					msg := "All registry components created"
 					condition := v1.Condition{
-						Type:               v1.ConditionTypeAvailable,
+						Type:               v1.ConditionComponentsCreated,
 						Status:             metav1.ConditionTrue,
-						Reason:             v1.ConditionReasonHealthChecksPassing,
+						Reason:             v1.ConditionReasonComponentsCreationSuccess,
 						Message:            msg,
 						LastUpdateTime:     metav1.Now(),
 						LastTransitionTime: metav1.Now(),
