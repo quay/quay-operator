@@ -2,35 +2,18 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	routev1 "github.com/openshift/api/route/v1"
-
 	"github.com/go-logr/logr"
-	ocsv1a1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
+	"github.com/quay/quay-operator/pkg/cmpstatus"
 )
-
-const (
-	// all objects that are deployed as part of any of our components must contain this
-	// annotation. it is used when evaluating the conditions for all the components.
-	quayComponentAnnotation = "quay-component"
-)
-
-// ConditionFetcher is a function capable of returning a map of conditions indexed by component
-// name.
-type ConditionFetcher func(context.Context, qv1.QuayRegistry) (map[string][]qv1.Condition, error)
 
 // QuayRegistryStatusReconciler updates status for QuayRegistry components. This status Reconciler
 // has to live in a different controller to avoid having to have a resync period in the main Quay
@@ -77,39 +60,15 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 		return reschedule, nil
 	}
 
-	allconds := map[string][]qv1.Condition{}
-	for _, fn := range []ConditionFetcher{
-		q.faultyDeploymentConditions,
-		q.faultyRouteConditions,
-		q.faultyObjectBucketClaimConditions,
-		q.faultyJobConditions,
-	} {
-		conditions, err := fn(ctx, reg)
-		if err != nil {
-			log.Error(err, "error retrieving QuayRegistry component conditions")
-			return reschedule, nil
-		}
-		for cname, conds := range conditions {
-			if _, ok := allconds[cname]; ok {
-				allconds[cname] = append(allconds[cname], conds...)
-				continue
-			}
-			allconds[cname] = conds
-		}
-	}
-
-	uc, err := qv1.MapToUnhealthyComponents(allconds)
+	conds, err := cmpstatus.Evaluate(ctx, q.Client, reg)
 	if err != nil {
-		log.Error(err, "error creating component conditions")
+		log.Error(err, "error retrieving QuayRegistry component conditions")
 		return reschedule, nil
 	}
 
-	if equality.Semantic.DeepEqual(reg.Status.UnhealthyComponents, uc) {
-		log.Info("quay components conditions reconciled (no changes)")
-		return reschedule, nil
-	}
+	// uses the list of updated conditions to overwrite the QuayRegistry conditions.
+	q.overwriteConditions(conds, &reg)
 
-	reg.Status.UnhealthyComponents = uc
 	if err := q.Client.Status().Update(ctx, &reg); err != nil {
 		if errors.IsConflict(err) {
 			log.Info("skipping status reconcile due to conflict, will retry")
@@ -123,212 +82,50 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 	return reschedule, nil
 }
 
-// faultyRouteConditions returns all conditions for Routes that were not admitted yet by any
-// reason. Looks for RouteAdmitted condition among the list of Route current conditions. Converts
-// RouteAdmitted conditions into quayv1 Conditions before return.
-func (q *QuayRegistryStatusReconciler) faultyRouteConditions(
-	ctx context.Context, reg qv1.QuayRegistry,
-) (map[string][]qv1.Condition, error) {
-	var list routev1.RouteList
-	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
-		return nil, err
-	}
-
-	conds := map[string][]qv1.Condition{}
-	for _, rt := range list.Items {
-		component, ok := rt.Annotations[quayComponentAnnotation]
-		if !qv1.Owns(reg, &rt) || !ok {
-			continue
-		}
-
-		for _, ingress := range rt.Status.Ingress {
-			cond, found := q.ingressAdmittedCondition(ingress.Conditions)
-			if !found {
-				continue
-			}
-
-			if cond.Status == corev1.ConditionTrue {
-				continue
-			}
-
-			msg := fmt.Sprintf("Route %q not admitted: %s", rt.Name, cond.Message)
-			var lastTransition metav1.Time
-			if !cond.LastTransitionTime.IsZero() {
-				lastTransition = *cond.LastTransitionTime
-			}
-			conds[component] = append(
-				conds[component],
-				qv1.Condition{
-					Type:               qv1.ConditionType(cond.Type),
-					Status:             metav1.ConditionStatus(cond.Status),
-					Reason:             qv1.ConditionReason(cond.Reason),
-					Message:            msg,
-					LastTransitionTime: lastTransition,
-				},
-			)
-		}
-	}
-	return conds, nil
-}
-
-// ingressAdmittedCondition looks and returns the Admitted condition among provided list of
-// ingress conditions. Returns the condition and a flag indicating if it was found or not.
-func (q *QuayRegistryStatusReconciler) ingressAdmittedCondition(
-	conds []routev1.RouteIngressCondition,
-) (routev1.RouteIngressCondition, bool) {
+// overwriteConditions glues the provided conditions into a QuayRegistry's status.conditions
+// slice.  QuayRegistry conditions are overwritten in place.
+func (q *QuayRegistryStatusReconciler) overwriteConditions(
+	conds []qv1.Condition, reg *qv1.QuayRegistry,
+) {
+	var faultySeen bool
 	for _, cond := range conds {
-		if cond.Type != routev1.RouteAdmitted {
-			continue
-		}
-		return cond, true
-	}
-	return routev1.RouteIngressCondition{}, false
-}
+		curCond := qv1.GetCondition(reg.Status.Conditions, cond.Type)
 
-// faultyDeploymentConditions returns the faulty conditions present in any of the component
-// Deployments. Evaluate the Deployment status by its Available condition.
-func (q *QuayRegistryStatusReconciler) faultyDeploymentConditions(
-	ctx context.Context, reg qv1.QuayRegistry,
-) (map[string][]qv1.Condition, error) {
-	var list appsv1.DeploymentList
-	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
-		return nil, err
-	}
-
-	conds := map[string][]qv1.Condition{}
-	for _, dep := range list.Items {
-		component, ok := dep.Annotations[quayComponentAnnotation]
-		if !qv1.Owns(reg, &dep) || !ok {
-			continue
+		// make sure we only update LastTransitionTime if the status has changed.
+		cond.LastTransitionTime = curCond.LastTransitionTime
+		if curCond != nil && curCond.Status != cond.Status {
+			cond.LastTransitionTime = cond.LastUpdateTime
 		}
 
-		cond, found := q.deployAvailableCondition(dep.Status.Conditions)
-		if !found {
-			continue
+		reg.Status.Conditions = qv1.SetCondition(reg.Status.Conditions, cond)
+		if cond.Reason == qv1.ConditionReasonComponentNotReady {
+			faultySeen = true
 		}
-
-		if cond.Status == corev1.ConditionTrue {
-			continue
-		}
-
-		msg := fmt.Sprintf("Deployment %s: %s", dep.Name, cond.Message)
-		conds[component] = append(
-			conds[component],
-			qv1.Condition{
-				Type:               qv1.ConditionType(cond.Type),
-				Status:             metav1.ConditionStatus(cond.Status),
-				Reason:             qv1.ConditionReason(cond.Reason),
-				Message:            msg,
-				LastUpdateTime:     cond.LastUpdateTime,
-				LastTransitionTime: cond.LastTransitionTime,
-			},
-		)
-	}
-	return conds, nil
-}
-
-// deployAvailableCondition filters the provided list of conditions and returns the Available
-// condition if found. Returns a boolean indicating if the Available condition was found or not.
-func (q *QuayRegistryStatusReconciler) deployAvailableCondition(
-	conds []appsv1.DeploymentCondition,
-) (appsv1.DeploymentCondition, bool) {
-	for _, cond := range conds {
-		if cond.Type != appsv1.DeploymentAvailable {
-			continue
-		}
-		return cond, true
-	}
-	return appsv1.DeploymentCondition{}, false
-}
-
-// faultyObjectBucketClaimConditions evaluates the ObjectBucketClaim phase and returns a faulty
-// condition if it is not set to ObjectBucketClaimStatusPhaseBound.
-func (q *QuayRegistryStatusReconciler) faultyObjectBucketClaimConditions(
-	ctx context.Context, reg qv1.QuayRegistry,
-) (map[string][]qv1.Condition, error) {
-
-	if !qv1.ComponentIsManaged(reg.Spec.Components, qv1.ComponentObjectStorage) {
-		return map[string][]qv1.Condition{}, nil
 	}
 
-	var list ocsv1a1.ObjectBucketClaimList
-	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
-		return nil, err
+	// sets the overall condition for the QuayRegistry.
+	status := metav1.ConditionTrue
+	message := "All components reporting as healthy"
+	reason := qv1.ConditionReasonHealthChecksPassing
+	if faultySeen {
+		status = metav1.ConditionFalse
+		message = "Some components are not ready"
+		reason = qv1.ConditionReasonComponentNotReady
 	}
 
-	conds := map[string][]qv1.Condition{}
-	for _, obc := range list.Items {
-		component, ok := obc.Annotations[quayComponentAnnotation]
-		if !qv1.Owns(reg, &obc) || !ok {
-			continue
-		}
-
-		phase := obc.Status.Phase
-		if phase == ocsv1a1.ObjectBucketClaimStatusPhaseBound {
-			continue
-		}
-
-		msg := fmt.Sprintf("ObjectBucketClaim %s reporing phase %q", obc.Name, phase)
-		conds[component] = append(
-			conds[component],
-			qv1.Condition{
-				Type:    "ObjectBucketClaimPhase",
-				Status:  metav1.ConditionFalse,
-				Reason:  "ObjectBucketClaimNotBound",
-				Message: msg,
-			},
-		)
-	}
-	return conds, nil
-}
-
-// faultyJobConditions looks for Jobs owned by provided QuayRegistry and filters possible faulty
-// conditions from it. Converts JobConditions into quayv1 Conditions before returning.
-func (q *QuayRegistryStatusReconciler) faultyJobConditions(
-	ctx context.Context, reg qv1.QuayRegistry,
-) (map[string][]qv1.Condition, error) {
-	var list batchv1.JobList
-	if err := q.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
-		return nil, err
+	availCond := qv1.GetCondition(reg.Status.Conditions, qv1.ConditionTypeAvailable)
+	transition := metav1.NewTime(time.Now())
+	if availCond != nil && availCond.Status == status {
+		transition = availCond.LastTransitionTime
 	}
 
-	conds := map[string][]qv1.Condition{}
-	for _, job := range list.Items {
-		component, ok := job.Annotations[quayComponentAnnotation]
-		if !qv1.Owns(reg, &job) || !ok {
-			continue
-		}
-
-		cond, found := q.jobFailedCondition(job.Status.Conditions)
-		if !found {
-			continue
-		}
-
-		msg := fmt.Sprintf("Job %s: %s", job.Name, cond.Message)
-		conds[component] = append(
-			conds[component],
-			qv1.Condition{
-				Type:               qv1.ConditionType(cond.Type),
-				Status:             metav1.ConditionStatus(cond.Status),
-				Reason:             qv1.ConditionReason(cond.Reason),
-				Message:            msg,
-				LastTransitionTime: cond.LastTransitionTime,
-			},
-		)
+	cond := qv1.Condition{
+		Type:               qv1.ConditionTypeAvailable,
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		LastUpdateTime:     metav1.NewTime(time.Now()),
+		LastTransitionTime: transition,
 	}
-	return conds, nil
-}
-
-// jobFailedCondition filters the provided list of JobsCondition by any Failed condition. Returns
-// a bool indicating if any failed condition was found in the list.
-func (q *QuayRegistryStatusReconciler) jobFailedCondition(
-	conds []batchv1.JobCondition,
-) (batchv1.JobCondition, bool) {
-	for _, cond := range conds {
-		if cond.Type != batchv1.JobFailed {
-			continue
-		}
-		return cond, true
-	}
-	return batchv1.JobCondition{}, false
+	reg.Status.Conditions = qv1.SetCondition(reg.Status.Conditions, cond)
 }
