@@ -4,21 +4,21 @@ kind: ClusterRole
 metadata:
   name: quayregistry-editor-role
 rules:
-- apiGroups:
-  - quay.redhat.com.quay.redhat.com
-  resources:
-  - quayregistries
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - quay.redhat.com.quay.redhat.com
-  resources:
-  - quayregistries/status
-  verbs:
-  - get
+  - apiGroups:
+      - quay.redhat.com
+    resources:
+      - quayregistries
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - quay.redhat.com
+    resources:
+      - quayregistries/status
+    verbs:
+      - get

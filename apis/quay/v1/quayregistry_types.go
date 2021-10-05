@@ -65,6 +65,7 @@ var requiredComponents = []ComponentKind{
 	ComponentPostgres,
 	ComponentObjectStorage,
 	ComponentRoute,
+	ComponentRedis,
 }
 
 const (
@@ -156,7 +157,7 @@ type QuayRegistryStatus struct {
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
 	// ComponentConditions holds the current condition for all component objects.
-	UnhealthyComponents UnhealthyComponents `json:"unhealthyComponents"`
+	UnhealthyComponents UnhealthyComponents `json:"unhealthyComponents,omitempty"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
