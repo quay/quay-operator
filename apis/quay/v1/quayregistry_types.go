@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -93,19 +92,34 @@ type Component struct {
 
 type ConditionType string
 
+// Follow a list of known condition types. These are used when reporting a QuayRegistry status
+// through its .status.conditions slice.
 const (
 	ConditionTypeAvailable      ConditionType = "Available"
 	ConditionTypeRolloutBlocked ConditionType = "RolloutBlocked"
-	// TODO: Add more useful conditions.
+	ConditionComponentsCreated  ConditionType = "ComponentsCreated"
+	ComponentBaseReady          ConditionType = "ComponentBaseReady"
+	ComponentPostgresReady      ConditionType = "ComponentPostgresReady"
+	ComponentClairReady         ConditionType = "ComponentClairReady"
+	ComponentRedisReady         ConditionType = "ComponentRedisReady"
+	ComponentHPAReady           ConditionType = "ComponentHPAReady"
+	ComponentObjectStorageReady ConditionType = "ComponentObjectStorageReady"
+	ComponentRouteReady         ConditionType = "ComponentRouteReady"
+	ComponentMirrorReady        ConditionType = "ComponentMirrorReady"
+	ComponentMonitoringReady    ConditionType = "ComponentMonitoringReady"
+	ComponentTLSReady           ConditionType = "ComponentTLSReady"
 )
 
 type ConditionReason string
 
+// Below follow a list of all Reasons used while reporting QuayRegistry conditions through its
+// .status.conditions field.
 const (
-	// ConditionTypeAvailable
-	ConditionReasonHealthChecksPassing  ConditionReason = "HealthChecksPassing"
-	ConditionReasonMigrationsInProgress ConditionReason = "MigrationsInProgress"
-	// ConditionTypeRolloutBlocked
+	ConditionReasonComponentNotReady                     ConditionReason = "ComponentNotReady"
+	ConditionReasonComponentReady                        ConditionReason = "ComponentReady"
+	ConditionReasonComponentUnmanaged                    ConditionReason = "ComponentNotManaged"
+	ConditionReasonHealthChecksPassing                   ConditionReason = "HealthChecksPassing"
+	ConditionReasonMigrationsInProgress                  ConditionReason = "MigrationsInProgress"
 	ConditionReasonComponentsCreationSuccess             ConditionReason = "ComponentsCreationSuccess"
 	ConditionReasonUpgradeUnsupported                    ConditionReason = "UpgradeUnsupported"
 	ConditionReasonComponentCreationFailed               ConditionReason = "ComponentCreationFailed"
@@ -128,20 +142,6 @@ type Condition struct {
 	LastTransitionTime metav1.Time            `json:"lastTransitionTime,omitempty"`
 }
 
-// UnhealthyComponents holds a list of unhealthy conditions in a per component basis.
-type UnhealthyComponents struct {
-	Base                    []Condition `json:"base,omitempty"`
-	Postgres                []Condition `json:"postgres,omitempty"`
-	Clair                   []Condition `json:"clair,omitempty"`
-	Redis                   []Condition `json:"redis,omitempty"`
-	HorizontalPodAutoscaler []Condition `json:"horizontalpodautoscaler,omitempty"`
-	ObjectStorage           []Condition `json:"objectstorage,omitempty"`
-	Route                   []Condition `json:"route,omitempty"`
-	Mirror                  []Condition `json:"mirror,omitempty"`
-	Monitoring              []Condition `json:"monitoring,omitempty"`
-	TLS                     []Condition `json:"tls,omitempty"`
-}
-
 // QuayRegistryStatus defines the observed state of QuayRegistry.
 type QuayRegistryStatus struct {
 	// CurrentVersion is the actual version of Quay that is actively deployed.
@@ -157,8 +157,6 @@ type QuayRegistryStatus struct {
 	ConfigEditorCredentialsSecret string `json:"configEditorCredentialsSecret,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
-	// ComponentConditions holds the current condition for all component objects.
-	UnhealthyComponents UnhealthyComponents `json:"unhealthyComponents,omitempty"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
@@ -253,6 +251,12 @@ func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 
 // ComponentIsManaged returns whether the given component is managed or not.
 func ComponentIsManaged(components []Component, name ComponentKind) bool {
+	// we do not expose Base component through the CRD, as it represents the base deployment
+	// of a quay registry and will always be managed.
+	if name == ComponentBase {
+		return true
+	}
+
 	for _, c := range components {
 		if c.Kind == name {
 			return c.Managed
@@ -378,19 +382,6 @@ func Owns(quay QuayRegistry, obj client.Object) bool {
 		return true
 	}
 	return false
-}
-
-// MapToUnhealthyComponents converts a map into a UnhealthyComponents object.
-func MapToUnhealthyComponents(allconds map[string][]Condition) (UnhealthyComponents, error) {
-	var uc UnhealthyComponents
-	dt, err := json.Marshal(allconds)
-	if err != nil {
-		return uc, err
-	}
-	if err := json.Unmarshal(dt, &uc); err != nil {
-		return uc, err
-	}
-	return uc, nil
 }
 
 // EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
