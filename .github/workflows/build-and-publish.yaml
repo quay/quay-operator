@@ -190,7 +190,7 @@ jobs:
       - name: Get bundle image digest
         id: bundle-image
         run: |
-          docker pull ${{ env.BUNDLE }}:${{ env.TAG }})
+          docker pull ${{ env.BUNDLE }}:${{ env.TAG }}
           echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.BUNDLE }}:${{ env.TAG }})"
 
       - name: Publish Catalog Index
