@@ -19,6 +19,7 @@ package v1
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -451,6 +452,54 @@ func IsManagedKeysSecretFor(quay *QuayRegistry, secret *corev1.Secret) bool {
 
 func IsManagedTLSSecretFor(quay *QuayRegistry, secret *corev1.Secret) bool {
 	return strings.Contains(secret.GetName(), quay.GetName()+"-"+QuayConfigTLSSecretName)
+}
+
+// FieldGroupNameFor returns the field group name for a component kind.
+func FieldGroupNameFor(cmp ComponentKind) (string, error) {
+	switch cmp {
+	case ComponentClair:
+		return "SecurityScanner", nil
+	case ComponentPostgres:
+		return "Database", nil
+	case ComponentRedis:
+		return "Redis", nil
+	case ComponentObjectStorage:
+		return "DistributedStorage", nil
+	case ComponentRoute:
+		return "HostSettings", nil
+	case ComponentMirror:
+		return "RepoMirror", nil
+	case ComponentHPA:
+		return "", nil
+	case ComponentMonitoring:
+		return "", nil
+	case ComponentTLS:
+		return "", nil
+	default:
+		return "", fmt.Errorf("unknown component: %q", cmp)
+	}
+}
+
+// FieldGroupNamesForManagedComponents returns an slice of group names for all managed components.
+func FieldGroupNamesForManagedComponents(quay *QuayRegistry) ([]string, error) {
+	var fgns []string
+	for _, cmp := range quay.Spec.Components {
+		if !cmp.Managed {
+			continue
+		}
+
+		fgn, err := FieldGroupNameFor(cmp.Kind)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(fgn) == 0 {
+			continue
+		}
+
+		fgns = append(fgns, fgn)
+	}
+	return fgns, nil
 }
 
 func init() {
