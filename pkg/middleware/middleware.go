@@ -46,8 +46,17 @@ func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj cl
 	}
 
 	// we have to set a special annotation in the config editor deployment. this annotation is
-	// then used as an environment variable and consumed by the app.
+	// then used as an environment variable and consumed by the app. we also need to remove
+	// an unused annotation from postgres deployment to avoid its redeployment.
 	if dep, ok := obj.(*appsv1.Deployment); ok {
+		// TODO we must not set annotations in objects where they are not needed. we also
+		// must stop mangling objects in this "middleware" thingy, what is the point of
+		// using kustomize if we keep changing stuff on the fly ?
+		if strings.Contains(dep.GetName(), "quay-database") {
+			delete(dep.Spec.Template.Annotations, "quay-registry-hostname")
+			return dep, nil
+		}
+
 		if !strings.Contains(dep.GetName(), "quay-config-editor") {
 			return obj, nil
 		}
