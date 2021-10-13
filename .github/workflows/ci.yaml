@@ -1,5 +1,5 @@
 name: CI
-on: [push, pull_request]
+on: [pull_request]
 jobs:
   build:
     name: Build
@@ -32,3 +32,9 @@ jobs:
           export PATH=$PATH:/usr/local/kubebuilder/bin
       - name: Tests
         run: go test -v ./...
+      - name: E2E Tests
+        env: 
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: |
+          printf "${{ secrets.KUBE_CONFIG }}" | base64 --decode > "${KUBECONFIG}"
+          make test-e2e;

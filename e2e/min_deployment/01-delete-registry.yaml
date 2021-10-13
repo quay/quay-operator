@@ -1,0 +1,7 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+- apiVersion: quay.redhat.com/v1
+  kind: QuayRegistry
+  metadata:
+    name: skynet
