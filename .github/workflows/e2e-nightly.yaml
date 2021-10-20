@@ -5,10 +5,10 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to run tests from. Defaults to redhat-3.5'
+        description: 'Branch to run tests from. Defaults to redhat-3.6'
         required: false
       tag:
-        description: 'quay-operator-index tag. Defaults to 3.5-unstable'
+        description: 'quay-operator-index tag. Defaults to 3.6-unstable'
         required: false
   schedule:
     - cron: '30 5 * * *'
@@ -18,8 +18,8 @@ jobs:
     name: Deploy the operator
     runs-on: 'ubuntu-latest'
     env:
-      BRANCH: ${{ github.event.inputs.branch || 'redhat-3.5' }}
-      TAG: ${{ github.event.inputs.tag || '3.5-unstable' }}
+      BRANCH: ${{ github.event.inputs.branch || 'redhat-3.6' }}
+      TAG: ${{ github.event.inputs.tag || '3.6-unstable' }}
       CATALOG_PATH: ./bundle/quay-operator.catalogsource.yaml
       OG_PATH: ./bundle/quay-operator.operatorgroup.yaml
       SUBSCRIPTION_PATH: ./bundle/quay-operator.subscription.yaml
