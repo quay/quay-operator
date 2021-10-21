@@ -333,6 +333,14 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	updatedQuay, upToDate := v1.EnsureRegistryEndpoint(quayContext, updatedQuay, userProvidedConfig)
+	if !upToDate {
+		if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
+			log.Error(err, "failed to update `registryEndpoint` of `QuayRegistry`")
+			return ctrl.Result{Requeue: true}, nil
+		}
+	}
+
 	if updatedQuay.Status.CurrentVersion != v1.QuayVersionCurrent {
 		updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionComponentsCreated, metav1.ConditionFalse, v1.ConditionReasonMigrationsInProgress, "running database migrations")
 		if err != nil {
@@ -363,7 +371,6 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 					}
 					qcopy := freshQuay.DeepCopy()
 
-					qcopy, _ = v1.EnsureRegistryEndpoint(quayContext, qcopy, userProvidedConfig)
 					msg := "All registry components created"
 					condition := v1.Condition{
 						Type:               v1.ConditionComponentsCreated,

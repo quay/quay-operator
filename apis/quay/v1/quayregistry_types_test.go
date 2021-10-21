@@ -370,24 +370,24 @@ var ensureRegistryEndpointTests = []struct {
 	expectedOk bool
 }{
 	{
-		"SupportsRoutesChanged",
-		QuayRegistry{
+		name: "SupportsRoutesChanged",
+		quay: QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "ns-1",
 			},
 		},
-		quaycontext.QuayRegistryContext{
+		ctx: quaycontext.QuayRegistryContext{
 			SupportsRoutes:  true,
 			ClusterHostname: "apps.example.com",
 		},
-		nil,
-		"https://test-quay-ns-1.apps.example.com",
-		false,
+		config:     nil,
+		expected:   "https://test-quay-ns-1.apps.example.com",
+		expectedOk: false,
 	},
 	{
-		"SupportsRoutesSame",
-		QuayRegistry{
+		name: "SupportsRoutesSame",
+		quay: QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "ns-1",
@@ -396,45 +396,45 @@ var ensureRegistryEndpointTests = []struct {
 				RegistryEndpoint: "https://test-quay-ns-1.apps.example.com",
 			},
 		},
-		quaycontext.QuayRegistryContext{
+		ctx: quaycontext.QuayRegistryContext{
 			SupportsRoutes:  true,
 			ClusterHostname: "apps.example.com",
 		},
-		map[string]interface{}{},
-		"https://test-quay-ns-1.apps.example.com",
-		true,
+		config:     map[string]interface{}{},
+		expected:   "https://test-quay-ns-1.apps.example.com",
+		expectedOk: true,
 	},
 	{
-		"DoesNotSupportRoutes",
-		QuayRegistry{
+		name: "DoesNotSupportRoutes",
+		quay: QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "ns-1",
 			},
 		},
-		quaycontext.QuayRegistryContext{},
-		map[string]interface{}{},
-		"",
-		true,
+		ctx:        quaycontext.QuayRegistryContext{},
+		config:     map[string]interface{}{},
+		expected:   "",
+		expectedOk: true,
 	},
 	{
-		"ServerHostnameInConfigChanged",
-		QuayRegistry{
+		name: "ServerHostnameInConfigChanged",
+		quay: QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "ns-1",
 			},
 		},
-		quaycontext.QuayRegistryContext{},
-		map[string]interface{}{
+		ctx: quaycontext.QuayRegistryContext{},
+		config: map[string]interface{}{
 			"SERVER_HOSTNAME": "registry.example.com",
 		},
-		"https://registry.example.com",
-		false,
+		expected:   "https://registry.example.com",
+		expectedOk: false,
 	},
 	{
-		"ServerHostnameInConfigSame",
-		QuayRegistry{
+		name: "ServerHostnameInConfigSame",
+		quay: QuayRegistry{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test",
 				Namespace: "ns-1",
@@ -443,12 +443,12 @@ var ensureRegistryEndpointTests = []struct {
 				RegistryEndpoint: "https://registry.example.com",
 			},
 		},
-		quaycontext.QuayRegistryContext{},
-		map[string]interface{}{
+		ctx: quaycontext.QuayRegistryContext{},
+		config: map[string]interface{}{
 			"SERVER_HOSTNAME": "registry.example.com",
 		},
-		"https://registry.example.com",
-		true,
+		expected:   "https://registry.example.com",
+		expectedOk: true,
 	},
 }
 
