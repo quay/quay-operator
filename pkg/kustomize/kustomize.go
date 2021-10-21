@@ -51,7 +51,7 @@ const (
 
 // componentImageFor checks for an environment variable indicating which component container image
 // to use. If set, returns a Kustomize image override for the given component.
-func componentImageFor(component v1.ComponentKind) types.Image {
+func componentImageFor(component v1.ComponentKind) (types.Image, error) {
 	envVarFor := map[v1.ComponentKind]string{
 		v1.ComponentBase:     componentImagePrefix + "QUAY",
 		v1.ComponentClair:    componentImagePrefix + "CLAIR",
@@ -77,11 +77,11 @@ func componentImageFor(component v1.ComponentKind) types.Image {
 			imageOverride.NewName = strings.Split(image, ":")[0]
 			imageOverride.NewTag = strings.Split(image, ":")[1]
 		} else {
-			panic("image override must be reference by tag or manifest digest: " + image)
+			return types.Image{}, errors.New("Image override must be reference by tag or manifest digest: " + image)
 		}
 	}
 
-	return imageOverride
+	return imageOverride, nil
 }
 
 func kustomizeDir() string {
@@ -358,10 +358,12 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 
 	images := []types.Image{}
 	for _, component := range append(quay.Spec.Components, v1.Component{Kind: "base", Managed: true}) {
-		if component.Managed {
-			if image := componentImageFor(component.Kind); image.NewName != "" || image.Digest != "" {
-				images = append(images, componentImageFor(component.Kind))
-			}
+		image, err := componentImageFor(component.Kind)
+		if err != nil {
+			return nil, err
+		}
+		if image.NewName != "" || image.Digest != "" {
+			images = append(images, image)
 		}
 	}
 
