@@ -5,7 +5,6 @@ resources:
   - ./clair.serviceaccount.yaml
   - ./postgres.serviceaccount.yaml
   - ./clair.deployment.yaml
-  - ./clair.horizontalpodautoscaler.yaml
   - ./clair.service.yaml
   - ./postgres.persistentvolumeclaim.yaml
   - ./postgres.deployment.yaml
