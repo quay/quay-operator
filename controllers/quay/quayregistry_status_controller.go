@@ -91,10 +91,13 @@ func (q *QuayRegistryStatusReconciler) overwriteConditions(
 	for _, cond := range conds {
 		curCond := qv1.GetCondition(reg.Status.Conditions, cond.Type)
 
-		// make sure we only update LastTransitionTime if the status has changed.
-		cond.LastTransitionTime = curCond.LastTransitionTime
-		if curCond != nil && curCond.Status != cond.Status {
-			cond.LastTransitionTime = cond.LastUpdateTime
+		// initially updates last transition time to be last update time but if the
+		// condition remains the same since we last checked overwrites it with the
+		// previous last transition time. LastTransitionTime shows the last time the
+		// status has changed (transition from ok to not ok or vice versa).
+		cond.LastTransitionTime = cond.LastUpdateTime
+		if curCond != nil && curCond.Status == cond.Status {
+			cond.LastTransitionTime = curCond.LastTransitionTime
 		}
 
 		reg.Status.Conditions = qv1.SetCondition(reg.Status.Conditions, cond)
