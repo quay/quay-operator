@@ -3,3 +3,6 @@ apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 resources: 
   - ./quay.horizontalpodautoscalar.yaml
+  - ./clair.horizontalpodautoscaler.yaml
+  - ./mirror.horizontalpodautoscaler.yaml
+
