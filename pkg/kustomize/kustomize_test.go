@@ -133,6 +133,38 @@ var kustomizationForTests = []struct {
 		},
 		"",
 	},
+	{
+		"ComponentImageOverridesPostgresUnmanaged",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: false},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{},
+		&types.Kustomization{
+			TypeMeta: types.TypeMeta{
+				APIVersion: types.KustomizationVersion,
+				Kind:       types.KustomizationKind,
+			},
+			Resources: []string{},
+			Components: []string{
+				"../components/clair",
+				"../components/redis",
+			},
+			Images: []types.Image{
+				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
+				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
+				{Name: "centos/redis-32-centos7", NewName: "redis", NewTag: "buster"},
+				{Name: "centos/postgresql-10-centos7", NewName: "postgres", NewTag: "latest"},
+			},
+			SecretGenerator: []types.SecretArgs{},
+		},
+		"",
+	},
 }
 
 func TestKustomizationFor(t *testing.T) {
