@@ -64,5 +64,10 @@ spec:
             secretName: clair-config-secret
         # Mount the public certificate because we are using storage proxying.
         - name: certs
-          secret:
-            secretName: quay-config-tls
+          projected:
+            sources:
+              - secret:
+                  name: quay-config-tls
+              - secret: 
+                  name: extra-ca-certs
+
