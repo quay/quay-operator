@@ -68,6 +68,6 @@ spec:
             sources:
               - secret:
                   name: quay-config-tls
-              - secret: 
-                  name: extra-ca-certs
+              - configMap: 
+                  name: cluster-service-ca
 
