@@ -40,6 +40,8 @@ spec:
               value: postgres
             - name: POSTGRESQL_ADMIN_PASSWORD
               value: postgres
+            - name: POSTGRESQL_MAX_CONNECTIONS
+              value: "1000"
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/pgsql/data
