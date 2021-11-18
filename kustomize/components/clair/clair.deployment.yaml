@@ -37,7 +37,7 @@ spec:
             - mountPath: /clair/
               name: config
             - mountPath: /var/run/certs
-              name: certs
+              name: certificates
           startupProbe:
             tcpSocket:
               port: clair-intro
@@ -63,7 +63,7 @@ spec:
           secret:
             secretName: clair-config-secret
         # Mount the public certificate because we are using storage proxying.
-        - name: certs
+        - name: certificates
           projected:
             sources:
               - secret:
