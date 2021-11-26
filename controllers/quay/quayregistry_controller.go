@@ -120,10 +120,103 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	created := v1.GetCondition(quay.Status.Conditions, v1.ConditionComponentsCreated)
-	if created != nil && created.Reason == v1.ConditionReasonMigrationsInProgress {
-		log.Info("migrations in progress, skipping reconcile")
-		return ctrl.Result{}, nil
+	created := v1.GetCondition(updatedQuay.Status.Conditions, v1.ConditionComponentsCreated)
+	migrationInProgress := created != nil && created.Reason == v1.ConditionReasonMigrationsInProgress
+	if migrationInProgress {
+		log.Info("checking Quay upgrade `Job` completion")
+
+		var upgradeJob batchv1.Job
+		err := r.Client.Get(
+			ctx,
+			types.NamespacedName{
+				Name:      updatedQuay.GetName() + "-" + v1.QuayUpgradeJobName,
+				Namespace: updatedQuay.GetNamespace(),
+			},
+			&upgradeJob,
+		)
+
+		// similarly to when a v1.ConditionReasonMigrationsFailed occurs,
+		// when the upgrade job is expected to exist but doesn't
+		// (i.e. someone manually removed it) we want the reconcile loop
+		// to run in its entirety, so we change the condition reason to
+		// something other than migrations in progress.
+		if err != nil && errors.IsNotFound(err) {
+			_, err = r.updateWithCondition(
+				updatedQuay,
+				v1.ConditionComponentsCreated,
+				metav1.ConditionFalse,
+				v1.ConditionReasonMigrationsJobMissing,
+				"upgrade job not found")
+			if err != nil {
+				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+			}
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		if err != nil {
+			log.Error(err, "could not retrieve Quay upgrade `Job`")
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		if upgradeJob.Status.Active == 1 {
+			log.Info("Upgrade job running, requeueing reconcile...")
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		if upgradeJob.Status.Succeeded == 1 {
+			log.Info("Quay upgrade complete, updating `status.currentVersion`")
+
+			msg := "All registry components created"
+			condition := v1.Condition{
+				Type:               v1.ConditionComponentsCreated,
+				Status:             metav1.ConditionTrue,
+				Reason:             v1.ConditionReasonComponentsCreationSuccess,
+				Message:            msg,
+				LastUpdateTime:     metav1.Now(),
+				LastTransitionTime: metav1.Now(),
+			}
+			updatedQuay.Status.Conditions = v1.SetCondition(updatedQuay.Status.Conditions, condition)
+			updatedQuay.Status.CurrentVersion = v1.QuayVersionCurrent
+
+			if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
+				log.Error(err, "could not update QuayRegistry status with current version")
+				return ctrl.Result{RequeueAfter: time.Second}, nil
+			}
+
+			log.Info("successfully updated `status` after Quay upgrade")
+
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		// when the job fails, the next reconciliation to run will think
+		// that migrations are currently not running, since we change
+		// the condition reason to v1.ConditionReasonMigrationsFailed.
+		// this doesn't necessarily describe reality, because kube will
+		// retry failed jobs for us, but it's desired behaviour because
+		// when the migration job fails due to misconfiguration, then the
+		// reconcile function should be allowed to proceed.
+		if upgradeJob.Status.Failed == 1 {
+			msg := "failed to run migrations"
+			for _, cond := range upgradeJob.Status.Conditions {
+				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+					msg = cond.Message
+					break
+				}
+			}
+			updatedQuay, err = r.updateWithCondition(
+				updatedQuay,
+				v1.ConditionComponentsCreated,
+				metav1.ConditionFalse,
+				v1.ConditionReasonMigrationsFailed,
+				msg)
+			if err != nil {
+				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+			}
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		log.Info("Unexpected job status.", fmt.Sprintf("%+v", upgradeJob.Status))
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	if quay.Spec.ConfigBundleSecret == "" {
@@ -352,68 +445,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionComponentsCreated, metav1.ConditionFalse, v1.ConditionReasonMigrationsInProgress, "running database migrations")
 		if err != nil {
 			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-
-			return ctrl.Result{}, nil
 		}
-
-		go func(quayRegistry *v1.QuayRegistry) {
-			err = wait.Poll(upgradePollInterval, upgradePollTimeout, func() (bool, error) {
-				log.Info("checking Quay upgrade `Job` completion")
-
-				var upgradeJob batchv1.Job
-				err = r.Client.Get(ctx, types.NamespacedName{Name: quayRegistry.GetName() + "-quay-app-upgrade", Namespace: quayRegistry.GetNamespace()}, &upgradeJob)
-				if err != nil {
-					log.Error(err, "could not retrieve Quay upgrade `Job`")
-
-					return false, err
-				}
-
-				if upgradeJob.Status.Succeeded > 0 {
-					log.Info("Quay upgrade complete, updating `status.currentVersion`")
-
-					var freshQuay v1.QuayRegistry
-					if err := r.Client.Get(ctx, req.NamespacedName, &freshQuay); err != nil {
-						log.Error(err, "could not retrieve QuayRegistry")
-						return false, err
-					}
-					qcopy := freshQuay.DeepCopy()
-
-					msg := "All registry components created"
-					condition := v1.Condition{
-						Type:               v1.ConditionComponentsCreated,
-						Status:             metav1.ConditionTrue,
-						Reason:             v1.ConditionReasonComponentsCreationSuccess,
-						Message:            msg,
-						LastUpdateTime:     metav1.Now(),
-						LastTransitionTime: metav1.Now(),
-					}
-					qcopy.Status.Conditions = v1.SetCondition(qcopy.Status.Conditions, condition)
-					qcopy.Status.CurrentVersion = v1.QuayVersionCurrent
-					r.EventRecorder.Event(qcopy, corev1.EventTypeNormal, string(v1.ConditionReasonHealthChecksPassing), msg)
-
-					if err = r.Client.Status().Update(ctx, qcopy); err != nil {
-						log.Error(err, "could not update QuayRegistry status with current version")
-						return false, nil
-					}
-
-					qcopy.Spec.Components = v1.EnsureComponents(qcopy.Spec.Components)
-					if err = r.Client.Update(ctx, qcopy); err != nil {
-						log.Error(err, "could not update QuayRegistry spec to complete upgrade")
-						return false, nil
-					}
-
-					log.Info("successfully updated `status` after Quay upgrade")
-
-					return true, nil
-				}
-
-				return false, nil
-			})
-
-			if err != nil {
-				log.Error(err, "Quay upgrade `Job` never completed")
-			}
-		}(updatedQuay.DeepCopy())
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	if !controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
