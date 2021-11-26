@@ -78,6 +78,7 @@ var supportsVolumeOverride = []ComponentKind{
 const (
 	ManagedKeysName         = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName = "quay-config-tls"
+	QuayUpgradeJobName      = "quay-app-upgrade"
 )
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
@@ -134,6 +135,8 @@ const (
 	ConditionReasonComponentUnmanaged                    ConditionReason = "ComponentNotManaged"
 	ConditionReasonHealthChecksPassing                   ConditionReason = "HealthChecksPassing"
 	ConditionReasonMigrationsInProgress                  ConditionReason = "MigrationsInProgress"
+	ConditionReasonMigrationsFailed                      ConditionReason = "MigrationsFailed"
+	ConditionReasonMigrationsJobMissing                  ConditionReason = "MigrationsJobMissing"
 	ConditionReasonComponentsCreationSuccess             ConditionReason = "ComponentsCreationSuccess"
 	ConditionReasonUpgradeUnsupported                    ConditionReason = "UpgradeUnsupported"
 	ConditionReasonComponentCreationFailed               ConditionReason = "ComponentCreationFailed"
