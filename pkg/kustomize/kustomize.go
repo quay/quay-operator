@@ -403,7 +403,12 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 }
 
 // Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
-func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseConfigBundle *corev1.Secret, log logr.Logger) ([]client.Object, error) {
+func Inflate(
+	ctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+	baseConfigBundle *corev1.Secret,
+	log logr.Logger,
+) ([]client.Object, error) {
 	// Each managed component brings its own generated `config.yaml` fields
 	// which are accumulated under the key `<component>.config.yaml` and then added to the base `Secret`.
 	componentConfigFiles := baseConfigBundle.DeepCopy().Data
@@ -502,6 +507,7 @@ func Inflate(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, baseCo
 	} else {
 		overlay = overlayDir()
 	}
+
 	resources, err := generate(kustomization, overlay, componentConfigFiles)
 	if err != nil {
 		return nil, err

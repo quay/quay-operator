@@ -309,8 +309,8 @@ var inflateTests = []struct {
 	expectedErr  error
 }{
 	{
-		"AllComponentsManagedExplicit",
-		&v1.QuayRegistry{
+		name: "AllComponentsManagedExplicit",
+		quayRegistry: &v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
@@ -322,20 +322,20 @@ var inflateTests = []struct {
 				},
 			},
 		},
-		quaycontext.QuayRegistryContext{
+		ctx: quaycontext.QuayRegistryContext{
 			SupportsObjectStorage: true,
 		},
-		&corev1.Secret{
+		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler"}),
-		nil,
+		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler"}),
+		expectedErr: nil,
 	},
 	{
-		"AllComponentsUnmanaged",
-		&v1.QuayRegistry{
+		name: "AllComponentsUnmanaged",
+		quayRegistry: &v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: false},
@@ -347,18 +347,18 @@ var inflateTests = []struct {
 				},
 			},
 		},
-		quaycontext.QuayRegistryContext{},
-		&corev1.Secret{
+		ctx: quaycontext.QuayRegistryContext{},
+		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base"}),
-		nil,
+		expected:    withComponents([]string{"base"}),
+		expectedErr: nil,
 	},
 	{
-		"SomeComponentsUnmanaged",
-		&v1.QuayRegistry{
+		name: "SomeComponentsUnmanaged",
+		quayRegistry: &v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
@@ -369,18 +369,18 @@ var inflateTests = []struct {
 				},
 			},
 		},
-		quaycontext.QuayRegistryContext{},
-		&corev1.Secret{
+		ctx: quaycontext.QuayRegistryContext{},
+		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "postgres", "clair", "mirror"}),
-		nil,
+		expected:    withComponents([]string{"base", "postgres", "clair", "mirror"}),
+		expectedErr: nil,
 	},
 	{
-		"CurrentVersion",
-		&v1.QuayRegistry{
+		name: "CurrentVersion",
+		quayRegistry: &v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
@@ -394,20 +394,20 @@ var inflateTests = []struct {
 				CurrentVersion: v1.QuayVersionCurrent,
 			},
 		},
-		quaycontext.QuayRegistryContext{
+		ctx: quaycontext.QuayRegistryContext{
 			SupportsObjectStorage: true,
 		},
-		&corev1.Secret{
+		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
-		nil,
+		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
+		expectedErr: nil,
 	},
 	{
-		"ManagedKeysInProvidedConfig",
-		&v1.QuayRegistry{
+		name: "ManagedKeysInProvidedConfig",
+		quayRegistry: &v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
@@ -421,48 +421,48 @@ var inflateTests = []struct {
 				CurrentVersion: v1.QuayVersionCurrent,
 			},
 		},
-		quaycontext.QuayRegistryContext{
+		ctx: quaycontext.QuayRegistryContext{
 			SupportsObjectStorage: true,
 		},
-		&corev1.Secret{
+		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io", "DATABASE_SECRET_KEY": "abc123"}),
 			},
 		},
-		withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
-		nil,
+		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
+		expectedErr: nil,
 	},
 	{
-		"PostgresManagedDbUriExists",
-		&v1.QuayRegistry{
+		name: "PostgresManagedDbUriExists",
+		quayRegistry: &v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 				},
 			},
 		},
-		quaycontext.QuayRegistryContext{
+		ctx: quaycontext.QuayRegistryContext{
 			DbUri: "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
 		},
-		&corev1.Secret{
+		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		withComponents([]string{"base", "postgres"}),
-		nil,
+		expected:    withComponents([]string{"base", "postgres"}),
+		expectedErr: nil,
 	},
 	{
-		"PostgresUnmanagedDbUriExists",
-		&v1.QuayRegistry{
+		name: "PostgresUnmanagedDbUriExists",
+		quayRegistry: &v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: false},
 				},
 			},
 		},
-		quaycontext.QuayRegistryContext{},
-		&corev1.Secret{
+		ctx: quaycontext.QuayRegistryContext{},
+		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
 				"config.yaml": encode(map[string]interface{}{
 					"SERVER_HOSTNAME": "quay.io",
@@ -470,8 +470,8 @@ var inflateTests = []struct {
 				}),
 			},
 		},
-		withComponents([]string{"base"}),
-		nil,
+		expected:    withComponents([]string{"base"}),
+		expectedErr: nil,
 	},
 }
 
@@ -481,57 +481,59 @@ func TestInflate(t *testing.T) {
 	log := testlogr.TestLogger{}
 
 	for _, test := range inflateTests {
-		pieces, err := Inflate(&test.ctx, test.quayRegistry, test.configBundle, log)
+		t.Run(test.name, func(t *testing.T) {
+			pieces, err := Inflate(&test.ctx, test.quayRegistry, test.configBundle, log)
 
-		assert.NotNil(pieces, test.name)
-		assert.Equal(len(test.expected), len(pieces), test.name)
-		assert.Nil(err, test.name)
+			assert.NotNil(pieces, test.name)
+			assert.Equal(len(test.expected), len(pieces), test.name)
+			assert.Nil(err, test.name)
 
-		var config map[string]interface{}
-		for _, obj := range pieces {
-			objectMeta, _ := meta.Accessor(obj)
+			var config map[string]interface{}
+			for _, obj := range pieces {
+				objectMeta, _ := meta.Accessor(obj)
 
-			if strings.Contains(objectMeta.GetName(), configSecretPrefix) {
-				configBundle := obj.(*corev1.Secret)
-				config = decode(configBundle.Data["config.yaml"]).(map[string]interface{})
+				if strings.Contains(objectMeta.GetName(), configSecretPrefix) {
+					configBundle := obj.(*corev1.Secret)
+					config = decode(configBundle.Data["config.yaml"]).(map[string]interface{})
+				}
 			}
-		}
 
-		for _, obj := range pieces {
-			objectMeta, _ := meta.Accessor(obj)
+			for _, obj := range pieces {
+				objectMeta, _ := meta.Accessor(obj)
 
-			assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-", test.name)
+				assert.Contains(objectMeta.GetName(), test.quayRegistry.GetName()+"-", test.name)
 
-			if strings.Contains(objectMeta.GetName(), v1.ManagedKeysSecretNameFor(test.quayRegistry)) {
-				managedKeys := obj.(*corev1.Secret)
+				if strings.Contains(objectMeta.GetName(), v1.ManagedKeysSecretNameFor(test.quayRegistry)) {
+					managedKeys := obj.(*corev1.Secret)
 
-				if test.ctx.DatabaseSecretKey == "" {
-					assert.Greater(len(string(managedKeys.Data["DATABASE_SECRET_KEY"])), 0, test.name)
-					assert.Greater(len(config["DATABASE_SECRET_KEY"].(string)), 0, test.name)
-				} else {
-					assert.Equal(test.ctx.DatabaseSecretKey, string(managedKeys.Data["DATABASE_SECRET_KEY"]), test.name)
-					assert.Equal(test.ctx.DatabaseSecretKey, config["DATABASE_SECRET_KEY"], test.name)
+					if test.ctx.DatabaseSecretKey == "" {
+						assert.Greater(len(string(managedKeys.Data["DATABASE_SECRET_KEY"])), 0, test.name)
+						assert.Greater(len(config["DATABASE_SECRET_KEY"].(string)), 0, test.name)
+					} else {
+						assert.Equal(test.ctx.DatabaseSecretKey, string(managedKeys.Data["DATABASE_SECRET_KEY"]), test.name)
+						assert.Equal(test.ctx.DatabaseSecretKey, config["DATABASE_SECRET_KEY"], test.name)
+					}
+					assert.Equal(string(managedKeys.Data["DATABASE_SECRET_KEY"]), config["DATABASE_SECRET_KEY"], test.name)
+
+					if test.ctx.SecretKey == "" {
+						assert.Greater(len(string(managedKeys.Data["SECRET_KEY"])), 0, test.name)
+						assert.Greater(len(config["SECRET_KEY"].(string)), 0, test.name)
+					} else {
+						assert.Equal(test.ctx.SecretKey, string(managedKeys.Data["SECRET_KEY"]), test.name)
+						assert.Equal(test.ctx.SecretKey, config["SECRET_KEY"], test.name)
+					}
+					assert.Equal(string(managedKeys.Data["SECRET_KEY"]), config["SECRET_KEY"], test.name)
+
+					if test.ctx.DbUri == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentPostgres) {
+						assert.Greater(len(string(managedKeys.Data["DB_URI"])), 0, test.name)
+						assert.Greater(len(config["DB_URI"].(string)), 0, test.name)
+					} else {
+						assert.Equal(test.ctx.DbUri, string(managedKeys.Data["DB_URI"]), test.name)
+						assert.Equal(test.ctx.DbUri, config["DB_URI"], test.name)
+					}
+					assert.Equal(string(managedKeys.Data["DB_URI"]), config["DB_URI"], test.name)
 				}
-				assert.Equal(string(managedKeys.Data["DATABASE_SECRET_KEY"]), config["DATABASE_SECRET_KEY"], test.name)
-
-				if test.ctx.SecretKey == "" {
-					assert.Greater(len(string(managedKeys.Data["SECRET_KEY"])), 0, test.name)
-					assert.Greater(len(config["SECRET_KEY"].(string)), 0, test.name)
-				} else {
-					assert.Equal(test.ctx.SecretKey, string(managedKeys.Data["SECRET_KEY"]), test.name)
-					assert.Equal(test.ctx.SecretKey, config["SECRET_KEY"], test.name)
-				}
-				assert.Equal(string(managedKeys.Data["SECRET_KEY"]), config["SECRET_KEY"], test.name)
-
-				if test.ctx.DbUri == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentPostgres) {
-					assert.Greater(len(string(managedKeys.Data["DB_URI"])), 0, test.name)
-					assert.Greater(len(config["DB_URI"].(string)), 0, test.name)
-				} else {
-					assert.Equal(test.ctx.DbUri, string(managedKeys.Data["DB_URI"]), test.name)
-					assert.Equal(test.ctx.DbUri, config["DB_URI"], test.name)
-				}
-				assert.Equal(string(managedKeys.Data["DB_URI"]), config["DB_URI"], test.name)
 			}
-		}
+		})
 	}
 }
