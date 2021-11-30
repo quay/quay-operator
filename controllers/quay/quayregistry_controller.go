@@ -222,6 +222,13 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
+	err = v1.ValidateOverrides(updatedQuay)
+	if err != nil {
+		msg := fmt.Sprintf("could not validate overrides on spec.components: %s", err)
+
+		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonComponentOverrideInvalid, msg)
+	}
+
 	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
 		log.Info("updating QuayRegistry `spec.components` to include defaults")
 		if err = r.Client.Update(ctx, updatedQuay); err != nil {

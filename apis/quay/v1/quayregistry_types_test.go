@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	quaycontext "github.com/quay/quay-operator/pkg/context"
@@ -349,6 +350,67 @@ var componentsMatchTests = []struct {
 		},
 		false,
 	},
+}
+
+var validateOverridesTests = []struct {
+	name        string
+	quay        QuayRegistry
+	expectedErr error
+}{
+	{
+		"NoOverridesProvided",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"InvalidVolumeSizeOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true, Overrides: &Override{VolumeSize: &resource.Quantity{}}},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component tls does not support volumeSize overrides"),
+	},
+}
+
+func TestValidOverrides(t *testing.T) {
+	assert := assert.New(t)
+
+	for _, test := range validateOverridesTests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateOverrides(&test.quay)
+			if test.expectedErr != nil {
+				assert.NotNil(err, test.name)
+				assert.Equal(test.expectedErr, err)
+			} else {
+				assert.Equal(test.expectedErr, err)
+			}
+		})
+	}
 }
 
 func TestComponentsMatch(t *testing.T) {
