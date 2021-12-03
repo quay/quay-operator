@@ -1,12 +1,14 @@
 package middleware
 
 import (
+	"fmt"
 	"strings"
 
 	route "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,7 +62,7 @@ func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj cl
 		}
 
 		if !strings.Contains(dep.GetName(), "quay-config-editor") {
-			return obj, nil
+			return dep, nil
 		}
 
 		fgns, err := v1.FieldGroupNamesForManagedComponents(quay)
@@ -70,6 +72,28 @@ func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj cl
 
 		dep.Spec.Template.Annotations[fieldGroupsAnnotation] = strings.Join(fgns, ",")
 		return dep, nil
+	}
+
+	// If the current object is a PVC, check for volume override
+	if pvc, ok := obj.(*corev1.PersistentVolumeClaim); ok {
+		var volumeSizeOverride *resource.Quantity
+		switch quayComponentLabel {
+		case "postgres":
+			volumeSizeOverride = getVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
+		case "clair-postgres":
+			volumeSizeOverride = getVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
+		}
+
+		// If override was provided
+		if volumeSizeOverride != nil {
+			// Ensure that volume size is not being reduced
+			if pvc.Spec.Resources.Requests.Storage() != nil && volumeSizeOverride.Cmp(*pvc.Spec.Resources.Requests.Storage()) == -1 {
+				return nil, fmt.Errorf("cannot shrink volume override size from %s to %s", pvc.Spec.Resources.Requests.Storage().String(), volumeSizeOverride.String())
+			}
+			pvc.Spec.Resources.Requests = corev1.ResourceList{corev1.ResourceStorage: *volumeSizeOverride}
+		}
+
+		return pvc, nil
 	}
 
 	rt, ok := obj.(*route.Route)
@@ -136,4 +160,15 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 	flattenedSecret.Data["config.yaml"] = []byte(flattenedConfigYAML)
 
 	return flattenedSecret, nil
+}
+
+func getVolumeSizeOverrideForComponent(quay *v1.QuayRegistry, componentKind v1.ComponentKind) (volumeSizeOverride *resource.Quantity) {
+	for _, component := range quay.Spec.Components {
+		if component.Kind == componentKind {
+			if component.Overrides != nil && component.Overrides.VolumeSize != nil {
+				volumeSizeOverride = component.Overrides.VolumeSize
+			}
+		}
+	}
+	return volumeSizeOverride
 }
