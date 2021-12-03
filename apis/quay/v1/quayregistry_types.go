@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,15 +39,15 @@ type ComponentKind string
 
 const (
 	ComponentBase          ComponentKind = "base"
-	ComponentPostgres                    = "postgres"
-	ComponentClair                       = "clair"
-	ComponentRedis                       = "redis"
-	ComponentHPA                         = "horizontalpodautoscaler"
-	ComponentObjectStorage               = "objectstorage"
-	ComponentRoute                       = "route"
-	ComponentMirror                      = "mirror"
-	ComponentMonitoring                  = "monitoring"
-	ComponentTLS                         = "tls"
+	ComponentPostgres      ComponentKind = "postgres"
+	ComponentClair         ComponentKind = "clair"
+	ComponentRedis         ComponentKind = "redis"
+	ComponentHPA           ComponentKind = "horizontalpodautoscaler"
+	ComponentObjectStorage ComponentKind = "objectstorage"
+	ComponentRoute         ComponentKind = "route"
+	ComponentMirror        ComponentKind = "mirror"
+	ComponentMonitoring    ComponentKind = "monitoring"
+	ComponentTLS           ComponentKind = "tls"
 )
 
 var allComponents = []ComponentKind{
@@ -66,6 +67,11 @@ var requiredComponents = []ComponentKind{
 	ComponentObjectStorage,
 	ComponentRoute,
 	ComponentRedis,
+}
+
+var supportsVolumeOverride = []ComponentKind{
+	ComponentPostgres,
+	ComponentClair,
 }
 
 const (
@@ -88,6 +94,13 @@ type Component struct {
 	// Managed indicates whether or not the Operator is responsible for the lifecycle of this component.
 	// Default is true.
 	Managed bool `json:"managed"`
+	// Overrides holds information regarding component specific configurations.
+	Overrides *Override `json:"overrides,omitempty"`
+}
+
+// Override describes configuration overrides for the given managed component
+type Override struct {
+	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
 }
 
 type ConditionType string
@@ -127,6 +140,7 @@ const (
 	ConditionReasonObjectStorageComponentDependencyError ConditionReason = "ObjectStorageComponentDependencyError"
 	ConditionReasonMonitoringComponentDependencyError    ConditionReason = "MonitoringComponentDependencyError"
 	ConditionReasonConfigInvalid                         ConditionReason = "ConfigInvalid"
+	ConditionReasonComponentOverrideInvalid              ConditionReason = "ComponentOverrideInvalid"
 )
 
 // Condition is a single condition of a QuayRegistry.
@@ -330,6 +344,33 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 	return updatedQuay, nil
 }
 
+// ValidateOverrides validates that the overrides set for each component are valid.
+func ValidateOverrides(quay *QuayRegistry) error {
+	for _, component := range quay.Spec.Components {
+
+		// No overrides provided
+		if component.Overrides == nil {
+			continue
+		}
+
+		// If the component is unmanaged, we cannot set overrides
+		if !ComponentIsManaged(quay.Spec.Components, component.Kind) {
+			if component.Overrides.VolumeSize != nil {
+				return errors.New("cannot set overrides on unmanaged component " + string(component.Kind))
+			}
+		}
+
+		// Check that component supports override
+		if component.Overrides.VolumeSize != nil && !ComponentSupportsOverride(component.Kind, "volumeSize") {
+			return fmt.Errorf("component %s does not support volumeSize overrides", component.Kind)
+		}
+
+	}
+
+	return nil
+
+}
+
 // EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was unchanged.
 func EnsureRegistryEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry, config map[string]interface{}) (*QuayRegistry, bool) {
 	updatedQuay := quay.DeepCopy()
@@ -491,6 +532,24 @@ func FieldGroupNamesForManagedComponents(quay *QuayRegistry) ([]string, error) {
 		fgns = append(fgns, fgn)
 	}
 	return fgns, nil
+}
+
+// ComponentSupportsOverride returns whether or not a given component supports the given override.
+func ComponentSupportsOverride(component ComponentKind, override string) bool {
+
+	// Using a switch statement for possible implementation of future overrides
+	switch override {
+	case "volumeSize":
+		for _, c := range supportsVolumeOverride {
+			if c == component {
+				return true
+			}
+		}
+	default:
+		return false
+	}
+
+	return false
 }
 
 func init() {
