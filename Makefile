@@ -80,23 +80,15 @@ CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
 # This target called from the prepare-release github action.
-# RELEASE       - quay-operator tag (eg. v3.6.0-alpha.4)
-# QUAY_RELEASE  - quay version
-# CLAIR_RELEASE - clair version
+# CHANNEL       - operator channel (eg. stable-3.6, preview-3.6)
+# RELEASE       - quay-operator tag (eg. 3.6.0-alpha.4)
+# QUAY_RELEASE  - quay version (eg. 3.6.0-alpha.4)
+# CLAIR_RELEASE - clair version (eg. 4.3.5)
 prepare-release:
-	sed -i "s/createdAt:.*/createdAt: `date --utc +'%Y-%m-%d %k:%m UTC'`/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/olm\.skipRange:.*/olm\.skipRange: \">=3.5.x <$(RELEASE)\"/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/quay-version:.*/quay-version: v$(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/containerImage:.*/containerImage: quay.io\/projectquay\/quay-operator:v$(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/^  name: quay-operator.*/  name: quay-operator.v$(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/image: quay.io\/projectquay\/quay-operator.*/image: quay.io\/projectquay\/quay-operator:v$(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/value: quay.io\/projectquay\/quay:.*/value: quay.io\/projectquay\/quay:$(QUAY_RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/value: quay.io\/projectquay\/clair:.*/value: quay.io\/projectquay\/clair:$(CLAIR_RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-	sed -i "s/^  version: .*/  version: $(RELEASE)/" bundle/upstream/manifests/quay-operator.clusterserviceversion.yaml
-ifneq (,$(findstring alpha,$(RELEASE)))
-	sed -i "s/operators.operatorframework.io.bundle.channel.default.v1.*/operators.operatorframework.io.bundle.channel.default.v1: preview-3.6/" bundle/upstream/metadata/annotations.yaml
-	sed -i "s/operators.operatorframework.io.bundle.channels.v1.*/operators.operatorframework.io.bundle.channels.v1: preview-3.6/" bundle/upstream/metadata/annotations.yaml
-else
-	sed -i "s/operators.operatorframework.io.bundle.channel.default.v1.*/operators.operatorframework.io.bundle.channel.default.v1: stable-3.6/" bundle/upstream/metadata/annotations.yaml
-	sed -i "s/operators.operatorframework.io.bundle.channels.v1.*/operators.operatorframework.io.bundle.channels.v1: stable-3.6/" bundle/upstream/metadata/annotations.yaml
-endif
+	@./hack/prepare-upstream.sh
+
+# CHANNEL       - operator channel (eg. stable-3.6)
+# RELEASE       - quay-operator tag (eg. 3.6.0-alpha.4)
+# REPLACES      - previous z-stream, do not set when releasing a y-stream
+prepare-downstream-release:
+	@./hack/prepare-downstream.sh
