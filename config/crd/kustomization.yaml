@@ -3,7 +3,7 @@
 # It should be run by config/default
 resources:
   - bases/quay.redhat.com_quayregistries.yaml
-  - bases/redhatcop.redhat.io.quay.redhat.com_quayecosystems.yaml
+  - bases/redhatcop.redhat.io_quayecosystems.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
