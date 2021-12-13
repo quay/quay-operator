@@ -67,6 +67,7 @@ var requiredComponents = []ComponentKind{
 	ComponentObjectStorage,
 	ComponentRoute,
 	ComponentRedis,
+	ComponentTLS,
 }
 
 var supportsVolumeOverride = []ComponentKind{
