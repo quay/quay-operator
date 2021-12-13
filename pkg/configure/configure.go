@@ -108,13 +108,13 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 				}
 			}
 
+			component.Managed = true
 			if contains {
-				log.Info("marking component as unmanaged", "component", component.Kind)
-				newComponents = append(newComponents, v1.Component{Kind: component.Kind, Managed: false})
-			} else {
-				log.Info("marking component as managed", "component", component.Kind)
-				newComponents = append(newComponents, v1.Component{Kind: component.Kind, Managed: true})
+				log.Info("marking component as unmanaged and removing overrides", "component", component.Kind)
+				component.Managed = false
+				component.Overrides = nil
 			}
+			newComponents = append(newComponents, component)
 		}
 		quay.Spec.Components = newComponents
 		quay.Spec.ConfigBundleSecret = newSecret.GetName()
