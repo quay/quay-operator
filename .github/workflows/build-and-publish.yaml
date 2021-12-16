@@ -195,10 +195,10 @@ jobs:
 
       - name: Publish Catalog Index
         env:
-          OPM_DOWNLOAD_URL: https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.6/
+          OPM_DOWNLOAD_URL: https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.6
           OPM_TAR: opm-linux.tar.gz
         run: |
-          wget -q "${OPM_DOWNLOAD_URL}/${OPM_TAR}"
+          wget "${OPM_DOWNLOAD_URL}/${OPM_TAR}"
           tar xvf "${OPM_TAR}"
           ./opm index add --build-tool docker --bundles "${{steps.bundle-image.outputs.digest}}" --tag "${INDEX}:${TAG}"
           docker push "${INDEX}:${TAG}"
