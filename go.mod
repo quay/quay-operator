@@ -14,6 +14,7 @@ require (
 	github.com/quay/config-tool v0.1.2-0.20210118162351-e19851d40f9e
 	github.com/stretchr/testify v1.6.1
 	github.com/tidwall/sjson v1.2.3
+	github.com/ulikunitz/xz v0.5.8 // indirect
 	gopkg.in/yaml.v2 v2.3.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/api v0.20.2
