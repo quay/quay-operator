@@ -36,6 +36,7 @@ import (
 	quaycontroller "github.com/quay/quay-operator/controllers/quay"
 	redhatcopcontroller "github.com/quay/quay-operator/controllers/redhatcop"
 	"github.com/quay/quay-operator/pkg/configure"
+	"github.com/quay/quay-operator/pkg/webhook"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -46,6 +47,7 @@ var (
 
 const (
 	operatorPort = 7071
+	webhookPort  = 9443
 )
 
 func init() {
@@ -60,11 +62,14 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var namespace string
+	var certDir string
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&namespace, "namespace", "", "The Kubernetes namespace that the controller will watch.")
+	flag.StringVar(&certDir, "cert-dir", "", "Path to directory containing TLS certificates for webhook and reconfiguration endpoints.")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -79,6 +84,7 @@ func main() {
 		ClientDisableCacheFor: []client.Object{
 			&quay.QuayRegistry{},
 		},
+		CertDir: certDir,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -115,6 +121,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayEcosystem")
 		os.Exit(1)
 	}
+
+	if err = webhook.SetupWebhooks(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "QuayRegistryValidator")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting server on port 7071")

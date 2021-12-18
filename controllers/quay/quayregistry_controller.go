@@ -126,48 +126,12 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	if quay.Spec.ConfigBundleSecret == "" {
-		log.Info("`spec.configBundleSecret` is unset. Creating base `Secret`")
-
-		baseConfigBundle, err := v1.EnsureOwnerReference(&quay, &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: quay.GetName() + "-config-bundle-",
-				Namespace:    quay.GetNamespace(),
-			},
-			Data: map[string][]byte{
-				"config.yaml": encode(kustomize.BaseConfig()),
-			},
-		})
-		if err != nil {
-			msg := fmt.Sprintf("unable to add owner reference to base config bundle `Secret`: %s", err)
-
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-		}
-
-		if err := r.Client.Create(ctx, baseConfigBundle); err != nil {
-			msg := fmt.Sprintf("unable to create base config bundle `Secret`: %s", err)
-
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-		}
-
-		objectMeta, _ := meta.Accessor(baseConfigBundle)
-		updatedQuay.Spec.ConfigBundleSecret = objectMeta.GetName()
-		if err := r.Client.Update(ctx, updatedQuay); err != nil {
-			log.Error(err, "unable to update `spec.configBundleSecret`")
-			return ctrl.Result{}, nil
-		}
-
-		log.Info("successfully updated `spec.configBundleSecret`")
-		return ctrl.Result{}, nil
-	}
-
 	var configBundle corev1.Secret
 	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.Spec.ConfigBundleSecret}, &configBundle); err != nil {
 		msg := fmt.Sprintf("unable to retrieve referenced `configBundleSecret`: %s, error: %s", quay.Spec.ConfigBundleSecret, err)
 
 		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
 	}
-
 	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
 
 	quayContext, updatedQuay, err := r.checkManagedKeys(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
