@@ -43,7 +43,7 @@ export SUBSCRIPTION_PATH=${SUBSCRIPTION_PATH:-'./bundle/quay-operator.subscripti
 export QUAY_SAMPLE_PATH=${QUAY_SAMPLE_PATH:-'./config/samples/managed.quayregistry.yaml'}
 export OPERATOR_PKG_NAME=${OPERATOR_PKG_NAME:-'quay-operator-test'}
 export NAMESPACE=${NAMESPACE:-'quay-operator-e2e-nightly'}
-export WAIT_TIMEOUT=${WAIT_TIMEOUT:-'10m'}
+export WAIT_TIMEOUT=${WAIT_TIMEOUT:-'20m'}
 
 info 'calculating catalog index image digest'
 
