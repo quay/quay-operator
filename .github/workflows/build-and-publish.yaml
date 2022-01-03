@@ -167,7 +167,7 @@ jobs:
               .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[7].value = "${{needs.qemu-builder-image.outputs.digest}}" |
               .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[8].value = "centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33" |
               .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[9].value = "centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542"
-              ' bundle/downstream/manifests/quay-operator.clusterserviceversion.yaml
+              ' bundle/manifests/quay-operator.clusterserviceversion.yaml
 
       - name: Update Bundle Annotations
         uses: mikefarah/yq@master
@@ -177,12 +177,12 @@ jobs:
               .annotations."operators.operatorframework.io.bundle.channel.default.v1" = "test" |
               .annotations."operators.operatorframework.io.bundle.channels.v1" = "test" |
               .annotations."operators.operatorframework.io.bundle.package.v1" = strenv(OPERATOR_NAME)
-              ' bundle/downstream/metadata/annotations.yaml
+              ' bundle/metadata/annotations.yaml
 
       - name: Publish Bundle Image
         uses: docker/build-push-action@v2
         with:
-          context: ./bundle/downstream
+          context: ./bundle
           file: ./bundle/Dockerfile
           push: true
           tags: ${{ env.BUNDLE }}:${{ env.TAG }}
