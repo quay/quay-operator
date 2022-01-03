@@ -188,34 +188,36 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
-		// when the job fails, the next reconciliation to run will think
-		// that migrations are currently not running, since we change
-		// the condition reason to v1.ConditionReasonMigrationsFailed.
+		log.Info("upgrade job failed or crashed.", "upgrade-job-status", upgradeJob.Status)
+
+		// a kube job can be Active, Succeeded or Failed.
+		// we explicitly check for Active and Succeeded above. if no pods
+		// are in either state it means the job either failed or crashed.
+		// crashed pods are not marked as Failed, so we don't check.
+		//
+		// when the job crashes or fails, the next reconciliation to run
+		// will think that migrations are currently not running, since
+		// we change the condition reason to v1.ConditionReasonMigrationsFailed.
 		// this doesn't necessarily describe reality, because kube will
 		// retry failed jobs for us, but it's desired behaviour because
 		// when the migration job fails due to misconfiguration, then the
 		// reconcile function should be allowed to proceed.
-		if upgradeJob.Status.Failed == 1 {
-			msg := "failed to run migrations"
-			for _, cond := range upgradeJob.Status.Conditions {
-				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-					msg = cond.Message
-					break
-				}
+		msg := "failed to run migrations"
+		for _, cond := range upgradeJob.Status.Conditions {
+			if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+				msg = cond.Message
+				break
 			}
-			updatedQuay, err = r.updateWithCondition(
-				updatedQuay,
-				v1.ConditionComponentsCreated,
-				metav1.ConditionFalse,
-				v1.ConditionReasonMigrationsFailed,
-				msg)
-			if err != nil {
-				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-			}
-			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
-
-		log.Info("Unexpected job status.", fmt.Sprintf("%+v", upgradeJob.Status))
+		updatedQuay, err = r.updateWithCondition(
+			updatedQuay,
+			v1.ConditionComponentsCreated,
+			metav1.ConditionFalse,
+			v1.ConditionReasonMigrationsFailed,
+			msg)
+		if err != nil {
+			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+		}
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
