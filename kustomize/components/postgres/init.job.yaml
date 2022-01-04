@@ -7,6 +7,7 @@ metadata:
   annotations:
     quay-component: postgres
 spec:
+  suspend: true
   template:
     metadata:
       name: quay-postgres-init

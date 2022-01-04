@@ -518,9 +518,9 @@ func TestEnsureRegistryEndpoint(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range ensureRegistryEndpointTests {
-		quay, ok := EnsureRegistryEndpoint(&test.ctx, &test.quay, test.config)
+		ok := EnsureRegistryEndpoint(&test.ctx, &test.quay, test.config)
 
 		assert.Equal(test.expectedOk, ok, test.name)
-		assert.Equal(test.expected, quay.Status.RegistryEndpoint, test.name)
+		assert.Equal(test.expected, test.quay.Status.RegistryEndpoint, test.name)
 	}
 }

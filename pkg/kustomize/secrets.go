@@ -44,17 +44,19 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 			return nil, err
 		}
 
-		preSharedKey, err := generateRandomString(32)
-		if err != nil {
-			return nil, err
+		if len(ctx.SecurityScannerV4PSK) == 0 {
+			preSharedKey, err := generateRandomString(32)
+			if err != nil {
+				return nil, err
+			}
+			ctx.SecurityScannerV4PSK = base64.StdEncoding.EncodeToString([]byte(preSharedKey))
 		}
-		psk := base64.StdEncoding.EncodeToString([]byte(preSharedKey))
 
 		fieldGroup.FeatureSecurityScanner = true
 		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + clairService + ":80"
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 		fieldGroup.SecurityScannerNotifications = true
-		fieldGroup.SecurityScannerV4PSK = psk
+		fieldGroup.SecurityScannerV4PSK = ctx.SecurityScannerV4PSK
 
 		return fieldGroup, nil
 	case v1.ComponentRedis:
@@ -291,21 +293,28 @@ func componentConfigFilesFor(qctx *quaycontext.QuayRegistryContext, component v1
 			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
 		}
 
-		return map[string][]byte{"config.yaml": clairConfigFor(quay, quayHostname, preSharedKey)}, nil
+		cfg, err := clairConfigFor(quay, quayHostname, preSharedKey)
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string][]byte{"config.yaml": cfg}, nil
 	default:
 		return nil, nil
 	}
 }
 
 // clairConfigFor returns a Clair v4 config with the correct values.
-func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []byte {
+func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
 	dbname := "postgres"
 	user := "postgres"
 	password := "postgres"
 
 	psk, err := base64.StdEncoding.DecodeString(preSharedKey)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
 
 	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
 	config := config.Config{
@@ -343,10 +352,7 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []
 		},
 	}
 
-	marshalled, err := yaml.Marshal(config)
-	check(err)
-
-	return marshalled
+	return yaml.Marshal(config)
 }
 
 // From: https://gist.github.com/dopey/c69559607800d2f2f90b1b1ed4e550fb

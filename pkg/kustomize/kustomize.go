@@ -68,17 +68,22 @@ func componentImageFor(component v1.ComponentKind) (types.Image, error) {
 	imageOverride := types.Image{
 		Name: defaultImagesFor[component],
 	}
+
 	image := os.Getenv(envVarFor[component])
-	if image != "" {
-		if len(strings.Split(image, "@")) == 2 {
-			imageOverride.NewName = strings.Split(image, "@")[0]
-			imageOverride.Digest = strings.Split(image, "@")[1]
-		} else if len(strings.Split(image, ":")) == 2 {
-			imageOverride.NewName = strings.Split(image, ":")[0]
-			imageOverride.NewTag = strings.Split(image, ":")[1]
-		} else {
-			return types.Image{}, errors.New("Image override must be reference by tag or manifest digest: " + image)
-		}
+	if image == "" {
+		return imageOverride, nil
+	}
+
+	if len(strings.Split(image, "@")) == 2 {
+		imageOverride.NewName = strings.Split(image, "@")[0]
+		imageOverride.Digest = strings.Split(image, "@")[1]
+	} else if len(strings.Split(image, ":")) == 2 {
+		imageOverride.NewName = strings.Split(image, ":")[0]
+		imageOverride.NewTag = strings.Split(image, ":")[1]
+	} else {
+		return types.Image{}, fmt.Errorf(
+			"image override must be reference by tag or digest: %s", image,
+		)
 	}
 
 	return imageOverride, nil
@@ -87,7 +92,6 @@ func componentImageFor(component v1.ComponentKind) (types.Image, error) {
 func kustomizeDir() string {
 	_, filename, _, _ := runtime.Caller(0)
 	path := filepath.Join(filepath.Dir(filename))
-
 	return filepath.Join(path, "..", "..", "kustomize")
 }
 
@@ -118,32 +122,27 @@ func rolloutBlocked(quay *v1.QuayRegistry) bool {
 	return false
 }
 
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 func encode(value interface{}) []byte {
 	yamlified, _ := yaml.Marshal(value)
-
 	return yamlified
 }
 
 func decode(bytes []byte) interface{} {
 	var value interface{}
 	_ = yaml.Unmarshal(bytes, &value)
-
 	return value
 }
 
-// EnsureCreationOrder sorts the given slice of Kubernetes objects so that
-// when created in order, `Deployments` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
+// EnsureCreationOrder sorts the given slice of Kubernetes objects so that when created in order,
+// `Deployments` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
 func EnsureCreationOrder(objects []client.Object) []client.Object {
-	sort.Slice(objects, func(i, j int) bool {
-		return objects[i].GetObjectKind().GroupVersionKind().String() != schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}.String()
-	})
-
+	sort.Slice(
+		objects,
+		func(i, j int) bool {
+			obji := objects[i]
+			return obji.GetObjectKind().GroupVersionKind().Kind != "Deployment"
+		},
+	)
 	return objects
 }
 
@@ -187,63 +186,114 @@ func ModelFor(gvk schema.GroupVersionKind) client.Object {
 }
 
 // generate uses Kustomize as a library to build the runtime objects to be applied to a cluster.
-func generate(kustomization *types.Kustomization, overlay string, quayConfigFiles map[string][]byte) ([]client.Object, error) {
+func generate(
+	kustomization *types.Kustomization, overlay string, quayConfigFiles map[string][]byte,
+) ([]client.Object, error) {
 	fSys := filesys.MakeEmptyDirInMemory()
-	err := filepath.Walk(kustomizeDir(), func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	if err := filepath.Walk(
+		kustomizeDir(),
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 
-		if !info.IsDir() {
+			if info.IsDir() {
+				return nil
+			}
+
 			f, err := ioutil.ReadFile(path)
 			if err != nil {
 				return err
 			}
 
-			err = fSys.WriteFile(path, f)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	check(err)
+			return fSys.WriteFile(path, f)
+		},
+	); err != nil {
+		return nil, err
+	}
 
 	// Write `kustomization.yaml` to filesystem
 	kustomizationFile, err := yaml.Marshal(kustomization)
-	check(err)
-	err = fSys.WriteFile(filepath.Join(appDir(), "kustomization.yaml"), kustomizationFile)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
+	if err := fSys.WriteFile(
+		filepath.Join(appDir(), "kustomization.yaml"), kustomizationFile,
+	); err != nil {
+		return nil, err
+	}
 
 	// Add all Quay config files to directory to be included in the generated `Secret`
 	for fileName, file := range quayConfigFiles {
-		check(err)
-		err = fSys.WriteFile(filepath.Join(appDir(), "bundle", fileName), file)
-		check(err)
+		if err := fSys.WriteFile(
+			filepath.Join(appDir(), "bundle", fileName), file,
+		); err != nil {
+			return nil, err
+		}
 	}
+
+	// REMOVE-ME-PLEASE
+	/*
+		bdir := "/home/rmarasch/workspace/testing-kustomize"
+		if err := fSys.Walk(
+			".",
+			func(fpath string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+
+				fullpath := path.Join(bdir, fpath)
+				if info.IsDir() {
+					if err := os.MkdirAll(fullpath, 0755); err != nil {
+						panic(err)
+					}
+					return nil
+				}
+
+				f, err := fSys.ReadFile(fpath)
+				if err != nil {
+					panic(err)
+				}
+
+				if err := os.WriteFile(fullpath, f, 0600); err != nil {
+					panic(err)
+				}
+
+				return fSys.WriteFile(fpath, f)
+			},
+		); err != nil {
+			panic(err)
+		}
+	*/
 
 	opts := &krusty.Options{}
 	k := krusty.MakeKustomizer(fSys, opts)
 	resMap, err := k.Run(overlay)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
 
 	output := []client.Object{}
 	for _, resource := range resMap.Resources() {
 		resourceJSON, err := resource.MarshalJSON()
-		check(err)
-
-		obj := ModelFor(schema.GroupVersionKind{
-			Group:   resource.GetGvk().Group,
-			Version: resource.GetGvk().Version,
-			Kind:    resource.GetGvk().Kind,
-		})
-
-		if obj == nil {
-			panic("TODO: Not implemented for GroupVersionKind: " + resource.GetGvk().String())
+		if err != nil {
+			return nil, err
 		}
 
-		err = json.Unmarshal(resourceJSON, obj)
-		check(err)
+		obj := ModelFor(
+			schema.GroupVersionKind{
+				Group:   resource.GetGvk().Group,
+				Version: resource.GetGvk().Version,
+				Kind:    resource.GetGvk().Kind,
+			},
+		)
+		if obj == nil {
+			return nil, fmt.Errorf("type not supported")
+		}
+
+		if err := json.Unmarshal(resourceJSON, obj); err != nil {
+			return nil, err
+		}
 
 		output = append(output, obj)
 	}
@@ -252,7 +302,11 @@ func generate(kustomization *types.Kustomization, overlay string, quayConfigFile
 }
 
 // KustomizationFor takes a `QuayRegistry` object and generates a Kustomization for it.
-func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, quayConfigFiles map[string][]byte) (*types.Kustomization, error) {
+func KustomizationFor(
+	ctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+	quayConfigFiles map[string][]byte,
+) (*types.Kustomization, error) {
 	if quay == nil {
 		return nil, errors.New("given QuayRegistry should not be nil")
 	}
@@ -262,9 +316,11 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 		configFiles = append(configFiles, filepath.Join("bundle", key))
 	}
 
-	configEditorPassword, err := generateRandomString(16)
-	if err != nil {
-		return nil, err
+	if len(ctx.ConfigEditorPw) == 0 {
+		var err error
+		if ctx.ConfigEditorPw, err = generateRandomString(16); err != nil {
+			return nil, err
+		}
 	}
 
 	if ctx.DbRootPw == "" {
@@ -304,6 +360,8 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 						"SECRET_KEY=" + ctx.SecretKey,
 						"DB_URI=" + ctx.DbUri,
 						"DB_ROOT_PW=" + ctx.DbRootPw,
+						"CONFIG_EDITOR_PW=" + ctx.ConfigEditorPw,
+						"SECURITY_SCANNER_V4_PSK=" + ctx.SecurityScannerV4PSK,
 					},
 				},
 			},
@@ -322,7 +380,7 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 				KvPairSources: types.KvPairSources{
 					LiteralSources: []string{
 						"username=" + configEditorUser,
-						"password=" + configEditorPassword,
+						"password=" + ctx.ConfigEditorPw,
 					},
 				},
 			},
@@ -331,20 +389,29 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 
 	componentPaths := []string{}
 	for _, component := range quay.Spec.Components {
-		if component.Managed {
-			componentPaths = append(componentPaths, filepath.Join("..", "components", string(component.Kind)))
+		if !component.Managed {
+			continue
+		}
 
-			componentConfigFiles, err := componentConfigFilesFor(ctx, component.Kind, quay, quayConfigFiles)
-			if componentConfigFiles == nil || err != nil {
-				continue
-			}
+		componentPaths = append(
+			componentPaths, filepath.Join("..", "components", string(component.Kind)),
+		)
 
-			sources := []string{}
-			for filename, fileValue := range componentConfigFiles {
-				sources = append(sources, strings.Join([]string{filename, string(fileValue)}, "="))
-			}
+		componentConfigFiles, err := componentConfigFilesFor(
+			ctx, component.Kind, quay, quayConfigFiles,
+		)
+		if componentConfigFiles == nil || err != nil {
+			continue
+		}
 
-			generatedSecrets = append(generatedSecrets, types.SecretArgs{
+		sources := []string{}
+		for filename, fileValue := range componentConfigFiles {
+			sources = append(sources, strings.Join([]string{filename, string(fileValue)}, "="))
+		}
+
+		generatedSecrets = append(
+			generatedSecrets,
+			types.SecretArgs{
 				GeneratorArgs: types.GeneratorArgs{
 					Name:     string(component.Kind) + "-config-secret",
 					Behavior: "merge",
@@ -352,12 +419,14 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 						LiteralSources: sources,
 					},
 				},
-			})
-		}
+			},
+		)
 	}
 
 	images := []types.Image{}
-	for _, component := range append(quay.Spec.Components, v1.Component{Kind: "base", Managed: true}) {
+	for _, component := range append(
+		quay.Spec.Components, v1.Component{Kind: "base", Managed: true},
+	) {
 		image, err := componentImageFor(component.Kind)
 		if err != nil {
 			return nil, err
@@ -402,30 +471,31 @@ func KustomizationFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistr
 	}, nil
 }
 
-// Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a Quay deployment.
+// Inflate takes a `QuayRegistry` object and returns a set of Kubernetes objects representing a
+// Quay deployment.
 func Inflate(
 	ctx *quaycontext.QuayRegistryContext,
 	quay *v1.QuayRegistry,
-	baseConfigBundle *corev1.Secret,
+	bundle *corev1.Secret,
 	log logr.Logger,
 ) ([]client.Object, error) {
-	// Each managed component brings its own generated `config.yaml` fields
-	// which are accumulated under the key `<component>.config.yaml` and then added to the base `Secret`.
-	componentConfigFiles := baseConfigBundle.DeepCopy().Data
+	// Each managed component brings its own generated `config.yaml` fields which are
+	// accumulated under the key <component>.config.yaml and then added to the base `Secret`.
+	componentConfigFiles := bundle.DeepCopy().Data
 
 	var parsedUserConfig map[string]interface{}
-	if err := yaml.Unmarshal(baseConfigBundle.Data["config.yaml"], &parsedUserConfig); err != nil {
+	if err := yaml.Unmarshal(bundle.Data["config.yaml"], &parsedUserConfig); err != nil {
 		return nil, err
 	}
 
-	// Generate or pull out the `SECRET_KEY` and `DATABASE_SECRET_KEY`. Since these must be stable across
-	// runs of the same config, we store them (and re-read them) from a specialized `Secret`.
-	// TODO(alecmerdler): Refector these three blocks...
-	if key, found := parsedUserConfig["DATABASE_SECRET_KEY"].(string); found && len(key) > 0 {
+	// Generate or pull out the `SECRET_KEY` and `DATABASE_SECRET_KEY`. Since these must be
+	// stable across runs of the same config, we store them (and re-read them) from a
+	// specialized `Secret`.  TODO(alecmerdler): Refector these three blocks...
+	if key, ok := parsedUserConfig["DATABASE_SECRET_KEY"].(string); ok && len(key) > 0 {
 		log.Info("`DATABASE_SECRET_KEY` found in user-provided config")
 		ctx.DatabaseSecretKey = key
 	} else if ctx.DatabaseSecretKey == "" {
-		log.Info("`DATABASE_SECRET_KEY` not found in user-provided config, generating new one")
+		log.Info("`DATABASE_SECRET_KEY` not found in user-provided config, generating")
 		databaseSecretKey, err := generateRandomString(secretKeyLength)
 		if err != nil {
 			return nil, err
@@ -434,11 +504,11 @@ func Inflate(
 	}
 	parsedUserConfig["DATABASE_SECRET_KEY"] = ctx.DatabaseSecretKey
 
-	if key, found := parsedUserConfig["SECRET_KEY"].(string); found && len(key) > 0 {
+	if key, ok := parsedUserConfig["SECRET_KEY"].(string); ok && len(key) > 0 {
 		log.Info("`SECRET_KEY` found in user-provided config")
 		ctx.SecretKey = key
 	} else if ctx.SecretKey == "" {
-		log.Info("`SECRET_KEY` not found in user-provided config, generating new one")
+		log.Info("`SECRET_KEY` not found in user-provided config, generating")
 		secretKey, err := generateRandomString(secretKeyLength)
 		if err != nil {
 			return nil, err
@@ -447,7 +517,7 @@ func Inflate(
 	}
 	parsedUserConfig["SECRET_KEY"] = ctx.SecretKey
 
-	if dbURI, found := parsedUserConfig["DB_URI"].(string); found && len(dbURI) > 0 {
+	if dbURI, ok := parsedUserConfig["DB_URI"].(string); ok && len(dbURI) > 0 {
 		ctx.DbUri = dbURI
 	} else if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) && len(ctx.DbUri) == 0 {
 		log.Info("managed `DB_URI` not found in config, generating new one")
@@ -473,14 +543,17 @@ func Inflate(
 	componentConfigFiles["config.yaml"] = encode(parsedUserConfig)
 
 	for _, component := range quay.Spec.Components {
-		if component.Managed {
-			fieldGroup, err := FieldGroupFor(ctx, component.Kind, quay)
-			if err != nil {
-				return nil, err
-			}
-
-			componentConfigFiles[string(component.Kind)+".config.yaml"] = encode(fieldGroup)
+		if !component.Managed {
+			continue
 		}
+
+		fieldGroup, err := FieldGroupFor(ctx, component.Kind, quay)
+		if err != nil {
+			return nil, err
+		}
+
+		index := fmt.Sprintf("%s.config.yaml", component.Kind)
+		componentConfigFiles[index] = encode(fieldGroup)
 	}
 
 	log.Info("Ensuring TLS cert/key pair for Quay app")
@@ -488,7 +561,6 @@ func Inflate(
 	if err != nil {
 		return nil, err
 	}
-
 	ctx.TLSCert = tlsCert
 	ctx.TLSKey = tlsKey
 
@@ -523,12 +595,7 @@ func Inflate(
 	}
 
 	for index, resource := range resources {
-		resource, err = v1.EnsureOwnerReference(quay, resource)
-		if err != nil {
-			return nil, err
-		}
-
-		resources[index] = resource
+		resources[index] = v1.EnsureOwnerReference(quay, resource)
 	}
 
 	return resources, err

@@ -1,4 +1,5 @@
-# Base assumes all other services (including database) are externally managed and only includes the Quay app itself.
+# Base assumes all other services (including database) are externally managed and only includes
+# the Quay app itself.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 commonLabels:

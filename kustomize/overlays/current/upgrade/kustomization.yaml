@@ -4,5 +4,6 @@ kind: Kustomization
 bases:
   - ../../../tmp
 patchesStrategicMerge:
-  # Scale the app deployment to 0 pods in order to run all migrations present in the new container image using the "upgrade" `Job`.
   - ./quay.deployment.patch.yaml
+  - ./postgres.init.job.yaml
+  - ./quay.upgrade.job.yaml
