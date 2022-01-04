@@ -161,12 +161,12 @@ jobs:
               del(.spec.replaces) |
               .spec.install.spec.deployments[0].name = strenv(OPERATOR_NAME) |
               .spec.install.spec.deployments[0].spec.template.spec.containers[0].image = "${{needs.operator-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[4].value = "${{needs.quay-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[5].value = "${{needs.clair-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[6].value = "${{needs.builder-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[7].value = "${{needs.qemu-builder-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[8].value = "centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[9].value = "centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542"
+              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_QUAY") .value = "${{needs.quay-image.outputs.digest}}" |
+              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_CLAIR") .value = "${{needs.clair-image.outputs.digest}}" |
+              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") .value = "${{needs.builder-image.outputs.digest}}" |
+              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_BUILDER_QEMU") .value = "${{needs.qemu-builder-image.outputs.digest}}" |
+              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES") .value = "centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33" |
+              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_REDIS") .value = "centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542"
               ' bundle/manifests/quay-operator.clusterserviceversion.yaml
 
       - name: Update Bundle Annotations
