@@ -202,3 +202,17 @@ jobs:
           tar xvf "${OPM_TAR}"
           ./opm index add --build-tool docker --bundles "${{steps.bundle-image.outputs.digest}}" --tag "${INDEX}:${TAG}"
           docker push "${INDEX}:${TAG}"
+
+      - name: Notify slack
+        if: ${{ always() }}
+        runs-on: ubuntu-latest
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: team-quay-bots
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "${{ github.workflow }}: ${{ job.status }}"
+          SLACK_MESSAGE: |
+            * **Repo**:     ${{ github.repository }}
+            * **Workflow**: ${{ github.workflow }}
+            * **Result**:   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
