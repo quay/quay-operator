@@ -478,7 +478,7 @@ var inflateTests = []struct {
 func TestInflate(t *testing.T) {
 	assert := assert.New(t)
 
-	log := testlogr.TestLogger{}
+	log := testlogr.NewTestLogger(t)
 
 	for _, test := range inflateTests {
 		t.Run(test.name, func(t *testing.T) {

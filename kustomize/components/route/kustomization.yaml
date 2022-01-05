@@ -17,11 +17,11 @@ vars:
       apiVersion: v1
       name: quay-app
     fieldref:
-      fieldpath: metadata.annotations["quay-registry-hostname"]
+      fieldpath: metadata.annotations.quay-registry-hostname
   - name: BUILDMAN_HOSTNAME
     objref:
       kind: Service
       apiVersion: v1
       name: quay-app
     fieldref:
-      fieldpath: metadata.annotations["quay-buildmanager-hostname"]
+      fieldpath: metadata.annotations.quay-buildmanager-hostname

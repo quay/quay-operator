@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	monv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
+	monv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
