@@ -59,3 +59,17 @@ jobs:
       - name: teardown deployment
         if: always()
         run: ./hack/teardown.sh
+
+      - name: Notify slack
+        if: ${{ always() }}
+        runs-on: ubuntu-latest
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: team-quay-bots
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "${{ github.workflow }}: ${{ job.status }}"
+          SLACK_MESSAGE: |
+            * **Repo**:     ${{ github.repository }}
+            * **Workflow**: ${{ github.workflow }}
+            * **Result**:   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
