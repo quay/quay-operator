@@ -23,8 +23,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/quay/config-tool/pkg/lib/fieldgroups/signingengine"
-
 	"github.com/go-logr/logr"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
@@ -330,7 +328,7 @@ func (r *QuayEcosystemReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 									},
 								},
 								ReadinessProbe: &corev1.Probe{
-									Handler: corev1.Handler{
+									ProbeHandler: corev1.ProbeHandler{
 										Exec: &corev1.ExecAction{
 											Command: []string{"/usr/libexec/check-container"},
 										},
@@ -348,7 +346,7 @@ func (r *QuayEcosystemReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 								Image:   pgImage,
 								Command: []string{"/bin/bash", "-c", cleanupCommand},
 								ReadinessProbe: &corev1.Probe{
-									Handler: corev1.Handler{
+									ProbeHandler: corev1.ProbeHandler{
 										Exec: &corev1.ExecAction{
 											Command: []string{"/bin/bash", "-c", "psql -h localhost -f /tmp/check-user.sql | grep -q 1"},
 										},
@@ -766,12 +764,19 @@ func canHandleClair(q redhatcop.QuayEcosystem) bool {
 	return q.Spec.Clair != nil && q.Spec.Clair.Enabled
 }
 
+// clean removes deprecated fields from provided config.
 func clean(config map[string]interface{}) map[string]interface{} {
-	// NOTE: Signing engine code has been removed from Quay.
-	for _, field := range (&signingengine.SigningEngineFieldGroup{}).Fields() {
+	// NOTE: signing engine code has been removed from Quay. here we remove the fields
+	// related to it as they are not useful anymore.
+	for _, field := range []string{
+		"GPG2_PRIVATE_KEY_FILENAME",
+		"GPG2_PRIVATE_KEY_NAME",
+		"GPG2_PUBLIC_KEY_FILENAME",
+		"SIGNING_ENGINE",
+		"FEATURE_SIGNING",
+	} {
 		delete(config, field)
 	}
-
 	return config
 }
 

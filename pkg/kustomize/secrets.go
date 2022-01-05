@@ -81,6 +81,14 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 
 		fieldGroup.DbUri = ctx.DbUri
 
+		// XXX after bumping database package (dependency) these fields stopped being
+		// set to true by default. These lines restores the old behavior so we don't
+		// expect to have unexpected side effects.
+		if fieldGroup.DbConnectionArgs != nil {
+			fieldGroup.DbConnectionArgs.Autorollback = true
+			fieldGroup.DbConnectionArgs.Threadlocals = true
+		}
+
 		return fieldGroup, nil
 	case v1.ComponentObjectStorage:
 		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{

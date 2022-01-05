@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	prometheusv1 "github.com/coreos/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/go-logr/logr"
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	route "github.com/openshift/api/route/v1"
+	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	apps "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -25,8 +25,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/krusty"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -222,9 +222,11 @@ func generate(kustomization *types.Kustomization, overlay string, quayConfigFile
 		check(err)
 	}
 
-	opts := &krusty.Options{}
-	k := krusty.MakeKustomizer(fSys, opts)
-	resMap, err := k.Run(overlay)
+	opts := &krusty.Options{
+		PluginConfig: &types.PluginConfig{},
+	}
+	k := krusty.MakeKustomizer(opts)
+	resMap, err := k.Run(fSys, overlay)
 	check(err)
 
 	output := []client.Object{}
