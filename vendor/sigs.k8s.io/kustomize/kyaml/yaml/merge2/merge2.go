@@ -12,12 +12,16 @@ import (
 )
 
 // Merge merges fields from src into dest.
-func Merge(src, dest *yaml.RNode) (*yaml.RNode, error) {
-	return walk.Walker{Sources: []*yaml.RNode{dest, src}, Visitor: Merger{}}.Walk()
+func Merge(src, dest *yaml.RNode, mergeOptions yaml.MergeOptions) (*yaml.RNode, error) {
+	return walk.Walker{
+		Sources:      []*yaml.RNode{dest, src},
+		Visitor:      Merger{},
+		MergeOptions: mergeOptions,
+	}.Walk()
 }
 
 // Merge parses the arguments, and merges fields from srcStr into destStr.
-func MergeStrings(srcStr, destStr string, infer bool) (string, error) {
+func MergeStrings(srcStr, destStr string, infer bool, mergeOptions yaml.MergeOptions) (string, error) {
 	src, err := yaml.Parse(srcStr)
 	if err != nil {
 		return "", err
@@ -31,6 +35,7 @@ func MergeStrings(srcStr, destStr string, infer bool) (string, error) {
 		Sources:               []*yaml.RNode{dest, src},
 		Visitor:               Merger{},
 		InferAssociativeLists: infer,
+		MergeOptions:          mergeOptions,
 	}.Walk()
 	if err != nil {
 		return "", err
@@ -52,16 +57,21 @@ func (m Merger) VisitMap(nodes walk.Sources, s *openapi.ResourceSchema) (*yaml.R
 	if err := m.SetStyle(nodes); err != nil {
 		return nil, err
 	}
-	if yaml.IsEmpty(nodes.Dest()) {
+	if yaml.IsMissingOrNull(nodes.Dest()) {
 		// Add
+		ps, _ := determineSmpDirective(nodes.Origin())
+		if ps == smpDelete {
+			return walk.ClearNode, nil
+		}
+
 		return nodes.Origin(), nil
 	}
-	if yaml.IsNull(nodes.Origin()) {
+	if nodes.Origin().IsTaggedNull() {
 		// clear the value
 		return walk.ClearNode, nil
 	}
 
-	ps, err := determineMappingNodePatchStrategy(nodes.Origin())
+	ps, err := determineSmpDirective(nodes.Origin())
 	if err != nil {
 		return nil, err
 	}
@@ -108,15 +118,27 @@ func (m Merger) VisitList(nodes walk.Sources, s *openapi.ResourceSchema, kind wa
 	}
 
 	// Add
-	if yaml.IsEmpty(nodes.Dest()) {
+	if yaml.IsMissingOrNull(nodes.Dest()) {
 		return nodes.Origin(), nil
 	}
 	// Clear
-	if yaml.IsNull(nodes.Origin()) {
+	if nodes.Origin().IsTaggedNull() {
 		return walk.ClearNode, nil
 	}
-	// Recursively Merge dest
-	return nodes.Dest(), nil
+
+	ps, err := determineSmpDirective(nodes.Origin())
+	if err != nil {
+		return nil, err
+	}
+
+	switch ps {
+	case smpDelete:
+		return walk.ClearNode, nil
+	case smpReplace:
+		return nodes.Origin(), nil
+	default:
+		return nodes.Dest(), nil
+	}
 }
 
 func (m Merger) SetStyle(sources walk.Sources) error {
@@ -147,13 +169,13 @@ func (m Merger) SetComments(sources walk.Sources) error {
 		// avoid panic
 		return nil
 	}
-	if source != nil && source.YNode().FootComment != "" {
+	if source.YNode().FootComment != "" {
 		dest.YNode().FootComment = source.YNode().FootComment
 	}
-	if source != nil && source.YNode().HeadComment != "" {
+	if source.YNode().HeadComment != "" {
 		dest.YNode().HeadComment = source.YNode().HeadComment
 	}
-	if source != nil && source.YNode().LineComment != "" {
+	if source.YNode().LineComment != "" {
 		dest.YNode().LineComment = source.YNode().LineComment
 	}
 	return nil

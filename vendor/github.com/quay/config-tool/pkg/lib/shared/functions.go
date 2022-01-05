@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +12,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // FixInterface converts a map[interface{}]interface{} into a map[string]interface{}
@@ -170,7 +171,7 @@ func RemoveNullValues(m map[string]interface{}) map[string]interface{} {
 	for k, v := range m {
 		_ = k
 		if v, ok := v.(map[string]interface{}); ok {
-			FixNumbers(v)
+			RemoveNullValues(v)
 		}
 		if v == nil {
 			delete(m, k)
@@ -202,7 +203,7 @@ func GetTlsConfig(opts Options) (*tls.Config, error) {
 	for name, cert := range opts.Certificates {
 		if strings.HasPrefix(name, "extra_ca_certs/") {
 			if ok := rootCAs.AppendCertsFromPEM(cert); !ok {
-				return nil, errors.New("Failed to append custom certificate: " + name)
+				log.Warningf("Could not load extra ca cert file: %s. Skipping.", name)
 			}
 		}
 	}

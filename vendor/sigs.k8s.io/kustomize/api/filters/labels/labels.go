@@ -25,15 +25,16 @@ type Filter struct {
 var _ kio.Filter = Filter{}
 
 func (f Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
-	keys := filtersutil.SortedMapKeys(f.Labels)
+	keys := yaml.SortedMapKeys(f.Labels)
 	_, err := kio.FilterAll(yaml.FilterFunc(
 		func(node *yaml.RNode) (*yaml.RNode, error) {
 			for _, k := range keys {
 				if err := node.PipeE(fsslice.Filter{
-					FsSlice:    f.FsSlice,
-					SetValue:   fsslice.SetEntry(k, f.Labels[k], yaml.StringTag),
+					FsSlice: f.FsSlice,
+					SetValue: filtersutil.SetEntry(
+						k, f.Labels[k], yaml.NodeTagString),
 					CreateKind: yaml.MappingNode, // Labels are MappingNodes.
-					CreateTag:  "!!map",
+					CreateTag:  yaml.NodeTagMap,
 				}); err != nil {
 					return nil, err
 				}

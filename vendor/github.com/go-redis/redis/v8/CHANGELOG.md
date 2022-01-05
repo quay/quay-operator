@@ -1,14 +1,78 @@
-# Changelog
+## [8.11.4](https://github.com/go-redis/redis/compare/v8.11.3...v8.11.4) (2021-10-04)
 
-## v8 (unreleased)
+
+### Features
+
+* add acl auth support for sentinels ([f66582f](https://github.com/go-redis/redis/commit/f66582f44f3dc3a4705a5260f982043fde4aa634))
+* add Cmd.{String,Int,Float,Bool}Slice helpers and an example ([5d3d293](https://github.com/go-redis/redis/commit/5d3d293cc9c60b90871e2420602001463708ce24))
+* add SetVal method for each command ([168981d](https://github.com/go-redis/redis/commit/168981da2d84ee9e07d15d3e74d738c162e264c4))
+
+
+
+## v8.11
+
+- Remove OpenTelemetry metrics.
+- Supports more redis commands and options.
+
+## v8.10
+
+- Removed extra OpenTelemetry spans from go-redis core. Now go-redis instrumentation only adds a
+  single span with a Redis command (instead of 4 spans). There are multiple reasons behind this
+  decision:
+
+  - Traces become smaller and less noisy.
+  - It may be costly to process those 3 extra spans for each query.
+  - go-redis no longer depends on OpenTelemetry.
+
+  Eventually we hope to replace the information that we no longer collect with OpenTelemetry
+  Metrics.
+
+## v8.9
+
+- Changed `PubSub.Channel` to only rely on `Ping` result. You can now use `WithChannelSize`,
+  `WithChannelHealthCheckInterval`, and `WithChannelSendTimeout` to override default settings.
+
+## v8.8
+
+- To make updating easier, extra modules now have the same version as go-redis does. That means that
+  you need to update your imports:
+
+```
+github.com/go-redis/redis/extra/redisotel -> github.com/go-redis/redis/extra/redisotel/v8
+github.com/go-redis/redis/extra/rediscensus -> github.com/go-redis/redis/extra/rediscensus/v8
+```
+
+## v8.5
+
+- [knadh](https://github.com/knadh) contributed long-awaited ability to scan Redis Hash into a
+  struct:
+
+```go
+err := rdb.HGetAll(ctx, "hash").Scan(&data)
+
+err := rdb.MGet(ctx, "key1", "key2").Scan(&data)
+```
+
+- Please check [redismock](https://github.com/go-redis/redismock) by
+  [monkey92t](https://github.com/monkey92t) if you are looking for mocking Redis Client.
+
+## v8
 
 - All commands require `context.Context` as a first argument, e.g. `rdb.Ping(ctx)`. If you are not
-  using `context.Context` yet, the simplest option is to define package variable
-  `var ctx = context.TODO()` and use it when `ctx` is expected.
-- Ring uses Rendezvous Hashing by default which provides better distribution. This means that
-  existing keys must be moved to a new location or key will be inaccessible / lost. To use old
-  hashing scheme:
-- `Cluster.ForEachNode` is renamed to `ForEachShard` for consistency with `Ring`.
+  using `context.Context` yet, the simplest option is to define global package variable
+  `var ctx = context.TODO()` and use it when `ctx` is required.
+
+- Full support for `context.Context` canceling.
+
+- Added `redis.NewFailoverClusterClient` that supports routing read-only commands to a slave node.
+
+- Added `redisext.OpenTemetryHook` that adds
+  [Redis OpenTelemetry instrumentation](https://redis.uptrace.dev/tracing/).
+
+- Redis slow log support.
+
+- Ring uses Rendezvous Hashing by default which provides better distribution. You need to move
+  existing keys to a new location or keys will be inaccessible / lost. To use old hashing scheme:
 
 ```go
 import "github.com/golang/groupcache/consistenthash"
@@ -20,8 +84,10 @@ ring := redis.NewRing(&redis.RingOptions{
 })
 ```
 
-- Added `redisext.OpenTemetryHook` that adds
-  [Redis OpenTelemetry instrumentation](https://redis.uptrace.dev/tracing/).
+- `ClusterOptions.MaxRedirects` default value is changed from 8 to 3.
+- `Options.MaxRetries` default value is changed from 0 to 3.
+
+- `Cluster.ForEachNode` is renamed to `ForEachShard` for consistency with `Ring`.
 
 ## v7.3
 

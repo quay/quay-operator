@@ -9,17 +9,18 @@ import (
 	"sigs.k8s.io/kustomize/api/internal/kusterr"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // Factory makes instances of ResMap.
 type Factory struct {
+	// Makes resources.
 	resF *resource.Factory
-	tf   PatchFactory
 }
 
 // NewFactory returns a new resmap.Factory.
-func NewFactory(rf *resource.Factory, tf PatchFactory) *Factory {
-	return &Factory{resF: rf, tf: tf}
+func NewFactory(rf *resource.Factory) *Factory {
+	return &Factory{resF: rf}
 }
 
 // RF returns a resource.Factory.
@@ -34,6 +35,15 @@ func New() ResMap {
 // FromResource returns a ResMap with one entry.
 func (rmF *Factory) FromResource(res *resource.Resource) ResMap {
 	m, err := newResMapFromResourceSlice([]*resource.Resource{res})
+	if err != nil {
+		panic(err)
+	}
+	return m
+}
+
+// FromResourceSlice returns a ResMap with a slice of resources.
+func (rmF *Factory) FromResourceSlice(ress []*resource.Resource) ResMap {
+	m, err := newResMapFromResourceSlice(ress)
 	if err != nil {
 		panic(err)
 	}
@@ -78,6 +88,7 @@ func (rmF *Factory) NewResMapFromConfigMapArgs(
 	return newResMapFromResourceSlice(resources)
 }
 
+// FromConfigMapArgs creates a new ResMap containing one ConfigMap.
 func (rmF *Factory) FromConfigMapArgs(
 	kvLdr ifc.KvLoader, args types.ConfigMapArgs) (ResMap, error) {
 	res, err := rmF.resF.MakeConfigMap(kvLdr, &args)
@@ -102,6 +113,7 @@ func (rmF *Factory) NewResMapFromSecretArgs(
 	return newResMapFromResourceSlice(resources)
 }
 
+// FromSecretArgs creates a new ResMap containing one secret.
 func (rmF *Factory) FromSecretArgs(
 	kvLdr ifc.KvLoader, args types.SecretArgs) (ResMap, error) {
 	res, err := rmF.resF.MakeSecret(kvLdr, &args)
@@ -111,12 +123,8 @@ func (rmF *Factory) FromSecretArgs(
 	return rmF.FromResource(res), nil
 }
 
-func (rmF *Factory) MergePatches(patches []*resource.Resource) (
-	ResMap, error) {
-	return rmF.tf.MergePatches(patches, rmF.resF)
-}
-
-func newResMapFromResourceSlice(resources []*resource.Resource) (ResMap, error) {
+func newResMapFromResourceSlice(
+	resources []*resource.Resource) (ResMap, error) {
 	result := New()
 	for _, res := range resources {
 		err := result.Append(res)
@@ -125,4 +133,13 @@ func newResMapFromResourceSlice(resources []*resource.Resource) (ResMap, error) 
 		}
 	}
 	return result, nil
+}
+
+// NewResMapFromRNodeSlice returns a ResMap from a slice of RNodes
+func (rmF *Factory) NewResMapFromRNodeSlice(s []*yaml.RNode) (ResMap, error) {
+	rs, err := rmF.resF.ResourcesFromRNodes(s)
+	if err != nil {
+		return nil, err
+	}
+	return newResMapFromResourceSlice(rs)
 }

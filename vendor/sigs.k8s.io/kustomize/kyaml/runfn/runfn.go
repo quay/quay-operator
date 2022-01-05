@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -52,9 +54,6 @@ type RunFns struct {
 	// Network enables network access for functions that declare it
 	Network bool
 
-	// NetworkName is the name of the docker network to use for the container
-	NetworkName string
-
 	// Output can be set to write the result to Output rather than back to the directory
 	Output io.Writer
 
@@ -74,13 +73,37 @@ type RunFns struct {
 	// ResultsDir is where to write each functions results
 	ResultsDir string
 
+	// LogSteps enables logging the function that is running.
+	LogSteps bool
+
+	// LogWriter can be set to write the logs to LogWriter rather than stderr if LogSteps is enabled.
+	LogWriter io.Writer
+
 	// resultsCount is used to generate the results filename for each container
 	resultsCount uint32
 
 	// functionFilterProvider provides a filter to perform the function.
 	// this is a variable so it can be mocked in tests
 	functionFilterProvider func(
-		filter runtimeutil.FunctionSpec, api *yaml.RNode) (kio.Filter, error)
+		filter runtimeutil.FunctionSpec, api *yaml.RNode, currentUser currentUserFunc) (kio.Filter, error)
+
+	// AsCurrentUser is a boolean to indicate whether docker container should use
+	// the uid and gid that run the command
+	AsCurrentUser bool
+
+	// Env contains environment variables that will be exported to container
+	Env []string
+
+	// ContinueOnEmptyResult configures what happens when the underlying pipeline
+	// returns an empty result.
+	// If it is false (default), subsequent functions will be skipped and the
+	// result will be returned immediately.
+	// If it is true, the empty result will be provided as input to the next
+	// function in the list.
+	ContinueOnEmptyResult bool
+
+	// WorkingDir specifies which working directory an exec function should run in.
+	WorkingDir string
 }
 
 // Execute runs the command
@@ -169,8 +192,34 @@ func (r RunFns) runFunctions(
 		// the output is nil (reading from Input)
 		outputs = append(outputs, kio.ByteWriter{Writer: r.Output})
 	}
-	err := kio.Pipeline{
-		Inputs: []kio.Reader{input}, Filters: fltrs, Outputs: outputs}.Execute()
+
+	var err error
+	pipeline := kio.Pipeline{
+		Inputs:                []kio.Reader{input},
+		Filters:               fltrs,
+		Outputs:               outputs,
+		ContinueOnEmptyResult: r.ContinueOnEmptyResult,
+	}
+	if r.LogSteps {
+		err = pipeline.ExecuteWithCallback(func(op kio.Filter) {
+			var identifier string
+
+			switch filter := op.(type) {
+			case *container.Filter:
+				identifier = filter.Image
+			case *exec.Filter:
+				identifier = filter.Path
+			case *starlark.Filter:
+				identifier = filter.String()
+			default:
+				identifier = "unknown-type function"
+			}
+
+			_, _ = fmt.Fprintf(r.LogWriter, "Running %s\n", identifier)
+		})
+	} else {
+		err = pipeline.Execute()
+	}
 	if err != nil {
 		return err
 	}
@@ -207,7 +256,10 @@ func (r RunFns) getFunctionsFromInput(nodes []*yaml.RNode) ([]kio.Filter, error)
 	if err != nil {
 		return nil, err
 	}
-	sortFns(buff)
+	err = sortFns(buff)
+	if err != nil {
+		return nil, err
+	}
 	return r.getFunctionFilters(false, buff.Nodes...)
 }
 
@@ -235,20 +287,40 @@ func (r RunFns) getFunctionsFromFunctions() ([]kio.Filter, error) {
 	return r.getFunctionFilters(true, r.Functions...)
 }
 
+// mergeContainerEnv will merge the envs specified by command line (imperative) and config
+// file (declarative). If they have same key, the imperative value will be respected.
+func (r RunFns) mergeContainerEnv(envs []string) []string {
+	imperative := runtimeutil.NewContainerEnvFromStringSlice(r.Env)
+	declarative := runtimeutil.NewContainerEnvFromStringSlice(envs)
+	for key, value := range imperative.EnvVars {
+		declarative.AddKeyValue(key, value)
+	}
+
+	for _, key := range imperative.VarsToExport {
+		declarative.AddKey(key)
+	}
+
+	return declarative.Raw()
+}
+
 func (r RunFns) getFunctionFilters(global bool, fns ...*yaml.RNode) (
 	[]kio.Filter, error) {
 	var fltrs []kio.Filter
 	for i := range fns {
 		api := fns[i]
 		spec := runtimeutil.GetFunctionSpec(api)
-		if spec.Container.Network.Required {
-			if !r.Network {
-				// TODO(eddiezane): Provide error info about which function needs the network
-				return fltrs, errors.Errorf("network required but not enabled with --network")
-			}
-			spec.Network = r.NetworkName
+		if spec == nil {
+			// resource doesn't have function spec
+			continue
 		}
-		c, err := r.functionFilterProvider(*spec, api)
+		if spec.Container.Network && !r.Network {
+			// TODO(eddiezane): Provide error info about which function needs the network
+			return fltrs, errors.Errorf("network required but not enabled with --network")
+		}
+		// merge envs from imperative and declarative
+		spec.Container.Env = r.mergeContainerEnv(spec.Container.Env)
+
+		c, err := r.functionFilterProvider(*spec, api, user.Current)
 		if err != nil {
 			return nil, err
 		}
@@ -266,12 +338,39 @@ func (r RunFns) getFunctionFilters(global bool, fns ...*yaml.RNode) (
 }
 
 // sortFns sorts functions so that functions with the longest paths come first
-func sortFns(buff *kio.PackageBuffer) {
+func sortFns(buff *kio.PackageBuffer) error {
+	var outerErr error
 	// sort the nodes so that we traverse them depth first
 	// functions deeper in the file system tree should be run first
 	sort.Slice(buff.Nodes, func(i, j int) bool {
+		if err := kioutil.CopyLegacyAnnotations(buff.Nodes[i]); err != nil {
+			return false
+		}
+		if err := kioutil.CopyLegacyAnnotations(buff.Nodes[j]); err != nil {
+			return false
+		}
 		mi, _ := buff.Nodes[i].GetMeta()
 		pi := filepath.ToSlash(mi.Annotations[kioutil.PathAnnotation])
+
+		mj, _ := buff.Nodes[j].GetMeta()
+		pj := filepath.ToSlash(mj.Annotations[kioutil.PathAnnotation])
+
+		// If the path is the same, we decide the ordering based on the
+		// index annotation.
+		if pi == pj {
+			iIndex, err := strconv.Atoi(mi.Annotations[kioutil.IndexAnnotation])
+			if err != nil {
+				outerErr = err
+				return false
+			}
+			jIndex, err := strconv.Atoi(mj.Annotations[kioutil.IndexAnnotation])
+			if err != nil {
+				outerErr = err
+				return false
+			}
+			return iIndex < jIndex
+		}
+
 		if filepath.Base(path.Dir(pi)) == "functions" {
 			// don't count the functions dir, the functions are scoped 1 level above
 			pi = filepath.Dir(path.Dir(pi))
@@ -279,8 +378,6 @@ func sortFns(buff *kio.PackageBuffer) {
 			pi = filepath.Dir(pi)
 		}
 
-		mj, _ := buff.Nodes[j].GetMeta()
-		pj := filepath.ToSlash(mj.Annotations[kioutil.PathAnnotation])
 		if filepath.Base(path.Dir(pj)) == "functions" {
 			// don't count the functions dir, the functions are scoped 1 level above
 			pj = filepath.Dir(path.Dir(pj))
@@ -309,6 +406,7 @@ func sortFns(buff *kio.PackageBuffer) {
 		// sort by path names if depths are equal
 		return pi < pj
 	})
+	return outerErr
 }
 
 // init initializes the RunFns with a containerFilterProvider.
@@ -333,10 +431,31 @@ func (r *RunFns) init() {
 	if r.functionFilterProvider == nil {
 		r.functionFilterProvider = r.ffp
 	}
+
+	// if LogSteps is enabled and LogWriter is not specified, use stderr
+	if r.LogSteps && r.LogWriter == nil {
+		r.LogWriter = os.Stderr
+	}
+}
+
+type currentUserFunc func() (*user.User, error)
+
+// getUIDGID will return "nobody" if asCurrentUser is false. Otherwise
+// return "uid:gid" according to the return from currentUser function.
+func getUIDGID(asCurrentUser bool, currentUser currentUserFunc) (string, error) {
+	if !asCurrentUser {
+		return "nobody", nil
+	}
+
+	u, err := currentUser()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s:%s", u.Uid, u.Gid), nil
 }
 
 // ffp provides function filters
-func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode) (kio.Filter, error) {
+func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode, currentUser currentUserFunc) (kio.Filter, error) {
 	var resultsFile string
 	if r.ResultsDir != "" {
 		resultsFile = filepath.Join(r.ResultsDir, fmt.Sprintf(
@@ -345,11 +464,20 @@ func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode) (kio.Filter
 	}
 	if !r.DisableContainers && spec.Container.Image != "" {
 		// TODO: Add a test for this behavior
-		cf := &container.Filter{
-			Image:         spec.Container.Image,
-			Network:       spec.Network,
-			StorageMounts: r.StorageMounts,
+		uidgid, err := getUIDGID(r.AsCurrentUser, currentUser)
+		if err != nil {
+			return nil, err
 		}
+		c := container.NewContainer(
+			runtimeutil.ContainerSpec{
+				Image:         spec.Container.Image,
+				Network:       spec.Container.Network,
+				StorageMounts: r.StorageMounts,
+				Env:           spec.Container.Env,
+			},
+			uidgid,
+		)
+		cf := &c
 		cf.Exec.FunctionConfig = api
 		cf.Exec.GlobalScope = r.GlobalScope
 		cf.Exec.ResultsFile = resultsFile
@@ -365,7 +493,12 @@ func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode) (kio.Filter
 
 		var p string
 		if spec.Starlark.Path != "" {
-			p = filepath.ToSlash(path.Clean(m.Annotations[kioutil.PathAnnotation]))
+			pathAnno := m.Annotations[kioutil.PathAnnotation]
+			if pathAnno == "" {
+				pathAnno = m.Annotations[kioutil.LegacyPathAnnotation]
+			}
+			p = filepath.ToSlash(path.Clean(pathAnno))
+
 			spec.Starlark.Path = filepath.ToSlash(path.Clean(spec.Starlark.Path))
 			if filepath.IsAbs(spec.Starlark.Path) || path.IsAbs(spec.Starlark.Path) {
 				return nil, errors.Errorf(
@@ -377,7 +510,6 @@ func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode) (kio.Filter
 			}
 			p = filepath.ToSlash(filepath.Join(r.Path, filepath.Dir(p), spec.Starlark.Path))
 		}
-		fmt.Println(p)
 
 		sf := &starlark.Filter{Name: spec.Starlark.Name, Path: p, URL: spec.Starlark.URL}
 
@@ -389,7 +521,10 @@ func (r *RunFns) ffp(spec runtimeutil.FunctionSpec, api *yaml.RNode) (kio.Filter
 	}
 
 	if r.EnableExec && spec.Exec.Path != "" {
-		ef := &exec.Filter{Path: spec.Exec.Path}
+		ef := &exec.Filter{
+			Path:       spec.Exec.Path,
+			WorkingDir: r.WorkingDir,
+		}
 
 		ef.FunctionConfig = api
 		ef.GlobalScope = r.GlobalScope

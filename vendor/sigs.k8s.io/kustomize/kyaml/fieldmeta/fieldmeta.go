@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-openapi/spec"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/openapi"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -21,6 +21,8 @@ type FieldMeta struct {
 	Schema spec.Schema
 
 	Extensions XKustomize
+
+	SettersSchema *spec.Schema
 }
 
 type XKustomize struct {
@@ -108,7 +110,7 @@ func (fm *FieldMeta) processShortHand(comment string) bool {
 		return false
 	}
 
-	if _, err := openapi.Resolve(&setterRef); err == nil {
+	if _, err := openapi.Resolve(&setterRef, fm.SettersSchema); err == nil {
 		setterErr := fm.Schema.UnmarshalJSON(setterRefBytes)
 		return setterErr == nil
 	}
@@ -123,7 +125,7 @@ func (fm *FieldMeta) processShortHand(comment string) bool {
 		return false
 	}
 
-	if _, err := openapi.Resolve(&substRef); err == nil {
+	if _, err := openapi.Resolve(&substRef, fm.SettersSchema); err == nil {
 		substErr := fm.Schema.UnmarshalJSON(substRefBytes)
 		return substErr == nil
 	}
@@ -146,21 +148,41 @@ func isExtensionEmpty(x XKustomize) bool {
 // Write writes the FieldMeta to a node
 func (fm *FieldMeta) Write(n *yaml.RNode) error {
 	if !isExtensionEmpty(fm.Extensions) {
-		fm.Schema.VendorExtensible.AddExtension("x-kustomize", fm.Extensions)
-	} else {
-		delete(fm.Schema.VendorExtensible.Extensions, "x-kustomize")
+		return fm.WriteV1Setters(n)
 	}
 
 	// Ref is removed when a setter is deleted, so the Ref string could be empty.
 	if fm.Schema.Ref.String() != "" {
 		// Ex: {"$ref":"#/definitions/io.k8s.cli.setters.replicas"} should be converted to
-		// {"openAPI":"replicas"} and added to the line comment
-		arr := strings.Split(fm.Schema.Ref.String(), ".")
-		n.YNode().LineComment = fmt.Sprintf(`{"%s":"%s"}`, shortHandRef, arr[len(arr)-1])
+		// {"$openAPI":"replicas"} and added to the line comment
+		ref := fm.Schema.Ref.String()
+		var shortHandRefValue string
+		switch {
+		case strings.HasPrefix(ref, DefinitionsPrefix+SetterDefinitionPrefix):
+			shortHandRefValue = strings.TrimPrefix(ref, DefinitionsPrefix+SetterDefinitionPrefix)
+		case strings.HasPrefix(ref, DefinitionsPrefix+SubstitutionDefinitionPrefix):
+			shortHandRefValue = strings.TrimPrefix(ref, DefinitionsPrefix+SubstitutionDefinitionPrefix)
+		default:
+			return fmt.Errorf("unexpected ref format: %s", ref)
+		}
+		n.YNode().LineComment = fmt.Sprintf(`{"%s":"%s"}`, shortHandRef,
+			shortHandRefValue)
 	} else {
 		n.YNode().LineComment = ""
 	}
 
+	return nil
+}
+
+// WriteV1Setters is the v1 setters way of writing setter definitions
+// TODO: pmarupaka - remove this method after migration
+func (fm *FieldMeta) WriteV1Setters(n *yaml.RNode) error {
+	fm.Schema.VendorExtensible.AddExtension("x-kustomize", fm.Extensions)
+	b, err := json.Marshal(fm.Schema)
+	if err != nil {
+		return errors.Wrap(err)
+	}
+	n.YNode().LineComment = string(b)
 	return nil
 }
 
@@ -200,11 +222,11 @@ func (it FieldValueType) Validate(value string) error {
 func (it FieldValueType) Tag() string {
 	switch it {
 	case String:
-		return yaml.StringTag
+		return yaml.NodeTagString
 	case Bool:
-		return yaml.BoolTag
+		return yaml.NodeTagBool
 	case Int:
-		return yaml.IntTag
+		return yaml.NodeTagInt
 	}
 	return ""
 }
@@ -212,17 +234,17 @@ func (it FieldValueType) Tag() string {
 func (it FieldValueType) TagForValue(value string) string {
 	switch it {
 	case String:
-		return yaml.StringTag
+		return yaml.NodeTagString
 	case Bool:
 		if _, err := strconv.ParseBool(string(it)); err != nil {
 			return ""
 		}
-		return yaml.BoolTag
+		return yaml.NodeTagBool
 	case Int:
 		if _, err := strconv.ParseInt(string(it), 0, 32); err != nil {
 			return ""
 		}
-		return yaml.IntTag
+		return yaml.NodeTagInt
 	}
 	return ""
 }

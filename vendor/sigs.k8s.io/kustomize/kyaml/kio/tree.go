@@ -6,6 +6,7 @@ package kio
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -31,12 +32,13 @@ var GraphStructures = []string{string(TreeStructureGraph), string(TreeStructureP
 
 // TreeWriter prints the package structured as a tree.
 // TODO(pwittrock): test this package better.  it is lower-risk since it is only
-// used for printing rather than updating or editing.
+//   used for printing rather than updating or editing.
 type TreeWriter struct {
-	Writer    io.Writer
-	Root      string
-	Fields    []TreeWriterField
-	Structure TreeStructure
+	Writer          io.Writer
+	Root            string
+	Fields          []TreeWriterField
+	Structure       TreeStructure
+	OpenAPIFileName string
 }
 
 // TreeWriterField configures a Resource field to be included in the tree
@@ -47,6 +49,11 @@ type TreeWriterField struct {
 }
 
 func (p TreeWriter) packageStructure(nodes []*yaml.RNode) error {
+	for i := range nodes {
+		if err := kioutil.CopyLegacyAnnotations(nodes[i]); err != nil {
+			return err
+		}
+	}
 	indexByPackage := p.index(nodes)
 
 	// create the new tree
@@ -72,7 +79,7 @@ func (p TreeWriter) packageStructure(nodes []*yaml.RNode) error {
 		// create a new branch for the package
 		createOk := pkg != "." // special edge case logic for tree on current working dir
 		if createOk {
-			branch = branch.AddBranch(pkg)
+			branch = branch.AddBranch(branchName(p.Root, pkg, p.OpenAPIFileName))
 		}
 
 		// cache the branch for this package
@@ -89,6 +96,19 @@ func (p TreeWriter) packageStructure(nodes []*yaml.RNode) error {
 
 	_, err := io.WriteString(p.Writer, tree.String())
 	return err
+}
+
+// branchName takes the root directory and relative path to the directory
+// and returns the branch name
+func branchName(root, dirRelPath, openAPIFileName string) string {
+	name := filepath.Base(dirRelPath)
+	_, err := os.Stat(filepath.Join(root, dirRelPath, openAPIFileName))
+	if !os.IsNotExist(err) {
+		// add Pkg: prefix indicating that it is a separate package as it has
+		// openAPIFile
+		return fmt.Sprintf("Pkg: %s", name)
+	}
+	return name
 }
 
 // Write writes the ascii tree to p.Writer
@@ -238,10 +258,10 @@ func ownerToString(node *yaml.RNode) (string, error) {
 	owner := elements[0]
 	var kind, name string
 
-	if value := owner.Field("kind"); !yaml.IsFieldEmpty(value) {
+	if value := owner.Field("kind"); !value.IsNilOrEmpty() {
 		kind = value.Value.YNode().Value
 	}
-	if value := owner.Field("name"); !yaml.IsFieldEmpty(value) {
+	if value := owner.Field("name"); !value.IsNilOrEmpty() {
 		name = value.Value.YNode().Value
 	}
 
