@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -10,13 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cespare/xxhash"
-	"github.com/dgryski/go-rendezvous"
-	"golang.org/x/exp/rand"
+	"github.com/cespare/xxhash/v2"
+	rendezvous "github.com/dgryski/go-rendezvous" //nolint
 
 	"github.com/go-redis/redis/v8/internal"
 	"github.com/go-redis/redis/v8/internal/hashtag"
 	"github.com/go-redis/redis/v8/internal/pool"
+	"github.com/go-redis/redis/v8/internal/rand"
 )
 
 var errRingShardsDown = errors.New("redis: all ring shards are down")
@@ -78,12 +79,18 @@ type RingOptions struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 
+	// PoolFIFO uses FIFO mode for each node connection pool GET/PUT (default LIFO).
+	PoolFIFO bool
+
 	PoolSize           int
 	MinIdleConns       int
 	MaxConnAge         time.Duration
 	PoolTimeout        time.Duration
 	IdleTimeout        time.Duration
 	IdleCheckFrequency time.Duration
+
+	TLSConfig *tls.Config
+	Limiter   Limiter
 }
 
 func (opt *RingOptions) init() {
@@ -101,6 +108,11 @@ func (opt *RingOptions) init() {
 		opt.NewConsistentHash = newRendezvous
 	}
 
+	if opt.MaxRetries == -1 {
+		opt.MaxRetries = 0
+	} else if opt.MaxRetries == 0 {
+		opt.MaxRetries = 3
+	}
 	switch opt.MinRetryBackoff {
 	case -1:
 		opt.MinRetryBackoff = 0
@@ -124,16 +136,22 @@ func (opt *RingOptions) clientOptions() *Options {
 		Password: opt.Password,
 		DB:       opt.DB,
 
+		MaxRetries: -1,
+
 		DialTimeout:  opt.DialTimeout,
 		ReadTimeout:  opt.ReadTimeout,
 		WriteTimeout: opt.WriteTimeout,
 
+		PoolFIFO:           opt.PoolFIFO,
 		PoolSize:           opt.PoolSize,
 		MinIdleConns:       opt.MinIdleConns,
 		MaxConnAge:         opt.MaxConnAge,
 		PoolTimeout:        opt.PoolTimeout,
 		IdleTimeout:        opt.IdleTimeout,
 		IdleCheckFrequency: opt.IdleCheckFrequency,
+
+		TLSConfig: opt.TLSConfig,
+		Limiter:   opt.Limiter,
 	}
 }
 
@@ -304,7 +322,7 @@ func (c *ringShards) Heartbeat(frequency time.Duration) {
 			err := shard.Client.Ping(ctx).Err()
 			isUp := err == nil || err == pool.ErrPoolTimeout
 			if shard.Vote(isUp) {
-				internal.Logger.Printf("ring shard state changed: %s", shard)
+				internal.Logger.Printf(context.Background(), "ring shard state changed: %s", shard)
 				rebalance = true
 			}
 		}
@@ -477,7 +495,7 @@ func (c *Ring) Subscribe(ctx context.Context, channels ...string) *PubSub {
 
 	shard, err := c.shards.GetByKey(channels[0])
 	if err != nil {
-		//TODO: return PubSub with sticky error
+		// TODO: return PubSub with sticky error
 		panic(err)
 	}
 	return shard.Client.Subscribe(ctx, channels...)
@@ -491,7 +509,7 @@ func (c *Ring) PSubscribe(ctx context.Context, channels ...string) *PubSub {
 
 	shard, err := c.shards.GetByKey(channels[0])
 	if err != nil {
-		//TODO: return PubSub with sticky error
+		// TODO: return PubSub with sticky error
 		panic(err)
 	}
 	return shard.Client.PSubscribe(ctx, channels...)
@@ -533,11 +551,11 @@ func (c *Ring) ForEachShard(
 	}
 }
 
-func (c *Ring) cmdsInfo() (map[string]*CommandInfo, error) {
+func (c *Ring) cmdsInfo(ctx context.Context) (map[string]*CommandInfo, error) {
 	shards := c.shards.List()
 	var firstErr error
 	for _, shard := range shards {
-		cmdsInfo, err := shard.Client.Command(context.TODO()).Result()
+		cmdsInfo, err := shard.Client.Command(ctx).Result()
 		if err == nil {
 			return cmdsInfo, nil
 		}
@@ -551,20 +569,20 @@ func (c *Ring) cmdsInfo() (map[string]*CommandInfo, error) {
 	return nil, firstErr
 }
 
-func (c *Ring) cmdInfo(name string) *CommandInfo {
-	cmdsInfo, err := c.cmdsInfoCache.Get()
+func (c *Ring) cmdInfo(ctx context.Context, name string) *CommandInfo {
+	cmdsInfo, err := c.cmdsInfoCache.Get(ctx)
 	if err != nil {
 		return nil
 	}
 	info := cmdsInfo[name]
 	if info == nil {
-		internal.Logger.Printf("info for cmd=%s not found", name)
+		internal.Logger.Printf(c.Context(), "info for cmd=%s not found", name)
 	}
 	return info
 }
 
-func (c *Ring) cmdShard(cmd Cmder) (*ringShard, error) {
-	cmdInfo := c.cmdInfo(cmd.Name())
+func (c *Ring) cmdShard(ctx context.Context, cmd Cmder) (*ringShard, error) {
+	cmdInfo := c.cmdInfo(ctx, cmd.Name())
 	pos := cmdFirstKeyPos(cmd, cmdInfo)
 	if pos == 0 {
 		return c.shards.Random()
@@ -574,15 +592,6 @@ func (c *Ring) cmdShard(cmd Cmder) (*ringShard, error) {
 }
 
 func (c *Ring) process(ctx context.Context, cmd Cmder) error {
-	err := c._process(ctx, cmd)
-	if err != nil {
-		cmd.SetErr(err)
-		return err
-	}
-	return nil
-}
-
-func (c *Ring) _process(ctx context.Context, cmd Cmder) error {
 	var lastErr error
 	for attempt := 0; attempt <= c.opt.MaxRetries; attempt++ {
 		if attempt > 0 {
@@ -591,13 +600,13 @@ func (c *Ring) _process(ctx context.Context, cmd Cmder) error {
 			}
 		}
 
-		shard, err := c.cmdShard(cmd)
+		shard, err := c.cmdShard(ctx, cmd)
 		if err != nil {
 			return err
 		}
 
 		lastErr = shard.Client.Process(ctx, cmd)
-		if lastErr == nil || !isRetryableError(lastErr, cmd.readTimeout() == nil) {
+		if lastErr == nil || !shouldRetry(lastErr, cmd.readTimeout() == nil) {
 			return lastErr
 		}
 	}
@@ -647,7 +656,7 @@ func (c *Ring) generalProcessPipeline(
 ) error {
 	cmdsMap := make(map[string][]Cmder)
 	for _, cmd := range cmds {
-		cmdInfo := c.cmdInfo(cmd.Name())
+		cmdInfo := c.cmdInfo(ctx, cmd.Name())
 		hash := cmd.stringArg(cmdFirstKeyPos(cmd, cmdInfo))
 		if hash != "" {
 			hash = c.shards.Hash(hash)
@@ -672,7 +681,7 @@ func (c *Ring) generalProcessPipeline(
 func (c *Ring) processShardPipeline(
 	ctx context.Context, hash string, cmds []Cmder, tx bool,
 ) error {
-	//TODO: retry?
+	// TODO: retry?
 	shard, err := c.shards.GetByName(hash)
 	if err != nil {
 		setCmdsErr(cmds, err)
@@ -680,11 +689,9 @@ func (c *Ring) processShardPipeline(
 	}
 
 	if tx {
-		err = shard.Client.processTxPipeline(ctx, cmds)
-	} else {
-		err = shard.Client.processPipeline(ctx, cmds)
+		return shard.Client.processTxPipeline(ctx, cmds)
 	}
-	return err
+	return shard.Client.processPipeline(ctx, cmds)
 }
 
 func (c *Ring) Watch(ctx context.Context, fn func(*Tx) error, keys ...string) error {

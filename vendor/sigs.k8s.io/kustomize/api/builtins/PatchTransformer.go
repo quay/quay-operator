@@ -8,13 +8,11 @@ import (
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/filters/patchjson6902"
-	"sigs.k8s.io/kustomize/api/filters/patchstrategicmerge"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/kustomize/kyaml/filtersutil"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/yaml"
 )
 
@@ -24,8 +22,7 @@ type PatchTransformerPlugin struct {
 	Path         string          `json:"path,omitempty" yaml:"path,omitempty"`
 	Patch        string          `json:"patch,omitempty" yaml:"patch,omitempty"`
 	Target       *types.Selector `json:"target,omitempty" yaml:"target,omitempty"`
-
-	YAMLSupport bool `json:"yamlSupport,omitempty" yaml:"yamlSupport,omitempty"`
+	Options      map[string]bool `json:"options,omitempty" yaml:"options,omitempty"`
 }
 
 func (p *PatchTransformerPlugin) Config(
@@ -33,11 +30,6 @@ func (p *PatchTransformerPlugin) Config(
 	err := yaml.Unmarshal(c, p)
 	if err != nil {
 		return err
-	}
-	if !strings.Contains(string(c), "yamlSupport") {
-		// If not explicitly denied,
-		// activate kyaml-based transformation.
-		p.YAMLSupport = true
 	}
 	p.Patch = strings.TrimSpace(p.Patch)
 	if p.Patch == "" && p.Path == "" {
@@ -48,7 +40,6 @@ func (p *PatchTransformerPlugin) Config(
 		return fmt.Errorf(
 			"patch and path can't be set at the same time\n%s", string(c))
 	}
-
 	if p.Path != "" {
 		loaded, loadErr := h.Loader().Load(p.Path)
 		if loadErr != nil {
@@ -71,6 +62,12 @@ func (p *PatchTransformerPlugin) Config(
 	}
 	if errSM == nil {
 		p.loadedPatch = patchSM
+		if p.Options["allowNameChange"] {
+			p.loadedPatch.AllowNameChange()
+		}
+		if p.Options["allowKindChange"] {
+			p.loadedPatch.AllowKindChange()
+		}
 	} else {
 		p.decodedPatch = patchJson
 	}
@@ -78,12 +75,11 @@ func (p *PatchTransformerPlugin) Config(
 }
 
 func (p *PatchTransformerPlugin) Transform(m resmap.ResMap) error {
-	if p.loadedPatch != nil {
-		// The patch was a strategic merge patch
-		return p.transformStrategicMerge(m, p.loadedPatch)
-	} else {
+	if p.loadedPatch == nil {
 		return p.transformJson6902(m, p.decodedPatch)
 	}
+	// The patch was a strategic merge patch
+	return p.transformStrategicMerge(m, p.loadedPatch)
 }
 
 // transformStrategicMerge applies the provided strategic merge patch
@@ -95,41 +91,13 @@ func (p *PatchTransformerPlugin) transformStrategicMerge(m resmap.ResMap, patch 
 		if err != nil {
 			return err
 		}
-		return p.applySMPatch(target, patch)
+		return target.ApplySmPatch(patch)
 	}
-
-	resources, err := m.Select(*p.Target)
+	selected, err := m.Select(*p.Target)
 	if err != nil {
 		return err
 	}
-	for _, res := range resources {
-		patchCopy := patch.DeepCopy()
-		patchCopy.SetName(res.GetName())
-		patchCopy.SetNamespace(res.GetNamespace())
-		patchCopy.SetGvk(res.GetGvk())
-		err := p.applySMPatch(res, patchCopy)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// applySMPatch applies the provided strategic merge patch to the
-// given resource. Depending on the value of YAMLSupport, it will either
-// use the legacy implementation or the kyaml-based solution.
-func (p *PatchTransformerPlugin) applySMPatch(resource, patch *resource.Resource) error {
-	if !p.YAMLSupport {
-		return resource.Patch(patch.Copy())
-	} else {
-		node, err := filtersutil.GetRNode(patch)
-		if err != nil {
-			return err
-		}
-		return filtersutil.ApplyToJSON(patchstrategicmerge.Filter{
-			Patch: node,
-		}, resource)
-	}
+	return m.ApplySmPatch(resource.MakeIdSet(selected), patch)
 }
 
 // transformJson6902 applies the provided json6902 patch
@@ -138,40 +106,27 @@ func (p *PatchTransformerPlugin) transformJson6902(m resmap.ResMap, patch jsonpa
 	if p.Target == nil {
 		return fmt.Errorf("must specify a target for patch %s", p.Patch)
 	}
-
 	resources, err := m.Select(*p.Target)
 	if err != nil {
 		return err
 	}
 	for _, res := range resources {
-		err = p.applyJson6902Patch(res, patch)
+		res.StorePreviousId()
+		internalAnnotations := kioutil.GetInternalAnnotations(&res.RNode)
+		err = res.ApplyFilter(patchjson6902.Filter{
+			Patch: p.Patch,
+		})
 		if err != nil {
 			return err
 		}
+
+		annotations := res.GetAnnotations()
+		for key, value := range internalAnnotations {
+			annotations[key] = value
+		}
+		err = res.SetAnnotations(annotations)
 	}
 	return nil
-}
-
-// applyJson6902Patch applies the provided patch to the given resource.
-// Depending on the value of YAMLSupport, it will either
-// use the legacy implementation or the kyaml-based solution.
-func (p *PatchTransformerPlugin) applyJson6902Patch(resource *resource.Resource, patch jsonpatch.Patch) error {
-	if !p.YAMLSupport {
-		rawObj, err := resource.MarshalJSON()
-		if err != nil {
-			return err
-		}
-		modifiedObj, err := patch.Apply(rawObj)
-		if err != nil {
-			return errors.Wrapf(
-				err, "failed to apply json patch '%s'", p.Patch)
-		}
-		return resource.UnmarshalJSON(modifiedObj)
-	} else {
-		return filtersutil.ApplyToJSON(patchjson6902.Filter{
-			Patch: p.Patch,
-		}, resource)
-	}
 }
 
 // jsonPatchFromBytes loads a Json 6902 patch from

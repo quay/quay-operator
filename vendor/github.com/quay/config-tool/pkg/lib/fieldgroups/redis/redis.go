@@ -17,6 +17,7 @@ type UserEventsRedisStruct struct {
 	Password string `default:"" validate:"" json:"password,omitempty" yaml:"password,omitempty"`
 	Port     int    `default:"" validate:"" json:"port,omitempty" yaml:"port,omitempty"`
 	Host     string `default:"" validate:"" json:"host,omitempty" yaml:"host,omitempty"`
+	Ssl      bool   `default:"false" validate:"" json:"ssl,omitempty" yaml:"ssl,omitempty"`
 }
 
 // BuildlogsRedisStruct represents the BuildlogsRedisStruct config fields
@@ -24,6 +25,7 @@ type BuildlogsRedisStruct struct {
 	Password string `default:"" validate:"" json:"password,omitempty" yaml:"password,omitempty"`
 	Port     int    `default:"" validate:"" json:"port,omitempty" yaml:"port,omitempty"`
 	Host     string `default:"" validate:"" json:"host,omitempty" yaml:"host,omitempty"`
+	Ssl      bool   `default:"false" validate:"" json:"ssl,omitempty" yaml:"ssl,omitempty"`
 }
 
 // NewRedisFieldGroup creates a new RedisFieldGroup
@@ -75,6 +77,13 @@ func NewUserEventsRedisStruct(fullConfig map[string]interface{}) (*UserEventsRed
 		}
 	}
 
+	if value, ok := fullConfig["ssl"]; ok {
+		newUserEventsRedisStruct.Ssl, ok = value.(bool)
+		if !ok {
+			return newUserEventsRedisStruct, errors.New("ssl must be of type bool")
+		}
+	}
+
 	return newUserEventsRedisStruct, nil
 }
 
@@ -99,6 +108,13 @@ func NewBuildlogsRedisStruct(fullConfig map[string]interface{}) (*BuildlogsRedis
 		newBuildlogsRedisStruct.Host, ok = value.(string)
 		if !ok {
 			return newBuildlogsRedisStruct, errors.New("host must be of type string")
+		}
+	}
+
+	if value, ok := fullConfig["ssl"]; ok {
+		newBuildlogsRedisStruct.Ssl, ok = value.(bool)
+		if !ok {
+			return newBuildlogsRedisStruct, errors.New("ssl must be of type bool")
 		}
 	}
 

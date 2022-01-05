@@ -4,7 +4,7 @@
 package krusty
 
 import (
-	"sigs.k8s.io/kustomize/api/konfig"
+	"sigs.k8s.io/kustomize/api/internal/plugins/builtinhelpers"
 	"sigs.k8s.io/kustomize/api/types"
 )
 
@@ -37,9 +37,22 @@ type Options struct {
 // MakeDefaultOptions returns a default instance of Options.
 func MakeDefaultOptions() *Options {
 	return &Options{
-		DoLegacyResourceSort: true,
+		DoLegacyResourceSort: false,
+		AddManagedbyLabel:    false,
 		LoadRestrictions:     types.LoadRestrictionsRootOnly,
 		DoPrune:              false,
-		PluginConfig:         konfig.DisabledPluginConfig(),
+		PluginConfig:         types.DisabledPluginConfig(),
 	}
+}
+
+// GetBuiltinPluginNames returns a list of builtin plugin names
+func GetBuiltinPluginNames() []string {
+	var ret []string
+	for k := range builtinhelpers.GeneratorFactories {
+		ret = append(ret, k.String())
+	}
+	for k := range builtinhelpers.TransformerFactories {
+		ret = append(ret, k.String())
+	}
+	return ret
 }

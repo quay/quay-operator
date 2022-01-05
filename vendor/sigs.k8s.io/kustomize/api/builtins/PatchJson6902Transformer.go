@@ -5,27 +5,23 @@ package builtins
 
 import (
 	"fmt"
-	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/filters/patchjson6902"
 	"sigs.k8s.io/kustomize/api/ifc"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/kustomize/kyaml/filtersutil"
+	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/yaml"
 )
 
 type PatchJson6902TransformerPlugin struct {
 	ldr          ifc.Loader
 	decodedPatch jsonpatch.Patch
-	Target       types.PatchTarget `json:"target,omitempty" yaml:"target,omitempty"`
-	Path         string            `json:"path,omitempty" yaml:"path,omitempty"`
-	JsonOp       string            `json:"jsonOp,omitempty" yaml:"jsonOp,omitempty"`
-
-	YAMLSupport bool `json:"yamlSupport,omitempty" yaml:"yamlSupport,omitempty"`
+	Target       *types.Selector `json:"target,omitempty" yaml:"target,omitempty"`
+	Path         string          `json:"path,omitempty" yaml:"path,omitempty"`
+	JsonOp       string          `json:"jsonOp,omitempty" yaml:"jsonOp,omitempty"`
 }
 
 func (p *PatchJson6902TransformerPlugin) Config(
@@ -34,11 +30,6 @@ func (p *PatchJson6902TransformerPlugin) Config(
 	err = yaml.Unmarshal(c, p)
 	if err != nil {
 		return err
-	}
-	if !strings.Contains(string(c), "yamlSupport") {
-		// If not explicitly denied,
-		// activate kyaml-based transformation.
-		p.YAMLSupport = true
 	}
 	if p.Target.Name == "" {
 		return fmt.Errorf("must specify the target name")
@@ -80,35 +71,33 @@ func (p *PatchJson6902TransformerPlugin) Config(
 }
 
 func (p *PatchJson6902TransformerPlugin) Transform(m resmap.ResMap) error {
-	id := resid.NewResIdWithNamespace(
-		resid.Gvk{
-			Group:   p.Target.Group,
-			Version: p.Target.Version,
-			Kind:    p.Target.Kind,
-		},
-		p.Target.Name,
-		p.Target.Namespace,
-	)
-	obj, err := m.GetById(id)
+	if p.Target == nil {
+		return fmt.Errorf("must specify a target for patch %s", p.JsonOp)
+	}
+	resources, err := m.Select(*p.Target)
 	if err != nil {
 		return err
 	}
-	if !p.YAMLSupport {
-		rawObj, err := obj.MarshalJSON()
+	for _, res := range resources {
+		internalAnnotations := kioutil.GetInternalAnnotations(&res.RNode)
+
+		err = res.ApplyFilter(patchjson6902.Filter{
+			Patch: p.JsonOp,
+		})
 		if err != nil {
 			return err
 		}
-		modifiedObj, err := p.decodedPatch.Apply(rawObj)
-		if err != nil {
-			return errors.Wrapf(
-				err, "failed to apply json patch '%s'", p.JsonOp)
+
+		annotations := res.GetAnnotations()
+		for key, value := range internalAnnotations {
+			annotations[key] = value
 		}
-		return obj.UnmarshalJSON(modifiedObj)
-	} else {
-		return filtersutil.ApplyToJSON(patchjson6902.Filter{
-			Patch: p.JsonOp,
-		}, obj)
+		err = res.SetAnnotations(annotations)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func NewPatchJson6902TransformerPlugin() resmap.TransformerPlugin {

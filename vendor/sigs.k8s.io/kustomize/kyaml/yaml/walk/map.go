@@ -27,11 +27,12 @@ func (l Walker) walkMap() (*yaml.RNode, error) {
 
 	// recursively set the field values on the map
 	for _, key := range l.fieldNames() {
+		var res *yaml.RNode
+		var keys []*yaml.RNode
 		if l.VisitKeysAsScalars {
 			// visit the map keys as if they were scalars,
 			// this is necessary if doing things such as copying
 			// comments
-			var keys []*yaml.RNode
 			for i := range l.Sources {
 				// construct the sources from the keys
 				if l.Sources[i] == nil {
@@ -39,7 +40,7 @@ func (l Walker) walkMap() (*yaml.RNode, error) {
 					continue
 				}
 				field := l.Sources[i].Field(key)
-				if field == nil || yaml.IsEmpty(field.Key) {
+				if field == nil || yaml.IsMissingOrNull(field.Key) {
 					keys = append(keys, nil)
 					continue
 				}
@@ -47,7 +48,7 @@ func (l Walker) walkMap() (*yaml.RNode, error) {
 			}
 			// visit the sources as a scalar
 			// keys don't have any schema --pass in nil
-			_, err := l.Visitor.VisitScalar(keys, nil)
+			res, err = l.Visitor.VisitScalar(keys, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -67,13 +68,29 @@ func (l Walker) walkMap() (*yaml.RNode, error) {
 			Visitor:               l,
 			Schema:                s,
 			Sources:               fv,
+			MergeOptions:          l.MergeOptions,
 			Path:                  append(l.Path, key)}.Walk()
 		if err != nil {
 			return nil, err
 		}
 
+		// transfer the comments of res to dest node
+		var comments yaml.Comments
+		if !yaml.IsMissingOrNull(res) {
+			comments = yaml.Comments{
+				LineComment: res.YNode().LineComment,
+				HeadComment: res.YNode().HeadComment,
+				FootComment: res.YNode().FootComment,
+			}
+			if len(keys) > 0 && !yaml.IsMissingOrNull(keys[DestIndex]) {
+				keys[DestIndex].YNode().HeadComment = res.YNode().HeadComment
+				keys[DestIndex].YNode().LineComment = res.YNode().LineComment
+				keys[DestIndex].YNode().FootComment = res.YNode().FootComment
+			}
+		}
+
 		// this handles empty and non-empty values
-		_, err = dest.Pipe(yaml.FieldSetter{Name: key, Value: val})
+		_, err = dest.Pipe(yaml.FieldSetter{Name: key, Comments: comments, Value: val})
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +113,7 @@ func (l Walker) valueIfPresent(node *yaml.MapNode) (*yaml.RNode, *openapi.Resour
 	if err = fm.Read(node.Value); err == nil {
 		s = &openapi.ResourceSchema{Schema: &fm.Schema}
 		if fm.Schema.Ref.String() != "" {
-			r, err := openapi.Resolve(&fm.Schema.Ref)
+			r, err := openapi.Resolve(&fm.Schema.Ref, openapi.Schema())
 			if err == nil && r != nil {
 				s.Schema = r
 			}
@@ -110,7 +127,7 @@ func (l Walker) valueIfPresent(node *yaml.MapNode) (*yaml.RNode, *openapi.Resour
 			s = &openapi.ResourceSchema{Schema: &fm.Schema}
 		}
 		if fm.Schema.Ref.String() != "" {
-			r, err := openapi.Resolve(&fm.Schema.Ref)
+			r, err := openapi.Resolve(&fm.Schema.Ref, openapi.Schema())
 			if err == nil && r != nil {
 				s.Schema = r
 			}
@@ -148,7 +165,7 @@ func (l Walker) fieldValue(fieldName string) ([]*yaml.RNode, *openapi.ResourceSc
 		field := l.Sources[i].Field(fieldName)
 		f, s := l.valueIfPresent(field)
 		fields = append(fields, f)
-		if sch == nil && !s.IsEmpty() {
+		if sch == nil && !s.IsMissingOrNull() {
 			sch = s
 		}
 	}

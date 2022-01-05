@@ -3,7 +3,6 @@ package shared
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -12,11 +11,12 @@ import (
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/aws/aws-sdk-go/aws"
 	awscredentials "github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/ncw/swift"
+	log "github.com/sirupsen/logrus"
 )
 
 // ValidateStorage will validate a S3 storage connection.
@@ -53,10 +53,6 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 		if ok, err := ValidateRequiredString(args.BucketName, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".bucket_name", fgName); !ok {
 			errors = append(errors, err)
 		}
-		// Check bucket name
-		if ok, err := ValidateRequiredString(args.StoragePath, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".storage_path", fgName); !ok {
-			errors = append(errors, err)
-		}
 
 		// Grab necessary variables
 		accessKey = args.AccessKey
@@ -80,20 +76,17 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 
 	case "S3Storage":
 
-		// Check access key
-		if ok, err := ValidateRequiredString(args.S3AccessKey, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_access_key", fgName); !ok {
-			errors = append(errors, err)
-		}
-		// Check secret key
-		if ok, err := ValidateRequiredString(args.S3SecretKey, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_secret_key", fgName); !ok {
-			errors = append(errors, err)
-		}
+		// // Check access key
+		// if ok, err := ValidateRequiredString(args.S3AccessKey, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_access_key", fgName); !ok {
+		// 	errors = append(errors, err)
+		// }
+		// // Check secret key
+		// if ok, err := ValidateRequiredString(args.S3SecretKey, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_secret_key", fgName); !ok {
+		// 	errors = append(errors, err)
+		// }
+
 		// Check bucket name
 		if ok, err := ValidateRequiredString(args.S3Bucket, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_bucket", fgName); !ok {
-			errors = append(errors, err)
-		}
-		// Check storage path
-		if ok, err := ValidateRequiredString(args.StoragePath, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".storage_path", fgName); !ok {
 			errors = append(errors, err)
 		}
 
@@ -115,6 +108,37 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 			return false, errors
 		}
 
+		// If no keys are provided, we attempt to use IAM
+		if args.S3AccessKey == "" || args.S3SecretKey == "" {
+
+			sess, err := session.NewSession()
+			if err != nil {
+				newError := ValidationError{
+					Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
+					FieldGroup: fgName,
+					Message:    "Could not create S3 session.",
+				}
+				errors = append(errors, newError)
+				return false, errors
+			}
+
+			// Get credentials and set
+			appCreds := ec2rolecreds.NewCredentials(sess)
+			value, err := appCreds.Get()
+			if err != nil {
+				newError := ValidationError{
+					Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
+					FieldGroup: fgName,
+					Message:    "No access key or secret key were provided. Attempted to fetch IAM role and failed.",
+				}
+				errors = append(errors, newError)
+				return false, errors
+			}
+
+			accessKey = value.AccessKeyID
+			secretKey = value.SecretAccessKey
+
+		}
 		if ok, err := validateMinioGateway(opts, storageName, endpoint, accessKey, secretKey, bucketName, token, isSecure, fgName); !ok {
 			errors = append(errors, err)
 		}
@@ -133,14 +157,11 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 		if ok, err := ValidateRequiredString(args.BucketName, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".bucket_name", fgName); !ok {
 			errors = append(errors, err)
 		}
-		// Check storage path
-		if ok, err := ValidateRequiredString(args.StoragePath, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".storage_path", fgName); !ok {
-			errors = append(errors, err)
-		}
 
 		accessKey = args.AccessKey
 		secretKey = args.SecretKey
 		endpoint = "storage.googleapis.com"
+		isSecure = true
 		bucketName = args.BucketName
 
 		if len(errors) > 0 {
@@ -155,10 +176,6 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 
 		// Check access key
 		if ok, err := ValidateRequiredString(args.AzureContainer, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".azure_container", fgName); !ok {
-			errors = append(errors, err)
-		}
-		// Check storage path
-		if ok, err := ValidateRequiredString(args.StoragePath, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".storage_path", fgName); !ok {
 			errors = append(errors, err)
 		}
 		// Check account name
@@ -193,10 +210,6 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 		if ok, err := ValidateRequiredString(args.S3Bucket, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_bucket", fgName); !ok {
 			errors = append(errors, err)
 		}
-		// Check storage path
-		if ok, err := ValidateRequiredString(args.StoragePath, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".storage_path", fgName); !ok {
-			errors = append(errors, err)
-		}
 		// Check distribution domain
 		if ok, err := ValidateRequiredString(args.CloudfrontDistributionDomain, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".cloudfront_distribution_domain", fgName); !ok {
 			errors = append(errors, err)
@@ -229,7 +242,7 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 			errors = append(errors, err)
 		}
 
-		sess, err := session.NewSession(&aws.Config{
+		_, err := session.NewSession(&aws.Config{
 			Credentials: awscredentials.NewStaticCredentials(accessKey, secretKey, ""),
 		})
 		if err != nil {
@@ -237,49 +250,6 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 				Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
 				FieldGroup: fgName,
 				Message:    "Could not create S3 session",
-			}
-			errors = append(errors, newError)
-			return false, errors
-		}
-
-		// Validate distribution
-		svc := cloudfront.New(sess)
-		res, err := svc.ListDistributions(&cloudfront.ListDistributionsInput{})
-		if err != nil {
-			newError := ValidationError{
-				Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
-				FieldGroup: fgName,
-				Message:    "Could not list CloudFront distributions. Error: " + err.Error(),
-			}
-			errors = append(errors, newError)
-			return false, errors
-		}
-
-		found := false
-		for _, distribution := range res.DistributionList.Items {
-			if *distribution.DomainName == args.CloudfrontDistributionDomain {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			err = fmt.Errorf("No CloudFront distribution exists with given domain name (%s)", args.CloudfrontDistributionDomain)
-			newError := ValidationError{
-				Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
-				FieldGroup: fgName,
-				Message:    "Could not get CloudFront distribution. Error: " + err.Error(),
-			}
-			errors = append(errors, newError)
-			return false, errors
-		}
-
-		_, err = svc.GetPublicKey(&cloudfront.GetPublicKeyInput{Id: &args.CloudfrontKeyID})
-		if err != nil {
-			newError := ValidationError{
-				Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
-				FieldGroup: fgName,
-				Message:    "Could not get CloudFront public key. Error: " + err.Error(),
 			}
 			errors = append(errors, newError)
 			return false, errors
@@ -302,10 +272,6 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 		}
 		// Check swift container
 		if ok, err := ValidateRequiredString(args.SwiftContainer, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".swift_container", fgName); !ok {
-			errors = append(errors, err)
-		}
-		// Check storage path
-		if ok, err := ValidateRequiredString(args.StoragePath, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".storage_path", fgName); !ok {
 			errors = append(errors, err)
 		}
 		// Check swift user
@@ -375,7 +341,7 @@ func validateMinioGateway(opts Options, storageName, endpoint, accessKey, secret
 		return false, newError
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	found, err := st.BucketExists(ctx, bucketName)
@@ -418,7 +384,7 @@ func validateAzureGateway(opts Options, storageName, accountName, accountKey, co
 	serviceURL := azblob.NewServiceURL(*u, p)
 	containerURL := serviceURL.NewContainerURL(containerName)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	_, err = containerURL.GetAccountInfo(ctx)

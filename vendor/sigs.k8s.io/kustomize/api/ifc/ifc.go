@@ -5,8 +5,8 @@
 package ifc
 
 import (
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // Validator provides functions to validate annotations and labels
@@ -38,51 +38,10 @@ type Loader interface {
 	Cleanup() error
 }
 
-// Kunstructured allows manipulation of k8s objects
-// that do not have Golang structs.
-type Kunstructured interface {
-	Copy() Kunstructured
-	GetAnnotations() map[string]string
-	GetBool(path string) (bool, error)
-	GetFieldValue(string) (interface{}, error)
-	GetFloat64(path string) (float64, error)
-	GetGvk() resid.Gvk
-	GetInt64(path string) (int64, error)
-	GetKind() string
-	GetLabels() map[string]string
-	GetMap(path string) (map[string]interface{}, error)
-	GetName() string
-	GetSlice(path string) ([]interface{}, error)
-	GetString(string) (string, error)
-	GetStringMap(path string) (map[string]string, error)
-	GetStringSlice(string) ([]string, error)
-	Map() map[string]interface{}
-	MarshalJSON() ([]byte, error)
-	MatchesAnnotationSelector(selector string) (bool, error)
-	MatchesLabelSelector(selector string) (bool, error)
-	Patch(Kunstructured) error
-	SetAnnotations(map[string]string)
-	SetGvk(resid.Gvk)
-	SetLabels(map[string]string)
-	SetMap(map[string]interface{})
-	SetName(string)
-	SetNamespace(string)
-	UnmarshalJSON([]byte) error
-}
-
-// KunstructuredFactory makes instances of Kunstructured.
-type KunstructuredFactory interface {
-	SliceFromBytes([]byte) ([]Kunstructured, error)
-	FromMap(m map[string]interface{}) Kunstructured
-	Hasher() KunstructuredHasher
-	MakeConfigMap(kvLdr KvLoader, args *types.ConfigMapArgs) (Kunstructured, error)
-	MakeSecret(kvLdr KvLoader, args *types.SecretArgs) (Kunstructured, error)
-}
-
-// KunstructuredHasher returns a hash of the argument
+// KustHasher returns a hash of the argument
 // or an error.
-type KunstructuredHasher interface {
-	Hash(Kunstructured) (string, error)
+type KustHasher interface {
+	Hash(*yaml.RNode) (string, error)
 }
 
 // See core.v1.SecretTypeOpaque

@@ -1,25 +1,40 @@
+<p align="center">
+  <a href="https://uptrace.dev/?utm_source=gh-redis&utm_campaign=gh-redis-banner1">
+    <img src="https://raw.githubusercontent.com/uptrace/roadmap/master/banner1.png" alt="All-in-one tool to optimize performance and monitor errors & logs">
+  </a>
+</p>
+
 # Redis client for Golang
 
-[![Build Status](https://travis-ci.org/go-redis/redis.png?branch=master)](https://travis-ci.org/go-redis/redis)
-[![GoDoc](https://godoc.org/github.com/go-redis/redis?status.svg)](https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc)
+![build workflow](https://github.com/go-redis/redis/actions/workflows/build.yml/badge.svg)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/go-redis/redis/v8)](https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc)
+[![Documentation](https://img.shields.io/badge/redis-documentation-informational)](https://redis.uptrace.dev/)
+[![Chat](https://discordapp.com/api/guilds/752070105847955518/widget.png)](https://discord.gg/rWtp5Aj)
 
-- [Docs](https://redis.uptrace.dev)
+- To ask questions, join [Discord](https://discord.gg/rWtp5Aj) or use
+  [Discussions](https://github.com/go-redis/redis/discussions).
+- [Newsletter](https://blog.uptrace.dev/pages/newsletter.html) to get latest updates.
+- [Documentation](https://redis.uptrace.dev)
 - [Reference](https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc)
 - [Examples](https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc#pkg-examples)
+- [RealWorld example app](https://github.com/uptrace/go-treemux-realworld-example-app)
 
-## Sponsors
+Other projects you may like:
 
-- [**Uptrace.dev** - distributed traces and metrics](https://uptrace.dev)
+- [Bun](https://bun.uptrace.dev) - fast and simple SQL client for PostgreSQL, MySQL, and SQLite.
+- [treemux](https://github.com/vmihailenco/treemux) - high-speed, flexible, tree-based HTTP router
+  for Go.
 
 ## Ecosystem
 
+- [Redis Mock](https://github.com/go-redis/redismock).
+- [Distributed Locks](https://github.com/bsm/redislock).
 - [Redis Cache](https://github.com/go-redis/cache).
 - [Rate limiting](https://github.com/go-redis/redis_rate).
-- [Distributed Locks](https://github.com/bsm/redislock).
 
 ## Features
 
-- Redis 3 commands except QUIT, MONITOR, SLOWLOG and SYNC.
+- Redis 3 commands except QUIT, MONITOR, and SYNC.
 - Automatic connection pooling with
   [circuit breaker](https://en.wikipedia.org/wiki/Circuit_breaker_design_pattern) support.
 - [Pub/Sub](https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc#PubSub).
@@ -35,23 +50,20 @@
 - [Ring](https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc#NewRing).
 - [Instrumentation](https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc#ex-package--Instrumentation).
 
-API docs: https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc. Examples:
-https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc#pkg-examples.
-
 ## Installation
 
-go-redis requires a Go version with [Modules](https://github.com/golang/go/wiki/Modules) support and
-uses import versioning. So please make sure to initialize a Go module before installing go-redis:
+go-redis supports 2 last Go versions and requires a Go version with
+[modules](https://github.com/golang/go/wiki/Modules) support. So make sure to initialize a Go
+module:
 
 ```shell
 go mod init github.com/my/repo
-go get github.com/go-redis/redis/v8
 ```
 
-Import:
+And then install go-redis/v8 (note _v8_ in the import; omitting it is a popular mistake):
 
-```go
-import "github.com/go-redis/redis/v8"
+```shell
+go get github.com/go-redis/redis/v8
 ```
 
 ## Quickstart
@@ -59,22 +71,10 @@ import "github.com/go-redis/redis/v8"
 ```go
 import (
     "context"
-    "github.com/go-redis/redis/v8"  
+    "github.com/go-redis/redis/v8"
 )
 
 var ctx = context.Background()
-
-func ExampleNewClient() {
-    rdb := redis.NewClient(&redis.Options{
-        Addr:     "localhost:6379",
-        Password: "", // no password set
-        DB:       0,  // use default DB
-    })
-
-    pong, err := rdb.Ping(ctx).Result()
-    fmt.Println(pong, err)
-    // Output: PONG <nil>
-}
 
 func ExampleClient() {
     rdb := redis.NewClient(&redis.Options{
@@ -82,6 +82,7 @@ func ExampleClient() {
         Password: "", // no password set
         DB:       0,  // use default DB
     })
+
     err := rdb.Set(ctx, "key", "value", 0).Err()
     if err != nil {
         panic(err)
@@ -106,11 +107,6 @@ func ExampleClient() {
 }
 ```
 
-## Howto
-
-Please go through [examples](https://pkg.go.dev/github.com/go-redis/redis/v8?tab=doc#pkg-examples)
-to get an idea how to use this package.
-
 ## Look and feel
 
 Some corner cases:
@@ -118,6 +114,9 @@ Some corner cases:
 ```go
 // SET key value EX 10 NX
 set, err := rdb.SetNX(ctx, "key", "value", 10*time.Second).Result()
+
+// SET key value keepttl NX
+set, err := rdb.SetNX(ctx, "key", "value", redis.KeepTTL).Result()
 
 // SORT list LIMIT 0 2 ASC
 vals, err := rdb.Sort(ctx, "list", &redis.Sort{Offset: 0, Count: 2, Order: "ASC"}).Result()
@@ -143,8 +142,37 @@ vals, err := rdb.Eval(ctx, "return {KEYS[1],ARGV[1]}", []string{"key"}, "hello")
 res, err := rdb.Do(ctx, "set", "key", "value").Result()
 ```
 
-## See also
+## Run the test
 
-- [Golang PostgreSQL ORM](https://github.com/go-pg/pg)
-- [Golang msgpack](https://github.com/vmihailenco/msgpack)
-- [Golang message task queue](https://github.com/vmihailenco/taskq)
+go-redis will start a redis-server and run the test cases.
+
+The paths of redis-server bin file and redis config file are defined in `main_test.go`:
+
+```
+var (
+	redisServerBin, _  = filepath.Abs(filepath.Join("testdata", "redis", "src", "redis-server"))
+	redisServerConf, _ = filepath.Abs(filepath.Join("testdata", "redis", "redis.conf"))
+)
+```
+
+For local testing, you can change the variables to refer to your local files, or create a soft link
+to the corresponding folder for redis-server and copy the config file to `testdata/redis/`:
+
+```
+ln -s /usr/bin/redis-server ./go-redis/testdata/redis/src
+cp ./go-redis/testdata/redis.conf ./go-redis/testdata/redis/
+```
+
+Lastly, run:
+
+```
+go test
+```
+
+## Contributors
+
+Thanks to all the people who already contributed!
+
+<a href="https://github.com/go-redis/redis/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=go-redis/redis" />
+</a>

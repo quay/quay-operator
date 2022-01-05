@@ -7,9 +7,21 @@ linters:
   disable:
     - funlen
     - gochecknoglobals
+    - gochecknoinits
     - gocognit
     - goconst
     - godox
     - gosec
     - maligned
     - wsl
+    - gomnd
+    - goerr113
+    - exhaustive
+    - nestif
+    - nlreturn
+    - exhaustivestruct
+    - wrapcheck
+    - errorlint
+    - cyclop
+    - forcetypeassert
+    - forbidigo
