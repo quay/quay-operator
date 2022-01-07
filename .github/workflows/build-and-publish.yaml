@@ -205,7 +205,6 @@ jobs:
 
       - name: Notify slack
         if: ${{ always() }}
-        runs-on: ubuntu-latest
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_CHANNEL: team-quay-bots
