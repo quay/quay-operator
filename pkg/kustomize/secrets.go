@@ -3,7 +3,6 @@ package kustomize
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -24,39 +23,42 @@ import (
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
-// underTest can be switched on/off to ensure deterministic random string generation for testing output.
-var underTest = false
-
 const (
 	secretKeyLength = 80
-
-	clairService = "clair-app"
-	// FIXME: Ensure this includes the `QuayRegistry` name prefix when we add `builder` managed component.
-	buildmanRoute = "quay-builder"
 )
 
 // FieldGroupFor generates and returns the correct config field group for the given component.
-func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentKind, quay *v1.QuayRegistry) (shared.FieldGroup, error) {
+func FieldGroupFor(
+	ctx *quaycontext.QuayRegistryContext, component v1.ComponentKind, quay *v1.QuayRegistry,
+) (shared.FieldGroup, error) {
 	switch component {
 	case v1.ComponentClair:
-		fieldGroup, err := securityscanner.NewSecurityScannerFieldGroup(map[string]interface{}{})
+		config := map[string]interface{}{}
+		fieldGroup, err := securityscanner.NewSecurityScannerFieldGroup(config)
 		if err != nil {
 			return nil, err
 		}
 
-		preSharedKey, err := generateRandomString(32)
-		if err != nil {
-			return nil, err
+		if len(ctx.SecurityScannerV4PSK) == 0 {
+			preSharedKey, err := generateRandomString(32)
+			if err != nil {
+				return nil, err
+			}
+
+			ctx.SecurityScannerV4PSK = base64.StdEncoding.EncodeToString(
+				[]byte(preSharedKey),
+			)
 		}
-		psk := base64.StdEncoding.EncodeToString([]byte(preSharedKey))
 
 		fieldGroup.FeatureSecurityScanner = true
-		fieldGroup.SecurityScannerV4Endpoint = "http://" + quay.GetName() + "-" + clairService + ":80"
+		fieldGroup.SecurityScannerV4Endpoint = fmt.Sprintf(
+			"http://%s-clair-app:80", quay.GetName(),
+		)
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 		fieldGroup.SecurityScannerNotifications = true
-		fieldGroup.SecurityScannerV4PSK = psk
-
+		fieldGroup.SecurityScannerV4PSK = ctx.SecurityScannerV4PSK
 		return fieldGroup, nil
+
 	case v1.ComponentRedis:
 		fieldGroup, err := redis.NewRedisFieldGroup(map[string]interface{}{})
 		if err != nil {
@@ -64,21 +66,20 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 		}
 
 		fieldGroup.BuildlogsRedis = &redis.BuildlogsRedisStruct{
-			Host: strings.Join([]string{quay.GetName(), "quay-redis"}, "-"),
+			Host: fmt.Sprintf("%s-quay-redis", quay.GetName()),
 			Port: 6379,
 		}
 		fieldGroup.UserEventsRedis = &redis.UserEventsRedisStruct{
-			Host: strings.Join([]string{quay.GetName(), "quay-redis"}, "-"),
+			Host: fmt.Sprintf("%s-quay-redis", quay.GetName()),
 			Port: 6379,
 		}
-
 		return fieldGroup, nil
+
 	case v1.ComponentPostgres:
 		fieldGroup, err := database.NewDatabaseFieldGroup(map[string]interface{}{})
 		if err != nil {
 			return nil, err
 		}
-
 		fieldGroup.DbUri = ctx.DbUri
 
 		// XXX after bumping database package (dependency) these fields stopped being
@@ -90,28 +91,30 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 		}
 
 		return fieldGroup, nil
+
 	case v1.ComponentObjectStorage:
-		fieldGroup := &distributedstorage.DistributedStorageFieldGroup{
-			FeatureProxyStorage:                true,
-			DistributedStoragePreference:       []string{"local_us"},
-			DistributedStorageDefaultLocations: []string{"local_us"},
-			DistributedStorageConfig: map[string]*distributedstorage.DistributedStorageDefinition{
-				"local_us": {
-					Name: "RHOCSStorage",
-					Args: &shared.DistributedStorageArgs{
-						Hostname:    ctx.StorageHostname,
-						IsSecure:    true,
-						Port:        443,
-						BucketName:  ctx.StorageBucketName,
-						AccessKey:   ctx.StorageAccessKey,
-						SecretKey:   ctx.StorageSecretKey,
-						StoragePath: "/datastorage/registry",
-					},
+		storageConfig := map[string]*distributedstorage.DistributedStorageDefinition{
+			"local_us": {
+				Name: "RHOCSStorage",
+				Args: &shared.DistributedStorageArgs{
+					Hostname:    ctx.StorageHostname,
+					IsSecure:    true,
+					Port:        443,
+					BucketName:  ctx.StorageBucketName,
+					AccessKey:   ctx.StorageAccessKey,
+					SecretKey:   ctx.StorageSecretKey,
+					StoragePath: "/datastorage/registry",
 				},
 			},
 		}
 
-		return fieldGroup, nil
+		return &distributedstorage.DistributedStorageFieldGroup{
+			FeatureProxyStorage:                true,
+			DistributedStoragePreference:       []string{"local_us"},
+			DistributedStorageDefaultLocations: []string{"local_us"},
+			DistributedStorageConfig:           storageConfig,
+		}, nil
+
 	case v1.ComponentRoute:
 		// sets tls termination in the load balancer if no cert has been provided.
 		terminateExternally := len(ctx.TLSCert) == 0 && len(ctx.TLSKey) == 0
@@ -120,24 +123,27 @@ func FieldGroupFor(ctx *quaycontext.QuayRegistryContext, component v1.ComponentK
 			PreferredUrlScheme:     "https",
 			ServerHostname:         ctx.ServerHostname,
 		}
-
 		return fieldGroup, nil
+
 	case v1.ComponentMirror:
 		fieldGroup := &repomirror.RepoMirrorFieldGroup{
 			FeatureRepoMirror:   true,
 			RepoMirrorInterval:  30,
 			RepoMirrorTlsVerify: true,
 		}
-
 		return fieldGroup, nil
+
 	case v1.ComponentHPA:
 		return nil, nil
+
 	case v1.ComponentMonitoring:
 		return nil, nil
+
 	case v1.ComponentTLS:
 		return nil, nil
+
 	default:
-		return nil, errors.New("unknown component: " + string(component))
+		return nil, fmt.Errorf("unknown component: %s", component)
 	}
 }
 
@@ -167,20 +173,22 @@ func BaseConfig() map[string]interface{} {
 	}
 }
 
-// EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for secure communication with clients.
-func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) ([]byte, []byte, error) {
-	fieldGroup, err := FieldGroupFor(ctx, "route", quay)
+// EnsureTLSFor checks if given TLS cert/key pair are valid for the Quay registry to use for
+// secure communication with clients.
+func EnsureTLSFor(
+	ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) ([]byte, []byte, error) {
+	fieldGroup, err := FieldGroupFor(ctx, v1.ComponentRoute, quay)
 	if err != nil {
-		return ctx.TLSCert, ctx.TLSKey, err
+		return nil, nil, err
 	}
 
-	routeFieldGroup := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
-
-	hosts := []string{
-		routeFieldGroup.ServerHostname,
+	routeFieldGroup, ok := fieldGroup.(*hostsettings.HostSettingsFieldGroup)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid field group found")
 	}
 
-	// Only add BUILDMAN_HOSTNAME as host if provided.
+	hosts := []string{routeFieldGroup.ServerHostname}
 	if ctx.BuildManagerHostname != "" {
 		hosts = append(hosts, strings.Split(ctx.BuildManagerHostname, ":")[0])
 	}
@@ -192,8 +200,14 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) (
 
 	if ctx.TLSCert != nil && ctx.TLSKey != nil {
 		for _, host := range hosts {
-			if valid, validationErr := shared.ValidateCertPairWithHostname(ctx.TLSCert, ctx.TLSKey, host, fgn); !valid {
-				return nil, nil, fmt.Errorf("provided certificate/key pair not valid for host '%s': %s", host, validationErr.String())
+			if valid, err := shared.ValidateCertPairWithHostname(
+				ctx.TLSCert, ctx.TLSKey, host, fgn,
+			); !valid {
+				return nil, nil, fmt.Errorf(
+					"provided certificate pair not valid for host '%s': %s",
+					host,
+					err,
+				)
 			}
 		}
 	}
@@ -204,7 +218,9 @@ func EnsureTLSFor(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) (
 // ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
 // the fieldgroup for the given component by comparing it with the fieldgroup defaults.
 // TODO: Replace this with function from `config-tool` library once implemented.
-func ContainsComponentConfig(fullConfig map[string]interface{}, certs map[string][]byte, component v1.Component) (bool, error) {
+func ContainsComponentConfig(
+	fullConfig map[string]interface{}, certs map[string][]byte, component v1.Component,
+) (bool, error) {
 	fields := []string{}
 
 	switch component.Kind {
@@ -232,7 +248,7 @@ func ContainsComponentConfig(fullConfig map[string]interface{}, certs map[string
 			return true, nil
 		}
 	default:
-		panic("unknown component: " + component.Kind)
+		return false, fmt.Errorf("unknown component: %s", component.Kind)
 	}
 
 	// FIXME: Only checking for the existance of a single field
@@ -290,7 +306,7 @@ func componentConfigFilesFor(qctx *quaycontext.QuayRegistryContext, component v1
 		}
 
 		if quayHostname == "" {
-			return nil, errors.New("cannot configure managed security scanner, `SERVER_HOSTNAME` is not set anywhere")
+			return nil, fmt.Errorf("cannot configure managed security scanner, `SERVER_HOSTNAME` is not set anywhere")
 		}
 
 		var preSharedKey string
@@ -299,21 +315,28 @@ func componentConfigFilesFor(qctx *quaycontext.QuayRegistryContext, component v1
 			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
 		}
 
-		return map[string][]byte{"config.yaml": clairConfigFor(quay, quayHostname, preSharedKey)}, nil
+		cfg, err := clairConfigFor(quay, quayHostname, preSharedKey)
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string][]byte{"config.yaml": cfg}, nil
 	default:
 		return nil, nil
 	}
 }
 
 // clairConfigFor returns a Clair v4 config with the correct values.
-func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []byte {
+func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
 	dbname := "postgres"
 	user := "postgres"
 	password := "postgres"
 
 	psk, err := base64.StdEncoding.DecodeString(preSharedKey)
-	check(err)
+	if err != nil {
+		return nil, err
+	}
 
 	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
 	config := config.Config{
@@ -337,7 +360,7 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []
 			PollInterval:     "5m",
 			Webhook: &webhook.Config{
 				Target:   "https://" + quayHostname + "/secscan/notification",
-				Callback: "http://" + quay.GetName() + "-" + clairService + "/notifier/api/v1/notifications",
+				Callback: "http://" + quay.GetName() + "-clair-app/notifier/api/v1/notifications",
 			},
 		},
 		Auth: config.Auth{
@@ -351,10 +374,7 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) []
 		},
 	}
 
-	marshalled, err := yaml.Marshal(config)
-	check(err)
-
-	return marshalled
+	return yaml.Marshal(config)
 }
 
 // From: https://gist.github.com/dopey/c69559607800d2f2f90b1b1ed4e550fb

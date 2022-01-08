@@ -31,6 +31,12 @@ type QuayRegistryContext struct {
 	// Database
 	DbUri    string
 	DbRootPw string
+
+	// Config editor
+	ConfigEditorPw string
+
+	// Clair integration
+	SecurityScannerV4PSK string
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.

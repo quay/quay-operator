@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
-	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 const (
@@ -23,9 +22,9 @@ const (
 	fieldGroupsAnnotation = "quay-managed-fieldgroups"
 )
 
-// Process applies any additional middleware steps to a managed k8s object that cannot be accomplished using
-// the Kustomize toolchain.
-func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj client.Object) (client.Object, error) {
+// Process applies any additional middleware steps to a managed k8s object that cannot be
+// accomplished using the Kustomize toolchain.
+func Process(quay *v1.QuayRegistry, obj client.Object) (client.Object, error) {
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -40,7 +39,8 @@ func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj cl
 			return nil, err
 		}
 
-		// NOTE: Remove user-provided TLS cert/key pair so it is not mounted to `/conf/stack`, otherwise it will affect Quay's generated NGINX config
+		// NOTE: Remove user-provided TLS cert/key pair so it is not mounted to
+		// `/conf/stack`, otherwise it will affect Quay's generated NGINX config
 		delete(configBundleSecret.Data, "ssl.cert")
 		delete(configBundleSecret.Data, "ssl.key")
 
@@ -76,21 +76,31 @@ func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj cl
 
 	// If the current object is a PVC, check for volume override
 	if pvc, ok := obj.(*corev1.PersistentVolumeClaim); ok {
-		var volumeSizeOverride *resource.Quantity
+		var override *resource.Quantity
 		switch quayComponentLabel {
 		case "postgres":
-			volumeSizeOverride = getVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
+			override = getVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
 		case "clair-postgres":
-			volumeSizeOverride = getVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
+			override = getVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
 		}
 
-		// If override was provided
-		if volumeSizeOverride != nil {
-			// Ensure that volume size is not being reduced
-			if pvc.Spec.Resources.Requests.Storage() != nil && volumeSizeOverride.Cmp(*pvc.Spec.Resources.Requests.Storage()) == -1 {
-				return nil, fmt.Errorf("cannot shrink volume override size from %s to %s", pvc.Spec.Resources.Requests.Storage().String(), volumeSizeOverride.String())
-			}
-			pvc.Spec.Resources.Requests = corev1.ResourceList{corev1.ResourceStorage: *volumeSizeOverride}
+		// If override was not provided
+		if override == nil {
+			return pvc, nil
+		}
+
+		// Ensure that volume size is not being reduced
+		pvcstorage := pvc.Spec.Resources.Requests.Storage()
+		if pvcstorage != nil && override.Cmp(*pvcstorage) == -1 {
+			return nil, fmt.Errorf(
+				"cannot shrink volume override size from %s to %s",
+				pvcstorage.String(),
+				override.String(),
+			)
+		}
+
+		pvc.Spec.Resources.Requests = corev1.ResourceList{
+			corev1.ResourceStorage: *override,
 		}
 
 		return pvc, nil
@@ -125,7 +135,8 @@ func Process(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, obj cl
 	return rt, nil
 }
 
-// flattenSecret takes all Quay config fields in given secret and combines them under `config.yaml` key.
+// FlattenSecret takes all Quay config fields in given secret and combines them under
+// `config.yaml` key.
 func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 	flattenedSecret := configBundle.DeepCopy()
 
@@ -134,22 +145,22 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 		return nil, err
 	}
 
-	isConfigField := func(field string) bool {
-		return strings.Contains(field, ".config.yaml")
-	}
-
 	for key, file := range configBundle.Data {
-		if isConfigField(key) {
-			var valueYAML map[string]interface{}
-			if err := yaml.Unmarshal(file, &valueYAML); err != nil {
-				return nil, err
-			}
-
-			for configKey, configValue := range valueYAML {
-				flattenedConfig[configKey] = configValue
-			}
-			delete(flattenedSecret.Data, key)
+		isConfig := strings.Contains(key, ".config.yaml")
+		if !isConfig {
+			continue
 		}
+
+		var valueYAML map[string]interface{}
+		if err := yaml.Unmarshal(file, &valueYAML); err != nil {
+			return nil, err
+		}
+
+		for configKey, configValue := range valueYAML {
+			flattenedConfig[configKey] = configValue
+		}
+
+		delete(flattenedSecret.Data, key)
 	}
 
 	flattenedConfigYAML, err := yaml.Marshal(flattenedConfig)
@@ -157,18 +168,22 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 		return nil, err
 	}
 
-	flattenedSecret.Data["config.yaml"] = []byte(flattenedConfigYAML)
-
+	flattenedSecret.Data["config.yaml"] = flattenedConfigYAML
 	return flattenedSecret, nil
 }
 
-func getVolumeSizeOverrideForComponent(quay *v1.QuayRegistry, componentKind v1.ComponentKind) (volumeSizeOverride *resource.Quantity) {
+func getVolumeSizeOverrideForComponent(
+	quay *v1.QuayRegistry, componentKind v1.ComponentKind,
+) (volumeSizeOverride *resource.Quantity) {
 	for _, component := range quay.Spec.Components {
-		if component.Kind == componentKind {
-			if component.Overrides != nil && component.Overrides.VolumeSize != nil {
-				volumeSizeOverride = component.Overrides.VolumeSize
-			}
+		if component.Kind != componentKind {
+			continue
 		}
+
+		if component.Overrides != nil && component.Overrides.VolumeSize != nil {
+			volumeSizeOverride = component.Overrides.VolumeSize
+		}
+		return
 	}
-	return volumeSizeOverride
+	return
 }

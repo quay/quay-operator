@@ -181,7 +181,7 @@ func TestKustomizationFor(t *testing.T) {
 			}
 		}
 
-		kustomization, err := KustomizationFor(&test.ctx, test.quayRegistry, map[string][]byte{})
+		kustomization, err := KustomizationFor(&test.ctx, test.quayRegistry, map[string][]byte{}, "")
 
 		if test.expectedErr != "" {
 			assert.EqualError(err, test.expectedErr)
@@ -239,7 +239,6 @@ func TestFlattenSecret(t *testing.T) {
 var quayComponents = map[string][]client.Object{
 	"base": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
-		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
@@ -266,7 +265,6 @@ var quayComponents = map[string][]client.Object{
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
-		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-database-init"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 	},
 	"redis": {
@@ -287,6 +285,9 @@ var quayComponents = map[string][]client.Object{
 		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror"}},
 		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
+	},
+	"job": {
+		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
 	},
 }
 

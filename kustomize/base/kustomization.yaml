@@ -7,7 +7,6 @@ resources:
   - ./quay.serviceaccount.yaml
   - ./quay.deployment.yaml
   - ./quay.service.yaml
-  - ./upgrade.job.yaml
   - ./cluster-service-ca.configmap.yaml
   - ./config.deployment.yaml
   - ./config.service.yaml

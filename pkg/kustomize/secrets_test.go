@@ -373,7 +373,7 @@ var ensureTLSForTests = []struct {
 		"registry.company.com",
 		"",
 		certKeyPairFor("nonexistent.company.com", nil),
-		fmt.Errorf("provided certificate/key pair not valid for host 'registry.company.com': x509: certificate is valid for nonexistent.company.com, not registry.company.com"),
+		fmt.Errorf("provided certificate pair not valid for host 'registry.company.com': x509: certificate is valid for nonexistent.company.com, not registry.company.com"),
 	},
 	{
 		"ManagedRouteProvidedHostnameNoCerts",
@@ -397,7 +397,7 @@ var ensureTLSForTests = []struct {
 		"registry.company.com",
 		"builds.company.com",
 		certKeyPairFor("registry.company.com", nil),
-		fmt.Errorf("provided certificate/key pair not valid for host 'builds.company.com': x509: certificate is valid for registry.company.com, not builds.company.com"),
+		fmt.Errorf("provided certificate pair not valid for host 'builds.company.com': x509: certificate is valid for registry.company.com, not builds.company.com"),
 	},
 	{
 		"ManagedRouteProvidedBuildmanagerHostnameProvidedCerts",

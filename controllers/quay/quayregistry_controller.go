@@ -1,6 +1,4 @@
 /*
-
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -32,7 +30,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -74,317 +71,419 @@ type QuayRegistryReconciler struct {
 	EventRecorder  record.EventRecorder
 	WatchNamespace string
 	Mtx            *sync.Mutex
+	Requeue        ctrl.Result
+}
 
-	// TODO(alecmerdler): Somehow generalize feature detection functions so that they can match a type signature and be iterated over...
+// manageQuayDeletion makes sure that we process a QuayRegistry once it is flagged for
+// deletion. Removes the finalizer once it is done, requeues an event for the registry
+// in case of failure.
+func (r *QuayRegistryReconciler) manageQuayDeletion(
+	ctx context.Context, quay *v1.QuayRegistry, log logr.Logger,
+) (ctrl.Result, error) {
+	log.Info("`QuayRegistry` to be deleted")
+	if !controllerutil.ContainsFinalizer(quay, QuayOperatorFinalizer) {
+		return ctrl.Result{}, nil
+	}
+
+	if err := r.finalizeQuay(ctx, quay); err != nil {
+		return r.Requeue, err
+	}
+
+	controllerutil.RemoveFinalizer(quay, QuayOperatorFinalizer)
+	if err := r.Update(ctx, quay); err != nil {
+		return r.Requeue, err
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// checkMigrationStatus checks the migration job status for a given QuayRegistry instance.
+// This function verifies if the job ran successfully and sets its condition properly. The
+// result of this function is always a ctrl.Result with a proper reschedule value. Once
+// migration job has been finished this function sets quay.Status.CurrentVersion to the
+// value of v1.QuayVersionCurrent, indicating that we have migrated to the current version.
+func (r *QuayRegistryReconciler) checkMigrationStatus(
+	ctx context.Context, quay *v1.QuayRegistry, log logr.Logger,
+) (ctrl.Result, error) {
+	log.Info("checking Quay upgrade `Job` completion")
+
+	nsn := types.NamespacedName{
+		Name:      fmt.Sprintf("%s-%s", quay.GetName(), v1.QuayUpgradeJobName),
+		Namespace: quay.GetNamespace(),
+	}
+
+	var job batchv1.Job
+	if err := r.Client.Get(ctx, nsn, &job); err != nil {
+		// similarly to when a v1.ConditionReasonMigrationsFailed occurs,
+		// when the upgrade job is expected to exist but doesn't
+		// (i.e. someone manually removed it) we want the reconcile loop
+		// to run in its entirety, so we change the condition reason to
+		// something other than migrations in progress.
+		if errors.IsNotFound(err) {
+			if err = r.updateWithCondition(
+				ctx,
+				quay,
+				v1.ConditionComponentsCreated,
+				metav1.ConditionFalse,
+				v1.ConditionReasonMigrationsJobMissing,
+				"upgrade job not found",
+			); err != nil {
+				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+			}
+			return r.Requeue, nil
+		}
+
+		log.Error(err, "could not retrieve Quay upgrade `Job`")
+		return r.Requeue, nil
+	}
+
+	if job.Status.Active == 1 {
+		log.Info("Upgrade job running, requeueing reconcile...")
+		return r.Requeue, nil
+	}
+
+	if job.Status.Succeeded == 1 {
+		log.Info("Quay upgrade complete, updating `status.currentVersion`")
+
+		condition := v1.Condition{
+			Type:               v1.ConditionComponentsCreated,
+			Status:             metav1.ConditionTrue,
+			Reason:             v1.ConditionReasonComponentsCreationSuccess,
+			Message:            "All registry components created",
+			LastUpdateTime:     metav1.Now(),
+			LastTransitionTime: metav1.Now(),
+		}
+		quay.Status.CurrentVersion = v1.QuayVersionCurrent
+		quay.Status.Conditions = v1.SetCondition(quay.Status.Conditions, condition)
+
+		if err := r.Client.Status().Update(ctx, quay); err != nil {
+			log.Error(err, "could not update status with current version")
+			return r.Requeue, nil
+		}
+
+		log.Info("successfully updated `status` after Quay upgrade")
+		return r.Requeue, nil
+	}
+
+	log.Info("upgrade job failed or crashed.", "upgrade-job-status", job.Status)
+
+	// a kube job can be Active, Succeeded or Failed.
+	// we explicitly check for Active and Succeeded above. if no pods
+	// are in either state it means the job either failed or crashed.
+	// crashed pods are not marked as Failed, so we don't check.
+	//
+	// when the job crashes or fails, the next reconciliation to run
+	// will think that migrations are currently not running, since
+	// we change the condition reason to v1.ConditionReasonMigrationsFailed.
+	// this doesn't necessarily describe reality, because kube will
+	// retry failed jobs for us, but it's desired behaviour because
+	// when the migration job fails due to misconfiguration, then the
+	// reconcile function should be allowed to proceed.
+	msg := "failed to run migrations"
+	for _, cond := range job.Status.Conditions {
+		if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+			msg = cond.Message
+			break
+		}
+	}
+
+	if err := r.updateWithCondition(
+		ctx,
+		quay,
+		v1.ConditionComponentsCreated,
+		metav1.ConditionFalse,
+		v1.ConditionReasonMigrationsFailed,
+		msg,
+	); err != nil {
+		log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+	}
+
+	return r.Requeue, nil
+}
+
+// createInitialBundleSecret creates a new config bundle secret for provided QuayRegistry
+// object, the created bundle contains a default quay config and is then populated as
+// ConfigBundleSecret. QuayRegistry is updated and a reschedule Result is returned.
+func (r *QuayRegistryReconciler) createInitialBundleSecret(
+	ctx context.Context, quay *v1.QuayRegistry, log logr.Logger,
+) (ctrl.Result, error) {
+	log.Info("`spec.configBundleSecret` is unset. Creating base `Secret`")
+
+	baseConfigBundle := v1.EnsureOwnerReference(
+		quay,
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: fmt.Sprintf("%s-config-bundle-", quay.GetName()),
+				Namespace:    quay.GetNamespace(),
+			},
+			Data: map[string][]byte{
+				"config.yaml": encode(kustomize.BaseConfig()),
+			},
+		},
+	)
+
+	if err := r.Client.Create(ctx, baseConfigBundle); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("unable to create base config bundle `Secret`: %s", err),
+		)
+	}
+
+	quay.Spec.ConfigBundleSecret = baseConfigBundle.GetName()
+	if err := r.Client.Update(ctx, quay); err != nil {
+		log.Error(err, "unable to update `spec.configBundleSecret`")
+		return r.Requeue, err
+	}
+
+	log.Info("successfully updated `spec.configBundleSecret`")
+	return r.Requeue, nil
+}
+
+// GetConfigBundleSecret returns the secret used to configure provided QuayRegistry
+// instance.
+func (r *QuayRegistryReconciler) GetConfigBundleSecret(
+	ctx context.Context, quay *v1.QuayRegistry,
+) (*corev1.Secret, error) {
+	secnsn := types.NamespacedName{
+		Namespace: quay.GetNamespace(),
+		Name:      quay.Spec.ConfigBundleSecret,
+	}
+
+	bundle := &corev1.Secret{}
+	if err := r.Get(ctx, secnsn, bundle); err != nil {
+		return nil, err
+	}
+
+	return bundle, nil
 }
 
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
 
+// Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
+// create all needed objects to get a quay instance running.
 func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Mtx.Lock()
 	defer r.Mtx.Unlock()
 
-	log := r.Log.WithValues("quayregistry", req.NamespacedName)
-
+	regid := fmt.Sprintf("%s/%s", req.NamespacedName.Namespace, req.NamespacedName.Name)
+	log := r.Log.WithValues("quayregistry", regid)
 	log.Info("begin reconcile")
 
 	var quay v1.QuayRegistry
 	if err := r.Client.Get(ctx, req.NamespacedName, &quay); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("`QuayRegistry` deleted")
-		} else {
-			log.Error(err, "unable to retrieve QuayRegistry")
-		}
-
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	updatedQuay := quay.DeepCopy()
-	quayContext := quaycontext.NewQuayRegistryContext()
-
-	isQuayMarkedToBeDeleted := quay.GetDeletionTimestamp() != nil
-	if isQuayMarkedToBeDeleted {
-		log.Info("`QuayRegistry` to be deleted")
-		if controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
-			if err := r.finalizeQuay(ctx, updatedQuay); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			controllerutil.RemoveFinalizer(updatedQuay, QuayOperatorFinalizer)
-			err := r.Update(ctx, updatedQuay)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
-
-	created := v1.GetCondition(updatedQuay.Status.Conditions, v1.ConditionComponentsCreated)
-	migrationInProgress := created != nil && created.Reason == v1.ConditionReasonMigrationsInProgress
-	if migrationInProgress {
-		log.Info("checking Quay upgrade `Job` completion")
-
-		var upgradeJob batchv1.Job
-		err := r.Client.Get(
-			ctx,
-			types.NamespacedName{
-				Name:      updatedQuay.GetName() + "-" + v1.QuayUpgradeJobName,
-				Namespace: updatedQuay.GetNamespace(),
-			},
-			&upgradeJob,
-		)
-
-		// similarly to when a v1.ConditionReasonMigrationsFailed occurs,
-		// when the upgrade job is expected to exist but doesn't
-		// (i.e. someone manually removed it) we want the reconcile loop
-		// to run in its entirety, so we change the condition reason to
-		// something other than migrations in progress.
-		if err != nil && errors.IsNotFound(err) {
-			_, err = r.updateWithCondition(
-				updatedQuay,
-				v1.ConditionComponentsCreated,
-				metav1.ConditionFalse,
-				v1.ConditionReasonMigrationsJobMissing,
-				"upgrade job not found")
-			if err != nil {
-				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-			}
-			return ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-
-		if err != nil {
-			log.Error(err, "could not retrieve Quay upgrade `Job`")
-			return ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-
-		if upgradeJob.Status.Active == 1 {
-			log.Info("Upgrade job running, requeueing reconcile...")
-			return ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-
-		if upgradeJob.Status.Succeeded == 1 {
-			log.Info("Quay upgrade complete, updating `status.currentVersion`")
-
-			msg := "All registry components created"
-			condition := v1.Condition{
-				Type:               v1.ConditionComponentsCreated,
-				Status:             metav1.ConditionTrue,
-				Reason:             v1.ConditionReasonComponentsCreationSuccess,
-				Message:            msg,
-				LastUpdateTime:     metav1.Now(),
-				LastTransitionTime: metav1.Now(),
-			}
-			updatedQuay.Status.Conditions = v1.SetCondition(updatedQuay.Status.Conditions, condition)
-			updatedQuay.Status.CurrentVersion = v1.QuayVersionCurrent
-
-			if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
-				log.Error(err, "could not update QuayRegistry status with current version")
-				return ctrl.Result{RequeueAfter: time.Second}, nil
-			}
-
-			log.Info("successfully updated `status` after Quay upgrade")
-
-			return ctrl.Result{RequeueAfter: time.Second}, nil
-		}
-
-		log.Info("upgrade job failed or crashed.", "upgrade-job-status", upgradeJob.Status)
-
-		// a kube job can be Active, Succeeded or Failed.
-		// we explicitly check for Active and Succeeded above. if no pods
-		// are in either state it means the job either failed or crashed.
-		// crashed pods are not marked as Failed, so we don't check.
-		//
-		// when the job crashes or fails, the next reconciliation to run
-		// will think that migrations are currently not running, since
-		// we change the condition reason to v1.ConditionReasonMigrationsFailed.
-		// this doesn't necessarily describe reality, because kube will
-		// retry failed jobs for us, but it's desired behaviour because
-		// when the migration job fails due to misconfiguration, then the
-		// reconcile function should be allowed to proceed.
-		msg := "failed to run migrations"
-		for _, cond := range upgradeJob.Status.Conditions {
-			if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-				msg = cond.Message
-				break
-			}
-		}
-		updatedQuay, err = r.updateWithCondition(
-			updatedQuay,
-			v1.ConditionComponentsCreated,
-			metav1.ConditionFalse,
-			v1.ConditionReasonMigrationsFailed,
-			msg)
-		if err != nil {
-			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-		}
-		return ctrl.Result{RequeueAfter: time.Second}, nil
-	}
-
-	if quay.Spec.ConfigBundleSecret == "" {
-		log.Info("`spec.configBundleSecret` is unset. Creating base `Secret`")
-
-		baseConfigBundle, err := v1.EnsureOwnerReference(&quay, &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: quay.GetName() + "-config-bundle-",
-				Namespace:    quay.GetNamespace(),
-			},
-			Data: map[string][]byte{
-				"config.yaml": encode(kustomize.BaseConfig()),
-			},
-		})
-		if err != nil {
-			msg := fmt.Sprintf("unable to add owner reference to base config bundle `Secret`: %s", err)
-
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-		}
-
-		if err := r.Client.Create(ctx, baseConfigBundle); err != nil {
-			msg := fmt.Sprintf("unable to create base config bundle `Secret`: %s", err)
-
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-		}
-
-		objectMeta, _ := meta.Accessor(baseConfigBundle)
-		updatedQuay.Spec.ConfigBundleSecret = objectMeta.GetName()
-		if err := r.Client.Update(ctx, updatedQuay); err != nil {
-			log.Error(err, "unable to update `spec.configBundleSecret`")
 			return ctrl.Result{}, nil
 		}
 
-		log.Info("successfully updated `spec.configBundleSecret`")
-		return ctrl.Result{}, nil
+		log.Error(err, "unable to retrieve QuayRegistry")
+		return r.Requeue, nil
 	}
 
-	var configBundle corev1.Secret
-	if err := r.Get(ctx, types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.Spec.ConfigBundleSecret}, &configBundle); err != nil {
-		msg := fmt.Sprintf("unable to retrieve referenced `configBundleSecret`: %s, error: %s", quay.Spec.ConfigBundleSecret, err)
-
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
+	updatedQuay := quay.DeepCopy()
+	if v1.FlaggedForDeletion(updatedQuay) {
+		return r.manageQuayDeletion(ctx, updatedQuay, log)
 	}
 
-	log.Info("successfully retrieved referenced `configBundleSecret`", "configBundleSecret", configBundle.GetName(), "resourceVersion", configBundle.GetResourceVersion())
+	if v1.MigrationsRunning(updatedQuay) {
+		return r.checkMigrationStatus(ctx, updatedQuay, log)
+	}
 
-	quayContext, updatedQuay, err := r.checkManagedKeys(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
+	if v1.NeedsBundleSecret(updatedQuay) {
+		return r.createInitialBundleSecret(ctx, updatedQuay, log)
+	}
+
+	configBundle, err := r.GetConfigBundleSecret(ctx, updatedQuay)
 	if err != nil {
-		msg := fmt.Sprintf("unable to retrieve managed keys `Secret`: %s", err)
-
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("unable to get `configBundleSecret`: %s", err),
+		)
 	}
 
-	quayContext, updatedQuay, err = r.checkManagedTLS(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
-	if err != nil {
-		msg := fmt.Sprintf("unable to retrieve managed TLS `Secret`: %s", err)
+	quayContext := quaycontext.NewQuayRegistryContext()
+	r.checkManagedTLS(quayContext, configBundle)
 
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
+	if err := r.checkManagedKeys(ctx, quayContext, updatedQuay); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("unable to retrieve managed keys `Secret`: %s", err),
+		)
 	}
 
-	quayContext, updatedQuay, err = r.checkRoutesAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
-	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentRoute) {
-		msg := fmt.Sprintf("could not check for `Routes` API: %s", err)
-
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonRouteComponentDependencyError, msg)
+	if err := r.checkRoutesAvailable(
+		ctx, quayContext, updatedQuay, configBundle,
+	); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonRouteComponentDependencyError,
+			fmt.Sprintf("could not check for `Routes` API: %s", err),
+		)
 	}
 
-	quayContext, updatedQuay, err = r.checkObjectBucketClaimsAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
-	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentObjectStorage) {
-		msg := fmt.Sprintf("could not check for `ObjectBucketClaims` API: %s", err)
-		if _, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg); err != nil {
-			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-		}
-
-		return ctrl.Result{RequeueAfter: time.Millisecond * 1000}, nil
+	osmanaged := v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentObjectStorage)
+	if err := r.checkObjectBucketClaimsAvailable(
+		ctx, quayContext, updatedQuay,
+	); err != nil && osmanaged {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonObjectStorageComponentDependencyError,
+			fmt.Sprintf("error checking for object storage support: %s", err),
+		)
 	}
 
-	quayContext, updatedQuay, err = r.checkBuildManagerAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
-	if err != nil {
-		msg := fmt.Sprintf("could not check for build manager support: %s", err)
-
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonObjectStorageComponentDependencyError, msg)
+	if err := r.checkBuildManagerAvailable(quayContext, configBundle); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("could not check for build manager support: %s", err),
+		)
 	}
 
-	quayContext, updatedQuay, err = r.checkMonitoringAvailable(quayContext, updatedQuay.DeepCopy(), configBundle.Data)
-	if err != nil && v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentMonitoring) {
-		msg := fmt.Sprintf("could not check for monitoring support: %s", err)
-
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonMonitoringComponentDependencyError, msg)
+	monmanaged := v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentMonitoring)
+	if err := r.checkMonitoringAvailable(ctx, quayContext); err != nil && monmanaged {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonMonitoringComponentDependencyError,
+			fmt.Sprintf("could not check for monitoring support: %s", err),
+		)
 	}
 
-	updatedQuay, err = v1.EnsureDefaultComponents(quayContext, updatedQuay.DeepCopy())
+	updatedQuay, err = v1.EnsureDefaultComponents(quayContext, updatedQuay)
 	if err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
-
-		return ctrl.Result{}, nil
+		return r.Requeue, err
 	}
 
-	err = v1.ValidateOverrides(updatedQuay)
-	if err != nil {
-		msg := fmt.Sprintf("could not validate overrides on spec.components: %s", err)
-
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonComponentOverrideInvalid, msg)
+	if err := v1.ValidateOverrides(updatedQuay); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonComponentOverrideInvalid,
+			fmt.Sprintf("could not validate overrides on spec.components: %s", err),
+		)
 	}
 
 	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
 		log.Info("updating QuayRegistry `spec.components` to include defaults")
 		if err = r.Client.Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `spec.components` to include defaults")
-
-			return ctrl.Result{}, nil
 		}
-
-		return ctrl.Result{}, nil
+		return r.Requeue, nil
 	}
 
-	var userProvidedConfig map[string]interface{}
-	err = yaml.Unmarshal(configBundle.Data["config.yaml"], &userProvidedConfig)
-	if err != nil {
-		updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, err.Error())
-		if err != nil {
-			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-
-			return ctrl.Result{}, nil
-		}
+	var usercfg map[string]interface{}
+	if err = yaml.Unmarshal(configBundle.Data["config.yaml"], &usercfg); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			err.Error(),
+		)
 	}
 
-	userProvidedCerts := map[string][]byte{}
+	updatedQuay.Status.Conditions = v1.RemoveCondition(
+		updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked,
+	)
+
+	usercerts := map[string][]byte{}
 	if _, ok := configBundle.Data["ssl.cert"]; ok {
-		userProvidedCerts["ssl.cert"] = configBundle.Data["ssl.cert"]
+		usercerts["ssl.cert"] = configBundle.Data["ssl.cert"]
 	}
 	if _, ok := configBundle.Data["ssl.key"]; ok {
-		userProvidedCerts["ssl.key"] = configBundle.Data["ssl.key"]
+		usercerts["ssl.key"] = configBundle.Data["ssl.key"]
 	}
 
-	updatedQuay.Status.Conditions = v1.RemoveCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked)
-
-	for _, component := range updatedQuay.Spec.Components {
-		contains, err := kustomize.ContainsComponentConfig(userProvidedConfig, userProvidedCerts, component)
+	for _, cmp := range updatedQuay.Spec.Components {
+		contains, err := kustomize.ContainsComponentConfig(usercfg, usercerts, cmp)
 		if err != nil {
-			updatedQuay, err = r.updateWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, err.Error())
-			if err != nil {
-				log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-
-				return ctrl.Result{}, nil
-			}
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				err.Error(),
+			)
 		}
 
-		if component.Managed && contains && component.Kind != v1.ComponentRoute && component.Kind != v1.ComponentMirror {
-			msg := fmt.Sprintf("%s component marked as managed, but `configBundleSecret` contains required fields", component.Kind)
-
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
-
-		} else if !component.Managed && v1.RequiredComponent(component.Kind) && !contains {
-			msg := fmt.Sprintf("required component `%s` marked as unmanaged, but `configBundleSecret` is missing necessary fields", component.Kind)
-
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, msg)
+		if cmp.Managed && contains && !v1.ComponentSupportsConfigWhenManaged(cmp) {
+			// if the component is marked as managed but the user has provided
+			// config for it (in config bundle secret) then we have a problem
+			// there are a few components that don't care if the config has
+			// been provided by the user or not, these are evaluated in the
+			// function ComponentSupportsConfigWhenManaged().
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				fmt.Sprintf(
+					"%s component marked as managed, but "+
+						"`configBundleSecret` contains required fields",
+					cmp.Kind,
+				),
+			)
+		} else if !cmp.Managed && !contains && v1.RequiredComponent(cmp.Kind) {
+			// here we have a component that is not managed, is required and the
+			// user has not provided a config for it (in config bundle secret).
+			// we can't proceed.
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				fmt.Sprintf(
+					"required component `%s` marked as unmanaged, but "+
+						"`configBundleSecret` is missing necessary fields",
+					cmp.Kind,
+				),
+			)
 		}
 	}
 
-	log.Info("inflating QuayRegistry into Kubernetes objects using Kustomize")
-	deploymentObjects, err := kustomize.Inflate(quayContext, updatedQuay, &configBundle, log)
+	log.Info("inflating QuayRegistry into Kubernetes objects")
+	deploymentObjects, err := kustomize.Inflate(quayContext, updatedQuay, configBundle, log)
 	if err != nil {
-		msg := fmt.Sprintf("could not inflate QuayRegistry into Kubernetes objects: %s", err)
-
-		return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonComponentCreationFailed, msg)
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonComponentCreationFailed,
+			fmt.Sprintf("could not inflate kubernetes objects: %s", err),
+		)
 	}
 
 	for _, obj := range kustomize.EnsureCreationOrder(deploymentObjects) {
@@ -392,117 +491,162 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// in the `openshift-config-managed` namespace and add the label
 		// `openshift.io/cluster-monitoring: true` to the registry namespace
 		if quayContext.SupportsMonitoring && isGrafanaConfigMap(obj) {
-			obj = updateResourceNamespace(obj, GrafanaDashboardConfigNamespace)
-
-			if obj, err = updateGrafanaDashboardData(obj, updatedQuay.GetName(), updatedQuay.GetNamespace()); err != nil {
-				msg := fmt.Sprintf("Unable to update title on Grafana ConfigMap %s", err)
-				return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonMonitoringComponentDependencyError, msg)
+			obj.SetNamespace(GrafanaDashboardConfigNamespace)
+			if err = updateGrafanaDashboardData(obj, updatedQuay); err != nil {
+				return r.reconcileWithCondition(
+					ctx,
+					&quay,
+					v1.ConditionTypeRolloutBlocked,
+					metav1.ConditionTrue,
+					v1.ConditionReasonMonitoringComponentDependencyError,
+					fmt.Sprintf("unable to update title on Grafana %s", err),
+				)
 			}
 		}
 
-		if err := r.createOrUpdateObject(ctx, obj, quay); err != nil {
-			msg := fmt.Sprintf("all Kubernetes objects not created/updated successfully: %s", err)
-
-			return r.reconcileWithCondition(&quay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonComponentCreationFailed, msg)
+		if err := r.createOrUpdateObject(ctx, obj, quay, log); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonComponentCreationFailed,
+				fmt.Sprintf("error creating object: %s", err),
+			)
 		}
 	}
 
 	if quayContext.SupportsMonitoring {
-		err := r.patchNamespaceForMonitoring(ctx, quay)
-		if err != nil {
-			return r.reconcileWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
-				v1.ConditionReasonMonitoringComponentDependencyError, err.Error())
+		if err := r.patchNamespaceForMonitoring(ctx, quay); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				updatedQuay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonMonitoringComponentDependencyError,
+				err.Error(),
+			)
 		}
 	}
 
 	updatedQuay, _ = v1.EnsureConfigEditorEndpoint(quayContext, updatedQuay)
-	updatedQuay.Status.ConfigEditorCredentialsSecret = configEditorCredentialsSecretFrom(deploymentObjects)
+	cfgsecret := configEditorCredentialsSecretFrom(deploymentObjects)
+	updatedQuay.Status.ConfigEditorCredentialsSecret = cfgsecret
 
-	if c := v1.GetCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked); c != nil && c.Status == metav1.ConditionTrue && c.Reason == v1.ConditionReasonConfigInvalid {
-		return r.reconcileWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonConfigInvalid, c.Message)
+	rolloutBlocked := v1.GetCondition(
+		updatedQuay.Status.Conditions,
+		v1.ConditionTypeRolloutBlocked,
+	)
+	if rolloutBlocked != nil {
+		invalid := rolloutBlocked.Reason == v1.ConditionReasonConfigInvalid
+		if invalid && rolloutBlocked.Status == metav1.ConditionTrue {
+			return r.reconcileWithCondition(
+				ctx,
+				updatedQuay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				rolloutBlocked.Message,
+			)
+		}
 	}
 
-	updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionTypeRolloutBlocked, metav1.ConditionFalse, v1.ConditionReasonComponentsCreationSuccess, "All objects created/updated successfully")
-	if err != nil {
+	if err := r.updateWithCondition(
+		ctx,
+		updatedQuay,
+		v1.ConditionTypeRolloutBlocked,
+		metav1.ConditionFalse,
+		v1.ConditionReasonComponentsCreationSuccess,
+		"All objects created/updated successfully",
+	); err != nil {
 		log.Error(err, "failed to update `conditions` of `QuayRegistry`")
-
-		return ctrl.Result{}, nil
+		return r.Requeue, nil
 	}
 
-	if !quayContext.ObjectStorageInitialized && v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage") {
+	osmanaged = v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage")
+	if osmanaged && !quayContext.ObjectStorageInitialized {
 		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
-
-		return ctrl.Result{Requeue: true}, nil
+		return r.Requeue, nil
 	}
 
-	updatedQuay, upToDate := v1.EnsureRegistryEndpoint(quayContext, updatedQuay, userProvidedConfig)
+	upToDate := v1.EnsureRegistryEndpoint(quayContext, updatedQuay, usercfg)
 	if !upToDate {
 		if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `registryEndpoint` of `QuayRegistry`")
-			return ctrl.Result{Requeue: true}, nil
+			return r.Requeue, nil
 		}
 	}
 
+	// if the version differ then it means that the operator was upgraded and we need
+	// to wait until the database upgrade job finishes. sets a condition here and
+	// returns.
 	if updatedQuay.Status.CurrentVersion != v1.QuayVersionCurrent {
-		updatedQuay, err = r.updateWithCondition(updatedQuay, v1.ConditionComponentsCreated, metav1.ConditionFalse, v1.ConditionReasonMigrationsInProgress, "running database migrations")
-		if err != nil {
+		if err := r.updateWithCondition(
+			ctx,
+			updatedQuay,
+			v1.ConditionComponentsCreated,
+			metav1.ConditionFalse,
+			v1.ConditionReasonMigrationsInProgress,
+			"running database migrations",
+		); err != nil {
 			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
 		}
-		return ctrl.Result{RequeueAfter: time.Second}, nil
+		return r.Requeue, nil
 	}
 
 	if !controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
 		controllerutil.AddFinalizer(updatedQuay, QuayOperatorFinalizer)
-		err = r.Update(ctx, updatedQuay)
-		if err != nil {
-			return ctrl.Result{}, err
+		if err := r.Update(ctx, updatedQuay); err != nil {
+			return r.Requeue, err
 		}
 	}
 
-	return ctrl.Result{}, nil
+	// when we get to this point all objects were created as expected and we can safely
+	// increase our reconcile delay.
+	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
-// updateGrafanaDashboardData parses the Grafana Dashboard ConfigMap and updates the title and labels to filter the query by
-func updateGrafanaDashboardData(obj client.Object, quayName string, quayNamespace string) (client.Object, error) {
-	updatedObj := obj.DeepCopyObject()
-	configMapObj := updatedObj.(*corev1.ConfigMap)
-
-	dashboardConfigJSON := configMapObj.Data[QuayDashboardJSONKey]
-
-	newTitle := fmt.Sprintf("Quay - %s - %s", quayNamespace, quayName)
-	dashboardConfigJSON, err := sjson.Set(dashboardConfigJSON, GrafanaTitleJSONPath, newTitle)
-	if err != nil {
-		return nil, err
+// updateGrafanaDashboardData parses the Grafana Dashboard ConfigMap and updates the title and
+// labels to filter the query by
+func updateGrafanaDashboardData(obj client.Object, quay *v1.QuayRegistry) error {
+	cm, ok := obj.(*corev1.ConfigMap)
+	if !ok {
+		return fmt.Errorf("unable to cast object to ConfigMap type")
 	}
 
-	dashboardConfigJSON, err = sjson.Set(dashboardConfigJSON, GrafanaNamespaceFilterJSONPath, quayNamespace)
+	config := cm.Data[QuayDashboardJSONKey]
+
+	title := fmt.Sprintf("Quay - %s - %s", quay.GetNamespace(), quay.GetName())
+	config, err := sjson.Set(config, GrafanaTitleJSONPath, title)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	metricsServiceName := fmt.Sprintf("%s-quay-metrics", quayName)
-	dashboardConfigJSON, err = sjson.Set(dashboardConfigJSON, GrafanaServiceFilterJSONPath, metricsServiceName)
-	if err != nil {
-		return nil, err
+	if config, err = sjson.Set(
+		config, GrafanaNamespaceFilterJSONPath, quay.GetNamespace(),
+	); err != nil {
+		return err
 	}
 
-	configMapObj.Data[QuayDashboardJSONKey] = dashboardConfigJSON
-	return configMapObj, nil
+	metricsServiceName := fmt.Sprintf("%s-quay-metrics", quay.GetName())
+	config, err = sjson.Set(config, GrafanaServiceFilterJSONPath, metricsServiceName)
+	if err != nil {
+		return err
+	}
+
+	cm.Data[QuayDashboardJSONKey] = config
+	return nil
 }
 
-// updateResourceNamespace updates an Object's namespace replacing the existing namespace
-func updateResourceNamespace(obj client.Object, newNamespace string) client.Object {
-	obj.(*corev1.ConfigMap).SetNamespace(newNamespace)
-
-	return obj
-}
-
-// isGrafanaConfigMap checks if an Object is the Grafana ConfigMap used in the monitoring component
+// isGrafanaConfigMap checks if an Object is the Grafana ConfigMap used in the monitoring
+// component.
 func isGrafanaConfigMap(obj client.Object) bool {
-	configMapGVK := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
+	if !strings.HasSuffix(obj.GetName(), GrafanaDashboardConfigMapNameSuffix) {
+		return false
+	}
 
-	return configMapGVK == obj.GetObjectKind().GroupVersionKind() &&
-		strings.HasSuffix(obj.(*corev1.ConfigMap).GetName(), GrafanaDashboardConfigMapNameSuffix)
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	return gvk.Version == "v1" && gvk.Kind == "ConfigMap"
 }
 
 func encode(value interface{}) []byte {
@@ -518,122 +662,107 @@ func decode(bytes []byte) interface{} {
 	return value
 }
 
-func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj client.Object, quay v1.QuayRegistry) error {
-	objectMeta, _ := meta.Accessor(obj)
-	groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
-
-	immutableResources := map[string]bool{
-		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String(): true,
-		schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}.String():  true,
-	}
-
-	log := r.Log.WithValues(
-		"quayregistry", quay.GetNamespace(),
-		"Name", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+func (r *QuayRegistryReconciler) createOrUpdateObject(
+	ctx context.Context, obj client.Object, quay v1.QuayRegistry, log logr.Logger,
+) error {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	log = log.WithValues("kind", gvk.Kind, "name", obj.GetName())
 	log.Info("creating/updating object")
 
-	obj, err := v1.EnsureOwnerReference(&quay, obj)
-	if err != nil {
-		log.Error(err, "could not ensure `ownerReferences` before creating object", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
-		return err
+	immutableResources := map[schema.GroupVersionKind]bool{
+		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}: true,
+		schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}:  true,
 	}
 
-	// Remove owner reference to prevent cross-namespace owner reference
+	// we set the owner in the object except when it belongs to a different namespace,
+	// on this case we have only the grafana dashboard that lives in another place.
+	obj = v1.EnsureOwnerReference(&quay, obj)
 	if isGrafanaConfigMap(obj) {
-		obj, err = v1.RemoveOwnerReference(&quay, obj)
-		if err != nil {
-			log.Error(err, "could not remove `ownerReferences` before creating object", objectMeta.GetName(), "GroupVersionKind", groupVersionKind)
+		var err error
+		if obj, err = v1.RemoveOwnerReference(&quay, obj); err != nil {
+			log.Error(err, "could not remove `ownerReferences` from grafana config")
 			return err
 		}
 	}
 
 	// managedFields cannot be set on a PATCH.
-	objectMeta.SetManagedFields([]metav1.ManagedFieldsEntry{})
+	obj.SetManagedFields([]metav1.ManagedFieldsEntry{})
 
-	if immutableResources[groupVersionKind] {
-		log.Info("(re)creating immutable resource")
-
+	if immutableResources[gvk] {
 		propagationPolicy := metav1.DeletePropagationForeground
-		if err := r.Client.Delete(ctx, obj, &client.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil && !errors.IsNotFound(err) && !errors.IsAlreadyExists(err) {
-			log.Error(err, "failed to delete immutable resource")
+		opts := &client.DeleteOptions{
+			PropagationPolicy: &propagationPolicy,
+		}
 
+		if err := r.Client.Delete(ctx, obj, opts); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "failed to delete immutable resource")
 			return err
 		}
 
-		err := wait.Poll(creationPollInterval, creationPollTimeout, func() (bool, error) {
-			if err := r.Client.Create(ctx, obj); err == nil {
+		if err := wait.Poll(
+			creationPollInterval,
+			creationPollTimeout,
+			func() (bool, error) {
+				if err := r.Client.Create(ctx, obj); err != nil {
+					return false, nil
+				}
 				return true, nil
-			} else if errors.IsAlreadyExists(err) {
-				return false, nil
-			} else {
-				return false, err
-			}
-		})
-
-		if err != nil {
+			},
+		); err != nil {
 			log.Error(err, "failed to create immutable resource")
-
 			return err
 		}
 
 		log.Info("succefully (re)created immutable resource")
-	} else {
-		opts := []client.PatchOption{client.ForceOwnership, client.FieldOwner("quay-operator")}
-		if err := r.Client.Patch(ctx, obj, client.Apply, opts...); err != nil {
-			log.Error(err, "failed to create/update object")
+		return nil
+	}
 
-			return err
-		}
+	opts := []client.PatchOption{
+		client.ForceOwnership,
+		client.FieldOwner("quay-operator"),
+	}
+	if err := r.Client.Patch(ctx, obj, client.Apply, opts...); err != nil {
+		log.Error(err, "failed to create/update object")
+		return err
 	}
 
 	log.Info("finished creating/updating object")
-
 	return nil
 }
 
-func (r *QuayRegistryReconciler) updateWithCondition(q *v1.QuayRegistry, t v1.ConditionType, s metav1.ConditionStatus, reason v1.ConditionReason, msg string) (*v1.QuayRegistry, error) {
-	updatedQuay := q.DeepCopy()
-
+func (r *QuayRegistryReconciler) updateWithCondition(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+	ctype v1.ConditionType,
+	cstatus metav1.ConditionStatus,
+	reason v1.ConditionReason,
+	msg string,
+) error {
 	condition := v1.Condition{
-		Type:               t,
-		Status:             s,
+		Type:               ctype,
+		Status:             cstatus,
 		Reason:             reason,
 		Message:            msg,
 		LastUpdateTime:     metav1.Now(),
 		LastTransitionTime: metav1.Now(),
 	}
-	updatedQuay.Status.Conditions = v1.SetCondition(q.Status.Conditions, condition)
-	updatedQuay.Status.LastUpdate = time.Now().UTC().String()
-
-	eventType := corev1.EventTypeNormal
-	if s == metav1.ConditionTrue {
-		eventType = corev1.EventTypeWarning
-	}
-
-	// FIXME: Need to pause here because race condition between updating `conditions` multiple times changes `resourceVersion`...
-	time.Sleep(1000 * time.Millisecond)
-
-	// Fetch first to ensure we have the right `resourceVersion` for updates.
-	var currentQuay v1.QuayRegistry
-	if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: q.GetNamespace(), Name: q.GetName()}, &currentQuay); err != nil {
-		return nil, err
-	}
-	updatedQuay.SetResourceVersion(currentQuay.GetResourceVersion())
-
-	if err := r.Client.Status().Update(context.Background(), updatedQuay); err != nil {
-		return nil, err
-	}
-	// FIXME: Events are not being recorded during testing, making it hard to debug...
-	r.EventRecorder.Event(updatedQuay, eventType, string(reason), msg)
-
-	return updatedQuay, nil
+	quay.Status.Conditions = v1.SetCondition(quay.Status.Conditions, condition)
+	quay.Status.LastUpdate = time.Now().UTC().String()
+	return r.Client.Status().Update(ctx, quay)
 }
 
-// reconcileWithCondition sets the given condition on the `QuayRegistry` and returns a reconcile result.
-func (r *QuayRegistryReconciler) reconcileWithCondition(q *v1.QuayRegistry, t v1.ConditionType, s metav1.ConditionStatus, reason v1.ConditionReason, msg string) (ctrl.Result, error) {
-	_, err := r.updateWithCondition(q, t, s, reason, msg)
-
-	return ctrl.Result{}, err
+// reconcileWithCondition sets the given condition on the `QuayRegistry` and returns a reconcile
+// result rescheduling the next loop.
+func (r *QuayRegistryReconciler) reconcileWithCondition(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+	ctype v1.ConditionType,
+	cstatus metav1.ConditionStatus,
+	reason v1.ConditionReason,
+	msg string,
+) (ctrl.Result, error) {
+	err := r.updateWithCondition(ctx, quay, ctype, cstatus, reason, msg)
+	return r.Requeue, err
 }
 
 // SetupWithManager initializes the controller manager
@@ -664,11 +793,17 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(ctx context.Context, quay v1.QuayRegistry) error {
-	var ns corev1.Namespace
-	err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
+// patchNamespaceForMonitoring adds a few labels to the namespace, these labels are
+// required to enable monitoring to "observer" the given namespace.
+func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(
+	ctx context.Context, quay v1.QuayRegistry,
+) error {
+	nsn := types.NamespacedName{
+		Name: quay.GetNamespace(),
+	}
 
-	if err != nil {
+	var ns corev1.Namespace
+	if err := r.Client.Get(ctx, nsn, &ns); err != nil {
 		return err
 	}
 
@@ -678,17 +813,16 @@ func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(ctx context.Context
 		labels[k] = v
 	}
 
-	if val, ok := labels[ClusterMonitoringLabelKey]; !ok || val != "true" {
-		labels[ClusterMonitoringLabelKey] = "true"
-		labels[QuayOperatorManagedLabelKey] = "true"
-		updatedNs.Labels = labels
-
-		patch := client.MergeFrom(&ns)
-		err = r.Client.Patch(context.Background(), updatedNs, patch)
-		return err
+	if val := labels[ClusterMonitoringLabelKey]; val == "true" {
+		return nil
 	}
 
-	return nil
+	labels[ClusterMonitoringLabelKey] = "true"
+	labels[QuayOperatorManagedLabelKey] = "true"
+	updatedNs.Labels = labels
+
+	patch := client.MergeFrom(&ns)
+	return r.Client.Patch(ctx, updatedNs, patch)
 }
 
 func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, quay *v1.QuayRegistry) error {
