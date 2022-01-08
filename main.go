@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -93,6 +94,7 @@ func main() {
 		EventRecorder:  mgr.GetEventRecorderFor("quayregistry-controller"),
 		WatchNamespace: namespace,
 		Mtx:            &mtx,
+		Requeue:        ctrl.Result{RequeueAfter: 10 * time.Second},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistry")
 		os.Exit(1)

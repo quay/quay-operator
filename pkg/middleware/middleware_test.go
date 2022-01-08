@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
-	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 const (
@@ -23,7 +22,6 @@ const (
 
 var processTests = []struct {
 	name          string
-	ctx           *quaycontext.QuayRegistryContext
 	quay          *v1.QuayRegistry
 	obj           client.Object
 	expected      client.Object
@@ -31,7 +29,6 @@ var processTests = []struct {
 }{
 	{
 		"quayConfigBundle",
-		&quaycontext.QuayRegistryContext{},
 		&v1.QuayRegistry{},
 		&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -49,10 +46,6 @@ var processTests = []struct {
 	},
 	{
 		"quayAppRouteTLSUnmanaged",
-		&quaycontext.QuayRegistryContext{
-			TLSCert: []byte(tlsCert),
-			TLSKey:  []byte(tlsKey),
-		},
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -84,10 +77,6 @@ var processTests = []struct {
 	},
 	{
 		"quayBuilderRouteTLSUnmanaged",
-		&quaycontext.QuayRegistryContext{
-			TLSCert: []byte(tlsCert),
-			TLSKey:  []byte(tlsKey),
-		},
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -116,10 +105,6 @@ var processTests = []struct {
 	},
 	{
 		"quayAppRouteTLSManaged",
-		&quaycontext.QuayRegistryContext{
-			TLSCert: []byte(tlsCert),
-			TLSKey:  []byte(tlsKey),
-		},
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -142,7 +127,6 @@ var processTests = []struct {
 	},
 	{
 		"volumeSizeDefault",
-		&quaycontext.QuayRegistryContext{},
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -171,7 +155,6 @@ var processTests = []struct {
 	},
 	{
 		"volumeSizeOverridePostgres",
-		&quaycontext.QuayRegistryContext{},
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -198,7 +181,6 @@ var processTests = []struct {
 	},
 	{
 		"volumeSizeOverrideClairPostgres",
-		&quaycontext.QuayRegistryContext{},
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -226,7 +208,6 @@ var processTests = []struct {
 	},
 	{
 		"volumeSizeShrinkError",
-		&quaycontext.QuayRegistryContext{},
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
@@ -254,7 +235,7 @@ func TestProcess(t *testing.T) {
 	for _, test := range processTests {
 
 		t.Run(test.name, func(t *testing.T) {
-			processedObj, err := Process(test.ctx, test.quay, test.obj)
+			processedObj, err := Process(test.quay, test.obj)
 			if test.expectedError != nil {
 				assert.Error(err, test.name)
 			} else {

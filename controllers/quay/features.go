@@ -15,10 +15,8 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,267 +33,304 @@ const (
 	datastoreAccessKey     = "AWS_ACCESS_KEY_ID"
 	datastoreSecretKey     = "AWS_SECRET_ACCESS_KEY"
 
-	databaseSecretKey = "DATABASE_SECRET_KEY"
-	secretKey         = "SECRET_KEY"
-	dbURI             = "DB_URI"
-	dbRootPw          = "DB_ROOT_PW"
+	databaseSecretKey    = "DATABASE_SECRET_KEY"
+	secretKey            = "SECRET_KEY"
+	dbURI                = "DB_URI"
+	dbRootPw             = "DB_ROOT_PW"
+	configEditorPw       = "CONFIG_EDITOR_PW"
+	securityScannerV4PSK = "SECURITY_SCANNER_V4_PSK"
 
 	GrafanaDashboardConfigNamespace = "openshift-config-managed"
 )
 
-// FeatureDetection is a method which should return an updated `QuayRegistryContext` after performing a feature detection task.
-// TODO(alecmerdler): Refactor all "feature detection" functions to use a common function interface...
-type FeatureDetection func(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error)
-
-func (r *QuayRegistryReconciler) checkManagedKeys(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
-	var secrets corev1.SecretList
+// checkManagedKeys populates the provided QuayRegistryContext with the information we
+// persist in between Reconcile calls. The information kept from one Reconcile loop to
+// the next is stored in a secret.
+func (r *QuayRegistryReconciler) checkManagedKeys(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) error {
 	listOptions := &client.ListOptions{
 		Namespace: quay.GetNamespace(),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			kustomize.QuayRegistryNameLabel: quay.GetName(),
-		}),
+		LabelSelector: labels.SelectorFromSet(
+			map[string]string{
+				kustomize.QuayRegistryNameLabel: quay.GetName(),
+			},
+		),
 	}
 
-	if err := r.List(context.Background(), &secrets, listOptions); err != nil {
-		return ctx, quay, err
+	var secrets corev1.SecretList
+	if err := r.List(ctx, &secrets, listOptions); err != nil {
+		return err
 	}
 
 	for _, secret := range secrets.Items {
-		if v1.IsManagedKeysSecretFor(quay, &secret) {
-			ctx.DatabaseSecretKey = string(secret.Data[databaseSecretKey])
-			ctx.SecretKey = string(secret.Data[secretKey])
-			ctx.DbUri = string(secret.Data[dbURI])
-			ctx.DbRootPw = string(secret.Data[dbRootPw])
-			break
+		if !v1.IsManagedKeysSecretFor(quay, &secret) {
+			continue
 		}
+
+		qctx.DatabaseSecretKey = string(secret.Data[databaseSecretKey])
+		qctx.SecretKey = string(secret.Data[secretKey])
+		qctx.DbUri = string(secret.Data[dbURI])
+		qctx.DbRootPw = string(secret.Data[dbRootPw])
+		qctx.ConfigEditorPw = string(secret.Data[configEditorPw])
+		qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
+		break
 	}
 
-	return ctx, quay, nil
+	return nil
 }
 
-func (r *QuayRegistryReconciler) checkManagedTLS(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
-	providedTLSCert := configBundle["ssl.cert"]
-	providedTLSKey := configBundle["ssl.key"]
+// checkManagedTLS verifies if provided bundle contains entries for ssl key and cert,
+// populate the data in provided QuayRegistryContext if found.
+func (r *QuayRegistryReconciler) checkManagedTLS(
+	qctx *quaycontext.QuayRegistryContext, bundle *corev1.Secret,
+) {
+	providedTLSCert := bundle.Data["ssl.cert"]
+	providedTLSKey := bundle.Data["ssl.key"]
 
-	if providedTLSCert != nil && providedTLSKey != nil {
-		r.Log.Info("provided TLS cert/key pair in `configBundleSecret` will be used")
-		ctx.TLSCert = providedTLSCert
-		ctx.TLSKey = providedTLSKey
-
-		return ctx, quay, nil
-	} else {
-		r.Log.Info("TLS cert/key pair not provided, will use default cluster wildcard cert")
+	if len(providedTLSCert) == 0 || len(providedTLSKey) == 0 {
+		r.Log.Info("TLS cert/key pair not provided, using default cluster wildcard cert")
+		return
 	}
 
-	return ctx, quay, nil
+	r.Log.Info("provided TLS cert/key pair in `configBundleSecret` will be used")
+	qctx.TLSCert = providedTLSCert
+	qctx.TLSKey = providedTLSKey
 }
 
-func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
-	// NOTE: The `route` component is unique because we allow users to set the `SERVER_HOSTNAME` field instead of controlling the entire fieldgroup.
-	// This value is then passed to the created `Route` using a Kustomize variable.
+// checkRoutesAvailable checks if the cluster supports Route objects. // XXX here
+// be dragons. This functions attempts to create a fake route and then read the
+// certificate used on it, this should be refactored. This is as wrong as it can
+// get.
+func (r *QuayRegistryReconciler) checkRoutesAvailable(
+	ctx context.Context,
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+	bundle *corev1.Secret,
+) error {
+	// NOTE: The `route` component is unique because we allow users to set the
+	// `SERVER_HOSTNAME` field instead of controlling the entire fieldgroup. This
+	// value is then passed to the created `Route` using a Kustomize variable.
 	var config map[string]interface{}
-	if err := yaml.Unmarshal(configBundle["config.yaml"], &config); err != nil {
-		return ctx, quay, err
+	if err := yaml.Unmarshal(bundle.Data["config.yaml"], &config); err != nil {
+		return err
 	}
 
 	fieldGroup, err := hostsettings.NewHostSettingsFieldGroup(config)
 	if err != nil {
-		return ctx, quay, err
+		return err
 	}
 
 	if fieldGroup.ServerHostname != "" {
-		ctx.ServerHostname = fieldGroup.ServerHostname
+		qctx.ServerHostname = fieldGroup.ServerHostname
 	}
 
-	fakeRoute, err := v1.EnsureOwnerReference(quay, &routev1.Route{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      quay.GetName() + "-test-route",
-			Namespace: quay.GetNamespace(),
+	fakeRoute := v1.EnsureOwnerReference(
+		quay,
+		&routev1.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-test-route", quay.GetName()),
+				Namespace: quay.GetNamespace(),
+			},
+			Spec: routev1.RouteSpec{
+				To: routev1.RouteTargetReference{
+					Kind: "Service",
+					Name: "none",
+				},
+			},
 		},
-		Spec: routev1.RouteSpec{To: routev1.RouteTargetReference{Kind: "Service", Name: "none"}},
-	})
+	)
 
+	// if we fail to create the fake route and the failure is not IsAlreadyExists then
+	// we consider as if the cluster does not support Route objects. XXX This must be
+	// redesigned. I am keeping the logic as is but we shouldn't blindly trust that any
+	// error means "does not support routes".
+	if err := r.Client.Create(ctx, fakeRoute); err != nil && !errors.IsAlreadyExists(err) {
+		r.Log.Info("cluster does not support `Route` API", "error", err)
+		return nil
+	}
+
+	// Wait until `status.ingress` is populated (should be immediately).
+	r.Log.Info("cluster supports `Routes` API")
+	var rt routev1.Route
+	if err := wait.Poll(
+		time.Second,
+		5*time.Minute,
+		func() (done bool, err error) {
+			routensn := types.NamespacedName{
+				Name:      fmt.Sprintf("%s-test-route", quay.GetName()),
+				Namespace: quay.GetNamespace(),
+			}
+
+			if err := r.Client.Get(ctx, routensn, &rt); err != nil {
+				return true, err
+			}
+
+			if len(rt.Status.Ingress) == 0 {
+				r.Log.Info("waiting to detect `routerCanonicalHostname`")
+				return false, nil
+			}
+
+			qctx.SupportsRoutes = true
+			prefix := fmt.Sprintf("router-%s.", rt.Status.Ingress[0].RouterName)
+			cnname := rt.Status.Ingress[0].RouterCanonicalHostname
+			qctx.ClusterHostname = strings.TrimPrefix(cnname, prefix)
+			r.Log.Info("Detected cluster hostname " + qctx.ClusterHostname)
+			return true, nil
+		},
+	); err != nil {
+		return err
+	}
+
+	if qctx.ServerHostname == "" {
+		qctx.ServerHostname = fmt.Sprintf(
+			"%s-quay-%s.%s",
+			quay.GetName(),
+			quay.GetNamespace(),
+			qctx.ClusterHostname,
+		)
+	}
+
+	wildcard, err := getCertificatesPEM(rt.Spec.Host + ":443")
 	if err != nil {
-		return ctx, quay, err
+		return err
 	}
+	qctx.ClusterWildcardCert = wildcard
 
-	if err := r.Client.Create(context.Background(), fakeRoute); err == nil || errors.IsAlreadyExists(err) {
-		r.Log.Info("cluster supports `Routes` API")
-
-		// Wait until `status.ingress` is populated (should be immediately).
-		err = wait.Poll(500*time.Millisecond, 5*time.Minute, func() (done bool, err error) {
-			if err := r.Client.Get(context.Background(), types.NamespacedName{Name: quay.GetName() + "-test-route", Namespace: quay.GetNamespace()}, fakeRoute); err != nil {
-				return false, client.IgnoreNotFound(err)
-			}
-
-			if len(fakeRoute.(*routev1.Route).Status.Ingress) > 0 {
-				ctx.SupportsRoutes = true
-				routerName := fakeRoute.(*routev1.Route).Status.Ingress[0].RouterName
-				routerCanonicalHostname := fakeRoute.(*routev1.Route).Status.Ingress[0].RouterCanonicalHostname
-				ctx.ClusterHostname = strings.TrimPrefix(routerCanonicalHostname, "router-"+routerName+".")
-				r.Log.Info("Detected cluster hostname " + ctx.ClusterHostname)
-
-				return true, nil
-			}
-
-			r.Log.Info("waiting to detect `routerCanonicalHostname`")
-
-			return false, nil
-		})
-		if err != nil {
-			return ctx, quay, err
-		}
-
-		if ctx.ServerHostname == "" {
-			ctx.ServerHostname = strings.Join([]string{
-				strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
-				ctx.ClusterHostname},
-				".")
-		}
-
-		r.Log.Info("detected router canonical hostname: " + ctx.ClusterHostname)
-
-		// TODO(alecmerdler): Try to fetch the wildcard cert from the `ConfigMap` at `openshift-config-managed/default-ingress-cert`...
-		clusterWildcardCert, err := getCertificatesPEM(fakeRoute.(*routev1.Route).Spec.Host + ":443")
-		if err != nil {
-			return ctx, quay, err
-		}
-
-		ctx.ClusterWildcardCert = clusterWildcardCert
-
-		r.Log.Info("detected cluster wildcard certificate for " + ctx.ClusterHostname)
-
-		if err := r.Client.Delete(context.Background(), fakeRoute); err != nil {
-			return ctx, quay, err
-		}
-
-		return ctx, quay, nil
-	}
-
-	r.Log.Info("cluster does not support `Route` API", "error", err)
-
-	return ctx, quay, nil
+	return r.Client.Delete(ctx, &rt)
 }
 
-func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
-	datastoreName := types.NamespacedName{Namespace: quay.GetNamespace(), Name: quay.GetName() + "-quay-datastore"}
-	var objectBucketClaims objectbucket.ObjectBucketClaimList
-	if err := r.Client.List(context.Background(), &objectBucketClaims); err == nil {
-		r.Log.Info("cluster supports `ObjectBucketClaims` API")
+func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) error {
+	dstorensn := types.NamespacedName{
+		Name:      fmt.Sprintf("%s-quay-datastore", quay.GetName()),
+		Namespace: quay.GetNamespace(),
+	}
 
-		ctx.SupportsObjectStorage = true
+	var claims objectbucket.ObjectBucketClaimList
+	if err := r.Client.List(ctx, &claims); err != nil {
+		return fmt.Errorf("unable to list object bucket claims: %s", err)
+	}
 
-		found := false
-		for _, obc := range objectBucketClaims.Items {
-			if obc.GetNamespace()+"/"+obc.GetName() == datastoreName.String() {
-				found = true
-				r.Log.Info("`ObjectBucketClaim` exists")
+	qctx.SupportsObjectStorage = true
+	r.Log.Info("cluster supports `ObjectBucketClaims` API")
 
-				var datastoreSecret corev1.Secret
-				if err = r.Client.Get(context.Background(), datastoreName, &datastoreSecret); err != nil {
-					r.Log.Error(err, "unable to retrieve Quay datastore `Secret`")
+	for _, obc := range claims.Items {
+		if obc.GetNamespace()+"/"+obc.GetName() != dstorensn.String() {
+			continue
+		}
 
-					return ctx, quay, err
-				}
+		r.Log.Info("`ObjectBucketClaim` exists")
 
-				var datastoreConfig corev1.ConfigMap
-				if err = r.Client.Get(context.Background(), datastoreName, &datastoreConfig); err != nil {
-					r.Log.Error(err, "unable to retrieve Quay datastore `ConfigMap`")
+		var datastoreSecret corev1.Secret
+		if err := r.Client.Get(ctx, dstorensn, &datastoreSecret); err != nil {
+			r.Log.Error(err, "error retrieving secret, bucket claim not ready")
+			return fmt.Errorf("awaiting for bucket claim to be processed")
+		}
 
-					return ctx, quay, err
-				}
+		var datastoreConfig corev1.ConfigMap
+		if err := r.Client.Get(ctx, dstorensn, &datastoreConfig); err != nil {
+			r.Log.Error(err, "error retrieving config map, bucket claim not ready")
+			return fmt.Errorf("awaiting for bucket claim to be processed")
+		}
 
-				r.Log.Info("found `ObjectBucketClaim` and credentials `Secret`, `ConfigMap`")
-
-				host := string(datastoreConfig.Data[datastoreBucketHostKey])
-				if strings.Contains(host, ".svc") && !strings.Contains(host, ".svc.cluster.local") {
-					r.Log.Info("`ObjectBucketClaim` is using in-cluster endpoint, ensuring we use the fully qualified domain name")
-					host = strings.ReplaceAll(host, ".svc", ".svc.cluster.local")
-				}
-
-				ctx.StorageBucketName = string(datastoreConfig.Data[datastoreBucketNameKey])
-				ctx.StorageHostname = host
-				ctx.StorageAccessKey = string(datastoreSecret.Data[datastoreAccessKey])
-				ctx.StorageSecretKey = string(datastoreSecret.Data[datastoreSecretKey])
-				ctx.ObjectStorageInitialized = true
+		r.Log.Info("found `ObjectBucketClaim` and credentials `Secret`, `ConfigMap`")
+		host := string(datastoreConfig.Data[datastoreBucketHostKey])
+		if strings.Contains(host, ".svc") {
+			if !strings.Contains(host, ".svc.cluster.local") {
+				host = strings.ReplaceAll(host, ".svc", ".svc.cluster.local")
 			}
 		}
 
-		if !found {
-			r.Log.Info("`ObjectBucketClaim` not found")
-		}
-
-	} else if err != nil {
-		r.Log.Info("cluster does not support `ObjectBucketClaim` API")
+		qctx.StorageBucketName = string(datastoreConfig.Data[datastoreBucketNameKey])
+		qctx.StorageHostname = host
+		qctx.StorageAccessKey = string(datastoreSecret.Data[datastoreAccessKey])
+		qctx.StorageSecretKey = string(datastoreSecret.Data[datastoreSecretKey])
+		qctx.ObjectStorageInitialized = true
+		return nil
 	}
 
-	return ctx, quay, nil
+	r.Log.Info("`ObjectBucketClaim` not found")
+	return nil
 }
 
-// TODO: Improve this once `builds` is a managed component.
-func (r *QuayRegistryReconciler) checkBuildManagerAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+// checkBuildManagerAvailable verifies if the config bundle contains an entry pointing to the
+// buildman host. If it contains then sets it properly in the provided QuayRegistryContext
+func (r *QuayRegistryReconciler) checkBuildManagerAvailable(
+	qctx *quaycontext.QuayRegistryContext, bundle *corev1.Secret,
+) error {
 	var config map[string]interface{}
-	if err := yaml.Unmarshal(configBundle["config.yaml"], &config); err != nil {
-		return ctx, quay, err
+	if err := yaml.Unmarshal(bundle.Data["config.yaml"], &config); err != nil {
+		return err
 	}
 
 	if buildManagerHostname, ok := config["BUILDMAN_HOSTNAME"]; ok {
-		ctx.BuildManagerHostname = buildManagerHostname.(string)
+		qctx.BuildManagerHostname = buildManagerHostname.(string)
 	}
 
-	return ctx, quay, nil
+	return nil
 }
 
 // Validates if the monitoring component can be run. We assume that we are
 // running in an Openshift environment with cluster monitoring enabled for our
 // monitoring component to work
-func (r *QuayRegistryReconciler) checkMonitoringAvailable(ctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, configBundle map[string][]byte) (*quaycontext.QuayRegistryContext, *v1.QuayRegistry, error) {
+func (r *QuayRegistryReconciler) checkMonitoringAvailable(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext,
+) error {
 	if len(r.WatchNamespace) > 0 {
-		msg := "monitoring is only supported in AllNamespaces mode. Disabling component monitoring"
+		msg := "Monitoring is only supported in AllNamespaces mode. Disabling."
 		r.Log.Info(msg)
-		err := fmt.Errorf(msg)
-		return ctx, quay, err
+		return fmt.Errorf(msg)
 	}
 
 	var serviceMonitors prometheusv1.ServiceMonitorList
-	if err := r.Client.List(context.Background(), &serviceMonitors); err != nil {
+	if err := r.Client.List(ctx, &serviceMonitors); err != nil {
 		r.Log.Info("Unable to find ServiceMonitor CRD. Monitoring component disabled")
-		return ctx, quay, err
+		return err
 	}
 	r.Log.Info("cluster supports `ServiceMonitor` API")
 
 	var prometheusRules prometheusv1.PrometheusRuleList
-	if err := r.Client.List(context.Background(), &prometheusRules); err != nil {
+	if err := r.Client.List(ctx, &prometheusRules); err != nil {
 		r.Log.Info("Unable to find PrometheusRule CRD. Monitoring component disabled")
-		return ctx, quay, err
+		return err
 	}
 	r.Log.Info("cluster supports `PrometheusRules` API")
 
-	namespaceKey := types.NamespacedName{Name: GrafanaDashboardConfigNamespace}
-	var grafanaDashboardNamespace corev1.Namespace
-	if err := r.Client.Get(context.Background(), namespaceKey, &grafanaDashboardNamespace); err != nil {
-		msg := fmt.Sprintf("Unable to find the Grafana config namespace %s. Monitoring component disabled", GrafanaDashboardConfigNamespace)
-		r.Log.Info(msg)
-		return ctx, quay, err
+	namespaceKey := types.NamespacedName{
+		Name: GrafanaDashboardConfigNamespace,
 	}
+
+	var grafanaDashboardNamespace corev1.Namespace
+	if err := r.Client.Get(ctx, namespaceKey, &grafanaDashboardNamespace); err != nil {
+		return fmt.Errorf("unable to get grafana namespace: %s", err)
+	}
+
 	r.Log.Info(GrafanaDashboardConfigNamespace + " found")
-
-	ctx.SupportsMonitoring = true
-
-	return ctx, quay, nil
+	qctx.SupportsMonitoring = true
+	return nil
 }
 
+// configEditorCredentialsSecretFrom returns the name of the secret that contains the
+// credentials for the config editor. If the secret does not exist among the provided
+// list an empty string is returned instead.
 func configEditorCredentialsSecretFrom(objs []client.Object) string {
 	for _, obj := range objs {
-		objectMeta, _ := meta.Accessor(obj)
-		groupVersionKind := obj.GetObjectKind().GroupVersionKind().String()
-		secretGVK := schema.GroupVersionKind{Version: "v1", Kind: "Secret"}.String()
-
-		if groupVersionKind == secretGVK && strings.Contains(objectMeta.GetName(), "quay-config-editor-credentials") {
-			return objectMeta.GetName()
+		if !strings.Contains(obj.GetName(), "quay-config-editor-credentials") {
+			continue
 		}
-	}
 
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		if gvk.Version != "v1" {
+			continue
+		}
+		if gvk.Kind != "Secret" {
+			continue
+		}
+
+		return obj.GetName()
+	}
 	return ""
 }
 

@@ -242,6 +242,35 @@ type QuayRegistryList struct {
 	Items           []QuayRegistry `json:"items"`
 }
 
+// MigrationsRunning returns true if the status for provided QuayRegistry indicates that
+// the database migrations are running.
+func MigrationsRunning(quay *QuayRegistry) bool {
+	created := GetCondition(quay.Status.Conditions, ConditionComponentsCreated)
+	if created == nil {
+		return false
+	}
+	return created.Reason == ConditionReasonMigrationsInProgress
+}
+
+// FlaggedForDeletion returns a boolean indicating if provided QuayRegistry object has
+// been flagged for deletion.
+func FlaggedForDeletion(quay *QuayRegistry) bool {
+	return quay.GetDeletionTimestamp() != nil
+}
+
+// NeedsBundleSecret returns if provided QuayRegistry has not a config bundle secret
+// populated on its Spec.ConfigBundleSecret property.
+func NeedsBundleSecret(quay *QuayRegistry) bool {
+	return quay.Spec.ConfigBundleSecret == ""
+}
+
+// ComponentSupportsConfigWhenManaged returns true if provided component can live with
+// being Managed AND containing a custom user config provided through the config bundle
+// secret.
+func ComponentSupportsConfigWhenManaged(cmp Component) bool {
+	return cmp.Kind == ComponentRoute || cmp.Kind == ComponentMirror
+}
+
 func EnsureComponents(components []Component) []Component {
 	return append(components, components[0])[1 : len(components)+1]
 }
@@ -375,24 +404,28 @@ func ValidateOverrides(quay *QuayRegistry) error {
 
 }
 
-// EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was unchanged.
-func EnsureRegistryEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry, config map[string]interface{}) (*QuayRegistry, bool) {
-	updatedQuay := quay.DeepCopy()
-
+// EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was
+// unchanged.
+func EnsureRegistryEndpoint(
+	qctx *quaycontext.QuayRegistryContext, quay *QuayRegistry, config map[string]interface{},
+) bool {
+	orig := quay.Status.RegistryEndpoint
 	if config == nil {
 		config = map[string]interface{}{}
 	}
 
 	if serverHostname, ok := config["SERVER_HOSTNAME"]; ok {
-		updatedQuay.Status.RegistryEndpoint = "https://" + serverHostname.(string)
-	} else if ctx.SupportsRoutes {
-		updatedQuay.Status.RegistryEndpoint = "https://" + strings.Join([]string{
-			strings.Join([]string{quay.GetName(), "quay", quay.GetNamespace()}, "-"),
-			ctx.ClusterHostname},
-			".")
+		quay.Status.RegistryEndpoint = "https://" + serverHostname.(string)
+	} else if qctx.SupportsRoutes {
+		quay.Status.RegistryEndpoint = fmt.Sprintf(
+			"https://%s-quay-%s.%s",
+			quay.GetName(),
+			quay.GetNamespace(),
+			qctx.ClusterHostname,
+		)
 	}
 
-	return updatedQuay, quay.Status.RegistryEndpoint == updatedQuay.Status.RegistryEndpoint
+	return quay.Status.RegistryEndpoint == orig
 }
 
 // EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field and returns `ok` if it was unchanged.
@@ -429,33 +462,37 @@ func Owns(quay QuayRegistry, obj client.Object) bool {
 	return false
 }
 
-// EnsureOwnerReference adds an `ownerReference` to the given object if it does not already have one.
-func EnsureOwnerReference(quay *QuayRegistry, obj client.Object) (client.Object, error) {
-	objectMeta, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-
-	hasOwnerRef := false
-	for _, ownerRef := range objectMeta.GetOwnerReferences() {
-		if ownerRef.Name == quay.GetName() &&
-			ownerRef.Kind == "QuayRegistry" &&
-			ownerRef.APIVersion == GroupVersion.String() &&
-			ownerRef.UID == quay.UID {
-			hasOwnerRef = true
+// EnsureOwnerReference adds an `ownerReference` to the given object if it does not already
+// have one.
+func EnsureOwnerReference(quay *QuayRegistry, obj client.Object) client.Object {
+	for _, ownerRef := range obj.GetOwnerReferences() {
+		if ownerRef.Kind != "QuayRegistry" {
+			continue
 		}
+		if ownerRef.APIVersion != GroupVersion.String() {
+			continue
+		}
+		if ownerRef.Name != quay.GetName() {
+			continue
+		}
+		if ownerRef.UID != quay.UID {
+			continue
+		}
+		return obj
 	}
 
-	if !hasOwnerRef {
-		objectMeta.SetOwnerReferences(append(objectMeta.GetOwnerReferences(), metav1.OwnerReference{
-			APIVersion: GroupVersion.String(),
-			Kind:       "QuayRegistry",
-			Name:       quay.GetName(),
-			UID:        quay.GetUID(),
-		}))
-	}
-
-	return obj, nil
+	obj.SetOwnerReferences(
+		append(
+			obj.GetOwnerReferences(),
+			metav1.OwnerReference{
+				APIVersion: GroupVersion.String(),
+				Kind:       "QuayRegistry",
+				Name:       quay.GetName(),
+				UID:        quay.GetUID(),
+			},
+		),
+	)
+	return obj
 }
 
 // RemoveOwnerReference removes the `ownerReference` of `QuayRegistry` on the given object.
