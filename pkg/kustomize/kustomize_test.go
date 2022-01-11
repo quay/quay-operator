@@ -483,7 +483,7 @@ func TestInflate(t *testing.T) {
 
 	for _, test := range inflateTests {
 		t.Run(test.name, func(t *testing.T) {
-			pieces, err := Inflate(&test.ctx, test.quayRegistry, test.configBundle, log)
+			pieces, err := Inflate(&test.ctx, test.quayRegistry, test.configBundle, log, false)
 
 			assert.NotNil(pieces, test.name)
 			assert.Equal(len(test.expected), len(pieces), test.name)

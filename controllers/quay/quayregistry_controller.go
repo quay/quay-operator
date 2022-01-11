@@ -66,12 +66,13 @@ const (
 // QuayRegistryReconciler reconciles a QuayRegistry object
 type QuayRegistryReconciler struct {
 	client.Client
-	Log            logr.Logger
-	Scheme         *runtime.Scheme
-	EventRecorder  record.EventRecorder
-	WatchNamespace string
-	Mtx            *sync.Mutex
-	Requeue        ctrl.Result
+	Log                logr.Logger
+	Scheme             *runtime.Scheme
+	EventRecorder      record.EventRecorder
+	WatchNamespace     string
+	Mtx                *sync.Mutex
+	Requeue            ctrl.Result
+	NoResourceRequests bool
 }
 
 // manageQuayDeletion makes sure that we process a QuayRegistry once it is flagged for
@@ -474,7 +475,9 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	log.Info("inflating QuayRegistry into Kubernetes objects")
-	deploymentObjects, err := kustomize.Inflate(quayContext, updatedQuay, configBundle, log)
+	deploymentObjects, err := kustomize.Inflate(
+		quayContext, updatedQuay, configBundle, log, r.NoResourceRequests,
+	)
 	if err != nil {
 		return r.reconcileWithCondition(
 			ctx,

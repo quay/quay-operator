@@ -68,6 +68,10 @@ func main() {
 	flag.StringVar(&namespace, "namespace", "", "The Kubernetes namespace that the controller will watch.")
 	flag.Parse()
 
+	// if this environment variable is set the operator removes all resource requirements
+	// (requests and limits), this is useful for development purposes.
+	nores := os.Getenv("NO_RESOURCE_REQUESTS") == "true"
+
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -88,13 +92,14 @@ func main() {
 
 	var mtx sync.Mutex
 	if err = (&quaycontroller.QuayRegistryReconciler{
-		Client:         mgr.GetClient(),
-		Log:            ctrl.Log.WithName("controllers").WithName("QuayRegistry"),
-		Scheme:         mgr.GetScheme(),
-		EventRecorder:  mgr.GetEventRecorderFor("quayregistry-controller"),
-		WatchNamespace: namespace,
-		Mtx:            &mtx,
-		Requeue:        ctrl.Result{RequeueAfter: 10 * time.Second},
+		Client:             mgr.GetClient(),
+		Log:                ctrl.Log.WithName("controllers").WithName("QuayRegistry"),
+		Scheme:             mgr.GetScheme(),
+		EventRecorder:      mgr.GetEventRecorderFor("quayregistry-controller"),
+		WatchNamespace:     namespace,
+		Mtx:                &mtx,
+		Requeue:            ctrl.Result{RequeueAfter: 10 * time.Second},
+		NoResourceRequests: nores,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistry")
 		os.Exit(1)
