@@ -235,7 +235,7 @@ func TestProcess(t *testing.T) {
 	for _, test := range processTests {
 
 		t.Run(test.name, func(t *testing.T) {
-			processedObj, err := Process(test.quay, test.obj)
+			processedObj, err := Process(test.quay, test.obj, false)
 			if test.expectedError != nil {
 				assert.Error(err, test.name)
 			} else {

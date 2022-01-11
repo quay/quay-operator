@@ -6,6 +6,7 @@ import (
 
 	route "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -23,8 +24,9 @@ const (
 )
 
 // Process applies any additional middleware steps to a managed k8s object that cannot be
-// accomplished using the Kustomize toolchain.
-func Process(quay *v1.QuayRegistry, obj client.Object) (client.Object, error) {
+// accomplished using the Kustomize toolchain. if nores is set all resource requests are
+// trimmed from the objects thus deploying quay with a much smaller footprint.
+func Process(quay *v1.QuayRegistry, obj client.Object, nores bool) (client.Object, error) {
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -65,6 +67,14 @@ func Process(quay *v1.QuayRegistry, obj client.Object) (client.Object, error) {
 				replicas := int32(2)
 				dep.Spec.Replicas = &replicas
 				break
+			}
+		}
+
+		if nores {
+			// if we are deploying without resource requests we have to remove them
+			var noresources corev1.ResourceRequirements
+			for i := range dep.Spec.Template.Spec.Containers {
+				dep.Spec.Template.Spec.Containers[i].Resources = noresources
 			}
 		}
 
@@ -121,6 +131,14 @@ func Process(quay *v1.QuayRegistry, obj client.Object) (client.Object, error) {
 		}
 
 		return pvc, nil
+	}
+
+	if job, ok := obj.(*batchv1.Job); ok && nores {
+		// if we are deploying without resource requests we have to remove them
+		var noresources corev1.ResourceRequirements
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Resources = noresources
+		}
 	}
 
 	rt, ok := obj.(*route.Route)

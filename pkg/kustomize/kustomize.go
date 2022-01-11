@@ -452,6 +452,7 @@ func Inflate(
 	quay *v1.QuayRegistry,
 	bundle *corev1.Secret,
 	log logr.Logger,
+	nores bool,
 ) ([]client.Object, error) {
 	// Each managed component brings its own generated `config.yaml` fields which are
 	// accumulated under the key <component>.config.yaml and then added to the base `Secret`.
@@ -560,7 +561,7 @@ func Inflate(
 	}
 
 	for index, resource := range resources {
-		obj, err := middleware.Process(quay, resource)
+		obj, err := middleware.Process(quay, resource, nores)
 		if err != nil {
 			return nil, err
 		}
