@@ -51,6 +51,23 @@ func Process(quay *v1.QuayRegistry, obj client.Object) (client.Object, error) {
 	// then used as an environment variable and consumed by the app. we also need to remove
 	// all unused annotations from postgres deployment to avoid its redeployment.
 	if dep, ok := obj.(*appsv1.Deployment); ok {
+
+		// if HPA is unmanaged we set the number of replicas to 2 for some of our
+		// components (clair, mirror and quay). TODO(ricardomaraschini): this should
+		// be an override so users can determine the desired number of replicas.
+		noreplicas := dep.Spec.Replicas == nil
+		if noreplicas && !v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentHPA) {
+			for _, suffix := range []string{"clair-app", "quay-mirror", "quay-app"} {
+				if !strings.HasSuffix(dep.Name, suffix) {
+					continue
+				}
+
+				replicas := int32(2)
+				dep.Spec.Replicas = &replicas
+				break
+			}
+		}
+
 		// TODO we must not set annotations in objects where they are not needed. we also
 		// must stop mangling objects in this "middleware" thingy, what is the point of
 		// using kustomize if we keep changing stuff on the fly ?
