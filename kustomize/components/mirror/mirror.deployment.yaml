@@ -60,6 +60,21 @@ spec:
               value: "false"
             - name: ENSURE_NO_MIGRATION
               value: "true"
+            - name: HTTP_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: HTTP_PROXY
+            - name: HTTPS_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: HTTPS_PROXY
+            - name: NO_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: NO_PROXY
           # TODO: Determine if we need to set resource requirements
           volumeMounts:
             - name: config

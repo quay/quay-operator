@@ -53,7 +53,9 @@ func FieldGroupFor(
 
 		fieldGroup.FeatureSecurityScanner = true
 		fieldGroup.SecurityScannerV4Endpoint = fmt.Sprintf(
-			"http://%s-clair-app:80", quay.GetName(),
+			"http://%s-clair-app.%s.svc.cluster.local",
+			quay.GetName(),
+			quay.GetNamespace(),
 		)
 		fieldGroup.SecurityScannerV4NamespaceWhitelist = []string{"admin"}
 		fieldGroup.SecurityScannerNotifications = true

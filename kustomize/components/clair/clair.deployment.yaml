@@ -25,6 +25,21 @@ spec:
               value: /clair/config.yaml
             - name: CLAIR_MODE
               value: combo
+            - name: HTTP_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: HTTP_PROXY
+            - name: HTTPS_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: HTTPS_PROXY
+            - name: NO_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: NO_PROXY
           ports:
             - containerPort: 8080
               name: clair-http
@@ -33,6 +48,9 @@ spec:
               name: clair-intro
               protocol: TCP
           volumeMounts:
+            - name: cluster-trusted-ca
+              mountPath: /etc/pki/ca-trust/extracted/pem
+              readOnly: true
             - mountPath: /clair/
               name: config
             - mountPath: /var/run/certs
@@ -58,6 +76,12 @@ spec:
               memory: 16Gi
       restartPolicy: Always
       volumes:
+        - name: cluster-trusted-ca
+          configMap:
+            name: cluster-trusted-ca
+            items:
+              - key: ca-bundle.crt
+                path: tls-ca-bundle.pem
         - name: config
           secret:
             secretName: clair-config-secret
