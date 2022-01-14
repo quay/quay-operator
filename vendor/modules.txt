@@ -91,18 +91,11 @@ github.com/go-redis/redis/v8/internal/rand
 github.com/go-redis/redis/v8/internal/util
 # github.com/go-sql-driver/mysql v1.5.0
 github.com/go-sql-driver/mysql
-# github.com/go-stomp/stomp v2.0.6+incompatible
-github.com/go-stomp/stomp
-github.com/go-stomp/stomp/frame
 # github.com/gogo/protobuf v1.3.2
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 github.com/golang/groupcache/lru
-# github.com/golang/mock v1.5.0
-github.com/golang/mock/gomock
-github.com/golang/mock/mockgen
-github.com/golang/mock/mockgen/model
 # github.com/golang/protobuf v1.5.2
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
@@ -256,21 +249,8 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/quay/clair/v4 v4.0.0-rc.20.0.20201112172303-bb3cd669f663
-github.com/quay/clair/v4/clair-error
-github.com/quay/clair/v4/config
-github.com/quay/clair/v4/indexer
-github.com/quay/clair/v4/matcher
-github.com/quay/clair/v4/notifier
-github.com/quay/clair/v4/notifier/amqp
-github.com/quay/clair/v4/notifier/keymanager
-github.com/quay/clair/v4/notifier/stomp
-github.com/quay/clair/v4/notifier/webhook
-# github.com/quay/claircore v1.0.5
-github.com/quay/claircore
-github.com/quay/claircore/libvuln/driver
-github.com/quay/claircore/pkg/cpe
-github.com/quay/claircore/pkg/distlock
+# github.com/quay/clair/config v1.1.0
+github.com/quay/clair/config
 # github.com/quay/config-tool v0.1.9
 github.com/quay/config-tool/pkg/lib/fieldgroups/database
 github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage
@@ -281,16 +261,10 @@ github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner
 github.com/quay/config-tool/pkg/lib/shared
 # github.com/rs/xid v1.2.1
 github.com/rs/xid
-# github.com/rs/zerolog v1.16.0
-github.com/rs/zerolog
-github.com/rs/zerolog/internal/cbor
-github.com/rs/zerolog/internal/json
 # github.com/sirupsen/logrus v1.8.1
 github.com/sirupsen/logrus
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# github.com/streadway/amqp v1.0.0
-github.com/streadway/amqp
 # github.com/stretchr/testify v1.7.0
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
@@ -330,9 +304,6 @@ golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/md4
 golang.org/x/crypto/pbkdf2
 # golang.org/x/mod v0.4.2
-golang.org/x/mod/internal/lazyregexp
-golang.org/x/mod/modfile
-golang.org/x/mod/module
 golang.org/x/mod/semver
 # golang.org/x/net v0.0.0-20210825183410-e898025ed96a
 golang.org/x/net/context
@@ -391,22 +362,17 @@ golang.org/x/text/unicode/norm
 golang.org/x/text/width
 # golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 golang.org/x/time/rate
-# golang.org/x/tools v0.1.6-0.20210820212750-d4cc65f0b2ff
+# golang.org/x/tools v0.1.7
 golang.org/x/tools/cmd/stringer
-golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/internal/gcimporter
 golang.org/x/tools/go/internal/packagesdriver
 golang.org/x/tools/go/packages
-golang.org/x/tools/imports
 golang.org/x/tools/internal/event
 golang.org/x/tools/internal/event/core
 golang.org/x/tools/internal/event/keys
 golang.org/x/tools/internal/event/label
-golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gocommand
-golang.org/x/tools/internal/gopathwalk
-golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/packagesinternal
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
@@ -465,7 +431,6 @@ gopkg.in/ini.v1
 gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
 gopkg.in/square/go-jose.v2/json
-gopkg.in/square/go-jose.v2/jwt
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 gopkg.in/tomb.v1
 # gopkg.in/yaml.v2 v2.4.0

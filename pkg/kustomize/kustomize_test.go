@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	testlogr "github.com/go-logr/logr/testing"
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
@@ -169,6 +170,7 @@ var kustomizationForTests = []struct {
 
 func TestKustomizationFor(t *testing.T) {
 	assert := assert.New(t)
+	log := logr.Discard()
 
 	for _, test := range kustomizationForTests {
 		if test.expected != nil {
@@ -181,7 +183,7 @@ func TestKustomizationFor(t *testing.T) {
 			}
 		}
 
-		kustomization, err := KustomizationFor(&test.ctx, test.quayRegistry, map[string][]byte{}, "")
+		kustomization, err := KustomizationFor(log, &test.ctx, test.quayRegistry, map[string][]byte{}, "")
 
 		if test.expectedErr != "" {
 			assert.EqualError(err, test.expectedErr)
