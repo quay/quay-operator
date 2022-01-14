@@ -47,6 +47,21 @@ spec:
               value: "2"
             - name: WORKER_COUNT_REGISTRY
               value: "8"
+            - name: HTTP_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: HTTP_PROXY
+            - name: HTTPS_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: HTTPS_PROXY
+            - name: NO_PROXY
+              valueFrom:
+                secretKeyRef:
+                  name: quay-proxy-config
+                  key: NO_PROXY
           ports:
             - containerPort: 8443
               protocol: TCP

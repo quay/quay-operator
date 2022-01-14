@@ -14,6 +14,7 @@ import (
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	route "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"golang.org/x/net/http/httpproxy"
 	apps "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -37,6 +38,7 @@ import (
 const (
 	QuayRegistryNameLabel = "quay-operator/quayregistry"
 
+	proxyConfigPrefix                 = "quay-proxy-config"
 	configSecretPrefix                = "quay-config-secret"
 	registryHostnameAnnotation        = "quay-registry-hostname"
 	buildManagerHostnameAnnotation    = "quay-buildmanager-hostname"
@@ -313,7 +315,25 @@ func KustomizationFor(
 		quayConfigTLSSources = append(quayConfigTLSSources, "ssl.key="+string(ctx.TLSKey))
 	}
 
+	// read the proxy configuration from the environment. makes sure we add the quay server
+	// host name to the list of addresses reachable without proxy (NO_PROXY).
+	proxyenv := httpproxy.FromEnvironment()
+	addrs := strings.Split(proxyenv.NoProxy, ",")
+	addrs = append(addrs, ctx.ServerHostname)
+
 	generatedSecrets := []types.SecretArgs{
+		{
+			GeneratorArgs: types.GeneratorArgs{
+				Name: proxyConfigPrefix,
+				KvPairSources: types.KvPairSources{
+					LiteralSources: []string{
+						"HTTP_PROXY=" + proxyenv.HTTPProxy,
+						"HTTPS_PROXY=" + proxyenv.HTTPSProxy,
+						"NO_PROXY=" + strings.Join(addrs, ","),
+					},
+				},
+			},
+		},
 		{
 			GeneratorArgs: types.GeneratorArgs{
 				Name: configSecretPrefix,

@@ -54,7 +54,7 @@ var fieldGroupForTests = []struct {
 			FeatureSecurityScanner:              true,
 			SecurityScannerIndexingInterval:     30,
 			SecurityScannerNotifications:        true,
-			SecurityScannerV4Endpoint:           "http://test-clair-app:80",
+			SecurityScannerV4Endpoint:           "http://test-clair-app.ns.svc.cluster.local",
 			SecurityScannerV4NamespaceWhitelist: []string{"admin"},
 			SecurityScannerV4PSK:                "abc123",
 		},
