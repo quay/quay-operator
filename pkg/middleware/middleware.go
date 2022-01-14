@@ -24,9 +24,9 @@ const (
 )
 
 // Process applies any additional middleware steps to a managed k8s object that cannot be
-// accomplished using the Kustomize toolchain. if nores is set all resource requests are
+// accomplished using the Kustomize toolchain. if skipres is set all resource requests are
 // trimmed from the objects thus deploying quay with a much smaller footprint.
-func Process(quay *v1.QuayRegistry, obj client.Object, nores bool) (client.Object, error) {
+func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Object, error) {
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func Process(quay *v1.QuayRegistry, obj client.Object, nores bool) (client.Objec
 			}
 		}
 
-		if nores {
+		if skipres {
 			// if we are deploying without resource requests we have to remove them
 			var noresources corev1.ResourceRequirements
 			for i := range dep.Spec.Template.Spec.Containers {
@@ -133,7 +133,7 @@ func Process(quay *v1.QuayRegistry, obj client.Object, nores bool) (client.Objec
 		return pvc, nil
 	}
 
-	if job, ok := obj.(*batchv1.Job); ok && nores {
+	if job, ok := obj.(*batchv1.Job); ok && skipres {
 		// if we are deploying without resource requests we have to remove them
 		var noresources corev1.ResourceRequirements
 		for i := range job.Spec.Template.Spec.Containers {
