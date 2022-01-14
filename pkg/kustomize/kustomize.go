@@ -272,6 +272,7 @@ func generate(
 
 // KustomizationFor takes a `QuayRegistry` object and generates a Kustomization for it.
 func KustomizationFor(
+	log logr.Logger,
 	ctx *quaycontext.QuayRegistryContext,
 	quay *v1.QuayRegistry,
 	quayConfigFiles map[string][]byte,
@@ -372,7 +373,7 @@ func KustomizationFor(
 		)
 
 		componentConfigFiles, err := componentConfigFilesFor(
-			ctx, component.Kind, quay, quayConfigFiles,
+			log, ctx, component.Kind, quay, quayConfigFiles,
 		)
 		if componentConfigFiles == nil || err != nil {
 			continue
@@ -550,7 +551,7 @@ func Inflate(
 		overlay = overlayDir()
 	}
 
-	kustomization, err := KustomizationFor(ctx, quay, componentConfigFiles, overlay)
+	kustomization, err := KustomizationFor(log, ctx, quay, componentConfigFiles, overlay)
 	if err != nil {
 		return nil, err
 	}

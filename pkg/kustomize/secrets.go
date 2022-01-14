@@ -7,9 +7,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/quay/clair/v4/config"
-	"github.com/quay/clair/v4/notifier/webhook"
+	"github.com/go-logr/logr"
+	"github.com/quay/clair/config"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
@@ -262,7 +263,7 @@ func ContainsComponentConfig(
 }
 
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
-func componentConfigFilesFor(qctx *quaycontext.QuayRegistryContext, component v1.ComponentKind, quay *v1.QuayRegistry, configFiles map[string][]byte) (map[string][]byte, error) {
+func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryContext, component v1.ComponentKind, quay *v1.QuayRegistry, configFiles map[string][]byte) (map[string][]byte, error) {
 	switch component {
 	case v1.ComponentPostgres:
 		dbConfig, ok := configFiles["postgres.config.yaml"]
@@ -315,7 +316,7 @@ func componentConfigFilesFor(qctx *quaycontext.QuayRegistryContext, component v1
 			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
 		}
 
-		cfg, err := clairConfigFor(quay, quayHostname, preSharedKey)
+		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey)
 		if err != nil {
 			return nil, err
 		}
@@ -327,7 +328,7 @@ func componentConfigFilesFor(qctx *quaycontext.QuayRegistryContext, component v1
 }
 
 // clairConfigFor returns a Clair v4 config with the correct values.
-func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
+func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
 	dbname := "postgres"
 	user := "postgres"
@@ -339,9 +340,9 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([
 	}
 
 	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
-	config := config.Config{
+	cfg := config.Config{
 		HTTPListenAddr: ":8080",
-		LogLevel:       "info",
+		LogLevel:       config.InfoLog,
 		Indexer: config.Indexer{
 			ConnString:           dbConn,
 			ScanLockRetry:        10,
@@ -356,16 +357,16 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([
 		Notifier: config.Notifier{
 			ConnString:       dbConn,
 			Migrations:       true,
-			DeliveryInterval: "1m",
-			PollInterval:     "5m",
-			Webhook: &webhook.Config{
+			DeliveryInterval: 1 * time.Minute,
+			PollInterval:     5 * time.Minute,
+			Webhook: &config.Webhook{
 				Target:   "https://" + quayHostname + "/secscan/notification",
 				Callback: "http://" + quay.GetName() + "-clair-app/notifier/api/v1/notifications",
 			},
 		},
 		Auth: config.Auth{
 			PSK: &config.AuthPSK{
-				Key:    psk,
+				Key:    config.Base64(psk),
 				Issuer: []string{"quay", "clairctl"},
 			},
 		},
@@ -373,8 +374,15 @@ func clairConfigFor(quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([
 			Name: "prometheus",
 		},
 	}
+	ws, err := config.Validate(&cfg)
+	if err != nil {
+		return nil, err
+	}
+	for _, w := range ws {
+		log.V(1).Info("clair config lint", "msg", w.Error())
+	}
 
-	return yaml.Marshal(config)
+	return yaml.Marshal(cfg)
 }
 
 // From: https://gist.github.com/dopey/c69559607800d2f2f90b1b1ed4e550fb
