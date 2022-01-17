@@ -374,7 +374,7 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 			Name: "prometheus",
 		},
 	}
-	ws, err := config.Validate(&cfg)
+	ws, err := config.Lint(&cfg)
 	if err != nil {
 		return nil, err
 	}
