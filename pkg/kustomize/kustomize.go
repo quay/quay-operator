@@ -318,8 +318,11 @@ func KustomizationFor(
 	// read the proxy configuration from the environment. makes sure we add the quay server
 	// host name to the list of addresses reachable without proxy (NO_PROXY).
 	proxyenv := httpproxy.FromEnvironment()
-	addrs := strings.Split(proxyenv.NoProxy, ",")
-	addrs = append(addrs, ctx.ServerHostname)
+	addrs := []string{ctx.ServerHostname}
+	if len(proxyenv.NoProxy) > 0 {
+		noproxy := strings.Split(proxyenv.NoProxy, ",")
+		addrs = append(addrs, noproxy...)
+	}
 
 	generatedSecrets := []types.SecretArgs{
 		{
