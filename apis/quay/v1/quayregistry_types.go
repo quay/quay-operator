@@ -85,6 +85,12 @@ var supportsEnvOverride = []ComponentKind{
 	ComponentRedis,
 }
 
+var supportsReplicasOverride = []ComponentKind{
+	ComponentClair,
+	ComponentMirror,
+	ComponentBase,
+}
+
 const (
 	ManagedKeysName         = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName = "quay-config-tls"
@@ -115,6 +121,7 @@ type Component struct {
 type Override struct {
 	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
 	Env        []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	Replicas   *int32             `json:"replicas,omitempty"`
 }
 
 type ConditionType string
@@ -436,10 +443,20 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		}
 
 		hasvolume := component.Overrides.VolumeSize != nil
+		hasreplicas := component.Overrides.Replicas != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasvolume || hasenvvar
-		if !ComponentIsManaged(quay.Spec.Components, component.Kind) && hasoverride {
+		hasoverride := hasvolume || hasenvvar || hasreplicas
+
+		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
+		}
+
+		if hasreplicas && ComponentIsManaged(quay.Spec.Components, ComponentHPA) {
+			// with managed HPA we only accept zero as an override for the number
+			// of replicas. we can't compete with HPA except when scaling down.
+			if *component.Overrides.Replicas != 0 {
+				return fmt.Errorf("cannot override replicas with managed HPA")
+			}
 		}
 
 		// Check that component supports override
@@ -453,6 +470,13 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		if hasenvvar && !ComponentSupportsOverride(component.Kind, "env") {
 			return fmt.Errorf(
 				"component %s does not support env overrides",
+				component.Kind,
+			)
+		}
+
+		if hasreplicas && !ComponentSupportsOverride(component.Kind, "replicas") {
+			return fmt.Errorf(
+				"component %s does not support replicas overrides",
 				component.Kind,
 			)
 		}
@@ -646,18 +670,20 @@ func FieldGroupNamesForManagedComponents(quay *QuayRegistry) ([]string, error) {
 
 // ComponentSupportsOverride returns whether or not a given component supports the given override.
 func ComponentSupportsOverride(component ComponentKind, override string) bool {
+	var components []ComponentKind
+
 	switch override {
 	case "volumeSize":
-		for _, c := range supportsVolumeOverride {
-			if c == component {
-				return true
-			}
-		}
+		components = supportsVolumeOverride
 	case "env":
-		for _, c := range supportsEnvOverride {
-			if c == component {
-				return true
-			}
+		components = supportsEnvOverride
+	case "replicas":
+		components = supportsReplicasOverride
+	}
+
+	for _, cmp := range components {
+		if component == cmp {
+			return true
 		}
 	}
 	return false
