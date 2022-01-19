@@ -85,10 +85,13 @@ const (
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
-	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace which contains the base Quay config and extra certs.
+	// ConfigBundleSecret is the name of the Kubernetes `Secret` in the same namespace
+	// which contains the base Quay config and extra certs.
 	ConfigBundleSecret string `json:"configBundleSecret,omitempty"`
 	// Components declare how the Operator should handle backing Quay services.
 	Components []Component `json:"components,omitempty"`
+	// Overrides holds overrides for the Base component (quay-app).
+	Overrides *Override `json:"overrides,omitempty"`
 }
 
 // Component describes how the Operator should handle a backing Quay service.
@@ -105,6 +108,7 @@ type Component struct {
 // Override describes configuration overrides for the given managed component
 type Override struct {
 	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
+	Env        []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 type ConditionType string
