@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -67,20 +68,34 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 			}
 		}
 
-		// if HPA is unmanaged we set the number of replicas to 2 for some of our
-		// components (clair, mirror and quay). TODO(ricardomaraschini): this should
-		// be an override so users can determine the desired number of replicas.
-		noreplicas := dep.Spec.Replicas == nil
-		if noreplicas && !v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentHPA) {
-			for _, suffix := range []string{"clair-app", "quay-mirror", "quay-app"} {
-				if !strings.HasSuffix(dep.Name, suffix) {
-					continue
-				}
+		for kind, depsuffix := range map[v1.ComponentKind]string{
+			v1.ComponentClair:  "clair-app",
+			v1.ComponentMirror: "quay-mirror",
+			v1.ComponentBase:   "quay-app",
+		} {
+			if !strings.HasSuffix(dep.Name, depsuffix) {
+				continue
+			}
 
-				replicas := int32(2)
-				dep.Spec.Replicas = &replicas
+			// if the number of replicas has been set through kustomization
+			// we do not override it, just break here and move on with it.
+			// we have to adopt this approach because during "upgrades" the
+			// number of replicas is set to zero and we don't want to stomp
+			// it.
+			if dep.Spec.Replicas != nil {
 				break
 			}
+
+			// if no number of replicas has been set in kustomization files
+			// we set its value to two or to the value provided by the user
+			// as an override (if provided).
+			desired := pointer.Int32(2)
+			if rs := getReplicasOverrideForComponent(quay, kind); rs != nil {
+				desired = rs
+			}
+
+			dep.Spec.Replicas = desired
+			break
 		}
 
 		if skipres {
@@ -233,6 +248,23 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 
 	flattenedSecret.Data["config.yaml"] = flattenedConfigYAML
 	return flattenedSecret, nil
+}
+
+// getReplicasOverrideForComponent returns the overrides set by the user for the provided
+// component. Returns nil if not set.
+func getReplicasOverrideForComponent(quay *v1.QuayRegistry, kind v1.ComponentKind) *int32 {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+
+		if cmp.Overrides == nil {
+			return nil
+		}
+
+		return cmp.Overrides.Replicas
+	}
+	return nil
 }
 
 // getEnvOverrideForComponent return the environment variables overrides for the provided

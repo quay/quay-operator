@@ -387,7 +387,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			v1.ConditionTypeRolloutBlocked,
 			metav1.ConditionTrue,
 			v1.ConditionReasonComponentOverrideInvalid,
-			fmt.Sprintf("could not validate overrides on spec.components: %s", err),
+			fmt.Sprintf("invalid overrides: %s", err),
 		)
 	}
 
