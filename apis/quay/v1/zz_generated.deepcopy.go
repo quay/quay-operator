@@ -22,6 +22,7 @@ limitations under the License.
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -69,6 +70,13 @@ func (in *Override) DeepCopyInto(out *Override) {
 		in, out := &in.VolumeSize, &out.VolumeSize
 		x := (*in).DeepCopy()
 		*out = &x
+	}
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
+		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
@@ -150,6 +158,11 @@ func (in *QuayRegistrySpec) DeepCopyInto(out *QuayRegistrySpec) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.Overrides != nil {
+		in, out := &in.Overrides, &out.Overrides
+		*out = new(Override)
+		(*in).DeepCopyInto(*out)
 	}
 }
 
