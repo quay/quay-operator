@@ -9,7 +9,7 @@ require (
 	github.com/onsi/gomega v1.17.0
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.53.1
-	github.com/quay/clair/config v1.1.0
+	github.com/quay/clair/config v1.1.2
 	github.com/quay/config-tool v0.1.9
 	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/sjson v1.2.3
