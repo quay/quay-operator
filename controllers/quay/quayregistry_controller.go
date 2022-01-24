@@ -672,11 +672,6 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 	log = log.WithValues("kind", gvk.Kind, "name", obj.GetName())
 	log.Info("creating/updating object")
 
-	immutableResources := map[schema.GroupVersionKind]bool{
-		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}: true,
-		schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}:  true,
-	}
-
 	// we set the owner in the object except when it belongs to a different namespace,
 	// on this case we have only the grafana dashboard that lives in another place.
 	obj = v1.EnsureOwnerReference(&quay, obj)
@@ -691,7 +686,8 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 	// managedFields cannot be set on a PATCH.
 	obj.SetManagedFields([]metav1.ManagedFieldsEntry{})
 
-	if immutableResources[gvk] {
+	jobGVK := schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}
+	if gvk == jobGVK {
 		propagationPolicy := metav1.DeletePropagationForeground
 		opts := &client.DeleteOptions{
 			PropagationPolicy: &propagationPolicy,
