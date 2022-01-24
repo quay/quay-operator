@@ -7,6 +7,7 @@ resources:
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
   - ./init.job.yaml
+  - ./postgres-conf-sample.configmap.yaml
 secretGenerator:
   # NOTE: `postgres-config-secret` fields generated in `kustomize.go`.
   - name: postgres-config-secret

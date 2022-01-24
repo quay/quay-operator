@@ -259,6 +259,7 @@ var quayComponents = map[string][]client.Object{
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres-conf-sample"}},
 	},
 	"postgres": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "postgres-bootstrap"}},
@@ -268,6 +269,7 @@ var quayComponents = map[string][]client.Object{
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-database-init"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "postgres-conf-sample"}},
 	},
 	"redis": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},

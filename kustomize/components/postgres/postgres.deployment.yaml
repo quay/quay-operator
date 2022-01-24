@@ -21,6 +21,9 @@ spec:
       terminationGracePeriodSeconds: 180
       serviceAccountName: quay-database
       volumes:
+        - name: postgres-conf-sample
+          configMap:
+            name: postgres-conf-sample
         - name: postgres-data
           persistentVolumeClaim:
             claimName: quay-database
@@ -57,6 +60,9 @@ spec:
             - name: POSTGRESQL_MAX_CONNECTIONS
               value: "2000"
           volumeMounts:
+            - name: postgres-conf-sample
+              mountPath: /usr/share/pgsql/postgresql.conf.sample
+              subPath: postgresql.conf.sample
             - name: postgres-data
               mountPath: /var/lib/pgsql/data
           resources:
