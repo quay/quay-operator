@@ -9,5 +9,6 @@ resources:
   - ./postgres.persistentvolumeclaim.yaml
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
+  - ./clair-postgres-conf-sample.configmap.yaml
 secretGenerator:
   - name: clair-config-secret

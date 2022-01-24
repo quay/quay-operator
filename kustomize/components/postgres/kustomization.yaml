@@ -6,6 +6,7 @@ resources:
   - ./postgres.persistentvolumeclaim.yaml
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
+  - ./postgres-conf-sample.configmap.yaml
 secretGenerator:
   # NOTE: `postgres-config-secret` fields generated in `kustomize.go`.
   - name: postgres-config-secret
