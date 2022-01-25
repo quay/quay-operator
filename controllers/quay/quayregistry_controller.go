@@ -532,7 +532,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	updatedQuay, _ = v1.EnsureConfigEditorEndpoint(quayContext, updatedQuay)
+	v1.EnsureConfigEditorEndpoint(quayContext, updatedQuay)
 	cfgsecret := configEditorCredentialsSecretFrom(deploymentObjects)
 	updatedQuay.Status.ConfigEditorCredentialsSecret = cfgsecret
 
