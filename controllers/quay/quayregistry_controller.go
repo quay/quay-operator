@@ -415,7 +415,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	updatedQuay, _ = v1.EnsureConfigEditorEndpoint(quayContext, updatedQuay)
+	v1.EnsureConfigEditorEndpoint(quayContext, updatedQuay)
 	updatedQuay.Status.ConfigEditorCredentialsSecret = configEditorCredentialsSecretFrom(deploymentObjects)
 
 	if c := v1.GetCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked); c != nil && c.Status == metav1.ConditionTrue && c.Reason == v1.ConditionReasonConfigInvalid {
