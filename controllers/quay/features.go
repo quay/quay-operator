@@ -95,7 +95,7 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(ctx *quaycontext.QuayRegis
 	// This value is then passed to the created `Route` using a Kustomize variable.
 	var config map[string]interface{}
 	if err := yaml.Unmarshal(configBundle["config.yaml"], &config); err != nil {
-		return ctx, quay, err
+		return ctx, quay, fmt.Errorf("unable to parse config.yaml: %w", err)
 	}
 
 	fieldGroup, err := hostsettings.NewHostSettingsFieldGroup(config)
