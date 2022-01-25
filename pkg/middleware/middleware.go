@@ -54,6 +54,19 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 	// all unused annotations from postgres deployment to avoid its redeployment.
 	if dep, ok := obj.(*appsv1.Deployment); ok {
 
+		// override any environment variable being provided through the component
+		// Override.Env property. XXX this does not include InitContainers.
+		component := labels.Set(objectMeta.GetAnnotations()).Get("quay-component")
+		kind := v1.ComponentKind(component)
+		if v1.ComponentIsManaged(quay.Spec.Components, kind) {
+			for _, oenv := range getEnvOverrideForComponent(quay, kind) {
+				for i := range dep.Spec.Template.Spec.Containers {
+					ref := &dep.Spec.Template.Spec.Containers[i]
+					UpsertContainerEnv(ref, oenv)
+				}
+			}
+		}
+
 		// if HPA is unmanaged we set the number of replicas to 2 for some of our
 		// components (clair, mirror and quay). TODO(ricardomaraschini): this should
 		// be an override so users can determine the desired number of replicas.
@@ -170,6 +183,21 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 	return rt, nil
 }
 
+// UpsertContainerEnv updates or inserts an environment variable into provided container.
+func UpsertContainerEnv(container *corev1.Container, newv corev1.EnvVar) {
+	for i, origv := range container.Env {
+		if origv.Name != newv.Name {
+			continue
+		}
+
+		container.Env[i] = newv
+		return
+	}
+
+	// if not found then append it to the end.
+	container.Env = append(container.Env, newv)
+}
+
 // FlattenSecret takes all Quay config fields in given secret and combines them under
 // `config.yaml` key.
 func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
@@ -205,6 +233,32 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 
 	flattenedSecret.Data["config.yaml"] = flattenedConfigYAML
 	return flattenedSecret, nil
+}
+
+// getEnvOverrideForComponent return the environment variables overrides for the provided
+// component, nil is returned if not defined. Each component has its own env override, but
+// not Base. Base is not consider an ordinary component so its env overides are kept in the
+// root of the spec object.
+func getEnvOverrideForComponent(quay *v1.QuayRegistry, kind v1.ComponentKind) []corev1.EnvVar {
+	if kind == v1.ComponentBase {
+		if quay.Spec.Overrides == nil {
+			return nil
+		}
+		return quay.Spec.Overrides.Env
+	}
+
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+
+		if cmp.Overrides == nil {
+			return nil
+		}
+
+		return cmp.Overrides.Env
+	}
+	return nil
 }
 
 func getVolumeSizeOverrideForComponent(
