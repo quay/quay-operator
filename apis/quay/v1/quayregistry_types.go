@@ -428,18 +428,26 @@ func EnsureRegistryEndpoint(
 	return quay.Status.RegistryEndpoint == orig
 }
 
-// EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field and returns `ok` if it was unchanged.
-func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) (*QuayRegistry, bool) {
-	updatedQuay := quay.DeepCopy()
-
-	if ctx.SupportsRoutes {
-		updatedQuay.Status.ConfigEditorEndpoint = "https://" + strings.Join([]string{
-			strings.Join([]string{quay.GetName(), "quay-config-editor", quay.GetNamespace()}, "-"),
-			ctx.ClusterHostname},
-			".")
+// EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field. If routes are
+// not supported or route component is unmanaged this sets configEditorEndpoint to empty
+// string.
+func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) {
+	if !ctx.SupportsRoutes {
+		quay.Status.ConfigEditorEndpoint = ""
+		return
 	}
 
-	return updatedQuay, quay.Status.ConfigEditorEndpoint == updatedQuay.Status.ConfigEditorEndpoint
+	if !ComponentIsManaged(quay.Spec.Components, ComponentRoute) {
+		quay.Status.ConfigEditorEndpoint = ""
+		return
+	}
+
+	quay.Status.ConfigEditorEndpoint = fmt.Sprintf(
+		"https://%s-quay-config-editor-%s.%s",
+		quay.GetName(),
+		quay.GetNamespace(),
+		ctx.ClusterHostname,
+	)
 }
 
 // Owns verifies if a QuayRegistry object owns provided Object.
