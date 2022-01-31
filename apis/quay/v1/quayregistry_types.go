@@ -77,6 +77,13 @@ var supportsVolumeOverride = []ComponentKind{
 	ComponentClair,
 }
 
+var supportsEnvOverride = []ComponentKind{
+	ComponentClair,
+	ComponentMirror,
+	ComponentPostgres,
+	ComponentRedis,
+}
+
 const (
 	ManagedKeysName         = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName = "quay-config-tls"
@@ -393,22 +400,30 @@ func ValidateOverrides(quay *QuayRegistry) error {
 			continue
 		}
 
-		// If the component is unmanaged, we cannot set overrides
-		if !ComponentIsManaged(quay.Spec.Components, component.Kind) {
-			if component.Overrides.VolumeSize != nil {
-				return errors.New("cannot set overrides on unmanaged component " + string(component.Kind))
-			}
+		hasvolume := component.Overrides.VolumeSize != nil
+		hasenvvar := len(component.Overrides.Env) > 0
+		hasoverride := hasvolume || hasenvvar
+		if !ComponentIsManaged(quay.Spec.Components, component.Kind) && hasoverride {
+			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
 		}
 
 		// Check that component supports override
-		if component.Overrides.VolumeSize != nil && !ComponentSupportsOverride(component.Kind, "volumeSize") {
-			return fmt.Errorf("component %s does not support volumeSize overrides", component.Kind)
+		if hasvolume && !ComponentSupportsOverride(component.Kind, "volumeSize") {
+			return fmt.Errorf(
+				"component %s does not support volumeSize overrides",
+				component.Kind,
+			)
 		}
 
+		if hasenvvar && !ComponentSupportsOverride(component.Kind, "env") {
+			return fmt.Errorf(
+				"component %s does not support env overrides",
+				component.Kind,
+			)
+		}
 	}
 
 	return nil
-
 }
 
 // EnsureRegistryEndpoint sets the `status.registryEndpoint` field and returns `ok` if it was
@@ -594,8 +609,6 @@ func FieldGroupNamesForManagedComponents(quay *QuayRegistry) ([]string, error) {
 
 // ComponentSupportsOverride returns whether or not a given component supports the given override.
 func ComponentSupportsOverride(component ComponentKind, override string) bool {
-
-	// Using a switch statement for possible implementation of future overrides
 	switch override {
 	case "volumeSize":
 		for _, c := range supportsVolumeOverride {
@@ -603,10 +616,13 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 				return true
 			}
 		}
-	default:
-		return false
+	case "env":
+		for _, c := range supportsEnvOverride {
+			if c == component {
+				return true
+			}
+		}
 	}
-
 	return false
 }
 
