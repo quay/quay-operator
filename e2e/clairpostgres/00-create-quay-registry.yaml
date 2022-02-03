@@ -1,10 +1,12 @@
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
-  name: mindeployment
+  name: clairpostgresE2E
 spec:
   components:
-  - kind: clair
+  - kind: horizontalpodautoscaler
     managed: false
-  - kind: clairpostgres
+  - kind: mirror
+    managed: false
+  - kind: monitoring
     managed: false

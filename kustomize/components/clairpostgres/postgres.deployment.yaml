@@ -5,7 +5,7 @@ metadata:
   labels:
     quay-component: clair-postgres
   annotations:
-    quay-component: clair
+    quay-component: clair-postgres
 spec:
   replicas: 1
   strategy:

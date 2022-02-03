@@ -73,7 +73,26 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 			return
 		}
 
-		newSecret := createUpdatedSecret(reconfigureRequest)
+		// Get old secret
+		var oldSecret corev1.Secret
+		nsn = types.NamespacedName{
+			Namespace: reconfigureRequest.Namespace,
+			Name:      quay.Spec.ConfigBundleSecret,
+		}
+		if err := k8sClient.Get(context.Background(), nsn, &oldSecret); err != nil {
+			log.Error(
+				err,
+				"failed to fetch secret",
+				"name",
+				quay.Spec.ConfigBundleSecret,
+				"namespace",
+				reconfigureRequest.Namespace,
+			)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		newSecret := createUpdatedSecret(reconfigureRequest, oldSecret)
 		if err := k8sClient.Create(context.Background(), &newSecret); err != nil {
 			log.Error(err, "failed to create new config bundle secret")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -93,7 +112,7 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 			}
 
 			// For the reset, infer from the presence of fields
-			contains, err := kustomize.ContainsComponentConfig(reconfigureRequest.Config, reconfigureRequest.Certs, component)
+			contains, err := kustomize.ContainsComponentConfig(newSecret.Data, component)
 			if err != nil {
 				log.Error(err, "failed to check `config.yaml` for component fieldgroup", "component", component.Kind)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -144,9 +163,7 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 
 // createUpdatedSecret takes the reconfigureRequest and the oldSecret and coalesces them into a
 // new secret.
-func createUpdatedSecret(reconfigureRequest request) corev1.Secret {
-	secretData := make(map[string][]byte)
-
+func createUpdatedSecret(reconfigureRequest request, oldSecret corev1.Secret) corev1.Secret {
 	if len(reconfigureRequest.Namespace) == 0 {
 		panic("namespace not provided")
 	}
@@ -155,15 +172,24 @@ func createUpdatedSecret(reconfigureRequest request) corev1.Secret {
 		panic("quayRegistryName not provided")
 	}
 
-	secretData["config.yaml"] = encode(reconfigureRequest.Config)
+	newSecretData := make(map[string][]byte)
+	newSecretData["config.yaml"] = encode(reconfigureRequest.Config)
+	log.Println("wrote config.yaml to secret data")
+
 	for fullFilePathname, encodedCert := range reconfigureRequest.Certs {
 		certName := strings.Split(fullFilePathname, "/")[len(strings.Split(fullFilePathname, "/"))-1]
 		if strings.HasPrefix(fullFilePathname, "extra_ca_certs/") {
 			certName = "extra_ca_cert_" + strings.ReplaceAll(certName, "extra_ca_cert_", "")
 		}
-		secretData[certName] = encodedCert
+		newSecretData[certName] = encodedCert
 
 		log.Println("including cert in secret: " + certName)
+	}
+
+	// Since the config app does not have the clair data, we need to pull it from the old secret
+	if clairConfig, ok := oldSecret.Data["clair-config.yaml"]; ok {
+		newSecretData["clair-config.yaml"] = clairConfig
+		log.Println("included clair-config.yaml in secret")
 	}
 
 	newSecret := corev1.Secret{
@@ -174,7 +200,7 @@ func createUpdatedSecret(reconfigureRequest request) corev1.Secret {
 				"quay-registry": reconfigureRequest.QuayRegistryName,
 			},
 		},
-		Data: secretData,
+		Data: newSecretData,
 	}
 
 	return newSecret

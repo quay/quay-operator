@@ -181,18 +181,19 @@ func TestFieldGroupFor(t *testing.T) {
 }
 
 var containsComponentConfigTests = []struct {
-	name          string
-	component     v1.ComponentKind
-	managed       bool
-	rawConfig     string
-	expected      bool
-	expectedError error
+	name               string
+	component          v1.ComponentKind
+	managed            bool
+	configBundleSecret map[string][]byte
+	expected           bool
+	expectedError      error
 }{
 	{
 		"ClairContains",
 		"clair",
 		true,
-		`FEATURE_SECURITY_SCANNER: true`,
+		map[string][]byte{
+			"config.yaml": []byte(`FEATURE_SECURITY_SCANNER: true`)},
 		true,
 		nil,
 	},
@@ -200,7 +201,8 @@ var containsComponentConfigTests = []struct {
 		"ClairDoesNotContain",
 		"clair",
 		true,
-		``,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
 		false,
 		nil,
 	},
@@ -208,7 +210,8 @@ var containsComponentConfigTests = []struct {
 		"PostgresContains",
 		"postgres",
 		true,
-		`DB_URI: postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database`,
+		map[string][]byte{
+			"config.yaml": []byte(`DB_URI: postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database`)},
 		true,
 		nil,
 	},
@@ -216,7 +219,8 @@ var containsComponentConfigTests = []struct {
 		"PostgresDoesNotContain",
 		"postgres",
 		true,
-		``,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
 		false,
 		nil,
 	},
@@ -224,9 +228,11 @@ var containsComponentConfigTests = []struct {
 		"RedisContains",
 		"redis",
 		true,
-		`BUILDLOGS_REDIS:
+		map[string][]byte{
+			"config.yaml": []byte(`BUILDLOGS_REDIS:
   host: test-quay-redis
-`,
+`)},
+
 		true,
 		nil,
 	},
@@ -234,7 +240,8 @@ var containsComponentConfigTests = []struct {
 		"RedisDoesNotContain",
 		"redis",
 		true,
-		``,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
 		false,
 		nil,
 	},
@@ -242,9 +249,11 @@ var containsComponentConfigTests = []struct {
 		"ObjectStorageContains",
 		"objectstorage",
 		true,
-		`DISTRIBUTED_STORAGE_PREFERENCE: 
+		map[string][]byte{
+			"config.yaml": []byte(`DISTRIBUTED_STORAGE_PREFERENCE: 
   - local_us
-`,
+`)},
+
 		true,
 		nil,
 	},
@@ -252,7 +261,8 @@ var containsComponentConfigTests = []struct {
 		"ObjectStorageDoesNotContain",
 		"objectstorage",
 		true,
-		``,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
 		false,
 		nil,
 	},
@@ -260,7 +270,8 @@ var containsComponentConfigTests = []struct {
 		"MirrorContains",
 		"mirror",
 		true,
-		`FEATURE_REPO_MIRROR: true`,
+		map[string][]byte{
+			"config.yaml": []byte(`FEATURE_REPO_MIRROR: true`)},
 		true,
 		nil,
 	},
@@ -268,7 +279,8 @@ var containsComponentConfigTests = []struct {
 		"MirrorDeosNotContain",
 		"mirror",
 		true,
-		``,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
 		false,
 		nil,
 	},
@@ -276,7 +288,8 @@ var containsComponentConfigTests = []struct {
 		"RouteContains",
 		"route",
 		true,
-		`PREFERRED_URL_SCHEME: http`,
+		map[string][]byte{
+			"config.yaml": []byte(`PREFERRED_URL_SCHEME: http`)},
 		true,
 		nil,
 	},
@@ -284,7 +297,8 @@ var containsComponentConfigTests = []struct {
 		"RouteContainsServerHostname",
 		"route",
 		true,
-		`SERVER_HOSTNAME: registry.skynet.com`,
+		map[string][]byte{
+			"config.yaml": []byte(`SERVER_HOSTNAME: registry.skynet.com`)},
 		true,
 		nil,
 	},
@@ -292,7 +306,8 @@ var containsComponentConfigTests = []struct {
 		"RouteDoesNotContain",
 		"route",
 		true,
-		``,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
 		false,
 		nil,
 	},
@@ -300,7 +315,8 @@ var containsComponentConfigTests = []struct {
 		"RouteUnmanagedDoesNotContain",
 		"route",
 		false,
-		``,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
 		false,
 		nil,
 	},
@@ -308,7 +324,8 @@ var containsComponentConfigTests = []struct {
 		"RouteUnmanagedContainsServerHostname",
 		"route",
 		false,
-		`SERVER_HOSTNAME: registry.skynet.com`,
+		map[string][]byte{
+			"config.yaml": []byte(`SERVER_HOSTNAME: registry.skynet.com`)},
 		true,
 		nil,
 	},
@@ -316,8 +333,37 @@ var containsComponentConfigTests = []struct {
 		"HorizontalPodAutoscalerDoesNotContain",
 		"horizontalpodautoscaler",
 		true,
-		``,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
 		false,
+		nil,
+	},
+	{
+		"ClairDatabaseComponentDoesNotContainFields",
+		"clairpostgres",
+		true,
+		map[string][]byte{
+			"clair-config.yaml": []byte(`http_listen_addr: ":8090"`)},
+		false,
+		nil,
+	},
+	{
+		"ClairDatabaseComponentDoesNotContainClairConfig",
+		"clairpostgres",
+		true,
+		map[string][]byte{
+			"config.yaml": []byte(``)},
+		false,
+		nil,
+	},
+	{
+		"ClairDatabaseContainsFields",
+		"clairpostgres",
+		true,
+		map[string][]byte{
+			"clair-config.yaml": []byte(`indexer:
+    connstring: "some fake dsn"`)},
+		true,
 		nil,
 	},
 }
@@ -326,12 +372,8 @@ func TestContainsComponentConfig(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range containsComponentConfigTests {
-		var fullConfig map[string]interface{}
-		var certs map[string][]byte
-		err := yaml.Unmarshal([]byte(test.rawConfig), &fullConfig)
-		assert.Nil(err, test.name)
 
-		contains, err := ContainsComponentConfig(fullConfig, certs, v1.Component{Kind: test.component, Managed: test.managed})
+		contains, err := ContainsComponentConfig(test.configBundleSecret, v1.Component{Kind: test.component, Managed: test.managed})
 
 		if test.expectedError != nil {
 			assert.NotNil(err, test.name)

@@ -322,6 +322,7 @@ var inflateTests = []struct {
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "mirror", Managed: true},
@@ -337,7 +338,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler"}),
+		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -347,6 +348,7 @@ var inflateTests = []struct {
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: false},
 					{Kind: "clair", Managed: false},
+					{Kind: "clairpostgres", Managed: false},
 					{Kind: "redis", Managed: false},
 					{Kind: "objectstorage", Managed: false},
 					{Kind: "mirror", Managed: false},
@@ -370,6 +372,7 @@ var inflateTests = []struct {
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
 					{Kind: "redis", Managed: false},
 					{Kind: "objectstorage", Managed: false},
 					{Kind: "mirror", Managed: true},
@@ -382,7 +385,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "postgres", "clair", "mirror"}),
+		expected:    withComponents([]string{"base", "postgres", "clair", "mirror", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -392,6 +395,7 @@ var inflateTests = []struct {
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "mirror", Managed: true},
@@ -409,7 +413,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
+		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -419,6 +423,7 @@ var inflateTests = []struct {
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "mirror", Managed: true},
@@ -436,7 +441,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io", "DATABASE_SECRET_KEY": "abc123"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror"}),
+		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{

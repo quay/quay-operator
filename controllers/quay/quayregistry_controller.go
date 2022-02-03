@@ -416,16 +416,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked,
 	)
 
-	usercerts := map[string][]byte{}
-	if _, ok := configBundle.Data["ssl.cert"]; ok {
-		usercerts["ssl.cert"] = configBundle.Data["ssl.cert"]
-	}
-	if _, ok := configBundle.Data["ssl.key"]; ok {
-		usercerts["ssl.key"] = configBundle.Data["ssl.key"]
-	}
-
 	for _, cmp := range updatedQuay.Spec.Components {
-		contains, err := kustomize.ContainsComponentConfig(usercfg, usercerts, cmp)
+		contains, err := kustomize.ContainsComponentConfig(configBundle.Data, cmp)
 		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
@@ -745,8 +737,16 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 		LastUpdateTime:     metav1.Now(),
 		LastTransitionTime: metav1.Now(),
 	}
+
 	quay.Status.Conditions = v1.SetCondition(quay.Status.Conditions, condition)
 	quay.Status.LastUpdate = time.Now().UTC().String()
+
+	eventType := corev1.EventTypeNormal
+	if cstatus == metav1.ConditionTrue {
+		eventType = corev1.EventTypeWarning
+	}
+	r.EventRecorder.Event(quay, eventType, string(reason), msg)
+
 	return r.Client.Status().Update(ctx, quay)
 }
 

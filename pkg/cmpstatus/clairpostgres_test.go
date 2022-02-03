@@ -15,7 +15,7 @@ import (
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
-func TestClairCheck(t *testing.T) {
+func TestClairPostgresCheck(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		quay qv1.QuayRegistry
@@ -23,7 +23,7 @@ func TestClairCheck(t *testing.T) {
 		cond qv1.Condition
 	}{
 		{
-			name: "unmanaged clair",
+			name: "unmanaged clairpostgres",
 			quay: qv1.QuayRegistry{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "registry",
@@ -32,21 +32,21 @@ func TestClairCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind:    qv1.ComponentClair,
+							Kind:    qv1.ComponentClairPostgres,
 							Managed: false,
 						},
 					},
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentClairReady,
+				Type:    qv1.ComponentClairPostgresReady,
 				Status:  metav1.ConditionTrue,
 				Reason:  qv1.ConditionReasonComponentUnmanaged,
-				Message: "Clair not managed by the operator",
+				Message: "ClairPostgres not managed by the operator",
 			},
 		},
 		{
-			name: "missing clair deployment",
+			name: "clair postgres deployment not found",
 			quay: qv1.QuayRegistry{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "registry",
@@ -55,7 +55,77 @@ func TestClairCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind:    qv1.ComponentClair,
+							Kind:    qv1.ComponentClairPostgres,
+							Managed: true,
+						},
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentClairPostgresReady,
+				Status:  metav1.ConditionFalse,
+				Reason:  qv1.ConditionReasonComponentNotReady,
+				Message: "Deployment registry-clair-postgres not found",
+			},
+		},
+		{
+			name: "unhealthy clair postgres deployment",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+				Spec: qv1.QuayRegistrySpec{
+					Components: []qv1.Component{
+						{
+							Kind:    qv1.ComponentClairPostgres,
+							Managed: true,
+						},
+					},
+				},
+			},
+			objs: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-clair-postgres",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						Conditions: []appsv1.DeploymentCondition{
+							{
+								Type:    appsv1.DeploymentAvailable,
+								Status:  corev1.ConditionFalse,
+								Message: "something went wrong",
+							},
+						},
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentClairPostgresReady,
+				Status:  metav1.ConditionFalse,
+				Reason:  qv1.ConditionReasonComponentNotReady,
+				Message: "Deployment registry-clair-postgres: something went wrong",
+			},
+		},
+		{
+			name: "all deployments working",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+				Spec: qv1.QuayRegistrySpec{
+					Components: []qv1.Component{
+						{
+							Kind:    qv1.ComponentClairPostgres,
 							Managed: true,
 						},
 					},
@@ -86,108 +156,14 @@ func TestClairCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentClairReady,
-				Status:  metav1.ConditionFalse,
-				Reason:  qv1.ConditionReasonComponentNotReady,
-				Message: "Deployment registry-clair-app not found",
-			},
-		},
-		{
-			name: "faulty clair deployment",
-			quay: qv1.QuayRegistry{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "registry",
-					UID:  "uid",
-				},
-				Spec: qv1.QuayRegistrySpec{
-					Components: []qv1.Component{
-						{
-							Kind:    qv1.ComponentClair,
-							Managed: true,
-						},
-					},
-				},
-			},
-			objs: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-clair-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionFalse,
-								Message: "something went wrong",
-							},
-						},
-					},
-				},
-			},
-			cond: qv1.Condition{
-				Type:    qv1.ComponentClairReady,
-				Status:  metav1.ConditionFalse,
-				Reason:  qv1.ConditionReasonComponentNotReady,
-				Message: "Deployment registry-clair-app: something went wrong",
-			},
-		},
-		{
-			name: "all deployments working",
-			quay: qv1.QuayRegistry{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "registry",
-					UID:  "uid",
-				},
-				Spec: qv1.QuayRegistrySpec{
-					Components: []qv1.Component{
-						{
-							Kind:    qv1.ComponentClair,
-							Managed: true,
-						},
-					},
-				},
-			},
-			objs: []runtime.Object{
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-clair-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
-			},
-			cond: qv1.Condition{
-				Type:    qv1.ComponentClairReady,
+				Type:    qv1.ComponentClairPostgresReady,
 				Reason:  qv1.ConditionReasonComponentReady,
 				Status:  metav1.ConditionTrue,
-				Message: "Clair component healthy",
+				Message: "ClairPostgres component healthy",
 			},
 		},
 		{
-			name: "not owned quay app deploy",
+			name: "registry-clair-postgres deployment not owned by QuayRegistry",
 			quay: qv1.QuayRegistry{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "registry",
@@ -196,7 +172,7 @@ func TestClairCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind:    qv1.ComponentClair,
+							Kind:    qv1.ComponentClairPostgres,
 							Managed: true,
 						},
 					},
@@ -205,7 +181,7 @@ func TestClairCheck(t *testing.T) {
 			objs: []runtime.Object{
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-clair-app",
+						Name: "registry-clair-postgres",
 					},
 					Status: appsv1.DeploymentStatus{
 						Conditions: []appsv1.DeploymentCondition{
@@ -219,10 +195,10 @@ func TestClairCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentClairReady,
+				Type:    qv1.ComponentClairPostgresReady,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Status:  metav1.ConditionFalse,
-				Message: "Deployment registry-clair-app not owned by QuayRegistry",
+				Message: "Deployment registry-clair-postgres not owned by QuayRegistry",
 			},
 		},
 	} {
@@ -231,11 +207,11 @@ func TestClairCheck(t *testing.T) {
 			defer cancel()
 
 			cli := fake.NewFakeClient(tt.objs...)
-			clair := Clair{
+			clairpostgres := ClairPostgres{
 				Client: cli,
 			}
 
-			cond, err := clair.Check(ctx, tt.quay)
+			cond, err := clairpostgres.Check(ctx, tt.quay)
 			if err != nil {
 				t.Fatalf("unexpected error: %s", err)
 			}

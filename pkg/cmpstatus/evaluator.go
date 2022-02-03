@@ -48,6 +48,7 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 		&Postgres{Client: c},
 		&ObjectStorage{Client: c},
 		&Clair{Client: c},
+		&ClairPostgres{Client: c},
 		&TLS{Client: c},
 		&Redis{Client: c},
 	} {

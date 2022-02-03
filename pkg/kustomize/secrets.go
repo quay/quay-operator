@@ -145,6 +145,9 @@ func FieldGroupFor(
 	case v1.ComponentTLS:
 		return nil, nil
 
+	case v1.ComponentClairPostgres:
+		return nil, nil
+
 	default:
 		return nil, fmt.Errorf("unknown component: %s", component)
 	}
@@ -218,11 +221,11 @@ func EnsureTLSFor(
 	return ctx.TLSCert, ctx.TLSKey, nil
 }
 
-// ContainsComponentConfig accepts a full `config.yaml` and determines if it contains
+// ContainsComponentConfig accepts a full configBundleSecret and determines if it contains
 // the fieldgroup for the given component by comparing it with the fieldgroup defaults.
 // TODO: Replace this with function from `config-tool` library once implemented.
 func ContainsComponentConfig(
-	fullConfig map[string]interface{}, certs map[string][]byte, component v1.Component,
+	configBundle map[string][]byte, component v1.Component,
 ) (bool, error) {
 	fields := []string{}
 
@@ -231,6 +234,24 @@ func ContainsComponentConfig(
 		fields = (&securityscanner.SecurityScannerFieldGroup{}).Fields()
 	case v1.ComponentPostgres:
 		fields = (&database.DatabaseFieldGroup{}).Fields()
+	case v1.ComponentClairPostgres:
+		clairConfigBytes, ok := configBundle["clair-config.yaml"]
+		// Clair config not provided
+		if !ok {
+			return false, nil
+		}
+		var clairConfig config.Config
+		if err := yaml.Unmarshal(clairConfigBytes, &clairConfig); err != nil {
+			return false, err
+		}
+		// Else check if connstring is provided anywhere in the config
+		if clairConfig.Matcher.ConnString != "" ||
+			clairConfig.Indexer.ConnString != "" ||
+			clairConfig.Notifier.ConnString != "" {
+			return true, nil
+		}
+		return false, nil
+
 	case v1.ComponentRedis:
 		fields = (&redis.RedisFieldGroup{}).Fields()
 	case v1.ComponentObjectStorage:
@@ -245,8 +266,8 @@ func ContainsComponentConfig(
 	case v1.ComponentMonitoring:
 		return false, nil
 	case v1.ComponentTLS:
-		_, keyPresent := certs["ssl.key"]
-		_, certPresent := certs["ssl.cert"]
+		_, keyPresent := configBundle["ssl.key"]
+		_, certPresent := configBundle["ssl.cert"]
 		if certPresent && keyPresent {
 			return true, nil
 		}
@@ -254,9 +275,15 @@ func ContainsComponentConfig(
 		return false, fmt.Errorf("unknown component: %s", component.Kind)
 	}
 
+	var quayConfig map[string]interface{}
+	err := yaml.Unmarshal(configBundle["config.yaml"], &quayConfig)
+	if err != nil {
+		return false, err
+	}
+
 	// FIXME: Only checking for the existance of a single field
 	for _, field := range fields {
-		if _, ok := fullConfig[field]; ok {
+		if _, ok := quayConfig[field]; ok {
 			return true, nil
 		}
 	}
@@ -318,7 +345,7 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
 		}
 
-		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey)
+		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey, configFiles)
 		if err != nil {
 			return nil, err
 		}
@@ -330,18 +357,19 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 }
 
 // clairConfigFor returns a Clair v4 config with the correct values.
-func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
+func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey string, configFiles map[string][]byte) ([]byte, error) {
+
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
 	dbname := "postgres"
 	user := "postgres"
 	password := "postgres"
+	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
 
 	psk, err := base64.StdEncoding.DecodeString(preSharedKey)
 	if err != nil {
 		return nil, err
 	}
 
-	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
 	cfg := config.Config{
 		HTTPListenAddr: ":8080",
 		LogLevel:       config.InfoLog,
@@ -376,6 +404,15 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 			Name: "prometheus",
 		},
 	}
+
+	// Overwrite default values with user provided clair configuration.
+	if clairConfig, ok := configFiles["clair-config.yaml"]; ok {
+		err := yaml.Unmarshal(clairConfig, &cfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ws, err := config.Lint(&cfg)
 	if err != nil {
 		return nil, err

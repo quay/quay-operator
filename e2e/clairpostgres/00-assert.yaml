@@ -3,44 +3,44 @@ kind: QuayRegistry
 metadata:
   finalizers:
   - quay-operator/finalizer
-  name: mindeployment
+  name: clairpostgresE2E
 spec:
   components:
-  - kind: clair
+  - kind: horizontalpodautoscaler
     managed: false
-  - kind: clairpostgres
+  - kind: mirror
+    managed: false
+  - kind: monitoring
     managed: false
   - kind: postgres
     managed: true
+  - kind: clair
+    managed: false
   - kind: redis
-    managed: true
-  - kind: horizontalpodautoscaler
     managed: true
   - kind: objectstorage
     managed: true
   - kind: route
     managed: true
-  - kind: mirror
-    managed: true
-  - kind: monitoring
-    managed: true
   - kind: tls
+    managed: true
+  - kind: clairpostgres
     managed: true
 status:
   conditions:
-  - message: Horizontal pod autoscaler found
-    reason: ComponentReady
+  - message: Horizontal pod autoscaler not managed by the operator
+    reason: ComponentNotManaged
     status: "True"
     type: ComponentHPAReady
   - message: Route admitted
     reason: ComponentReady
     status: "True"
     type: ComponentRouteReady
-  - message: ServiceMonitor and PrometheusRules created
-    reason: ComponentReady
+  - message: Monitoring not managed by the operator
+    reason: ComponentNotManaged
     status: "True"
     type: ComponentMonitoringReady
-  - message: Deployment mindeployment-quay-database healthy
+  - message: Deployment clairpostgresE2E-quay-database healthy
     reason: ComponentReady
     status: "True"
     type: ComponentPostgresReady
@@ -48,19 +48,15 @@ status:
     reason: ComponentReady
     status: "True"
     type: ComponentObjectStorageReady
-  - message: Clair not managed by the operator
-    reason: ComponentNotManaged
+  - message: Clair component healthy
+    reason: ComponentReady
     status: "True"
     type: ComponentClairReady
-  - message: ClairPostgres not managed by the operator
-    reason: ComponentNotManaged
-    status: "True"
-    type: ComponentClairPostgresReady
   - message: Using cluster wildcard certs
     reason: ComponentReady
     status: "True"
     type: ComponentTLSReady
-  - message: Deployment mindeployment-quay-redis healthy
+  - message: Deployment clairpostgresE2E-quay-redis healthy
     reason: ComponentReady
     status: "True"
     type: ComponentRedisReady
@@ -68,14 +64,18 @@ status:
     reason: ComponentReady
     status: "True"
     type: ComponentBaseReady
-  - message: Deployment mindeployment-quay-mirror healthy
-    reason: ComponentReady
+  - message: Mirror not managed by the operator
+    reason: ComponentNotManaged
     status: "True"
     type: ComponentMirrorReady
   - message: All components reporting as healthy
     reason: HealthChecksPassing
     status: "True"
     type: Available
+  - message: ClairPostgres component healthy
+    reason: ComponentReady
+    status: "True"
+    type: ComponentClairPostgresReady
   - message: All registry components created
     reason: ComponentsCreationSuccess
     status: "True"
@@ -84,3 +84,4 @@ status:
     reason: ComponentsCreationSuccess
     status: "False"
     type: RolloutBlocked
+  currentVersion: dev
