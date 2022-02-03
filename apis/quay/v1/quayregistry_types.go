@@ -41,6 +41,7 @@ const (
 	ComponentBase          ComponentKind = "base"
 	ComponentPostgres      ComponentKind = "postgres"
 	ComponentClair         ComponentKind = "clair"
+	ComponentClairPostgres ComponentKind = "clairpostgres"
 	ComponentRedis         ComponentKind = "redis"
 	ComponentHPA           ComponentKind = "horizontalpodautoscaler"
 	ComponentObjectStorage ComponentKind = "objectstorage"
@@ -60,6 +61,7 @@ var allComponents = []ComponentKind{
 	ComponentMirror,
 	ComponentMonitoring,
 	ComponentTLS,
+	ComponentClairPostgres,
 }
 
 var requiredComponents = []ComponentKind{
@@ -116,6 +118,7 @@ const (
 	ComponentBaseReady          ConditionType = "ComponentBaseReady"
 	ComponentPostgresReady      ConditionType = "ComponentPostgresReady"
 	ComponentClairReady         ConditionType = "ComponentClairReady"
+	ComponentClairPostgresReady ConditionType = "ComponentClairPostgresReady"
 	ComponentRedisReady         ConditionType = "ComponentRedisReady"
 	ComponentHPAReady           ConditionType = "ComponentHPAReady"
 	ComponentObjectStorageReady ConditionType = "ComponentObjectStorageReady"
@@ -542,6 +545,8 @@ func FieldGroupNameFor(cmp ComponentKind) (string, error) {
 		return "SecurityScanner", nil
 	case ComponentPostgres:
 		return "Database", nil
+	case ComponentClairPostgres:
+		return "", nil
 	case ComponentRedis:
 		return "Redis", nil
 	case ComponentObjectStorage:

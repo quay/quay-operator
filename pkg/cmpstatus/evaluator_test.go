@@ -44,6 +44,10 @@ func TestEvaluate(t *testing.T) {
 							Managed: true,
 						},
 						{
+							Kind:    qv1.ComponentClairPostgres,
+							Managed: true,
+						},
+						{
 							Kind:    qv1.ComponentRedis,
 							Managed: true,
 						},
@@ -109,6 +113,12 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentClairReady,
 					Status:  metav1.ConditionFalse,
 					Reason:  qv1.ConditionReasonComponentNotReady,
+					Message: "Deployment registry-clair-app not found",
+				},
+				{
+					Type:    qv1.ComponentClairPostgresReady,
+					Status:  metav1.ConditionFalse,
+					Reason:  qv1.ConditionReasonComponentNotReady,
 					Message: "Deployment registry-clair-postgres not found",
 				},
 				{
@@ -128,7 +138,7 @@ func TestEvaluate(t *testing.T) {
 					Status: metav1.ConditionFalse,
 					Reason: qv1.ConditionReasonComponentNotReady,
 					Message: "Awaiting for component postgres," +
-						"objectstorage,clair,tls,redis to become " +
+						"objectstorage,clair,clairpostgres,tls,redis to become " +
 						"available",
 				},
 				{
@@ -159,6 +169,10 @@ func TestEvaluate(t *testing.T) {
 						},
 						{
 							Kind:    qv1.ComponentClair,
+							Managed: true,
+						},
+						{
+							Kind:    qv1.ComponentClairPostgres,
 							Managed: true,
 						},
 						{
@@ -423,6 +437,12 @@ func TestEvaluate(t *testing.T) {
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
 					Message: "Clair component healthy",
+				},
+				{
+					Type:    qv1.ComponentClairPostgresReady,
+					Status:  metav1.ConditionTrue,
+					Reason:  qv1.ConditionReasonComponentReady,
+					Message: "ClairPostgres component healthy",
 				},
 				{
 					Type:    qv1.ComponentTLSReady,
@@ -473,6 +493,10 @@ func TestEvaluate(t *testing.T) {
 							Managed: true,
 						},
 						{
+							Kind:    qv1.ComponentClairPostgres,
+							Managed: true,
+						},
+						{
 							Kind:    qv1.ComponentRedis,
 							Managed: true,
 						},
@@ -778,6 +802,12 @@ func TestEvaluate(t *testing.T) {
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
 					Message: "Clair component healthy",
+				},
+				{
+					Type:    qv1.ComponentClairPostgresReady,
+					Status:  metav1.ConditionTrue,
+					Reason:  qv1.ConditionReasonComponentReady,
+					Message: "ClairPostgres component healthy",
 				},
 				{
 					Type:    qv1.ComponentTLSReady,
@@ -828,6 +858,10 @@ func TestEvaluate(t *testing.T) {
 							Managed: true,
 						},
 						{
+							Kind:    qv1.ComponentClairPostgres,
+							Managed: true,
+						},
+						{
 							Kind:    qv1.ComponentRedis,
 							Managed: true,
 						},
@@ -1155,6 +1189,12 @@ func TestEvaluate(t *testing.T) {
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
 					Message: "Clair component healthy",
+				},
+				{
+					Type:    qv1.ComponentClairPostgresReady,
+					Status:  metav1.ConditionTrue,
+					Reason:  qv1.ConditionReasonComponentReady,
+					Message: "ClairPostgres component healthy",
 				},
 				{
 					Type:    qv1.ComponentTLSReady,
