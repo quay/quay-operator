@@ -3,10 +3,5 @@ kind: TestSuite
 testDirs:
   - ./e2e
 timeout: 500
-crdDir: ./bundle/upstream/manifests
 suppress: 
  - "events"
-commands:
-  - command: /bin/bash -c 'QUAY_VERSION=dev go run main.go' 
-    background: true
-
