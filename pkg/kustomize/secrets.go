@@ -148,6 +148,9 @@ func FieldGroupFor(
 	case v1.ComponentClairPostgres:
 		return nil, nil
 
+	case v1.ComponentBase:
+		return nil, nil
+
 	default:
 		return nil, fmt.Errorf("unknown component: %s", component)
 	}
@@ -232,8 +235,10 @@ func ContainsComponentConfig(
 	switch component.Kind {
 	case v1.ComponentClair:
 		fields = (&securityscanner.SecurityScannerFieldGroup{}).Fields()
+
 	case v1.ComponentPostgres:
 		fields = (&database.DatabaseFieldGroup{}).Fields()
+
 	case v1.ComponentClairPostgres:
 		clairConfigBytes, ok := configBundle["clair-config.yaml"]
 		// Clair config not provided
@@ -254,23 +259,33 @@ func ContainsComponentConfig(
 
 	case v1.ComponentRedis:
 		fields = (&redis.RedisFieldGroup{}).Fields()
+
 	case v1.ComponentObjectStorage:
 		fields = (&distributedstorage.DistributedStorageFieldGroup{}).Fields()
+
 	case v1.ComponentHPA:
 		// HorizontalPodAutoscaler has no associated config fieldgroup.
 		return false, nil
+
 	case v1.ComponentMirror:
 		fields = (&repomirror.RepoMirrorFieldGroup{}).Fields()
+
 	case v1.ComponentRoute:
 		fields = (&hostsettings.HostSettingsFieldGroup{}).Fields()
+
 	case v1.ComponentMonitoring:
 		return false, nil
+
 	case v1.ComponentTLS:
 		_, keyPresent := configBundle["ssl.key"]
 		_, certPresent := configBundle["ssl.cert"]
 		if certPresent && keyPresent {
 			return true, nil
 		}
+
+	case v1.ComponentBase:
+		return false, nil
+
 	default:
 		return false, fmt.Errorf("unknown component: %s", component.Kind)
 	}

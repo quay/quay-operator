@@ -37,9 +37,9 @@ func newQuayRegistry(name, namespace string) *v1.QuayRegistry {
 		Spec: v1.QuayRegistrySpec{},
 	}
 	// TODO: Test omitting components and marking some as disabled/unmanaged...
-	quay, _ = v1.EnsureDefaultComponents(
+	v1.EnsureDefaultComponents(
 		&quaycontext.QuayRegistryContext{SupportsRoutes: false, SupportsObjectStorage: false, SupportsMonitoring: false},
-		quay.DeepCopy(),
+		quay,
 	)
 
 	return quay
@@ -445,9 +445,10 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 
 			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).Should(Succeed())
 
-			expectedQuay, err := v1.EnsureDefaultComponents(
+			expectedQuay := quayRegistry.DeepCopy()
+			err := v1.EnsureDefaultComponents(
 				&quaycontext.QuayRegistryContext{SupportsRoutes: false, SupportsObjectStorage: false, SupportsMonitoring: false},
-				quayRegistry.DeepCopy(),
+				expectedQuay,
 			)
 
 			Expect(err).NotTo(HaveOccurred())

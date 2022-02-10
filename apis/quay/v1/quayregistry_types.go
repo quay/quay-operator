@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -52,6 +51,7 @@ const (
 )
 
 var allComponents = []ComponentKind{
+	ComponentBase,
 	ComponentPostgres,
 	ComponentClair,
 	ComponentRedis,
@@ -78,6 +78,7 @@ var supportsVolumeOverride = []ComponentKind{
 }
 
 var supportsEnvOverride = []ComponentKind{
+	ComponentBase,
 	ComponentClair,
 	ComponentMirror,
 	ComponentPostgres,
@@ -97,8 +98,6 @@ type QuayRegistrySpec struct {
 	ConfigBundleSecret string `json:"configBundleSecret,omitempty"`
 	// Components declare how the Operator should handle backing Quay services.
 	Components []Component `json:"components,omitempty"`
-	// Overrides holds overrides for the Base component (quay-app).
-	Overrides *Override `json:"overrides,omitempty"`
 }
 
 // Component describes how the Operator should handle a backing Quay service.
@@ -337,58 +336,94 @@ func RequiredComponent(component ComponentKind) bool {
 }
 
 // EnsureDefaultComponents adds any `Components` which are missing from `Spec.Components`.
-// Returns an error if a component was declared as managed but is not supported in the current k8s cluster.
-func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) (*QuayRegistry, error) {
-	updatedQuay := quay.DeepCopy()
-	if updatedQuay.Spec.Components == nil {
-		updatedQuay.Spec.Components = []Component{}
+// Returns an error if a component was declared as managed but is not supported in the current
+// k8s cluster.
+func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) error {
+	if quay.Spec.Components == nil {
+		quay.Spec.Components = []Component{}
 	}
 
-	type componentCheck struct {
+	type check struct {
 		check func() bool
 		msg   string
 	}
-	componentChecks := map[ComponentKind]componentCheck{
-		ComponentRoute:         {func() bool { return ctx.SupportsRoutes }, "cannot use `route` component when `Route` API not available"},
-		ComponentTLS:           {func() bool { return ctx.SupportsRoutes }, "cannot use `tls` component when `Route` API not available"},
-		ComponentObjectStorage: {func() bool { return ctx.SupportsObjectStorage }, "cannot use `ObjectStorage` component when `ObjectStorage` API not available"},
-		ComponentMonitoring:    {func() bool { return ctx.SupportsMonitoring }, "cannot use `monitoring` component when `Prometheus` API not available"},
+	checks := map[ComponentKind]check{
+		ComponentRoute: {
+			check: func() bool { return ctx.SupportsRoutes },
+			msg:   "Route API not available",
+		},
+		ComponentTLS: {
+			check: func() bool { return ctx.SupportsRoutes },
+			msg:   "Route API not available",
+		},
+		ComponentObjectStorage: {
+			check: func() bool { return ctx.SupportsObjectStorage },
+			msg:   "ObjectStorage API not available",
+		},
+		ComponentMonitoring: {
+			check: func() bool { return ctx.SupportsMonitoring },
+			msg:   "Prometheus API not available",
+		},
 	}
 
-	componentManaged := map[ComponentKind]componentCheck{
+	componentManaged := map[ComponentKind]check{
 		ComponentTLS: {
 			check: func() bool { return ctx.TLSCert == nil && ctx.TLSKey == nil },
 		},
 	}
 
-	for _, component := range allComponents {
-		componentCheck, checkExists := componentChecks[component]
-		if (checkExists && !componentCheck.check()) && ComponentIsManaged(quay.Spec.Components, component) {
-			return quay, errors.New(componentCheck.msg)
-		}
-
-		found := false
-		for _, declaredComponent := range quay.Spec.Components {
-			if component == declaredComponent.Kind {
-				found = true
-				break
+	for _, cmp := range allComponents {
+		ccheck, checkexists := checks[cmp]
+		if checkexists {
+			// if there is a check registered for the component we run it, if the
+			// check fails and the component is managed then we have a problem with
+			// the current components configuration. returns the check error.
+			if !ccheck.check() && ComponentIsManaged(quay.Spec.Components, cmp) {
+				return fmt.Errorf(
+					"Error validatingcomponent %s: %s", cmp, ccheck.msg,
+				)
 			}
 		}
 
-		managed := !checkExists || componentCheck.check()
-		if _, ok := componentManaged[component]; ok {
-			managed = managed && componentManaged[component].check()
+		// if the component has already been declared in the QuayRegistry object we can
+		// just return as there is nothing we need to do.
+		var found bool
+		for i, declaredComponent := range quay.Spec.Components {
+			if cmp != declaredComponent.Kind {
+				continue
+			}
+
+			// we disregard whatever the user has defined for base component, this
+			// is a component that can't be unmanaged so if user sets it to unmanaged
+			// we are going to roll it back to managed.
+			if declaredComponent.Kind == ComponentBase {
+				quay.Spec.Components[i].Managed = true
+			}
+
+			found = true
+			break
+		}
+		if found {
+			continue
 		}
 
-		if !found {
-			updatedQuay.Spec.Components = append(updatedQuay.Spec.Components, Component{
-				Kind:    component,
-				Managed: managed,
-			})
+		// the component management status is set to true if the check for the component
+		// has passed.
+		managed := !checkexists || ccheck.check()
+		if _, ok := componentManaged[cmp]; ok {
+			managed = managed && componentManaged[cmp].check()
 		}
+
+		quay.Spec.Components = append(
+			quay.Spec.Components,
+			Component{
+				Kind:    cmp,
+				Managed: managed,
+			},
+		)
 	}
 
-	return updatedQuay, nil
+	return nil
 }
 
 // ValidateOverrides validates that the overrides set for each component are valid.
@@ -579,6 +614,8 @@ func FieldGroupNameFor(cmp ComponentKind) (string, error) {
 	case ComponentMonitoring:
 		return "", nil
 	case ComponentTLS:
+		return "", nil
+	case ComponentBase:
 		return "", nil
 	default:
 		return "", fmt.Errorf("unknown component: %q", cmp)

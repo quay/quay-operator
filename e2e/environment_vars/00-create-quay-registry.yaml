@@ -1,0 +1,36 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: skynet
+spec:
+  components:
+  - kind: base
+    managed: true
+    overrides:
+      env:
+      - name: TESTING
+        value: TESTING
+  - kind: postgres
+    managed: true
+    overrides:
+      env:
+      - name: TESTING
+        value: TESTING
+  - kind: clair
+    managed: true
+    overrides:
+      env:
+      - name: TESTING
+        value: TESTING
+  - kind: redis
+    managed: true
+    overrides:
+      env:
+      - name: TESTING
+        value: TESTING
+  - kind: mirror
+    managed: true
+    overrides:
+      env:
+      - name: TESTING
+        value: TESTING
