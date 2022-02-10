@@ -240,13 +240,6 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 // not Base. Base is not consider an ordinary component so its env overides are kept in the
 // root of the spec object.
 func getEnvOverrideForComponent(quay *v1.QuayRegistry, kind v1.ComponentKind) []corev1.EnvVar {
-	if kind == v1.ComponentBase {
-		if quay.Spec.Overrides == nil {
-			return nil
-		}
-		return quay.Spec.Overrides.Env
-	}
-
 	for _, cmp := range quay.Spec.Components {
 		if cmp.Kind != kind {
 			continue

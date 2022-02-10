@@ -387,7 +387,7 @@ func KustomizationFor(
 	}
 
 	for _, component := range quay.Spec.Components {
-		if !component.Managed {
+		if !component.Managed || component.Kind == v1.ComponentBase {
 			continue
 		}
 

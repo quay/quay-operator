@@ -50,7 +50,7 @@ import (
 const (
 	upgradePollInterval  = time.Second * 10
 	upgradePollTimeout   = time.Second * 6000
-	creationPollInterval = time.Second * 1
+	creationPollInterval = time.Second * 2
 	creationPollTimeout  = time.Second * 600
 
 	GrafanaDashboardConfigMapNameSuffix = "grafana-dashboard-quay"
@@ -375,8 +375,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	updatedQuay, err = v1.EnsureDefaultComponents(quayContext, updatedQuay)
-	if err != nil {
+	if err = v1.EnsureDefaultComponents(quayContext, updatedQuay); err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
 		return r.Requeue, err
 	}
@@ -695,7 +694,11 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 			creationPollTimeout,
 			func() (bool, error) {
 				if err := r.Client.Create(ctx, obj); err != nil {
-					return false, nil
+					if errors.IsAlreadyExists(err) {
+						log.Info("immutable resource being deleted, retry")
+						return false, nil
+					}
+					return true, err
 				}
 				return true, nil
 			},

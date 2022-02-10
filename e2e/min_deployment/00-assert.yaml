@@ -10,6 +10,8 @@ spec:
     managed: false
   - kind: clairpostgres
     managed: false
+  - kind: base
+    managed: true
   - kind: postgres
     managed: true
   - kind: redis

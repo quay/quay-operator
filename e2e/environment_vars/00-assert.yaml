@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-app
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: QE_K8S_CONFIG_SECRET
+        - name: QE_K8S_NAMESPACE
+        - name: DEBUGLOG
+        - name: WORKER_COUNT_WEB
+        - name: WORKER_COUNT_SECSCAN
+        - name: WORKER_COUNT_REGISTRY
+        - name: HTTP_PROXY
+        - name: HTTPS_PROXY
+        - name: NO_PROXY
+        - name: TESTING
+          value: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-database
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: POSTGRESQL_USER
+        - name: POSTGRESQL_DATABASE
+        - name: POSTGRESQL_ADMIN_PASSWORD
+        - name: POSTGRESQL_PASSWORD
+        - name: POSTGRESQL_SHARED_BUFFERS
+        - name: POSTGRESQL_MAX_CONNECTIONS
+        - name: TESTING
+          value: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-clair-app
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: CLAIR_CONF
+        - name: CLAIR_MODE
+        - name: HTTP_PROXY
+        - name: HTTPS_PROXY
+        - name: NO_PROXY
+        - name: TESTING
+          value: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-redis
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: TESTING
+          value: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-mirror
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: QE_K8S_CONFIG_SECRET
+        - name: QE_K8S_NAMESPACE
+        - name: DEBUGLOG
+        - name: ENSURE_NO_MIGRATION
+        - name: HTTP_PROXY
+        - name: HTTPS_PROXY
+        - name: NO_PROXY
+        - name: TESTING
+          value: TESTING
