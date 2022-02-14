@@ -18,7 +18,7 @@ test: generate fmt vet manifests
 	go test ./... -coverprofile cover.out
 
 test-e2e:
-	mkdir ./bin
+	mkdir -p ./bin
 	curl -L https://github.com/kudobuilder/kuttl/releases/download/v0.11.1/kubectl-kuttl_0.11.1_linux_x86_64 -o ./bin/kuttl;
 	chmod +x ./bin/kuttl;
 	./bin/kuttl test;
