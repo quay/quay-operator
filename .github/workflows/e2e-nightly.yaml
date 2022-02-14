@@ -56,6 +56,11 @@ jobs:
           CATALOG_IMAGE: quay.io/projectquay/quay-operator-index:${{ env.TAG }}
         run: ./hack/deploy.sh
 
+      - name: E2E Tests
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: make test-e2e
+
       - name: teardown deployment
         if: always()
         run: ./hack/teardown.sh

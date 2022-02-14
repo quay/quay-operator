@@ -78,4 +78,3 @@ status:
     reason: ComponentsCreationSuccess
     status: "False"
     type: RolloutBlocked
-  currentVersion: dev
