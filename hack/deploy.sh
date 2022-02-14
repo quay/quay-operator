@@ -106,8 +106,6 @@ for n in {1..60}; do
 	break
 done
 
-make test-e2e;
-
 # shellcheck disable=SC2046
 if [ -x $(command -v git >/dev/null 2>&1) ]; then
 	git checkout "${CATALOG_PATH}" >/dev/null 2>&1
