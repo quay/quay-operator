@@ -17,6 +17,10 @@ all: manager
 test: generate fmt vet manifests
 	go test ./... -coverprofile cover.out
 
+# Runs our very peculiar suite of end to end tests.
+test-e2e:
+	echo no e2e tests
+
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/manager main.go
