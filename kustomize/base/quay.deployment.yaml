@@ -77,11 +77,17 @@ spec:
               path: /health/instance
               port: 8080
               scheme: HTTP
-          livelinessProbe:
+            timeoutSeconds: 10
+            periodSeconds: 15
+            failureThreshold: 10
+          livenessProbe:
             httpGet:
               path: /health/instance
               port: 8080
               scheme: HTTP
+            timeoutSeconds: 10
+            periodSeconds: 15
+            failureThreshold: 10
           volumeMounts:
             - name: config
               readOnly: false
