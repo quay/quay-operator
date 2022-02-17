@@ -51,7 +51,7 @@ const (
 	upgradePollInterval  = time.Second * 10
 	upgradePollTimeout   = time.Second * 6000
 	creationPollInterval = time.Second * 1
-	creationPollTimeout  = time.Second * 600
+	creationPollTimeout  = time.Minute * 2
 
 	GrafanaDashboardConfigMapNameSuffix = "grafana-dashboard-quay"
 	GrafanaTitleJSONPath                = "title"
@@ -695,6 +695,10 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 			creationPollTimeout,
 			func() (bool, error) {
 				if err := r.Client.Create(ctx, obj); err != nil {
+					if !errors.IsAlreadyExists(err) {
+						return true, err
+					}
+					log.Info("immutable resource not deleted yet")
 					return false, nil
 				}
 				return true, nil
