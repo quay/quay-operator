@@ -554,16 +554,17 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj c
 		log.Info("(re)creating immutable resource")
 
 		propagationPolicy := metav1.DeletePropagationForeground
-		if err := r.Client.Delete(ctx, obj, &client.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil && !errors.IsNotFound(err) && !errors.IsAlreadyExists(err) {
+		if err := r.Client.Delete(ctx, obj, &client.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "failed to delete immutable resource")
-
 			return err
 		}
+		log.Info("immutable resource delete called")
 
 		err := wait.Poll(creationPollInterval, creationPollTimeout, func() (bool, error) {
 			if err := r.Client.Create(ctx, obj); err == nil {
 				return true, nil
 			} else if errors.IsAlreadyExists(err) {
+				log.Info("awaiting for immutable resource to be deleted")
 				return false, nil
 			} else {
 				return false, err
@@ -572,7 +573,6 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(ctx context.Context, obj c
 
 		if err != nil {
 			log.Error(err, "failed to create immutable resource")
-
 			return err
 		}
 
