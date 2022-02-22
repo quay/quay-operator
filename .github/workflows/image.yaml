@@ -29,4 +29,4 @@ jobs:
       with:
         push: true
         context: ./
-        tags: quay.io/projectquay/quay-operator-dev:pr-${{ github.event.number }}
+        tags: quay.io/projectquay/quay-operator:pr-${{ github.event.number }}
