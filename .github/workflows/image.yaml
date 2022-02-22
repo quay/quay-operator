@@ -3,8 +3,7 @@ name: image
 on:
   pull_request_target:
     branches:
-      - master
-
+      - '*'
 jobs:
   image:
     name: image
