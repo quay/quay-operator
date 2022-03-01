@@ -4,6 +4,11 @@ on:
   pull_request_target:
     branches:
       - '*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to attach to image'     
+        required: true
 jobs:
   image:
     name: image
@@ -11,9 +16,6 @@ jobs:
     steps:
     - name: check out code
       uses: actions/checkout@v2
-      with:
-        repository: ${{ github.event.pull_request.head.repo.full_name }}
-        ref: ${{ github.event.pull_request.head.ref }}
 
     - name: registry login
       uses: docker/login-action@v1
@@ -28,4 +30,4 @@ jobs:
       with:
         push: true
         context: ./
-        tags: quay.io/projectquay/quay-operator:pr-${{ github.event.number }}
+        tags: quay.io/projectquay/quay-operator:${{ github.event.inputs.tag || github.event.number }}
