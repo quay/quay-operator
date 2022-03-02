@@ -17,7 +17,7 @@ spec:
               path: /health/instance
               port: 8443
               scheme: HTTPS
-          livelinessProbe:
+          livenessProbe:
             httpGet:
               path: /health/instance
               port: 8443
