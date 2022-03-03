@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -59,6 +60,7 @@ func TestBaseCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -98,6 +100,7 @@ func TestBaseCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -137,6 +140,7 @@ func TestBaseCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -159,6 +163,7 @@ func TestBaseCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -198,6 +203,7 @@ func TestBaseCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -220,6 +226,7 @@ func TestBaseCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -266,6 +273,232 @@ func TestBaseCheck(t *testing.T) {
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Status:  metav1.ConditionFalse,
 				Message: "Deployment registry-quay-app not owned by QuayRegistry",
+			},
+		},
+		{
+			name: "base component being scaled down",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+				Spec: qv1.QuayRegistrySpec{
+					Components: []qv1.Component{
+						{
+							Kind: qv1.ComponentBase,
+							Overrides: &qv1.Override{
+								Replicas: pointer.Int32(0),
+							},
+						},
+					},
+				},
+			},
+			objs: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 2,
+						Conditions: []appsv1.DeploymentCondition{
+							{
+								Type:    appsv1.DeploymentAvailable,
+								Status:  corev1.ConditionTrue,
+								Message: "all good",
+							},
+						},
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentBaseReady,
+				Reason:  qv1.ConditionReasonComponentNotReady,
+				Status:  metav1.ConditionFalse,
+				Message: "Base component is being scaled down",
+			},
+		},
+		{
+			name: "base component scaled down",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+				Spec: qv1.QuayRegistrySpec{
+					Components: []qv1.Component{
+						{
+							Kind: qv1.ComponentBase,
+							Overrides: &qv1.Override{
+								Replicas: pointer.Int32(0),
+							},
+						},
+					},
+				},
+			},
+			objs: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 0,
+						Conditions: []appsv1.DeploymentCondition{
+							{
+								Type:    appsv1.DeploymentAvailable,
+								Status:  corev1.ConditionTrue,
+								Message: "all good",
+							},
+						},
+					},
+				},
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-config-editor",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
+						Conditions: []appsv1.DeploymentCondition{
+							{
+								Type:    appsv1.DeploymentAvailable,
+								Status:  corev1.ConditionTrue,
+								Message: "all good",
+							},
+						},
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentBaseReady,
+				Reason:  qv1.ConditionReasonComponentReady,
+				Status:  metav1.ConditionTrue,
+				Message: "Base component healthy",
+			},
+		},
+		{
+			name: "zero available replicas quay app",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+			},
+			objs: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 0,
+						Conditions: []appsv1.DeploymentCondition{
+							{
+								Type:    appsv1.DeploymentAvailable,
+								Status:  corev1.ConditionTrue,
+								Message: "all good",
+							},
+						},
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentBaseReady,
+				Reason:  qv1.ConditionReasonComponentNotReady,
+				Status:  metav1.ConditionFalse,
+				Message: "Deployment registry-quay-app has zero replicas available",
+			},
+		},
+		{
+			name: "zero available replicas for config editor",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+			},
+			objs: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
+						Conditions: []appsv1.DeploymentCondition{
+							{
+								Type:    appsv1.DeploymentAvailable,
+								Status:  corev1.ConditionTrue,
+								Message: "all good",
+							},
+						},
+					},
+				},
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-config-editor",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 0,
+						Conditions: []appsv1.DeploymentCondition{
+							{
+								Type:    appsv1.DeploymentAvailable,
+								Status:  corev1.ConditionTrue,
+								Message: "all good",
+							},
+						},
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentBaseReady,
+				Reason:  qv1.ConditionReasonComponentNotReady,
+				Status:  metav1.ConditionFalse,
+				Message: "Deployment registry-quay-config-editor has zero replicas available",
 			},
 		},
 	} {

@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -128,6 +129,7 @@ func TestMirrorCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -143,6 +145,56 @@ func TestMirrorCheck(t *testing.T) {
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Message: "Deployment registry-quay-mirror: something went wrong",
+			},
+		},
+		{
+			name: "deployment scaled down",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+				Spec: qv1.QuayRegistrySpec{
+					Components: []qv1.Component{
+						{
+							Kind:    qv1.ComponentMirror,
+							Managed: true,
+							Overrides: &qv1.Override{
+								Replicas: pointer.Int32(0),
+							},
+						},
+					},
+				},
+			},
+			objs: []runtime.Object{
+				&appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-mirror",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Kind:       "QuayRegistry",
+								Name:       "registry",
+								APIVersion: "quay.redhat.com/v1",
+								UID:        "uid",
+							},
+						},
+					},
+					Status: appsv1.DeploymentStatus{
+						Conditions: []appsv1.DeploymentCondition{
+							{
+								Type:    appsv1.DeploymentAvailable,
+								Status:  corev1.ConditionFalse,
+								Message: "something went wrong",
+							},
+						},
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentMirrorReady,
+				Status:  metav1.ConditionTrue,
+				Reason:  qv1.ConditionReasonComponentReady,
+				Message: "Mirror manually scaled down",
 			},
 		},
 	} {

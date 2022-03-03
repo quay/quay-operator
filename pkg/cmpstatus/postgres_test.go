@@ -128,6 +128,7 @@ func TestPostgresCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,

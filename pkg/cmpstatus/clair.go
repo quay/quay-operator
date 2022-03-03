@@ -73,6 +73,30 @@ func (c *Clair) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition,
 		}, nil
 	}
 
+	// users are able to override the number of replicas. if they do override it to zero
+	// we expect zero replicas to be running.
+	replicas := qv1.GetReplicasOverrideForComponent(&reg, qv1.ComponentClair)
+	scaleddown := replicas != nil && *replicas == 0
+	if scaleddown {
+		if dep.Status.AvailableReplicas == 0 {
+			return qv1.Condition{
+				Type:           qv1.ComponentClairReady,
+				Reason:         qv1.ConditionReasonComponentReady,
+				Status:         metav1.ConditionTrue,
+				Message:        "Clair manually scaled down",
+				LastUpdateTime: metav1.NewTime(time.Now()),
+			}, nil
+		}
+
+		return qv1.Condition{
+			Type:           qv1.ComponentClairReady,
+			Reason:         qv1.ConditionReasonComponentNotReady,
+			Status:         metav1.ConditionFalse,
+			Message:        "Clair component is being scaled down",
+			LastUpdateTime: metav1.NewTime(time.Now()),
+		}, nil
+	}
+
 	cond := c.deploy.check(dep)
 	if cond.Status != metav1.ConditionTrue {
 		// if the deployment is in a faulty state bails out immediately.
