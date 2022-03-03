@@ -60,7 +60,7 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 		component := labels.Set(objectMeta.GetAnnotations()).Get("quay-component")
 		kind := v1.ComponentKind(component)
 		if v1.ComponentIsManaged(quay.Spec.Components, kind) {
-			for _, oenv := range getEnvOverrideForComponent(quay, kind) {
+			for _, oenv := range v1.GetEnvOverrideForComponent(quay, kind) {
 				for i := range dep.Spec.Template.Spec.Containers {
 					ref := &dep.Spec.Template.Spec.Containers[i]
 					UpsertContainerEnv(ref, oenv)
@@ -90,7 +90,7 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 			// we set its value to two or to the value provided by the user
 			// as an override (if provided).
 			desired := pointer.Int32(2)
-			if rs := getReplicasOverrideForComponent(quay, kind); rs != nil {
+			if rs := v1.GetReplicasOverrideForComponent(quay, kind); rs != nil {
 				desired = rs
 			}
 
@@ -134,9 +134,9 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 		var override *resource.Quantity
 		switch quayComponentLabel {
 		case "postgres":
-			override = getVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
+			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
 		case "clair-postgres":
-			override = getVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
+			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
 		}
 
 		// If override was not provided
@@ -248,56 +248,4 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 
 	flattenedSecret.Data["config.yaml"] = flattenedConfigYAML
 	return flattenedSecret, nil
-}
-
-// getReplicasOverrideForComponent returns the overrides set by the user for the provided
-// component. Returns nil if not set.
-func getReplicasOverrideForComponent(quay *v1.QuayRegistry, kind v1.ComponentKind) *int32 {
-	for _, cmp := range quay.Spec.Components {
-		if cmp.Kind != kind {
-			continue
-		}
-
-		if cmp.Overrides == nil {
-			return nil
-		}
-
-		return cmp.Overrides.Replicas
-	}
-	return nil
-}
-
-// getEnvOverrideForComponent return the environment variables overrides for the provided
-// component, nil is returned if not defined. Each component has its own env override, but
-// not Base. Base is not consider an ordinary component so its env overides are kept in the
-// root of the spec object.
-func getEnvOverrideForComponent(quay *v1.QuayRegistry, kind v1.ComponentKind) []corev1.EnvVar {
-	for _, cmp := range quay.Spec.Components {
-		if cmp.Kind != kind {
-			continue
-		}
-
-		if cmp.Overrides == nil {
-			return nil
-		}
-
-		return cmp.Overrides.Env
-	}
-	return nil
-}
-
-func getVolumeSizeOverrideForComponent(
-	quay *v1.QuayRegistry, componentKind v1.ComponentKind,
-) (volumeSizeOverride *resource.Quantity) {
-	for _, component := range quay.Spec.Components {
-		if component.Kind != componentKind {
-			continue
-		}
-
-		if component.Overrides != nil && component.Overrides.VolumeSize != nil {
-			volumeSizeOverride = component.Overrides.VolumeSize
-		}
-		return
-	}
-	return
 }

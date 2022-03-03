@@ -24,6 +24,9 @@ func TestDeploy_check(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "does-not-exist",
 				},
+				Status: appsv1.DeploymentStatus{
+					AvailableReplicas: 1,
+				},
 			},
 			cond: qv1.Condition{
 				Status:  metav1.ConditionFalse,
@@ -38,6 +41,7 @@ func TestDeploy_check(t *testing.T) {
 					Name: "abc",
 				},
 				Status: appsv1.DeploymentStatus{
+					AvailableReplicas: 1,
 					Conditions: []appsv1.DeploymentCondition{
 						{
 							Type:    appsv1.DeploymentAvailable,
@@ -60,6 +64,7 @@ func TestDeploy_check(t *testing.T) {
 					Name: "abc",
 				},
 				Status: appsv1.DeploymentStatus{
+					AvailableReplicas: 1,
 					Conditions: []appsv1.DeploymentCondition{
 						{
 							Type:    appsv1.DeploymentAvailable,
@@ -82,6 +87,7 @@ func TestDeploy_check(t *testing.T) {
 					Name: "abc",
 				},
 				Status: appsv1.DeploymentStatus{
+					AvailableReplicas: 1,
 					Conditions: []appsv1.DeploymentCondition{
 						{
 							Type:    appsv1.DeploymentProgressing,
@@ -100,6 +106,29 @@ func TestDeploy_check(t *testing.T) {
 				Status:  metav1.ConditionTrue,
 				Reason:  qv1.ConditionReasonComponentReady,
 				Message: "Deployment abc healthy",
+			},
+		},
+		{
+			name: "zero replicas available",
+			deploy: appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "abc",
+				},
+				Status: appsv1.DeploymentStatus{
+					AvailableReplicas: 0,
+					Conditions: []appsv1.DeploymentCondition{
+						{
+							Type:    appsv1.DeploymentAvailable,
+							Status:  corev1.ConditionFalse,
+							Message: "random failure",
+						},
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Status:  metav1.ConditionFalse,
+				Reason:  qv1.ConditionReasonComponentNotReady,
+				Message: "Deployment abc has zero replicas available",
 			},
 		},
 	} {

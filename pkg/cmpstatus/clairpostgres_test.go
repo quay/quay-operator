@@ -98,6 +98,7 @@ func TestClairPostgresCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -145,6 +146,7 @@ func TestClairPostgresCheck(t *testing.T) {
 						},
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,
@@ -184,6 +186,7 @@ func TestClairPostgresCheck(t *testing.T) {
 						Name: "registry-clair-postgres",
 					},
 					Status: appsv1.DeploymentStatus{
+						AvailableReplicas: 1,
 						Conditions: []appsv1.DeploymentCondition{
 							{
 								Type:    appsv1.DeploymentAvailable,

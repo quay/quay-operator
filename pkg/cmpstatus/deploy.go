@@ -21,6 +21,16 @@ type deploy struct{}
 // property is not set. Type property therefore must be set by the caller when defining the
 // component the provided deployment is part of.
 func (d *deploy) check(dep appsv1.Deployment) qv1.Condition {
+	if dep.Status.AvailableReplicas == 0 {
+		msg := fmt.Sprintf("Deployment %s has zero replicas available", dep.Name)
+		return qv1.Condition{
+			Status:         metav1.ConditionFalse,
+			Reason:         qv1.ConditionReasonComponentNotReady,
+			LastUpdateTime: metav1.NewTime(time.Now()),
+			Message:        msg,
+		}
+	}
+
 	cond, found := d.availableCondition(dep.Status.Conditions)
 	if !found {
 		return qv1.Condition{

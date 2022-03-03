@@ -692,3 +692,55 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 func init() {
 	SchemeBuilder.Register(&QuayRegistry{}, &QuayRegistryList{})
 }
+
+// GetReplicasOverrideForComponent returns the overrides set by the user for the provided
+// component. Returns nil if not set.
+func GetReplicasOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *int32 {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+
+		if cmp.Overrides == nil {
+			return nil
+		}
+
+		return cmp.Overrides.Replicas
+	}
+	return nil
+}
+
+// GetVolumeSizeOverrideForComponent returns the volume size overrides set by the user for the
+// provided component. Returns nil if not set.
+func GetVolumeSizeOverrideForComponent(
+	quay *QuayRegistry, kind ComponentKind,
+) (qt *resource.Quantity) {
+	for _, component := range quay.Spec.Components {
+		if component.Kind != kind {
+			continue
+		}
+
+		if component.Overrides != nil && component.Overrides.VolumeSize != nil {
+			qt = component.Overrides.VolumeSize
+		}
+		return
+	}
+	return
+}
+
+// GetEnvOverrideForComponent return the environment variables overrides for the provided
+// component, nil is returned if not defined.
+func GetEnvOverrideForComponent(quay *QuayRegistry, kind ComponentKind) []corev1.EnvVar {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+
+		if cmp.Overrides == nil {
+			return nil
+		}
+
+		return cmp.Overrides.Env
+	}
+	return nil
+}

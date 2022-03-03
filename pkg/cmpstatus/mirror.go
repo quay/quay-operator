@@ -69,6 +69,30 @@ func (m *Mirror) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition
 		}, nil
 	}
 
+	// users are able to override the number of replicas. if they do override it to zero
+	// we expect zero replicas to be running.
+	replicas := qv1.GetReplicasOverrideForComponent(&reg, qv1.ComponentMirror)
+	scaleddown := replicas != nil && *replicas == 0
+	if scaleddown {
+		if dep.Status.AvailableReplicas == 0 {
+			return qv1.Condition{
+				Type:           qv1.ComponentMirrorReady,
+				Reason:         qv1.ConditionReasonComponentReady,
+				Status:         metav1.ConditionTrue,
+				Message:        "Mirror manually scaled down",
+				LastUpdateTime: metav1.NewTime(time.Now()),
+			}, nil
+		}
+
+		return qv1.Condition{
+			Type:           qv1.ComponentMirrorReady,
+			Reason:         qv1.ConditionReasonComponentNotReady,
+			Status:         metav1.ConditionFalse,
+			Message:        "Mirror component is being scaled down",
+			LastUpdateTime: metav1.NewTime(time.Now()),
+		}, nil
+	}
+
 	cond := m.deploy.check(dep)
 	cond.Type = qv1.ComponentMirrorReady
 	return cond, nil

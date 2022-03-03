@@ -31,6 +31,11 @@ func (b *Base) Name() string {
 func (b *Base) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, error) {
 	var zero qv1.Condition
 
+	// users are able to override the number of replicas. if they do override it to zero
+	// we expect zero replicas to be running.
+	replicas := qv1.GetReplicasOverrideForComponent(&reg, qv1.ComponentBase)
+	scaleddown := replicas != nil && *replicas == 0
+
 	// we need to check two distinct deployments, the quay app and its config editor.
 	for _, depsuffix := range []string{"quay-app", "quay-config-editor"} {
 		depname := fmt.Sprintf("%s-%s", reg.Name, depsuffix)
@@ -61,6 +66,23 @@ func (b *Base) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, 
 				Status:         metav1.ConditionFalse,
 				Reason:         qv1.ConditionReasonComponentNotReady,
 				Message:        msg,
+				LastUpdateTime: metav1.NewTime(time.Now()),
+			}, nil
+		}
+
+		basedep := fmt.Sprintf("%s-quay-app", reg.Name)
+		if dep.Name == basedep && scaleddown {
+			// if user has scaled down base component and we have zero replicas for
+			// the current deployment we are good to go, move to the next deployment.
+			if dep.Status.AvailableReplicas == 0 {
+				continue
+			}
+
+			return qv1.Condition{
+				Type:           qv1.ComponentBaseReady,
+				Reason:         qv1.ConditionReasonComponentNotReady,
+				Status:         metav1.ConditionFalse,
+				Message:        "Base component is being scaled down",
 				LastUpdateTime: metav1.NewTime(time.Now()),
 			}, nil
 		}
