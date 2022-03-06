@@ -43,10 +43,10 @@ const (
 	GrafanaDashboardConfigNamespace = "openshift-config-managed"
 )
 
-// checkManagedKeys populates the provided QuayRegistryContext with the information we
-// persist in between Reconcile calls. The information kept from one Reconcile loop to
-// the next is stored in a secret.
-func (r *QuayRegistryReconciler) checkManagedKeys(
+// checkDeprecatedManagedKeys populates the provided quay context with information we
+// persist between Reconcile calls. This function uses the old secret (<=3.6.4) and not
+// the new one (>=3.7.0).
+func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
 ) error {
 	listOptions := &client.ListOptions{
@@ -77,6 +77,35 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 		break
 	}
 
+	return nil
+}
+
+// checkManagedKeys populates the provided QuayRegistryContext with the information we
+// persist in between Reconcile calls. The information kept from one Reconcile loop to
+// the next is stored in a secret.
+func (r *QuayRegistryReconciler) checkManagedKeys(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) error {
+
+	nsn := types.NamespacedName{
+		Name:      fmt.Sprintf("%s-%s", quay.Name, v1.ManagedKeysName),
+		Namespace: quay.Namespace,
+	}
+
+	var secret corev1.Secret
+	if err := r.Get(ctx, nsn, &secret); err != nil {
+		if errors.IsNotFound(err) {
+			return r.checkDeprecatedManagedKeys(ctx, qctx, quay)
+		}
+		return err
+	}
+
+	qctx.DatabaseSecretKey = string(secret.Data[databaseSecretKey])
+	qctx.SecretKey = string(secret.Data[secretKey])
+	qctx.DbUri = string(secret.Data[dbURI])
+	qctx.DbRootPw = string(secret.Data[dbRootPw])
+	qctx.ConfigEditorPw = string(secret.Data[configEditorPw])
+	qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
 	return nil
 }
 

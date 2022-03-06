@@ -348,6 +348,9 @@ func KustomizationFor(
 		{
 			GeneratorArgs: types.GeneratorArgs{
 				Name: v1.ManagedKeysName,
+				Options: &types.GeneratorOptions{
+					DisableNameSuffixHash: true,
+				},
 				KvPairSources: types.KvPairSources{
 					LiteralSources: []string{
 						"DATABASE_SECRET_KEY=" + ctx.DatabaseSecretKey,
