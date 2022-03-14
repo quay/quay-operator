@@ -1,0 +1,10 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: mirror
+spec:
+  components:
+  - kind: clair
+    managed: false
+  - kind: clairpostgres
+    managed: false
