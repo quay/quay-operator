@@ -325,9 +325,10 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	rtmanaged := v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentRoute)
 	if err := r.checkRoutesAvailable(
 		ctx, quayContext, updatedQuay, configBundle,
-	); err != nil {
+	); err != nil && rtmanaged {
 		return r.reconcileWithCondition(
 			ctx,
 			&quay,
