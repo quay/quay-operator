@@ -41,7 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	quayredhatcomv1 "github.com/quay/quay-operator/apis/quay/v1"
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/quay/quay-operator/pkg/kustomize"
@@ -807,7 +806,7 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&quayredhatcomv1.QuayRegistry{}).
+		For(&v1.QuayRegistry{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		// TODO: Add `.Owns()` for every resource type we manage...
 		Complete(r)
