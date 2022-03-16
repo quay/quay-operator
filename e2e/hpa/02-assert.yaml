@@ -1,0 +1,114 @@
+---
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  finalizers:
+  - quay-operator/finalizer
+  name: hpa
+spec:
+  components:
+  - kind: clair
+    managed: true
+  - kind: clairpostgres
+    managed: true
+  - kind: quay
+    managed: true
+  - kind: postgres
+    managed: true
+  - kind: redis
+    managed: true
+  - kind: horizontalpodautoscaler
+    managed: true
+  - kind: objectstorage
+    managed: true
+  - kind: route
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: monitoring
+    managed: true
+  - kind: tls
+    managed: true
+status:
+  conditions:
+  - message: Horizontal pod autoscaler found
+    reason: ComponentReady
+    status: "True"
+    type: ComponentHPAReady
+  - message: Route admitted
+    reason: ComponentReady
+    status: "True"
+    type: ComponentRouteReady
+  - message: ServiceMonitor and PrometheusRules created
+    reason: ComponentReady
+    status: "True"
+    type: ComponentMonitoringReady
+  - message: Deployment hpa-quay-database healthy
+    reason: ComponentReady
+    status: "True"
+    type: ComponentPostgresReady
+  - message: Object bucket claim bound
+    reason: ComponentReady
+    status: "True"
+    type: ComponentObjectStorageReady
+  - message: Clair component healthy
+    reason: ComponentReady
+    status: "True"
+    type: ComponentClairReady
+  - message: ClairPostgres component healthy
+    reason: ComponentReady
+    status: "True"
+    type: ComponentClairPostgresReady
+  - message: Using cluster wildcard certs
+    reason: ComponentReady
+    status: "True"
+    type: ComponentTLSReady
+  - message: Deployment hpa-quay-redis healthy
+    reason: ComponentReady
+    status: "True"
+    type: ComponentRedisReady
+  - message: Quay component healthy
+    reason: ComponentReady
+    status: "True"
+    type: ComponentBaseReady
+  - message: Deployment hpa-quay-mirror healthy
+    reason: ComponentReady
+    status: "True"
+    type: ComponentMirrorReady
+  - message: All components reporting as healthy
+    reason: HealthChecksPassing
+    status: "True"
+    type: Available
+  - message: All registry components created
+    reason: ComponentsCreationSuccess
+    status: "True"
+    type: ComponentsCreated
+  - message: All objects created/updated successfully
+    reason: ComponentsCreationSuccess
+    status: "False"
+    type: RolloutBlocked
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-clair-app
+status:
+  currentReplicas: 2
+  desiredReplicas: 2
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-quay-app
+status:
+  currentReplicas: 2
+  desiredReplicas: 2
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-quay-mirror
+status:
+  currentReplicas: 2
+  desiredReplicas: 2
+---
