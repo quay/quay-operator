@@ -29,7 +29,9 @@ metadata:
               {"kind": "route", "managed": true},
               {"kind": "mirror", "managed": true},
               {"kind": "monitoring", "managed": true},
-              {"kind": "tls", "managed": true}
+              {"kind": "tls", "managed": true},
+              {"kind": "base", "managed": true},
+              {"kind": "clairpostgres", "managed": true}
             ]
           }
         }
