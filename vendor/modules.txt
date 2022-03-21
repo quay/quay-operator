@@ -319,7 +319,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/quay/clair/config v1.1.2
+# github.com/quay/clair/config v1.1.3
 ## explicit; go 1.16
 github.com/quay/clair/config
 # github.com/quay/config-tool v0.1.9

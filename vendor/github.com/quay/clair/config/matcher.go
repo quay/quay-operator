@@ -23,7 +23,7 @@ type Matcher struct {
 	// Period controls how often updaters are run.
 	//
 	// The default is 30 minutes.
-	Period time.Duration `yaml:"period" json:"period"`
+	Period time.Duration `yaml:"period,omitempty" json:"period,omitempty"`
 	// UpdateRetention controls the number of updates to retain between
 	// garbage collection periods.
 	//
@@ -34,10 +34,15 @@ type Matcher struct {
 	UpdateRetention int `yaml:"update_retention" json:"update_retention"`
 	// A positive integer
 	//
-	// Clair allows for a custom connection pool size.
-	// This number will directly set how many active sql
-	// connections are allowed concurrently.
-	MaxConnPool int `yaml:"max_conn_pool" json:"max_conn_pool"`
+	// Clair allows for a custom connection pool size.  This number will
+	// directly set how many active sql connections are allowed concurrently.
+	//
+	// Deprecated: Pool size should be set through the ConnString member.
+	// Currently, Clair only uses the "pgxpool" package to connect to the
+	// database, so see
+	// https://pkg.go.dev/github.com/jackc/pgx/v4/pgxpool#ParseConfig for more
+	// information.
+	MaxConnPool int `yaml:"max_conn_pool,omitempty" json:"max_conn_pool,omitempty"`
 	// CacheAge controls how long clients should be hinted to cache responses
 	// for.
 	//
@@ -47,12 +52,12 @@ type Matcher struct {
 	// A "true" or "false" value
 	//
 	// Whether Matcher nodes handle migrations to their databases.
-	Migrations bool `yaml:"migrations" json:"migrations"`
+	Migrations bool `yaml:"migrations,omitempty" json:"migrations,omitempty"`
 	// DisableUpdaters disables the updater's running of matchers.
 	//
 	// This should be toggled on if vulnerabilities are being provided by
 	// another mechanism.
-	DisableUpdaters bool `yaml:"disable_updaters" json:"disable_updaters"`
+	DisableUpdaters bool `yaml:"disable_updaters,omitempty" json:"disable_updaters,omitempty"`
 }
 
 func (m *Matcher) validate(mode Mode) ([]Warning, error) {
@@ -114,6 +119,12 @@ func (m *Matcher) lint() (ws []Warning, err error) {
 		ws = append(ws, Warning{
 			path: ".update_retention",
 			msg:  "update garbage collection is off",
+		})
+	}
+	if m.MaxConnPool != 0 {
+		ws = append(ws, Warning{
+			path: ".max_conn_pool",
+			msg:  "this parameter will be ignored in a future release",
 		})
 	}
 

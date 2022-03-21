@@ -1,7 +1,10 @@
 package kustomize
 
 import (
+	"bytes"
 	"fmt"
+	"io/fs"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +12,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/yaml"
 
+	"github.com/quay/clair/config"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/database"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
@@ -491,5 +495,37 @@ func TestEnsureTLSFor(t *testing.T) {
 				shared.ValidateCertPairWithHostname(tlsCert, tlsKey, test.buildManagerHostname, fgn)
 			}
 		}
+	}
+}
+
+func TestClairMarshal(t *testing.T) {
+	tt := []struct {
+		_forcekeys struct{}
+		Name       string
+		In         *config.Config
+		Want       string
+	}{
+		{
+			Name: "Zero",
+			In:   &config.Config{},
+			Want: "clair_zero.yaml",
+		},
+	}
+
+	sys := os.DirFS("testdata")
+	for _, tc := range tt {
+		t.Run(tc.Name, func(t *testing.T) {
+			got, err := yaml.Marshal(tc.In)
+			if err != nil {
+				t.Error(err)
+			}
+			want, err := fs.ReadFile(sys, tc.Want)
+			if err != nil {
+				t.Error(err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Errorf("got: %+q, want: %+q", got, want)
+			}
+		})
 	}
 }
