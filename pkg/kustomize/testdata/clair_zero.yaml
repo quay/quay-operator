@@ -1,0 +1,29 @@
+auth: {}
+http_listen_addr: ""
+indexer:
+  connstring: ""
+  scanner: {}
+introspection_addr: ""
+log_level: info
+matcher:
+  connstring: ""
+  indexer_addr: ""
+  update_retention: 0
+matchers:
+  names: null
+metrics:
+  name: ""
+  prometheus: {}
+notifier:
+  connstring: ""
+  indexer_addr: ""
+  matcher_addr: ""
+trace:
+  jaeger:
+    agent:
+      endpoint: ""
+    collector:
+      endpoint: ""
+  name: ""
+updaters:
+  filter: ""
