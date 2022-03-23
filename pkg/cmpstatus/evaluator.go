@@ -39,8 +39,8 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 		conds = append(conds, cond)
 	}
 
-	// now analyse the components that the base component depends on. if any of these is in
-	// a faulty state then base won't be able to come up properly. we gather the name of
+	// now analyse the components that the quay component depends on. if any of these is in
+	// a faulty state then Quay won't be able to come up properly. we gather the name of
 	// any faulty component in a slice of strings, all conditions are append to the slice
 	// we return at the end of the process.
 	var failed []string
@@ -63,14 +63,14 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 		}
 	}
 
-	// if we found out any component in a faulty state we have to abort now. base component
+	// if we found out any component in a faulty state we have to abort now. Quay component
 	// must indicate which component is in a faulty state. as mirror component depends on
-	// base component its status is also defined as faulty.
+	// Quay component its status is also defined as faulty.
 	if len(failed) > 0 {
 		conds = append(
 			conds,
 			qv1.Condition{
-				Type:           qv1.ComponentBaseReady,
+				Type:           qv1.ComponentQuayReady,
 				Status:         metav1.ConditionFalse,
 				Reason:         qv1.ConditionReasonComponentNotReady,
 				LastUpdateTime: metav1.NewTime(time.Now()),
@@ -83,24 +83,24 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 				Type:           qv1.ComponentMirrorReady,
 				Status:         metav1.ConditionFalse,
 				Reason:         qv1.ConditionReasonComponentNotReady,
-				Message:        "Awaiting for component base to become available",
+				Message:        "Awaiting for component quay to become available",
 				LastUpdateTime: metav1.NewTime(time.Now()),
 			},
 		)
 		return conds, nil
 	}
 
-	// checks now if the base component is in a faulty state. if it is then sets mirror
-	// component as faulty as well (awaiting for base) and returns. base condition is
+	// checks now if the quay component is in a faulty state. if it is then sets mirror
+	// component as faulty as well (awaiting for quay) and returns. quay condition is
 	// append to the returned slice.
-	base := &Base{Client: c}
-	cond, err := base.Check(ctx, q)
+	quay := &Quay{Client: c}
+	cond, err := quay.Check(ctx, q)
 	if err != nil {
 		return nil, err
 	}
 	conds = append(conds, cond)
 
-	// if base is in a faulty state then sets mirror as faulty and awaiting for base. we
+	// if quay is in a faulty state then sets mirror as faulty and awaiting for quay. we
 	// can return here as there is no need to check mirror status.
 	if cond.Status != metav1.ConditionTrue {
 		conds = append(
@@ -109,13 +109,13 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 				Type:    qv1.ComponentMirrorReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
-				Message: "Awaiting for component base to become available",
+				Message: "Awaiting for component quay to become available",
 			},
 		)
 		return conds, nil
 	}
 
-	// this is the last component we check the health for. it depends on base component that
+	// this is the last component we check the health for. it depends on quay component that
 	// in turn depends on almost all other components.
 	mirror := &Mirror{Client: c}
 	cond, err = mirror.Check(ctx, q)

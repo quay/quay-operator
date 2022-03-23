@@ -37,7 +37,7 @@ var QuayVersionCurrent QuayVersion = QuayVersion(os.Getenv("QUAY_VERSION"))
 type ComponentKind string
 
 const (
-	ComponentBase          ComponentKind = "base"
+	ComponentQuay          ComponentKind = "quay"
 	ComponentPostgres      ComponentKind = "postgres"
 	ComponentClair         ComponentKind = "clair"
 	ComponentClairPostgres ComponentKind = "clairpostgres"
@@ -51,7 +51,7 @@ const (
 )
 
 var allComponents = []ComponentKind{
-	ComponentBase,
+	ComponentQuay,
 	ComponentPostgres,
 	ComponentClair,
 	ComponentRedis,
@@ -78,7 +78,7 @@ var supportsVolumeOverride = []ComponentKind{
 }
 
 var supportsEnvOverride = []ComponentKind{
-	ComponentBase,
+	ComponentQuay,
 	ComponentClair,
 	ComponentMirror,
 	ComponentPostgres,
@@ -88,7 +88,7 @@ var supportsEnvOverride = []ComponentKind{
 var supportsReplicasOverride = []ComponentKind{
 	ComponentClair,
 	ComponentMirror,
-	ComponentBase,
+	ComponentQuay,
 }
 
 const (
@@ -132,7 +132,7 @@ const (
 	ConditionTypeAvailable      ConditionType = "Available"
 	ConditionTypeRolloutBlocked ConditionType = "RolloutBlocked"
 	ConditionComponentsCreated  ConditionType = "ComponentsCreated"
-	ComponentBaseReady          ConditionType = "ComponentBaseReady"
+	ComponentQuayReady          ConditionType = "ComponentQuayReady"
 	ComponentPostgresReady      ConditionType = "ComponentPostgresReady"
 	ComponentClairReady         ConditionType = "ComponentClairReady"
 	ComponentClairPostgresReady ConditionType = "ComponentClairPostgresReady"
@@ -318,9 +318,9 @@ func ComponentsMatch(firstComponents, secondComponents []Component) bool {
 
 // ComponentIsManaged returns whether the given component is managed or not.
 func ComponentIsManaged(components []Component, name ComponentKind) bool {
-	// we do not expose Base component through the CRD, as it represents the base deployment
-	// of a quay registry and will always be managed.
-	if name == ComponentBase {
+	// we do not expose Quay component through the CRD, as it represents the Quay deployment
+	// and will always be managed.
+	if name == ComponentQuay {
 		return true
 	}
 
@@ -400,10 +400,10 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 				continue
 			}
 
-			// we disregard whatever the user has defined for base component, this
+			// we disregard whatever the user has defined for Quay component, this
 			// is a component that can't be unmanaged so if user sets it to unmanaged
 			// we are going to roll it back to managed.
-			if declaredComponent.Kind == ComponentBase {
+			if declaredComponent.Kind == ComponentQuay {
 				quay.Spec.Components[i].Managed = true
 			}
 
@@ -639,7 +639,7 @@ func FieldGroupNameFor(cmp ComponentKind) (string, error) {
 		return "", nil
 	case ComponentTLS:
 		return "", nil
-	case ComponentBase:
+	case ComponentQuay:
 		return "", nil
 	default:
 		return "", fmt.Errorf("unknown component: %q", cmp)
@@ -743,4 +743,38 @@ func GetEnvOverrideForComponent(quay *QuayRegistry, kind ComponentKind) []corev1
 		return cmp.Overrides.Env
 	}
 	return nil
+}
+
+// RemoveUnusedConditions is used to trim off conditions created by previous releases of this
+// operator that are not used anymore.
+func RemoveUnusedConditions(quay *QuayRegistry) {
+	validConditionTypes := []ConditionType{
+		ConditionTypeAvailable,
+		ConditionTypeRolloutBlocked,
+		ConditionComponentsCreated,
+		ComponentQuayReady,
+		ComponentPostgresReady,
+		ComponentClairReady,
+		ComponentClairPostgresReady,
+		ComponentRedisReady,
+		ComponentHPAReady,
+		ComponentObjectStorageReady,
+		ComponentRouteReady,
+		ComponentMirrorReady,
+		ComponentMonitoringReady,
+		ComponentTLSReady,
+	}
+
+	newconds := []Condition{}
+	for _, qcond := range quay.Status.Conditions {
+		for _, valid := range validConditionTypes {
+			if qcond.Type != valid {
+				continue
+			}
+			newconds = append(newconds, qcond)
+			break
+		}
+	}
+
+	quay.Status.Conditions = newconds
 }

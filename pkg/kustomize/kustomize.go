@@ -55,13 +55,13 @@ const (
 // to use. If set, returns a Kustomize image override for the given component.
 func componentImageFor(component v1.ComponentKind) (types.Image, error) {
 	envVarFor := map[v1.ComponentKind]string{
-		v1.ComponentBase:     componentImagePrefix + "QUAY",
+		v1.ComponentQuay:     componentImagePrefix + "QUAY",
 		v1.ComponentClair:    componentImagePrefix + "CLAIR",
 		v1.ComponentRedis:    componentImagePrefix + "REDIS",
 		v1.ComponentPostgres: componentImagePrefix + "POSTGRES",
 	}
 	defaultImagesFor := map[v1.ComponentKind]string{
-		v1.ComponentBase:     "quay.io/projectquay/quay",
+		v1.ComponentQuay:     "quay.io/projectquay/quay",
 		v1.ComponentClair:    "quay.io/projectquay/clair",
 		v1.ComponentRedis:    "centos/redis-32-centos7",
 		v1.ComponentPostgres: "centos/postgresql-10-centos7",
@@ -390,7 +390,7 @@ func KustomizationFor(
 	}
 
 	for _, component := range quay.Spec.Components {
-		if !component.Managed || component.Kind == v1.ComponentBase {
+		if !component.Managed || component.Kind == v1.ComponentQuay {
 			continue
 		}
 
@@ -426,7 +426,7 @@ func KustomizationFor(
 
 	images := []types.Image{}
 	for _, component := range append(
-		quay.Spec.Components, v1.Component{Kind: "base", Managed: true},
+		quay.Spec.Components, v1.Component{Kind: "quay", Managed: true},
 	) {
 		image, err := componentImageFor(component.Kind)
 		if err != nil {
@@ -537,7 +537,7 @@ func Inflate(
 	}
 	parsedUserConfig["DB_URI"] = ctx.DbUri
 
-	for field, value := range BaseConfig() {
+	for field, value := range BaseQuayConfig() {
 		if _, ok := parsedUserConfig[field]; !ok {
 			parsedUserConfig[field] = value
 		}

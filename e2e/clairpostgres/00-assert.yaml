@@ -3,7 +3,7 @@ kind: QuayRegistry
 metadata:
   finalizers:
   - quay-operator/finalizer
-  name: clairpostgresE2E
+  name: clairpostgres-e2e
 spec:
   components:
   - kind: horizontalpodautoscaler
@@ -12,10 +12,12 @@ spec:
     managed: false
   - kind: monitoring
     managed: false
+  - kind: quay
+    managed: true
   - kind: postgres
     managed: true
   - kind: clair
-    managed: false
+    managed: true
   - kind: redis
     managed: true
   - kind: objectstorage
@@ -40,7 +42,7 @@ status:
     reason: ComponentNotManaged
     status: "True"
     type: ComponentMonitoringReady
-  - message: Deployment clairpostgresE2E-quay-database healthy
+  - message: Deployment clairpostgres-e2e-quay-database healthy
     reason: ComponentReady
     status: "True"
     type: ComponentPostgresReady
@@ -52,18 +54,22 @@ status:
     reason: ComponentReady
     status: "True"
     type: ComponentClairReady
+  - message: ClairPostgres component healthy
+    reason: ComponentReady
+    status: "True"
+    type: ComponentClairPostgresReady
   - message: Using cluster wildcard certs
     reason: ComponentReady
     status: "True"
     type: ComponentTLSReady
-  - message: Deployment clairpostgresE2E-quay-redis healthy
+  - message: Deployment clairpostgres-e2e-quay-redis healthy
     reason: ComponentReady
     status: "True"
     type: ComponentRedisReady
-  - message: Base component healthy
+  - message: Quay component healthy
     reason: ComponentReady
     status: "True"
-    type: ComponentBaseReady
+    type: ComponentQuayReady
   - message: Mirror not managed by the operator
     reason: ComponentNotManaged
     status: "True"
@@ -72,10 +78,6 @@ status:
     reason: HealthChecksPassing
     status: "True"
     type: Available
-  - message: ClairPostgres component healthy
-    reason: ComponentReady
-    status: "True"
-    type: ComponentClairPostgresReady
   - message: All registry components created
     reason: ComponentsCreationSuccess
     status: "True"
@@ -84,4 +86,3 @@ status:
     reason: ComponentsCreationSuccess
     status: "False"
     type: RolloutBlocked
-  currentVersion: dev

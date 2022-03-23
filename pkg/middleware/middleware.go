@@ -71,7 +71,7 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 		for kind, depsuffix := range map[v1.ComponentKind]string{
 			v1.ComponentClair:  "clair-app",
 			v1.ComponentMirror: "quay-mirror",
-			v1.ComponentBase:   "quay-app",
+			v1.ComponentQuay:   "quay-app",
 		} {
 			if !strings.HasSuffix(dep.Name, depsuffix) {
 				continue

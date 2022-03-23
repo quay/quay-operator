@@ -131,4 +131,9 @@ func (q *QuayRegistryStatusReconciler) overwriteConditions(
 		LastTransitionTime: transition,
 	}
 	reg.Status.Conditions = qv1.SetCondition(reg.Status.Conditions, cond)
+
+	// we do a final pass through all conditions set in the quay registry and drop all of
+	// those that are not relevant anymore (most likely used in previous operator releases
+	// and not used anymore).
+	qv1.RemoveUnusedConditions(reg)
 }

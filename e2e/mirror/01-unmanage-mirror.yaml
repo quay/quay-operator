@@ -9,7 +9,7 @@ spec:
     managed: false
   - kind: clairpostgres
     managed: false
-  - kind: base
+  - kind: quay
     managed: true
   - kind: postgres
     managed: true

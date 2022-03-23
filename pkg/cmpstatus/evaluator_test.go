@@ -134,7 +134,7 @@ func TestEvaluate(t *testing.T) {
 					Message: "Redis deployment not found",
 				},
 				{
-					Type:   qv1.ComponentBaseReady,
+					Type:   qv1.ComponentQuayReady,
 					Status: metav1.ConditionFalse,
 					Reason: qv1.ConditionReasonComponentNotReady,
 					Message: "Awaiting for component postgres," +
@@ -145,12 +145,12 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentMirrorReady,
 					Status:  metav1.ConditionFalse,
 					Reason:  qv1.ConditionReasonComponentNotReady,
-					Message: "Awaiting for component base to become available",
+					Message: "Awaiting for component quay to become available",
 				},
 			},
 		},
 		{
-			name: "base unhealthy",
+			name: "quay unhealthy",
 			quay: qv1.QuayRegistry{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "registry",
@@ -461,7 +461,7 @@ func TestEvaluate(t *testing.T) {
 					Message: "Deployment registry-quay-redis healthy",
 				},
 				{
-					Type:    qv1.ComponentBaseReady,
+					Type:    qv1.ComponentQuayReady,
 					Status:  metav1.ConditionFalse,
 					Reason:  qv1.ConditionReasonComponentNotReady,
 					Message: "Deployment registry-quay-app not found",
@@ -470,12 +470,12 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentMirrorReady,
 					Status:  metav1.ConditionFalse,
 					Reason:  qv1.ConditionReasonComponentNotReady,
-					Message: "Awaiting for component base to become available",
+					Message: "Awaiting for component quay to become available",
 				},
 			},
 		},
 		{
-			name: "base healthy",
+			name: "quay healthy",
 			quay: qv1.QuayRegistry{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "registry",
@@ -832,10 +832,10 @@ func TestEvaluate(t *testing.T) {
 					Message: "Deployment registry-quay-redis healthy",
 				},
 				{
-					Type:    qv1.ComponentBaseReady,
+					Type:    qv1.ComponentQuayReady,
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
-					Message: "Base component healthy",
+					Message: "Quay component healthy",
 				},
 				{
 					Type:    qv1.ComponentMirrorReady,
@@ -1226,10 +1226,10 @@ func TestEvaluate(t *testing.T) {
 					Message: "Deployment registry-quay-redis healthy",
 				},
 				{
-					Type:    qv1.ComponentBaseReady,
+					Type:    qv1.ComponentQuayReady,
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
-					Message: "Base component healthy",
+					Message: "Quay component healthy",
 				},
 				{
 					Type:    qv1.ComponentMirrorReady,

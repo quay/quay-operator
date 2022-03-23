@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: quay-app
   labels:
-    quay-component: quay-app
+    quay-component: quay
   annotations:
-    quay-component: base
+    quay-component: quay
 spec:
   type: ClusterIP
   ports:
