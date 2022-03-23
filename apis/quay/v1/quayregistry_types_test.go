@@ -23,7 +23,7 @@ var ensureDefaultComponentsTests = []struct {
 		QuayRegistry{
 			Spec: QuayRegistrySpec{
 				Components: []Component{
-					{Kind: "base", Managed: true},
+					{Kind: "quay", Managed: true},
 					{Kind: "postgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -43,7 +43,7 @@ var ensureDefaultComponentsTests = []struct {
 			SupportsRoutes:        true,
 		},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
@@ -62,7 +62,7 @@ var ensureDefaultComponentsTests = []struct {
 		QuayRegistry{
 			Spec: QuayRegistrySpec{
 				Components: []Component{
-					{Kind: "base", Managed: true},
+					{Kind: "quay", Managed: true},
 					{Kind: "postgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -77,7 +77,7 @@ var ensureDefaultComponentsTests = []struct {
 		},
 		quaycontext.QuayRegistryContext{},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
@@ -95,7 +95,7 @@ var ensureDefaultComponentsTests = []struct {
 		QuayRegistry{
 			Spec: QuayRegistrySpec{
 				Components: []Component{
-					{Kind: "base", Managed: true},
+					{Kind: "quay", Managed: true},
 					{Kind: "postgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -115,7 +115,7 @@ var ensureDefaultComponentsTests = []struct {
 			SupportsMonitoring:    true,
 		},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
@@ -134,7 +134,7 @@ var ensureDefaultComponentsTests = []struct {
 		QuayRegistry{
 			Spec: QuayRegistrySpec{
 				Components: []Component{
-					{Kind: "base", Managed: true},
+					{Kind: "quay", Managed: true},
 					{Kind: "postgres", Managed: true},
 					{Kind: "redis", Managed: true},
 					{Kind: "clair", Managed: true},
@@ -154,7 +154,7 @@ var ensureDefaultComponentsTests = []struct {
 			SupportsMonitoring:    true,
 		},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
@@ -175,7 +175,7 @@ var ensureDefaultComponentsTests = []struct {
 		},
 		quaycontext.QuayRegistryContext{},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
@@ -200,7 +200,7 @@ var ensureDefaultComponentsTests = []struct {
 			SupportsMonitoring: true,
 		},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: true},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
@@ -227,7 +227,7 @@ var ensureDefaultComponentsTests = []struct {
 		},
 		quaycontext.QuayRegistryContext{},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
@@ -258,7 +258,7 @@ var ensureDefaultComponentsTests = []struct {
 			ClusterHostname:    "apps.example.com",
 		},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},
@@ -291,7 +291,7 @@ var ensureDefaultComponentsTests = []struct {
 			ClusterHostname:    "apps.example.com",
 		},
 		[]Component{
-			{Kind: "base", Managed: true},
+			{Kind: "quay", Managed: true},
 			{Kind: "postgres", Managed: false},
 			{Kind: "redis", Managed: true},
 			{Kind: "clair", Managed: true},

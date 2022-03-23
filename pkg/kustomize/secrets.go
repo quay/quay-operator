@@ -148,7 +148,7 @@ func FieldGroupFor(
 	case v1.ComponentClairPostgres:
 		return nil, nil
 
-	case v1.ComponentBase:
+	case v1.ComponentQuay:
 		return nil, nil
 
 	default:
@@ -156,8 +156,8 @@ func FieldGroupFor(
 	}
 }
 
-// BaseConfig returns a minimum config bundle with values that Quay doesn't have defaults for.
-func BaseConfig() map[string]interface{} {
+// BaseQuayConfig returns a minimum config bundle with values that Quay doesn't have defaults for.
+func BaseQuayConfig() map[string]interface{} {
 	registryTitle := "Quay"
 	enterpriseLogoURL := "/static/img/quay-horizontal-color.svg"
 	if os.Getenv("QUAY_DEFAULT_BRANDING") == "redhat" {
@@ -283,7 +283,7 @@ func ContainsComponentConfig(
 			return true, nil
 		}
 
-	case v1.ComponentBase:
+	case v1.ComponentQuay:
 		return false, nil
 
 	default:

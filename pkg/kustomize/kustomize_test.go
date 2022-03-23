@@ -239,7 +239,7 @@ func TestFlattenSecret(t *testing.T) {
 }
 
 var quayComponents = map[string][]client.Object{
-	"base": {
+	"quay": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
@@ -338,7 +338,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres"}),
+		expected:    withComponents([]string{"quay", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -362,7 +362,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"base"}),
+		expected:    withComponents([]string{"quay"}),
 		expectedErr: nil,
 	},
 	{
@@ -385,7 +385,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "postgres", "clair", "mirror", "clairpostgres"}),
+		expected:    withComponents([]string{"quay", "postgres", "clair", "mirror", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -413,7 +413,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "clairpostgres"}),
+		expected:    withComponents([]string{"quay", "clair", "postgres", "redis", "objectstorage", "mirror", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -441,7 +441,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io", "DATABASE_SECRET_KEY": "abc123"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "clair", "postgres", "redis", "objectstorage", "mirror", "clairpostgres"}),
+		expected:    withComponents([]string{"quay", "clair", "postgres", "redis", "objectstorage", "mirror", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -461,7 +461,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"base", "postgres"}),
+		expected:    withComponents([]string{"quay", "postgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -482,7 +482,7 @@ var inflateTests = []struct {
 				}),
 			},
 		},
-		expected:    withComponents([]string{"base"}),
+		expected:    withComponents([]string{"quay"}),
 		expectedErr: nil,
 	},
 }

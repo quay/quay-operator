@@ -4,7 +4,7 @@ metadata:
   name: skynet
 spec:
   components:
-  - kind: base
+  - kind: quay
     managed: true
     overrides:
       env:

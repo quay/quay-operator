@@ -14,26 +14,26 @@ import (
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
-// Base checks a quay registry base component status. In order to evaluate the status for the
+// Quay checks a quay registry base component status. In order to evaluate the status for the
 // base component we need to verify if quay and config-editor deployments succeed.
-type Base struct {
+type Quay struct {
 	Client client.Client
 	deploy deploy
 }
 
 // Name returns the component name this entity checks for health.
-func (b *Base) Name() string {
-	return "base"
+func (q *Quay) Name() string {
+	return "quay"
 }
 
 // Check verifies if the quay and config-editor deployment associated with provided quay registry
 // were created and rolled out as expected.
-func (b *Base) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, error) {
+func (q *Quay) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, error) {
 	var zero qv1.Condition
 
 	// users are able to override the number of replicas. if they do override it to zero
 	// we expect zero replicas to be running.
-	replicas := qv1.GetReplicasOverrideForComponent(&reg, qv1.ComponentBase)
+	replicas := qv1.GetReplicasOverrideForComponent(&reg, qv1.ComponentQuay)
 	scaleddown := replicas != nil && *replicas == 0
 
 	// we need to check two distinct deployments, the quay app and its config editor.
@@ -45,11 +45,11 @@ func (b *Base) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, 
 		}
 
 		var dep appsv1.Deployment
-		if err := b.Client.Get(ctx, nsn, &dep); err != nil {
+		if err := q.Client.Get(ctx, nsn, &dep); err != nil {
 			if errors.IsNotFound(err) {
 				msg := fmt.Sprintf("Deployment %s not found", depname)
 				return qv1.Condition{
-					Type:           qv1.ComponentBaseReady,
+					Type:           qv1.ComponentQuayReady,
 					Status:         metav1.ConditionFalse,
 					Reason:         qv1.ConditionReasonComponentNotReady,
 					Message:        msg,
@@ -62,7 +62,7 @@ func (b *Base) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, 
 		if !qv1.Owns(reg, &dep) {
 			msg := fmt.Sprintf("Deployment %s not owned by QuayRegistry", depname)
 			return qv1.Condition{
-				Type:           qv1.ComponentBaseReady,
+				Type:           qv1.ComponentQuayReady,
 				Status:         metav1.ConditionFalse,
 				Reason:         qv1.ConditionReasonComponentNotReady,
 				Message:        msg,
@@ -79,27 +79,27 @@ func (b *Base) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, 
 			}
 
 			return qv1.Condition{
-				Type:           qv1.ComponentBaseReady,
+				Type:           qv1.ComponentQuayReady,
 				Reason:         qv1.ConditionReasonComponentNotReady,
 				Status:         metav1.ConditionFalse,
-				Message:        "Base component is being scaled down",
+				Message:        "Quay component is being scaled down",
 				LastUpdateTime: metav1.NewTime(time.Now()),
 			}, nil
 		}
 
-		cond := b.deploy.check(dep)
+		cond := q.deploy.check(dep)
 		if cond.Status != metav1.ConditionTrue {
 			// if the deployment is in a faulty state bails out immediately.
-			cond.Type = qv1.ComponentBaseReady
+			cond.Type = qv1.ComponentQuayReady
 			return cond, nil
 		}
 	}
 
 	return qv1.Condition{
-		Type:           qv1.ComponentBaseReady,
+		Type:           qv1.ComponentQuayReady,
 		Reason:         qv1.ConditionReasonComponentReady,
 		Status:         metav1.ConditionTrue,
-		Message:        "Base component healthy",
+		Message:        "Quay component healthy",
 		LastUpdateTime: metav1.NewTime(time.Now()),
 	}, nil
 }

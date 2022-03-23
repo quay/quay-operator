@@ -16,7 +16,7 @@ import (
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
-func TestBaseCheck(t *testing.T) {
+func TestQuayCheck(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		quay qv1.QuayRegistry
@@ -32,7 +32,7 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Message: "Deployment registry-quay-app not found",
@@ -72,7 +72,7 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Message: "Deployment registry-quay-app: something went wrong",
@@ -112,7 +112,7 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Message: "Deployment registry-quay-config-editor not found",
@@ -175,7 +175,7 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Message: "Deployment registry-quay-config-editor: something went wrong",
@@ -238,10 +238,10 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Reason:  qv1.ConditionReasonComponentReady,
 				Status:  metav1.ConditionTrue,
-				Message: "Base component healthy",
+				Message: "Quay component healthy",
 			},
 		},
 		{
@@ -269,7 +269,7 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Status:  metav1.ConditionFalse,
 				Message: "Deployment registry-quay-app not owned by QuayRegistry",
@@ -285,7 +285,7 @@ func TestBaseCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind: qv1.ComponentBase,
+							Kind: qv1.ComponentQuay,
 							Overrides: &qv1.Override{
 								Replicas: pointer.Int32(0),
 							},
@@ -319,10 +319,10 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Status:  metav1.ConditionFalse,
-				Message: "Base component is being scaled down",
+				Message: "Quay component is being scaled down",
 			},
 		},
 		{
@@ -335,7 +335,7 @@ func TestBaseCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind: qv1.ComponentBase,
+							Kind: qv1.ComponentQuay,
 							Overrides: &qv1.Override{
 								Replicas: pointer.Int32(0),
 							},
@@ -392,10 +392,10 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Reason:  qv1.ConditionReasonComponentReady,
 				Status:  metav1.ConditionTrue,
-				Message: "Base component healthy",
+				Message: "Quay component healthy",
 			},
 		},
 		{
@@ -432,7 +432,7 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Status:  metav1.ConditionFalse,
 				Message: "Deployment registry-quay-app has zero replicas available",
@@ -495,7 +495,7 @@ func TestBaseCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentBaseReady,
+				Type:    qv1.ComponentQuayReady,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Status:  metav1.ConditionFalse,
 				Message: "Deployment registry-quay-config-editor has zero replicas available",
@@ -507,11 +507,11 @@ func TestBaseCheck(t *testing.T) {
 			defer cancel()
 
 			cli := fake.NewFakeClient(tt.objs...)
-			base := Base{
+			quay := Quay{
 				Client: cli,
 			}
 
-			cond, err := base.Check(ctx, tt.quay)
+			cond, err := quay.Check(ctx, tt.quay)
 			if err != nil {
 				t.Fatalf("unexpected error: %s", err)
 			}

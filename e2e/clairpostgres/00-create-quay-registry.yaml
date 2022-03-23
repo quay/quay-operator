@@ -1,7 +1,7 @@
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
-  name: clairpostgresE2E
+  name: clairpostgres-e2e
 spec:
   components:
   - kind: horizontalpodautoscaler

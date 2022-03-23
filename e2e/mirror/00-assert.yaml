@@ -11,7 +11,7 @@ spec:
     managed: false
   - kind: clairpostgres
     managed: false
-  - kind: base
+  - kind: quay
     managed: true
   - kind: postgres
     managed: true
@@ -67,10 +67,10 @@ status:
     reason: ComponentReady
     status: "True"
     type: ComponentRedisReady
-  - message: Base component healthy
+  - message: Quay component healthy
     reason: ComponentReady
     status: "True"
-    type: ComponentBaseReady
+    type: ComponentQuayReady
   - message: Deployment mirror-quay-mirror healthy
     reason: ComponentReady
     status: "True"

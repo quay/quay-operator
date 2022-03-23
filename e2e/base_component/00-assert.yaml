@@ -4,7 +4,7 @@ metadata:
   name: skynet
 spec:
   components:
-  - kind: base
+  - kind: quay
     managed: true
   - kind: postgres
     managed: true
@@ -23,4 +23,6 @@ spec:
   - kind: monitoring
     managed: true
   - kind: tls
+    managed: true
+  - kind: clairpostgres
     managed: true

@@ -218,7 +218,7 @@ func (r *QuayRegistryReconciler) createInitialBundleSecret(
 				Namespace:    quay.GetNamespace(),
 			},
 			Data: map[string][]byte{
-				"config.yaml": encode(kustomize.BaseConfig()),
+				"config.yaml": encode(kustomize.BaseQuayConfig()),
 			},
 		},
 	)
