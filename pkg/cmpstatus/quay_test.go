@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,11 +25,61 @@ func TestQuayCheck(t *testing.T) {
 		cond qv1.Condition
 	}{
 		{
+			name: "quay app upgrade job not found",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentQuayReady,
+				Status:  metav1.ConditionFalse,
+				Reason:  qv1.ConditionReasonComponentNotReady,
+				Message: "Job registry-quay-app-upgrade not found",
+			},
+		},
+		{
+			name: "quay app upgrade job not finished",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+			},
+			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 0,
+					},
+				},
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentQuayReady,
+				Status:  metav1.ConditionFalse,
+				Reason:  qv1.ConditionReasonComponentNotReady,
+				Message: "Job registry-quay-app-upgrade not finished",
+			},
+		},
+		{
 			name: "quay app deployment not found",
 			quay: qv1.QuayRegistry{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "registry",
 					UID:  "uid",
+				},
+			},
+			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
 				},
 			},
 			cond: qv1.Condition{
@@ -47,6 +98,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -87,6 +146,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -127,6 +194,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -190,6 +265,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -253,6 +336,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -294,6 +385,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -344,6 +443,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -407,6 +514,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -447,6 +562,14 @@ func TestQuayCheck(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
