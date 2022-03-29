@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +31,18 @@ func (q *Quay) Name() string {
 // were created and rolled out as expected.
 func (q *Quay) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, error) {
 	var zero qv1.Condition
+
+	// check the upgrade job status. this job is created as part of "quay component" and
+	// must succeed for quay deployment to rollout.
+	if err := q.upgradeJob(ctx, reg); err != nil {
+		return qv1.Condition{
+			Type:           qv1.ComponentQuayReady,
+			Status:         metav1.ConditionFalse,
+			Reason:         qv1.ConditionReasonComponentNotReady,
+			Message:        err.Error(),
+			LastUpdateTime: metav1.NewTime(time.Now()),
+		}, nil
+	}
 
 	// users are able to override the number of replicas. if they do override it to zero
 	// we expect zero replicas to be running.
@@ -102,4 +115,27 @@ func (q *Quay) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, 
 		Message:        "Quay component healthy",
 		LastUpdateTime: metav1.NewTime(time.Now()),
 	}, nil
+}
+
+// upgradeJob checks the status for the upgrade job created as part of the Quay component. If
+// this function returns an error this error can be used as status for the Quay component.
+func (q *Quay) upgradeJob(ctx context.Context, reg qv1.QuayRegistry) error {
+	jname := fmt.Sprintf("%s-quay-app-upgrade", reg.Name)
+	nsn := types.NamespacedName{
+		Namespace: reg.Namespace,
+		Name:      jname,
+	}
+
+	var job batchv1.Job
+	if err := q.Client.Get(ctx, nsn, &job); err != nil {
+		if errors.IsNotFound(err) {
+			return fmt.Errorf("Job %s not found", jname)
+		}
+		return fmt.Errorf("unexpected error reading upgrade job: %w", err)
+	}
+
+	if job.Status.Succeeded == 0 {
+		return fmt.Errorf("Job %s not finished", jname)
+	}
+	return nil
 }
