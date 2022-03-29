@@ -8,6 +8,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	asv2b2 "k8s.io/api/autoscaling/v2beta2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -203,6 +204,14 @@ func TestEvaluate(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -528,6 +537,14 @@ func TestEvaluate(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -899,6 +916,14 @@ func TestEvaluate(t *testing.T) {
 				},
 			},
 			objs: []runtime.Object{
+				&batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "registry-quay-app-upgrade",
+					},
+					Status: batchv1.JobStatus{
+						Succeeded: 1,
+					},
+				},
 				&routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -1262,6 +1287,9 @@ func TestEvaluate(t *testing.T) {
 			}
 			if err := monv1.AddToScheme(scheme); err != nil {
 				t.Fatalf("unexpected error adding monitoring to scheme: %s", err)
+			}
+			if err := batchv1.AddToScheme(scheme); err != nil {
+				t.Fatalf("unexpected error adding batch to scheme: %s", err)
 			}
 
 			cli := fake.NewFakeClientWithScheme(scheme, tt.objs...)
