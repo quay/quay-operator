@@ -39,8 +39,6 @@ const (
 	dbRootPw             = "DB_ROOT_PW"
 	configEditorPw       = "CONFIG_EDITOR_PW"
 	securityScannerV4PSK = "SECURITY_SCANNER_V4_PSK"
-
-	GrafanaDashboardConfigNamespace = "openshift-config-managed"
 )
 
 // checkDeprecatedManagedKeys populates the provided quay context with information we
@@ -328,7 +326,7 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 	r.Log.Info("cluster supports `PrometheusRules` API")
 
 	namespaceKey := types.NamespacedName{
-		Name: GrafanaDashboardConfigNamespace,
+		Name: grafanaDashboardConfigNamespace,
 	}
 
 	var grafanaDashboardNamespace corev1.Namespace
@@ -336,7 +334,7 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 		return fmt.Errorf("unable to get grafana namespace: %s", err)
 	}
 
-	r.Log.Info(GrafanaDashboardConfigNamespace + " found")
+	r.Log.Info(grafanaDashboardConfigNamespace + " found")
 	qctx.SupportsMonitoring = true
 	return nil
 }
