@@ -53,14 +53,15 @@ const (
 	creationPollInterval = time.Second * 2
 	creationPollTimeout  = time.Second * 600
 
-	GrafanaDashboardConfigMapNameSuffix = "grafana-dashboard-quay"
-	GrafanaTitleJSONPath                = "title"
-	GrafanaNamespaceFilterJSONPath      = "templating.list.1.options.0.value"
-	GrafanaServiceFilterJSONPath        = "templating.list.2.options.0.value"
-	ClusterMonitoringLabelKey           = "openshift.io/cluster-monitoring"
-	QuayDashboardJSONKey                = "quay.json"
-	QuayOperatorManagedLabelKey         = "quay-operator/managed-label"
-	QuayOperatorFinalizer               = "quay-operator/finalizer"
+	grafanaDashboardConfigMapNameSuffix = "grafana-dashboard-quay"
+	grafanaTitleJSONPath                = "title"
+	grafanaNamespaceFilterJSONPath      = "templating.list.1.options.0.value"
+	grafanaServiceFilterJSONPath        = "templating.list.2.options.0.value"
+	clusterMonitoringLabelKey           = "openshift.io/cluster-monitoring"
+	quayDashboardJSONKey                = "quay.json"
+	quayOperatorManagedLabelKey         = "quay-operator/managed-label"
+	quayOperatorFinalizer               = "quay-operator/finalizer"
+	grafanaDashboardConfigNamespace     = "openshift-config-managed"
 )
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
@@ -82,7 +83,7 @@ func (r *QuayRegistryReconciler) manageQuayDeletion(
 	ctx context.Context, quay *v1.QuayRegistry, log logr.Logger,
 ) (ctrl.Result, error) {
 	log.Info("`QuayRegistry` to be deleted")
-	if !controllerutil.ContainsFinalizer(quay, QuayOperatorFinalizer) {
+	if !controllerutil.ContainsFinalizer(quay, quayOperatorFinalizer) {
 		return ctrl.Result{}, nil
 	}
 
@@ -90,7 +91,7 @@ func (r *QuayRegistryReconciler) manageQuayDeletion(
 		return r.Requeue, err
 	}
 
-	controllerutil.RemoveFinalizer(quay, QuayOperatorFinalizer)
+	controllerutil.RemoveFinalizer(quay, quayOperatorFinalizer)
 	if err := r.Update(ctx, quay); err != nil {
 		return r.Requeue, err
 	}
@@ -485,7 +486,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// in the `openshift-config-managed` namespace and add the label
 		// `openshift.io/cluster-monitoring: true` to the registry namespace
 		if quayContext.SupportsMonitoring && isGrafanaConfigMap(obj) {
-			obj.SetNamespace(GrafanaDashboardConfigNamespace)
+			obj.SetNamespace(grafanaDashboardConfigNamespace)
 			if err = updateGrafanaDashboardData(obj, updatedQuay); err != nil {
 				return r.reconcileWithCondition(
 					ctx,
@@ -588,8 +589,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.Requeue, nil
 	}
 
-	if !controllerutil.ContainsFinalizer(updatedQuay, QuayOperatorFinalizer) {
-		controllerutil.AddFinalizer(updatedQuay, QuayOperatorFinalizer)
+	if !controllerutil.ContainsFinalizer(updatedQuay, quayOperatorFinalizer) {
+		controllerutil.AddFinalizer(updatedQuay, quayOperatorFinalizer)
 		if err := r.Update(ctx, updatedQuay); err != nil {
 			return r.Requeue, err
 		}
@@ -608,34 +609,34 @@ func updateGrafanaDashboardData(obj client.Object, quay *v1.QuayRegistry) error 
 		return fmt.Errorf("unable to cast object to ConfigMap type")
 	}
 
-	config := cm.Data[QuayDashboardJSONKey]
+	config := cm.Data[quayDashboardJSONKey]
 
 	title := fmt.Sprintf("Quay - %s - %s", quay.GetNamespace(), quay.GetName())
-	config, err := sjson.Set(config, GrafanaTitleJSONPath, title)
+	config, err := sjson.Set(config, grafanaTitleJSONPath, title)
 	if err != nil {
 		return err
 	}
 
 	if config, err = sjson.Set(
-		config, GrafanaNamespaceFilterJSONPath, quay.GetNamespace(),
+		config, grafanaNamespaceFilterJSONPath, quay.GetNamespace(),
 	); err != nil {
 		return err
 	}
 
 	metricsServiceName := fmt.Sprintf("%s-quay-metrics", quay.GetName())
-	config, err = sjson.Set(config, GrafanaServiceFilterJSONPath, metricsServiceName)
+	config, err = sjson.Set(config, grafanaServiceFilterJSONPath, metricsServiceName)
 	if err != nil {
 		return err
 	}
 
-	cm.Data[QuayDashboardJSONKey] = config
+	cm.Data[quayDashboardJSONKey] = config
 	return nil
 }
 
 // isGrafanaConfigMap checks if an Object is the Grafana ConfigMap used in the monitoring
 // component.
 func isGrafanaConfigMap(obj client.Object) bool {
-	if !strings.HasSuffix(obj.GetName(), GrafanaDashboardConfigMapNameSuffix) {
+	if !strings.HasSuffix(obj.GetName(), grafanaDashboardConfigMapNameSuffix) {
 		return false
 	}
 
@@ -815,12 +816,12 @@ func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(
 		labels[k] = v
 	}
 
-	if val := labels[ClusterMonitoringLabelKey]; val == "true" {
+	if val := labels[clusterMonitoringLabelKey]; val == "true" {
 		return nil
 	}
 
-	labels[ClusterMonitoringLabelKey] = "true"
-	labels[QuayOperatorManagedLabelKey] = "true"
+	labels[clusterMonitoringLabelKey] = "true"
+	labels[quayOperatorManagedLabelKey] = "true"
 	updatedNs.Labels = labels
 
 	patch := client.MergeFrom(&ns)
@@ -844,14 +845,14 @@ func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, qua
 		return err
 	}
 
-	if ns.Labels != nil && ns.Labels[QuayOperatorManagedLabelKey] != "" && len(quayRegistryList.Items) == 1 {
+	if ns.Labels != nil && ns.Labels[quayOperatorManagedLabelKey] != "" && len(quayRegistryList.Items) == 1 {
 		updatedNs := ns.DeepCopy()
 		labels := make(map[string]string)
 		for k, v := range updatedNs.Labels {
 			labels[k] = v
 		}
-		delete(labels, ClusterMonitoringLabelKey)
-		delete(labels, QuayOperatorManagedLabelKey)
+		delete(labels, clusterMonitoringLabelKey)
+		delete(labels, quayOperatorManagedLabelKey)
 		updatedNs.Labels = labels
 
 		patch := client.MergeFrom(&ns)
@@ -865,8 +866,8 @@ func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, qua
 func (r *QuayRegistryReconciler) cleanupGrafanaConfigMap(ctx context.Context, quay *v1.QuayRegistry) error {
 	var grafanaConfigMap corev1.ConfigMap
 	grafanaConfigMapName := types.NamespacedName{
-		Name:      quay.GetName() + "-" + GrafanaDashboardConfigMapNameSuffix,
-		Namespace: GrafanaDashboardConfigNamespace}
+		Name:      quay.GetName() + "-" + grafanaDashboardConfigMapNameSuffix,
+		Namespace: grafanaDashboardConfigNamespace}
 
 	if err := r.Client.Get(ctx, grafanaConfigMapName, &grafanaConfigMap); err == nil || !errors.IsNotFound(err) {
 		return r.Client.Delete(ctx, &grafanaConfigMap)
