@@ -30,12 +30,18 @@ import (
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
+// QuayVersion represents a quay version as a string. Normally this is set using semantic
+// versioning, e.g. 3.7.0.
 type QuayVersion string
 
+// QuayVersionCurrent holds the current quay version as captured by means of an environment
+// variable. This can be used to identify a version upgrade.
 var QuayVersionCurrent QuayVersion = QuayVersion(os.Getenv("QUAY_VERSION"))
 
+// ComponentKind holds a component type, e.g. "clair", "postgres", etc.
 type ComponentKind string
 
+// Follow a list of constants representing all supported components.
 const (
 	ComponentQuay          ComponentKind = "quay"
 	ComponentPostgres      ComponentKind = "postgres"
@@ -50,7 +56,8 @@ const (
 	ComponentTLS           ComponentKind = "tls"
 )
 
-var allComponents = []ComponentKind{
+// AllComponents holds a list of all supported components.
+var AllComponents = []ComponentKind{
 	ComponentQuay,
 	ComponentPostgres,
 	ComponentClair,
@@ -379,7 +386,7 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 		},
 	}
 
-	for _, cmp := range allComponents {
+	for _, cmp := range AllComponents {
 		ccheck, checkexists := checks[cmp]
 		if checkexists {
 			// if there is a check registered for the component we run it, if the

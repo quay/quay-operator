@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"sync"
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -456,3 +457,243 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 		})
 	})
 })
+
+func quayWithUnmanagedComponents(unmanaged ...v1.ComponentKind) v1.QuayRegistry {
+	cmps := make([]v1.Component, len(v1.AllComponents))
+	for i, kind := range v1.AllComponents {
+		cmp := v1.Component{
+			Kind:    kind,
+			Managed: true,
+		}
+
+		for _, unmkind := range unmanaged {
+			if kind != unmkind {
+				continue
+			}
+			cmp.Managed = false
+			break
+		}
+
+		cmps[i] = cmp
+	}
+
+	var quay v1.QuayRegistry
+	quay.Spec.Components = cmps
+	return quay
+}
+
+func Test_hasNecessaryConfig(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		experr bool
+		cfg    map[string][]byte
+		quay   v1.QuayRegistry
+	}{
+		{
+			name:   "all managed",
+			experr: false,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "unmanaged postgres without config",
+			experr: true,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentPostgres),
+		},
+		{
+			name:   "unmanaged postgres with config",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("DB_CONNECTION_ARGS: 'a'\nDB_URI: 'b'"),
+			},
+			quay: quayWithUnmanagedComponents(v1.ComponentPostgres),
+		},
+		{
+			name:   "unmanaged clair without config",
+			experr: false,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentClair),
+		},
+		{
+			name:   "unmanaged clair with config",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("SECURITY_SCANNER_ENDPOINT: 'test.com'"),
+			},
+			quay: quayWithUnmanagedComponents(v1.ComponentClair),
+		},
+		{
+			name:   "managed clair with config",
+			experr: true,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("SECURITY_SCANNER_ENDPOINT: 'test.com'"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "unmanaged redis",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("USER_EVENTS_REDIS: 'redis.addr.io'"),
+			},
+			quay: quayWithUnmanagedComponents(v1.ComponentRedis),
+		},
+		{
+			name:   "managed redis",
+			experr: true,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("USER_EVENTS_REDIS: 'redis.addr.io'"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "unmanaged hpa",
+			experr: false,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentHPA),
+		},
+		{
+			name:   "unmanaged objectstorage without config",
+			experr: true,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentObjectStorage),
+		},
+		{
+			name:   "unmanaged objectstorage with config",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("DISTRIBUTED_STORAGE_CONFIG: 'bucket'"),
+			},
+			quay: quayWithUnmanagedComponents(v1.ComponentObjectStorage),
+		},
+		{
+			name:   "managed objectstorage with config",
+			experr: true,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("DISTRIBUTED_STORAGE_CONFIG: 'bucket'"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "managed route with config",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("SERVER_HOSTNAME: 'registry.io'"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "unmanaged route without config",
+			experr: true,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentRoute),
+		},
+		{
+			name:   "unmanaged route with config",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("SERVER_HOSTNAME: 'registry.io'"),
+			},
+			quay: quayWithUnmanagedComponents(v1.ComponentRoute),
+		},
+		{
+			name:   "unmanaged mirror without config",
+			experr: false,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentMirror),
+		},
+		{
+			name:   "unmanaged mirror with config",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("REPO_MIRROR_INTERVAL: '10'"),
+			},
+			quay: quayWithUnmanagedComponents(v1.ComponentMirror),
+		},
+		{
+			name:   "managed mirror with config",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("REPO_MIRROR_INTERVAL: '10'"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "unmanaged monitoring",
+			experr: false,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentMonitoring),
+		},
+		{
+			name:   "managed tls with certs",
+			experr: true,
+			cfg: map[string][]byte{
+				"ssl.key":  []byte("key"),
+				"ssl.cert": []byte("cert"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "unmanaged tls with certs",
+			experr: false,
+			cfg: map[string][]byte{
+				"ssl.key":  []byte("key"),
+				"ssl.cert": []byte("cert"),
+			},
+			quay: quayWithUnmanagedComponents(v1.ComponentTLS),
+		},
+		{
+			name:   "unmanaged tls without certs",
+			experr: true,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentTLS),
+		},
+		{
+			name:   "managed clairpostgres with config",
+			experr: true,
+			cfg: map[string][]byte{
+				"clair-config.yaml": []byte("matcher:\n  connstring: 'test'"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "managed clair and managed clairpostgres with config",
+			experr: true,
+			cfg: map[string][]byte{
+				"clair-config.yaml": []byte("matcher:\n  connstring: 'test'"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "managed clair with unmanaged clairpostgres with config",
+			experr: false,
+			cfg: map[string][]byte{
+				"clair-config.yaml": []byte("matcher:\n  connstring: 'test'"),
+			},
+			quay: quayWithUnmanagedComponents(v1.ComponentClairPostgres),
+		},
+		{
+			name: "managed clair with unmanaged clairpostgres without	 config",
+			experr: true,
+			cfg:    map[string][]byte{},
+			quay:   quayWithUnmanagedComponents(v1.ComponentClairPostgres),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			reconciler := QuayRegistryReconciler{}
+			err := reconciler.hasNecessaryConfig(tt.quay, tt.cfg)
+			if err != nil {
+				if tt.experr {
+					return
+				}
+				t.Errorf("unexpected err: %s", err)
+				return
+			}
+
+			if tt.experr {
+				t.Errorf("expecting error but nil returned")
+			}
+		})
+	}
+}
