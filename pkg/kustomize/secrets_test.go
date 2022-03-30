@@ -185,190 +185,211 @@ func TestFieldGroupFor(t *testing.T) {
 }
 
 var containsComponentConfigTests = []struct {
-	name               string
-	component          v1.ComponentKind
-	managed            bool
-	configBundleSecret map[string][]byte
-	expected           bool
-	expectedError      error
+	name          string
+	component     v1.ComponentKind
+	managed       bool
+	cfgbundle     map[string][]byte
+	expected      bool
+	expectedError error
 }{
 	{
-		"ClairContains",
-		"clair",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(`FEATURE_SECURITY_SCANNER: true`)},
-		true,
-		nil,
+		name:      "ClairContains",
+		component: "clair",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(`FEATURE_SECURITY_SCANNER: true`),
+		},
+		expected:      true,
+		expectedError: nil,
 	},
 	{
-		"ClairDoesNotContain",
-		"clair",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "ClairDoesNotContain",
+		component: "clair",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected: false,
 	},
 	{
-		"PostgresContains",
-		"postgres",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(`DB_URI: postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database`)},
-		true,
-		nil,
+		name:      "PostgresContains",
+		component: "postgres",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(`DB_URI: postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database`),
+		},
+		expected:      true,
+		expectedError: nil,
 	},
 	{
-		"PostgresDoesNotContain",
-		"postgres",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "PostgresDoesNotContain",
+		component: "postgres",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"RedisContains",
-		"redis",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(`BUILDLOGS_REDIS:
-  host: test-quay-redis
-`)},
-
-		true,
-		nil,
+		name:      "RedisContains",
+		component: "redis",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte("BUILDLOGS_REDIS:\n  host: test-quay-redis"),
+		},
+		expected:      true,
+		expectedError: nil,
 	},
 	{
-		"RedisDoesNotContain",
-		"redis",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "RedisDoesNotContain",
+		component: "redis",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"ObjectStorageContains",
-		"objectstorage",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(`DISTRIBUTED_STORAGE_PREFERENCE: 
-  - local_us
-`)},
-
-		true,
-		nil,
+		name:      "ObjectStorageContains",
+		component: "objectstorage",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte("DISTRIBUTED_STORAGE_PREFERENCE:\n- local_us"),
+		},
+		expected:      true,
+		expectedError: nil,
 	},
 	{
-		"ObjectStorageDoesNotContain",
-		"objectstorage",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "ObjectStorageDoesNotContain",
+		component: "objectstorage",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"MirrorContains",
-		"mirror",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(`FEATURE_REPO_MIRROR: true`)},
-		true,
-		nil,
+		name:      "MirrorContains",
+		component: "mirror",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(`FEATURE_REPO_MIRROR: true`),
+		},
+		expected:      true,
+		expectedError: nil,
 	},
 	{
-		"MirrorDeosNotContain",
-		"mirror",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "MirrorDeosNotContain",
+		component: "mirror",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"RouteContains",
-		"route",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(`PREFERRED_URL_SCHEME: http`)},
-		true,
-		nil,
+		name:      "RouteContains",
+		component: "route",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(`PREFERRED_URL_SCHEME: http`),
+		},
+		expected:      true,
+		expectedError: nil,
 	},
 	{
-		"RouteContainsServerHostname",
-		"route",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(`SERVER_HOSTNAME: registry.skynet.com`)},
-		true,
-		nil,
+		name:      "RouteContainsServerHostname",
+		component: "route",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(`SERVER_HOSTNAME: registry.skynet.com`),
+		},
+		expected:      true,
+		expectedError: nil,
 	},
 	{
-		"RouteDoesNotContain",
-		"route",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "RouteDoesNotContain",
+		component: "route",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"RouteUnmanagedDoesNotContain",
-		"route",
-		false,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "RouteUnmanagedDoesNotContain",
+		component: "route",
+		managed:   false,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"RouteUnmanagedContainsServerHostname",
-		"route",
-		false,
-		map[string][]byte{
-			"config.yaml": []byte(`SERVER_HOSTNAME: registry.skynet.com`)},
-		true,
-		nil,
+		name:      "RouteUnmanagedContainsServerHostname",
+		component: "route",
+		managed:   false,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(`SERVER_HOSTNAME: registry.skynet.com`),
+		},
+		expected:      true,
+		expectedError: nil,
 	},
 	{
-		"HorizontalPodAutoscalerDoesNotContain",
-		"horizontalpodautoscaler",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "HorizontalPodAutoscalerDoesNotContain",
+		component: "horizontalpodautoscaler",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"ClairDatabaseComponentDoesNotContainFields",
-		"clairpostgres",
-		true,
-		map[string][]byte{
-			"clair-config.yaml": []byte(`http_listen_addr: ":8090"`)},
-		false,
-		nil,
+		name:      "ClairDatabaseComponentDoesNotContainFields",
+		component: "clairpostgres",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"clair-config.yaml": []byte(`http_listen_addr: ":8090"`),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"ClairDatabaseComponentDoesNotContainClairConfig",
-		"clairpostgres",
-		true,
-		map[string][]byte{
-			"config.yaml": []byte(``)},
-		false,
-		nil,
+		name:      "ClairDatabaseComponentDoesNotContainClairConfig",
+		component: "clairpostgres",
+		managed:   true,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 	{
-		"ClairDatabaseContainsFields",
-		"clairpostgres",
-		true,
-		map[string][]byte{
-			"clair-config.yaml": []byte(`indexer:
-    connstring: "some fake dsn"`)},
-		true,
-		nil,
+		name:      "ContainsClairPostgresConfiguration",
+		component: "clairpostgres",
+		managed:   false,
+		cfgbundle: map[string][]byte{
+			"clair-config.yaml": []byte("indexer:\n connstring: 'some fake dsn'"),
+		},
+		expected:      true,
+		expectedError: nil,
+	},
+	{
+		name:      "DoesNotContainClairPostgresConfiguration",
+		component: "clairpostgres",
+		managed:   false,
+		cfgbundle: map[string][]byte{
+			"clair-config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
 	},
 }
 
@@ -376,9 +397,8 @@ func TestContainsComponentConfig(t *testing.T) {
 	assert := assert.New(t)
 
 	for _, test := range containsComponentConfigTests {
-
-		contains, err := ContainsComponentConfig(test.configBundleSecret, v1.Component{Kind: test.component, Managed: test.managed})
-
+		cmp := v1.Component{Kind: test.component, Managed: test.managed}
+		contains, err := ContainsComponentConfig(test.cfgbundle, cmp)
 		if test.expectedError != nil {
 			assert.NotNil(err, test.name)
 		} else {

@@ -300,7 +300,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.createInitialBundleSecret(ctx, updatedQuay, log)
 	}
 
-	configBundle, err := r.GetConfigBundleSecret(ctx, updatedQuay)
+	cbundle, err := r.GetConfigBundleSecret(ctx, updatedQuay)
 	if err != nil {
 		return r.reconcileWithCondition(
 			ctx,
@@ -313,7 +313,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	quayContext := quaycontext.NewQuayRegistryContext()
-	r.checkManagedTLS(quayContext, configBundle)
+	r.checkManagedTLS(quayContext, cbundle)
 
 	if err := r.checkManagedKeys(ctx, quayContext, updatedQuay); err != nil {
 		return r.reconcileWithCondition(
@@ -326,9 +326,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	if err := r.checkRoutesAvailable(
-		ctx, quayContext, updatedQuay, configBundle,
-	); err != nil {
+	if err := r.checkRoutesAvailable(ctx, quayContext, updatedQuay, cbundle); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
 			&quay,
@@ -353,7 +351,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	if err := r.checkBuildManagerAvailable(quayContext, configBundle); err != nil {
+	if err := r.checkBuildManagerAvailable(quayContext, cbundle); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
 			&quay,
@@ -401,7 +399,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	var usercfg map[string]interface{}
-	if err = yaml.Unmarshal(configBundle.Data["config.yaml"], &usercfg); err != nil {
+	if err = yaml.Unmarshal(cbundle.Data["config.yaml"], &usercfg); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
 			&quay,
@@ -416,59 +414,20 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked,
 	)
 
-	for _, cmp := range updatedQuay.Spec.Components {
-		contains, err := kustomize.ContainsComponentConfig(configBundle.Data, cmp)
-		if err != nil {
-			return r.reconcileWithCondition(
-				ctx,
-				&quay,
-				v1.ConditionTypeRolloutBlocked,
-				metav1.ConditionTrue,
-				v1.ConditionReasonConfigInvalid,
-				err.Error(),
-			)
-		}
-
-		if cmp.Managed && contains && !v1.ComponentSupportsConfigWhenManaged(cmp) {
-			// if the component is marked as managed but the user has provided
-			// config for it (in config bundle secret) then we have a problem
-			// there are a few components that don't care if the config has
-			// been provided by the user or not, these are evaluated in the
-			// function ComponentSupportsConfigWhenManaged().
-			return r.reconcileWithCondition(
-				ctx,
-				&quay,
-				v1.ConditionTypeRolloutBlocked,
-				metav1.ConditionTrue,
-				v1.ConditionReasonConfigInvalid,
-				fmt.Sprintf(
-					"%s component marked as managed, but "+
-						"`configBundleSecret` contains required fields",
-					cmp.Kind,
-				),
-			)
-		} else if !cmp.Managed && !contains && v1.RequiredComponent(cmp.Kind) {
-			// here we have a component that is not managed, is required and the
-			// user has not provided a config for it (in config bundle secret).
-			// we can't proceed.
-			return r.reconcileWithCondition(
-				ctx,
-				&quay,
-				v1.ConditionTypeRolloutBlocked,
-				metav1.ConditionTrue,
-				v1.ConditionReasonConfigInvalid,
-				fmt.Sprintf(
-					"required component `%s` marked as unmanaged, but "+
-						"`configBundleSecret` is missing necessary fields",
-					cmp.Kind,
-				),
-			)
-		}
+	if err := r.hasNecessaryConfig(quay, cbundle.Data); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			err.Error(),
+		)
 	}
 
 	log.Info("inflating QuayRegistry into Kubernetes objects")
 	deploymentObjects, err := kustomize.Inflate(
-		quayContext, updatedQuay, configBundle, log, r.SkipResourceRequests,
+		quayContext, updatedQuay, cbundle, log, r.SkipResourceRequests,
 	)
 	if err != nil {
 		return r.reconcileWithCondition(
@@ -599,6 +558,64 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// when we get to this point all objects were created as expected and we can safely
 	// increase our reconcile delay.
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
+}
+
+// hasNecessaryConfig checks every component has been provided with a proper configuration. For
+// instance if redis is unmanaged the user provided configuration must contain a custom redis
+// config otherwise we may render an invalid quay deployment.
+func (r *QuayRegistryReconciler) hasNecessaryConfig(
+	quay v1.QuayRegistry, cfg map[string][]byte,
+) error {
+	for _, cmp := range quay.Spec.Components {
+		hascfg, err := kustomize.ContainsComponentConfig(cfg, cmp)
+		if err != nil {
+			return fmt.Errorf("unable to verify component config: %w", err)
+		}
+
+		if cmp.Managed {
+			// if the user has not provided config for a managed component or if the
+			// managed component supports custom config even when managed we are ok.
+			// if the component is marked as managed but the user has provided config
+			// for it (in config bundle secret) then we have a problem.
+			if !hascfg || v1.ComponentSupportsConfigWhenManaged(cmp) {
+				continue
+			}
+
+			return fmt.Errorf(
+				"%s component marked as managed, but `configBundleSecret` "+
+					"contains required fields",
+				cmp.Kind,
+			)
+		}
+
+		// if the unmanaged component has been provided with proper config we can move
+		// on as we already have everything we need.
+		if hascfg {
+			continue
+		}
+
+		// if user miss a configuration for an required component we fail.
+		if v1.RequiredComponent(cmp.Kind) {
+			return fmt.Errorf(
+				"required component `%s` marked as unmanaged, but "+
+					"`configBundleSecret` is missing necessary fields",
+				cmp.Kind,
+			)
+		}
+
+		// if we got here then it means the user has not provided configuration and
+		// the copmonent is optional. almost all components support this scenario, the
+		// exception is clairpostgres, this component can't be render correctly if clair
+		// is set as managed but no database configuration has been provided to it.
+		managedclair := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClair)
+		if cmp.Kind == v1.ComponentClairPostgres && managedclair {
+			return fmt.Errorf(
+				"clairpostgres component unmanaged but no clair postgres " +
+					"config provided",
+			)
+		}
+	}
+	return nil
 }
 
 // updateGrafanaDashboardData parses the Grafana Dashboard ConfigMap and updates the title and
