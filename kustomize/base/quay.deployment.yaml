@@ -71,6 +71,8 @@ spec:
               protocol: TCP
             - containerPort: 9091
               protocol: TCP
+            - containerPort: 55443
+              protocol: TCP
           resources:
             requests:
               cpu: 2000m
