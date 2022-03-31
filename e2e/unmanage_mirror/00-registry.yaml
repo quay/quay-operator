@@ -1,4 +1,5 @@
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
-  name: clairpostgresE2E
+  name: registry
+spec: {}
