@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry-quay-mirror
+spec:
+  replicas: 3
+status:
+  availableReplicas: 3
+  readyReplicas: 3
+  updatedReplicas: 3
+

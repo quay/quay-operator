@@ -1,10 +1,8 @@
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
-  name: mindeployment
+  name: testreg
 spec:
   components:
-  - kind: clair
-    managed: false
   - kind: clairpostgres
     managed: false

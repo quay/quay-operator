@@ -1,0 +1,71 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: registry
+spec:
+  components:
+  - kind: quay
+    managed: true
+  - kind: postgres
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: redis
+    managed: true
+  - kind: horizontalpodautoscaler
+    managed: true
+  - kind: objectstorage
+    managed: true
+  - kind: route
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: monitoring
+    managed: true
+  - kind: tls
+    managed: true
+  - kind: clairpostgres
+    managed: true
+status:
+  conditions:
+  - type: ComponentHPAReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentRouteReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentMonitoringReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentPostgresReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentObjectStorageReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentClairReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentClairPostgresReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentTLSReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentRedisReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentQuayReady
+    reason: ComponentReady
+    status: "True"
+  - type: ComponentMirrorReady
+    reason: ComponentReady
+    status: "True"
+  - type: Available
+    reason: HealthChecksPassing
+    status: "True"
+  - type: ComponentsCreated
+    reason: ComponentsCreationSuccess
+    status: "True"
+  - type: RolloutBlocked
+    status: "False"

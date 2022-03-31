@@ -1,17 +1,14 @@
----
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
-  name: mirror
+  name: registry
 spec:
   components:
-  - kind: clair
-    managed: false
-  - kind: clairpostgres
-    managed: false
   - kind: quay
     managed: true
   - kind: postgres
+    managed: true
+  - kind: clair
     managed: true
   - kind: redis
     managed: true
@@ -27,10 +24,5 @@ spec:
     managed: true
   - kind: tls
     managed: true
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mirror-quay-mirror
-spec:
-  replicas: 0
+  - kind: clairpostgres
+    managed: true
