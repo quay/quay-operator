@@ -5,8 +5,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
@@ -421,6 +423,63 @@ var validateOverridesTests = []struct {
 			},
 		},
 		errors.New("component tls does not support volumeSize overrides"),
+	},
+	{
+		"InvalidReplicasOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true, Overrides: &Override{Replicas: pointer.Int32(10)}},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: false},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component redis does not support replicas overrides"),
+	},
+	{
+		"InvalidEnvVarOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true, Overrides: &Override{Env: []corev1.EnvVar{corev1.EnvVar{Name: "foo", Value: "bar"}}}},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component tls does not support env overrides"),
+	},
+	{
+		"InvalidAffinityOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true, Overrides: &Override{Affinity: &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{}}}},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component postgres does not support affinity overrides"),
 	},
 }
 

@@ -33,6 +33,18 @@ spec:
                   name: cluster-trusted-ca
               - secret:
                   name: extra-ca-certs
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: quay-component
+                  operator: In
+                  values:
+                  - quay-app
+              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: quay-app
           image: quay.io/projectquay/quay@sha256:5660d7174218e1cb21bf6ef406602dbe8c01c878c630a9f310fe3e5560d4c2cd
