@@ -63,7 +63,6 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 	// then used as an environment variable and consumed by the app. we also need to remove
 	// all unused annotations from postgres deployment to avoid its redeployment.
 	if dep, ok := obj.(*appsv1.Deployment); ok {
-
 		// override any environment variable being provided through the component
 		// Override.Env property. XXX this does not include InitContainers.
 		component := labels.Set(objectMeta.GetAnnotations()).Get("quay-component")
@@ -75,6 +74,10 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 					UpsertContainerEnv(ref, oenv)
 				}
 			}
+		}
+
+		if oaff := v1.GetAffinityForComponent(quay, kind); oaff != nil {
+			dep.Spec.Template.Spec.Affinity = oaff
 		}
 
 		// here we do an attempt to setting the default or overwriten number of replicas

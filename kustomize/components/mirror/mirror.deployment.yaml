@@ -18,6 +18,18 @@ spec:
         quay-component: quay-mirror
     spec:
       serviceAccountName: quay-app
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: quay-component
+                  operator: In
+                  values:
+                  - quay-mirror
+              topologyKey: "kubernetes.io/hostname"
       volumes:
         - name: config
           projected:

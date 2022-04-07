@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: affinity-quay-app
+spec:
+  spec:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: quay-component
+            operator: In
+            values:
+            - quay-app
+        topologyKey: kubernetes.io/hostname
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: affinity-clair-app
+spec:
+  spec:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: quay-component
+            operator: In
+            values:
+            - quay-app
+        topologyKey: kubernetes.io/hostname
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: affinity-quay-mirror
+spec:
+  spec:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: quay-component
+            operator: In
+            values:
+            - quay-mirror
+        topologyKey: kubernetes.io/hostname
