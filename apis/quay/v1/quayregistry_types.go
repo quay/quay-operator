@@ -98,6 +98,12 @@ var supportsReplicasOverride = []ComponentKind{
 	ComponentQuay,
 }
 
+var supportsAffinityOverride = []ComponentKind{
+	ComponentClair,
+	ComponentMirror,
+	ComponentQuay,
+}
+
 const (
 	ManagedKeysName         = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName = "quay-config-tls"
@@ -129,6 +135,7 @@ type Override struct {
 	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
 	Env        []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	Replicas   *int32             `json:"replicas,omitempty"`
+	Affinity   *corev1.Affinity   `json:"affinity,omitempty"`
 }
 
 type ConditionType string
@@ -394,7 +401,7 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 			// the current components configuration. returns the check error.
 			if !ccheck.check() && ComponentIsManaged(quay.Spec.Components, cmp) {
 				return fmt.Errorf(
-					"Error validatingcomponent %s: %s", cmp, ccheck.msg,
+					"error validating component %s: %s", cmp, ccheck.msg,
 				)
 			}
 		}
@@ -440,6 +447,13 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 	return nil
 }
 
+// hasAffinity checks if any anti/affinity option has been changed
+// returns true if something has changed, false otherwise
+func hasAffinity(component Component) bool {
+	overrideAffinity := component.Overrides.Affinity
+	return overrideAffinity != nil
+}
+
 // ValidateOverrides validates that the overrides set for each component are valid.
 func ValidateOverrides(quay *QuayRegistry) error {
 	for _, component := range quay.Spec.Components {
@@ -449,10 +463,11 @@ func ValidateOverrides(quay *QuayRegistry) error {
 			continue
 		}
 
+		hasaffinity := hasAffinity(component)
 		hasvolume := component.Overrides.VolumeSize != nil
 		hasreplicas := component.Overrides.Replicas != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasvolume || hasenvvar || hasreplicas
+		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas
 
 		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
@@ -467,6 +482,13 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		}
 
 		// Check that component supports override
+		if hasaffinity && !ComponentSupportsOverride(component.Kind, "affinity") {
+			return fmt.Errorf(
+				"component %s does not support affinity overrides",
+				component.Kind,
+			)
+		}
+
 		if hasvolume && !ComponentSupportsOverride(component.Kind, "volumeSize") {
 			return fmt.Errorf(
 				"component %s does not support volumeSize overrides",
@@ -686,6 +708,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 		components = supportsEnvOverride
 	case "replicas":
 		components = supportsReplicasOverride
+	case "affinity":
+		components = supportsAffinityOverride
 	}
 
 	for _, cmp := range components {
@@ -731,6 +755,24 @@ func GetVolumeSizeOverrideForComponent(
 			qt = component.Overrides.VolumeSize
 		}
 		return
+	}
+	return
+}
+
+// GetAffinityForComponent returns affinity overrides for the provided component
+// if they are present, nil otherwise
+func GetAffinityForComponent(quay *QuayRegistry, kind ComponentKind) (affinity *corev1.Affinity) {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+
+		if cmp.Overrides == nil {
+			return
+		}
+
+		affinity = cmp.Overrides.Affinity
+		return affinity
 	}
 	return
 }
