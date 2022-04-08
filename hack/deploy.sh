@@ -9,7 +9,6 @@
 #
 # REQUIREMENTS:
 #  * a valid login session to an OCP cluster, with cluster admin privileges
-#  * the namespace $NAMESPACE exists in the cluster
 #  * noobaa backing storage (TODO: elaborate)
 #  * `curl`
 #  * `docker`
@@ -42,7 +41,6 @@ export OG_PATH=${OG_PATH:-'./bundle/quay-operator.operatorgroup.yaml'}
 export SUBSCRIPTION_PATH=${SUBSCRIPTION_PATH:-'./bundle/quay-operator.subscription.yaml'}
 export QUAY_SAMPLE_PATH=${QUAY_SAMPLE_PATH:-'./config/samples/managed.quayregistry.yaml'}
 export OPERATOR_PKG_NAME=${OPERATOR_PKG_NAME:-'quay-operator-test'}
-export NAMESPACE=${NAMESPACE:-'quay-operator-e2e-nightly'}
 export WAIT_TIMEOUT=${WAIT_TIMEOUT:-'20m'}
 
 info 'calculating catalog index image digest'

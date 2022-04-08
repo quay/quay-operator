@@ -14,6 +14,10 @@ function info {
 export OPERATOR_PKG_NAME=${OPERATOR_PKG_NAME:-'quay-operator-test'}
 export OG_PATH=${OG_PATH:-'./bundle/quay-operator.operatorgroup.yaml'}
 export SUBSCRIPTION_PATH=${SUBSCRIPTION_PATH:-'./bundle/quay-operator.subscription.yaml'}
+export QUAY_SAMPLE_PATH=${QUAY_SAMPLE_PATH:-'./config/samples/managed.quayregistry.yaml'}
+
+info 'deleting quay registry'
+oc delete $(yq '.metadata.name' ${QUAY_SAMPLE_PATH})
 
 info 'uninstalling operator'
 oc delete operatorgroup "$(yq e '.metadata.name' "${OG_PATH}")"
