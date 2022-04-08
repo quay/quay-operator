@@ -1,5 +1,5 @@
 #!/bin/bash
-# deploys noobaa via openshift storage operator to a cluster from redhat
+# deploys noobaa via openshift data foundation operator to a cluster from redhat
 # marketplace.
 #
 # REQUIREMENTS:
@@ -23,7 +23,7 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   annotations:
-  name: openshift-storage-og
+  name: odf-og
   namespace: openshift-storage
 spec:
   targetNamespaces:
@@ -33,13 +33,13 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   labels:
-    operators.coreos.com/ocs-operator.openshift-storage: ""
-  name: ocs-operator
+    operators.coreos.com/odf-operator.openshift-storage: ""
+  name: odf-operator
   namespace: openshift-storage
 spec:
-  channel: stable-4.8
+  channel: stable-4.9
   installPlanApproval: Automatic
-  name: ocs-operator
+  name: odf-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
@@ -49,7 +49,7 @@ NAMESPACE='openshift-storage'
 info 'waiting for CSV installation...'
 
 for _ in {1..60}; do
-	phase="$(oc -n "${NAMESPACE}" get csv -l operators.coreos.com/ocs-operator.openshift-storage -o jsonpath='{.items[*].status.phase}')"
+	phase="$(oc -n "${NAMESPACE}" get csv -l operators.coreos.com/odf-operator.openshift-storage -o jsonpath='{.items[*].status.phase}')"
 	if [ "$phase" = "Succeeded" ]; then
 		info "operator installed"
 		break
