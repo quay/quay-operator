@@ -9,11 +9,9 @@
 #
 # REQUIREMENTS:
 #  * a valid login session to an OCP cluster, with cluster admin privileges
-#  * noobaa backing storage (TODO: elaborate)
-#  * `curl`
+#  * noobaa backing storage (you can set it up by running hack/storage.sh)
 #  * `docker`
 #  * `yq`
-#  * `jq`
 #  * `oc`
 #
 # NOTE: this script will modify the following files:
@@ -39,9 +37,7 @@ export CATALOG_PATH=${CATALOG_PATH:-'./bundle/quay-operator.catalogsource.yaml'}
 export CATALOG_IMAGE=${CATALOG_IMAGE:-"quay.io/projectquay/quay-operator-index:${TAG}"}
 export OG_PATH=${OG_PATH:-'./bundle/quay-operator.operatorgroup.yaml'}
 export SUBSCRIPTION_PATH=${SUBSCRIPTION_PATH:-'./bundle/quay-operator.subscription.yaml'}
-export QUAY_SAMPLE_PATH=${QUAY_SAMPLE_PATH:-'./config/samples/managed.quayregistry.yaml'}
 export OPERATOR_PKG_NAME=${OPERATOR_PKG_NAME:-'quay-operator-test'}
-export WAIT_TIMEOUT=${WAIT_TIMEOUT:-'20m'}
 
 info 'calculating catalog index image digest'
 
