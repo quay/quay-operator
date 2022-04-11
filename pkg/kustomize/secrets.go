@@ -385,38 +385,38 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 		return nil, err
 	}
 
-	cfg := config.Config{
-		HTTPListenAddr: ":8080",
-		LogLevel:       config.InfoLog,
-		Indexer: config.Indexer{
-			ConnString:           dbConn,
-			ScanLockRetry:        10,
-			LayerScanConcurrency: 5,
-			Migrations:           true,
+	cfg := map[string]interface{}{
+		"http_listen_addr": ":8080",
+		"log_level":        "info",
+		"indexer": map[string]interface{}{
+			"connstring":             dbConn,
+			"scanlock_retry":         10,
+			"layer_scan_concurrency": 5,
+			"migrations":             true,
 		},
-		Matcher: config.Matcher{
-			ConnString:  dbConn,
-			MaxConnPool: 100,
-			Migrations:  true,
+		"matcher": map[string]interface{}{
+			"connstring":    dbConn,
+			"max_conn_pool": 100,
+			"migrations":    true,
 		},
-		Notifier: config.Notifier{
-			ConnString:       dbConn,
-			Migrations:       true,
-			DeliveryInterval: 1 * time.Minute,
-			PollInterval:     5 * time.Minute,
-			Webhook: &config.Webhook{
-				Target:   "https://" + quayHostname + "/secscan/notification",
-				Callback: "http://" + quay.GetName() + "-clair-app/notifier/api/v1/notifications",
+		"notifier": map[string]interface{}{
+			"connstring":        dbConn,
+			"migrations":        true,
+			"delivery_interval": 1 * time.Minute,
+			"poll_interval":     5 * time.Minute,
+			"webhook": map[string]interface{}{
+				"target":   "https://" + quayHostname + "/secscan/notification",
+				"callback": "http://" + quay.GetName() + "-clair-app/notifier/api/v1/notifications",
 			},
 		},
-		Auth: config.Auth{
-			PSK: &config.AuthPSK{
-				Key:    config.Base64(psk),
-				Issuer: []string{"quay", "clairctl"},
+		"auth": map[string]interface{}{
+			"psk": map[string]interface{}{
+				"key": config.Base64(psk),
+				"iss": []string{"quay", "clairctl"},
 			},
 		},
-		Metrics: config.Metrics{
-			Name: "prometheus",
+		"metrics": map[string]interface{}{
+			"name": "prometheus",
 		},
 	}
 
@@ -426,14 +426,6 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	ws, err := config.Lint(&cfg)
-	if err != nil {
-		return nil, err
-	}
-	for _, w := range ws {
-		log.V(1).Info("clair config lint", "msg", w.Error())
 	}
 
 	return yaml.Marshal(cfg)
