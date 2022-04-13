@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -20,7 +21,7 @@ func TestRouteCheck(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		quay qv1.QuayRegistry
-		objs []runtime.Object
+		objs []client.Object
 		cond qv1.Condition
 	}{
 		{
@@ -39,7 +40,7 @@ func TestRouteCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "some-route",
@@ -115,7 +116,7 @@ func TestRouteCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -152,7 +153,7 @@ func TestRouteCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -201,7 +202,7 @@ func TestRouteCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -250,7 +251,7 @@ func TestRouteCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&routev1.Route{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -317,7 +318,8 @@ func TestRouteCheck(t *testing.T) {
 				t.Fatalf("unexpected error adding routes to scheme: %s", err)
 			}
 
-			cli := fake.NewFakeClientWithScheme(scheme, tt.objs...)
+			builder := fake.NewClientBuilder()
+			cli := builder.WithObjects(tt.objs...).WithScheme(scheme).Build()
 			route := Route{cli}
 
 			cond, err := route.Check(ctx, tt.quay)

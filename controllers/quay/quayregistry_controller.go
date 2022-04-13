@@ -47,8 +47,6 @@ import (
 )
 
 const (
-	upgradePollInterval  = time.Second * 10
-	upgradePollTimeout   = time.Second * 6000
 	creationPollInterval = time.Second * 2
 	creationPollTimeout  = time.Second * 600
 
@@ -664,13 +662,6 @@ func encode(value interface{}) []byte {
 	yamlified, _ := yaml.Marshal(value)
 
 	return yamlified
-}
-
-func decode(bytes []byte) interface{} {
-	var value interface{}
-	_ = yaml.Unmarshal(bytes, &value)
-
-	return value
 }
 
 func (r *QuayRegistryReconciler) createOrUpdateObject(

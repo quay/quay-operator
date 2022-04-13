@@ -38,7 +38,7 @@ func newQuayRegistry(name, namespace string) *v1.QuayRegistry {
 		Spec: v1.QuayRegistrySpec{},
 	}
 	// TODO: Test omitting components and marking some as disabled/unmanaged...
-	v1.EnsureDefaultComponents(
+	_ = v1.EnsureDefaultComponents(
 		&quaycontext.QuayRegistryContext{SupportsRoutes: false, SupportsObjectStorage: false, SupportsMonitoring: false},
 		quay,
 	)

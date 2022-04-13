@@ -8,7 +8,7 @@ import (
 
 	asv2b2 "k8s.io/api/autoscaling/v2beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -18,7 +18,7 @@ func TestHPACheck(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		quay qv1.QuayRegistry
-		objs []runtime.Object
+		objs []client.Object
 		cond qv1.Condition
 	}{
 		{
@@ -86,7 +86,7 @@ func TestHPACheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&asv2b2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -117,7 +117,7 @@ func TestHPACheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&asv2b2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
@@ -170,7 +170,7 @@ func TestHPACheck(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			cli := fake.NewFakeClient(tt.objs...)
+			cli := fake.NewClientBuilder().WithObjects(tt.objs...).Build()
 			hpa := HPA{cli}
 
 			cond, err := hpa.Check(ctx, tt.quay)
