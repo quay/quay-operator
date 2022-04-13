@@ -8,6 +8,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - name: Go Fmt
+        run: make fmt
       - name: Go Tidy
         run: go mod tidy
       - name: Git Diff
