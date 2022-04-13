@@ -1,6 +1,17 @@
 name: CI
 on: [pull_request]
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=1m
   build:
     name: Build
     runs-on: ubuntu-latest
