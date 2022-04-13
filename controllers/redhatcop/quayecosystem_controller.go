@@ -402,8 +402,8 @@ func (r *QuayEcosystemReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			if err := r.Client.Get(ctx, types.NamespacedName{Name: postgresPVC.GetName(), Namespace: postgresPVC.GetNamespace()}, &corev1.PersistentVolumeClaim{}); err == nil || !k8sErrors.IsNotFound(err) {
 				log.Info("attempting to delete new database `PersistentVolumeClaim` to start clean migration")
 
-				r.Client.Delete(ctx, migrationDeployment)
-				r.Client.Delete(ctx, &postgresPVC)
+				_ = r.Client.Delete(ctx, migrationDeployment)
+				_ = r.Client.Delete(ctx, &postgresPVC)
 
 				return false, nil
 			}

@@ -327,23 +327,23 @@ type RegistryBackend struct {
 // RegistryBackendSource defines the specific configurations to support the Quay registry
 // +k8s:openapi-gen=true
 type RegistryBackendSource struct {
-	Local        *LocalRegistryBackendSource        `json:"local,omitempty,name=local"`
-	S3           *S3RegistryBackendSource           `json:"s3,omitempty,name=s3"`
-	GoogleCloud  *GoogleCloudRegistryBackendSource  `json:"googleCloud,omitempty,name=googleCloud"`
-	Azure        *AzureRegistryBackendSource        `json:"azure,omitempty,name=azure"`
-	RADOS        *RADOSRegistryBackendSource        `json:"rados,omitempty,name=rados"`
-	RHOCS        *RHOCSRegistryBackendSource        `json:"rhocs,omitempty,name=rhocs"`
-	Swift        *SwiftRegistryBackendSource        `json:"swift,omitempty,name=swift"`
-	CloudfrontS3 *CloudfrontS3RegistryBackendSource `json:"cloudfrontS3,omitempty,name=cloudfrontS3"`
+	Local        *LocalRegistryBackendSource        `json:"local,omitempty"`
+	S3           *S3RegistryBackendSource           `json:"s3,omitempty"`
+	GoogleCloud  *GoogleCloudRegistryBackendSource  `json:"googleCloud,omitempty"`
+	Azure        *AzureRegistryBackendSource        `json:"azure,omitempty"`
+	RADOS        *RADOSRegistryBackendSource        `json:"rados,omitempty"`
+	RHOCS        *RHOCSRegistryBackendSource        `json:"rhocs,omitempty"`
+	Swift        *SwiftRegistryBackendSource        `json:"swift,omitempty"`
+	CloudfrontS3 *CloudfrontS3RegistryBackendSource `json:"cloudfrontS3,omitempty"`
 }
 
 // RegistryStorage defines the configurations to support persistent storage
 // +k8s:openapi-gen=true
 type RegistryStorage struct {
 	// +listType=set
-	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessModes,omitempty,name=persistentVolumeAccessModes"`
-	PersistentVolumeSize             string                              `json:"persistentVolumeSize,omitempty,name=volumeSize"`
-	PersistentVolumeStorageClassName string                              `json:"persistentVolumeStorageClassName,omitempty,name=storageClassName"`
+	PersistentVolumeAccessModes      []corev1.PersistentVolumeAccessMode `json:"persistentVolumeAccessModes,omitempty"`
+	PersistentVolumeSize             string                              `json:"persistentVolumeSize,omitempty"`
+	PersistentVolumeStorageClassName string                              `json:"persistentVolumeStorageClassName,omitempty"`
 }
 
 // ExternalAccess defines the properies of a Quay External Access
@@ -371,89 +371,89 @@ type TLSExternalAccess struct {
 // LocalRegistryBackendSource defines local registry storage
 // +k8s:openapi-gen=true
 type LocalRegistryBackendSource struct {
-	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
+	StoragePath string `json:"storagePath,omitempty"`
 }
 
 // S3RegistryBackendSource defines S3 registry storage
 // +k8s:openapi-gen=true
 type S3RegistryBackendSource struct {
-	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
-	BucketName  string `json:"bucketName,omitempty,name=bucketName"`
-	AccessKey   string `json:"accessKey,omitempty,name=accessKey"`
-	SecretKey   string `json:"secretKey,omitempty,name=secretKey"`
-	Host        string `json:"host,omitempty,name=host"`
-	Port        int    `json:"port,omitempty,name=port"`
+	StoragePath string `json:"storagePath,omitempty"`
+	BucketName  string `json:"bucketName,omitempty"`
+	AccessKey   string `json:"accessKey,omitempty"`
+	SecretKey   string `json:"secretKey,omitempty"`
+	Host        string `json:"host,omitempty"`
+	Port        int    `json:"port,omitempty"`
 }
 
 // GoogleCloudRegistryBackendSource defines Google Cloud registry storage
 // +k8s:openapi-gen=true
 type GoogleCloudRegistryBackendSource struct {
-	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
-	BucketName  string `json:"bucketName,omitempty,name=bucketName"`
-	AccessKey   string `json:"accessKey,omitempty,name=accessKey"`
-	SecretKey   string `json:"secretKey,omitempty,name=secretKey"`
+	StoragePath string `json:"storagePath,omitempty"`
+	BucketName  string `json:"bucketName,omitempty"`
+	AccessKey   string `json:"accessKey,omitempty"`
+	SecretKey   string `json:"secretKey,omitempty"`
 }
 
 // AzureRegistryBackendSource defines Azure blob registry storage
 // +k8s:openapi-gen=true
 type AzureRegistryBackendSource struct {
-	StoragePath   string `json:"storagePath,omitempty,name=storagePath"`
-	ContainerName string `json:"containerName,omitempty,name=containerName"`
-	AccountName   string `json:"accountName,omitempty,name=accountName"`
-	AccountKey    string `json:"accountKey,omitempty,name=accountKey"`
-	SasToken      string `json:"sasToken,omitempty,name=sasToken"`
+	StoragePath   string `json:"storagePath,omitempty"`
+	ContainerName string `json:"containerName,omitempty"`
+	AccountName   string `json:"accountName,omitempty"`
+	AccountKey    string `json:"accountKey,omitempty"`
+	SasToken      string `json:"sasToken,omitempty"`
 }
 
 // RADOSRegistryBackendSource defines Ceph RADOS registry storage
 // +k8s:openapi-gen=true
 type RADOSRegistryBackendSource struct {
-	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
-	BucketName  string `json:"bucketName,omitempty,name=bucketName"`
-	AccessKey   string `json:"accessKey,omitempty,name=accessKey"`
-	SecretKey   string `json:"secretKey,omitempty,name=secretKey"`
-	Hostname    string `json:"hostname,omitempty,name=hostname"`
-	Secure      bool   `json:"secure,omitempty,name=secure"`
-	Port        int    `json:"port,omitempty,name=port"`
+	StoragePath string `json:"storagePath,omitempty"`
+	BucketName  string `json:"bucketName,omitempty"`
+	AccessKey   string `json:"accessKey,omitempty"`
+	SecretKey   string `json:"secretKey,omitempty"`
+	Hostname    string `json:"hostname,omitempty"`
+	Secure      bool   `json:"secure,omitempty"`
+	Port        int    `json:"port,omitempty"`
 }
 
 // RHOCSRegistryBackendSource defines RHOCS registry storage
 // +k8s:openapi-gen=true
 type RHOCSRegistryBackendSource struct {
-	StoragePath string `json:"storagePath,omitempty,name=storagePath"`
-	BucketName  string `json:"bucketName,omitempty,name=bucketName"`
-	AccessKey   string `json:"accessKey,omitempty,name=accessKey"`
-	SecretKey   string `json:"secretKey,omitempty,name=secretKey"`
-	Hostname    string `json:"hostname,omitempty,name=hostname"`
-	Secure      bool   `json:"secure,omitempty,name=secure"`
-	Port        int    `json:"port,omitempty,name=port"`
+	StoragePath string `json:"storagePath,omitempty"`
+	BucketName  string `json:"bucketName,omitempty"`
+	AccessKey   string `json:"accessKey,omitempty"`
+	SecretKey   string `json:"secretKey,omitempty"`
+	Hostname    string `json:"hostname,omitempty"`
+	Secure      bool   `json:"secure,omitempty"`
+	Port        int    `json:"port,omitempty"`
 }
 
 // SwiftRegistryBackendSource defines Swift registry storage
 // +k8s:openapi-gen=true
 type SwiftRegistryBackendSource struct {
-	StoragePath string            `json:"storagePath,omitempty,name=storagePath"`
-	AuthVersion string            `json:"authVersion,omitempty,name=authVersion"`
-	AuthURL     string            `json:"authURL,omitempty,name=authURL"`
-	Container   string            `json:"container,omitempty,name=container"`
-	User        string            `json:"user,omitempty,name=user"`
-	Password    string            `json:"password,omitempty,name=password"`
-	CACertPath  string            `json:"caCertPath,omitempty,name=caCertPath"`
-	TempURLKey  string            `json:"tempURLKey,omitempty,name=tempURLKey"`
-	OSOptions   map[string]string `json:"osOptions,omitempty" protobuf:"bytes,7,rep,name=osOptions"`
+	StoragePath string            `json:"storagePath,omitempty"`
+	AuthVersion string            `json:"authVersion,omitempty"`
+	AuthURL     string            `json:"authURL,omitempty"`
+	Container   string            `json:"container,omitempty"`
+	User        string            `json:"user,omitempty"`
+	Password    string            `json:"password,omitempty"`
+	CACertPath  string            `json:"caCertPath,omitempty"`
+	TempURLKey  string            `json:"tempURLKey,omitempty"`
+	OSOptions   map[string]string `json:"osOptions,omitempty" protobuf:"bytes,7,rep"`
 }
 
 // CloudfrontS3RegistryBackendSource defines CouldfrontS3 registry storage
 // +k8s:openapi-gen=true
 type CloudfrontS3RegistryBackendSource struct {
-	StoragePath        string `json:"storagePath,omitempty,name=storagePath"`
-	BucketName         string `json:"bucketName,omitempty,name=bucketName"`
-	AccessKey          string `json:"accessKey,omitempty,name=accessKey"`
-	SecretKey          string `json:"secretKey,omitempty,name=secretKey"`
-	Host               string `json:"host,omitempty,name=host"`
-	Port               int    `json:"port,omitempty,name=port"`
-	DistributionDomain string `json:"distributionDomain,omitempty,name=distributionDomain"`
-	KeyID              string `json:"keyID,omitempty,name=keyID"`
-	PrivateKeyFilename string `json:"privateKeyFilename,omitempty,name=privateKeyFilename"`
+	StoragePath        string `json:"storagePath,omitempty"`
+	BucketName         string `json:"bucketName,omitempty"`
+	AccessKey          string `json:"accessKey,omitempty"`
+	SecretKey          string `json:"secretKey,omitempty"`
+	Host               string `json:"host,omitempty"`
+	Port               int    `json:"port,omitempty"`
+	DistributionDomain string `json:"distributionDomain,omitempty"`
+	KeyID              string `json:"keyID,omitempty"`
+	PrivateKeyFilename string `json:"privateKeyFilename,omitempty"`
 }
 
 // ConfigFiles defines configuration files that are injected into the Quay resources
@@ -461,18 +461,18 @@ type CloudfrontS3RegistryBackendSource struct {
 type ConfigFiles struct {
 	SecretName string `json:"secretName"`
 	// +listType=atomic
-	Files []ConfigFile   `json:"files,omitempty,name=files"`
-	Type  ConfigFileType `json:"type,omitempty,name=type"`
+	Files []ConfigFile   `json:"files,omitempty"`
+	Type  ConfigFileType `json:"type,omitempty"`
 }
 
 // ConfigFile defines configuration files that are injected into the Quay resources
 // +k8s:openapi-gen=true
 type ConfigFile struct {
 	// +kubebuilder:validation:Enum=config;extraCaCert
-	Type          ConfigFileType `json:"type,omitempty,name=type"`
-	Key           string         `json:"key,name=key"`
-	Filename      string         `json:"filename,omitempty,name=filename"`
-	SecretContent []byte         `json:"secretContent,omitempty,name=secretContent"`
+	Type          ConfigFileType `json:"type,omitempty"`
+	Key           string         `json:"key"`
+	Filename      string         `json:"filename,omitempty"`
+	SecretContent []byte         `json:"secretContent,omitempty"`
 }
 
 type QuayMigrationPhase string
@@ -506,11 +506,6 @@ func (q *QuayEcosystem) SetCondition(newCondition QuayEcosystemCondition) *QuayE
 		q.Status.Conditions = append(q.Status.Conditions, newCondition)
 
 		return &newCondition
-	}
-
-	if newCondition.Status != newCondition.Status {
-		existingCondition.Status = newCondition.Status
-		existingCondition.LastTransitionTime = now
 	}
 
 	existingCondition.LastUpdateTime = now

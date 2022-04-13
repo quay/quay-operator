@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	ocsv1a1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
@@ -24,7 +25,7 @@ import (
 func TestEvaluate(t *testing.T) {
 	for _, tt := range []struct {
 		name  string
-		objs  []runtime.Object
+		objs  []client.Object
 		quay  qv1.QuayRegistry
 		conds []qv1.Condition
 	}{
@@ -203,7 +204,7 @@ func TestEvaluate(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&batchv1.Job{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app-upgrade",
@@ -536,7 +537,7 @@ func TestEvaluate(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&batchv1.Job{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app-upgrade",
@@ -915,7 +916,7 @@ func TestEvaluate(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&batchv1.Job{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app-upgrade",
@@ -1292,7 +1293,8 @@ func TestEvaluate(t *testing.T) {
 				t.Fatalf("unexpected error adding batch to scheme: %s", err)
 			}
 
-			cli := fake.NewFakeClientWithScheme(scheme, tt.objs...)
+			builder := fake.NewClientBuilder()
+			cli := builder.WithObjects(tt.objs...).WithScheme(scheme).Build()
 			conds, err := Evaluate(ctx, cli, tt.quay)
 			if err != nil {
 				t.Fatalf("unexpected error: %s", err)

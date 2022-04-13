@@ -9,8 +9,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -20,7 +20,7 @@ func TestMirrorCheck(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		quay qv1.QuayRegistry
-		objs []runtime.Object
+		objs []client.Object
 		cond qv1.Condition
 	}{
 		{
@@ -85,7 +85,7 @@ func TestMirrorCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-mirror",
@@ -115,7 +115,7 @@ func TestMirrorCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-mirror",
@@ -166,7 +166,7 @@ func TestMirrorCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-mirror",
@@ -202,7 +202,7 @@ func TestMirrorCheck(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			cli := fake.NewFakeClient(tt.objs...)
+			cli := fake.NewClientBuilder().WithObjects(tt.objs...).Build()
 			mirror := Mirror{
 				Client: cli,
 			}

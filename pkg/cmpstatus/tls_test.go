@@ -8,7 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -18,7 +18,7 @@ func TestTLSCheck(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		quay qv1.QuayRegistry
-		objs []runtime.Object
+		objs []client.Object
 		cond qv1.Condition
 	}{
 		{
@@ -85,7 +85,7 @@ func TestTLSCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "config-bundle",
@@ -120,7 +120,7 @@ func TestTLSCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "config-bundle",
@@ -154,7 +154,7 @@ func TestTLSCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "config-bundle",
@@ -189,7 +189,7 @@ func TestTLSCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "config-bundle",
@@ -211,7 +211,7 @@ func TestTLSCheck(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			cli := fake.NewFakeClient(tt.objs...)
+			cli := fake.NewClientBuilder().WithObjects(tt.objs...).Build()
 			tls := TLS{cli}
 
 			cond, err := tls.Check(ctx, tt.quay)

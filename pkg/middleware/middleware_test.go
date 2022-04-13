@@ -15,11 +15,6 @@ import (
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
-const (
-	tlsCert = "my-own-cert"
-	tlsKey  = "my-own-key"
-)
-
 var processTests = []struct {
 	name          string
 	quay          *v1.QuayRegistry

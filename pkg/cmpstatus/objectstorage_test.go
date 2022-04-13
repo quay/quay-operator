@@ -8,6 +8,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -19,7 +20,7 @@ func TestObjectStorageCheck(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		quay qv1.QuayRegistry
-		objs []runtime.Object
+		objs []client.Object
 		cond qv1.Condition
 	}{
 		{
@@ -76,7 +77,7 @@ func TestObjectStorageCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&ocsv1a1.ObjectBucketClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -116,7 +117,7 @@ func TestObjectStorageCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&ocsv1a1.ObjectBucketClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						OwnerReferences: []metav1.OwnerReference{
@@ -156,7 +157,7 @@ func TestObjectStorageCheck(t *testing.T) {
 					},
 				},
 			},
-			objs: []runtime.Object{
+			objs: []client.Object{
 				&ocsv1a1.ObjectBucketClaim{
 					Status: ocsv1a1.ObjectBucketClaimStatus{
 						Phase: ocsv1a1.ObjectBucketClaimStatusPhaseBound,
@@ -180,7 +181,8 @@ func TestObjectStorageCheck(t *testing.T) {
 				t.Fatalf("unexpected error adding ocs to scheme: %s", err)
 			}
 
-			cli := fake.NewFakeClientWithScheme(scheme, tt.objs...)
+			builder := fake.NewClientBuilder()
+			cli := builder.WithObjects(tt.objs...).WithScheme(scheme).Build()
 			obs := ObjectStorage{cli}
 
 			cond, err := obs.Check(ctx, tt.quay)
