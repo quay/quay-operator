@@ -91,8 +91,8 @@ func TestTLSCheck(t *testing.T) {
 						Name: "config-bundle",
 					},
 					Data: map[string][]byte{
-						"ssl.key": []byte(""),
-						"ssl.crt": []byte(""),
+						"ssl.key":  []byte(""),
+						"ssl.cert": []byte(""),
 					},
 				},
 			},
@@ -160,8 +160,8 @@ func TestTLSCheck(t *testing.T) {
 						Name: "config-bundle",
 					},
 					Data: map[string][]byte{
-						"ssl.key": []byte(""),
-						"ssl.crt": []byte(""),
+						"ssl.key":  []byte(""),
+						"ssl.cert": []byte(""),
 					},
 				},
 			},

@@ -58,10 +58,10 @@ func (t *TLS) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, e
 		return zero, err
 	}
 
-	_, hasCRT := secret.Data["ssl.crt"]
+	_, hasCRT := secret.Data["ssl.cert"]
 	_, hasKey := secret.Data["ssl.key"]
 
-	// if tls is managed we do not expect to find entries for ssl.key and ssl.crt in the
+	// if tls is managed we do not expect to find entries for ssl.key and ssl.cert in the
 	// config bundle secret.
 	if qv1.ComponentIsManaged(reg.Spec.Components, qv1.ComponentTLS) {
 		if hasCRT || hasKey {
