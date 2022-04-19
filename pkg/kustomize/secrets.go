@@ -337,6 +337,8 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			"database-root-password": []byte(databaseRootPassword),
 		}, nil
 	case v1.ComponentClair:
+		cfgFiles := make(map[string][]byte)
+
 		quayHostname := ""
 		if v1.ComponentIsManaged(quay.Spec.Components, "route") {
 			config := decode(configFiles["route.config.yaml"])
@@ -347,6 +349,12 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			config := decode(configFiles["config.yaml"])
 			if configHostname, ok := config.(map[string]interface{})["SERVER_HOSTNAME"].(string); ok && configHostname != "" {
 				quayHostname = configHostname
+			}
+		}
+
+		for key, val := range configFiles {
+			if strings.HasPrefix(key, "clair_extra_ca_cert_") {
+				cfgFiles["clair_extra_ca_cert_"] = val
 			}
 		}
 
@@ -364,8 +372,9 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 		if err != nil {
 			return nil, err
 		}
+		cfgFiles["config.yaml"] = cfg
 
-		return map[string][]byte{"config.yaml": cfg}, nil
+		return cfgFiles, nil
 	default:
 		return nil, nil
 	}
