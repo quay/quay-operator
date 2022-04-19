@@ -2,3 +2,4 @@ bin
 tmp
 cover.out
 kubeconfig
+.DS_Store

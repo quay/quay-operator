@@ -31,8 +31,8 @@ spec:
             sources:
               - configMap:
                   name: cluster-service-ca
-              - secret:
-                  name: quay-config-tls
+              - configMap:
+                  name: cluster-trusted-ca
       initContainers:
         - name: quay-mirror-init
           image: quay.io/projectquay/quay@sha256:5660d7174218e1cb21bf6ef406602dbe8c01c878c630a9f310fe3e5560d4c2cd
