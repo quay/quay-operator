@@ -40,8 +40,6 @@ spec:
                 secretKeyRef:
                   name: quay-proxy-config
                   key: NO_PROXY
-            - name: SSL_CERT_DIR
-              value: $SSL_CERT_DIR:/clair/
           ports:
             - containerPort: 8080
               name: clair-http
@@ -50,7 +48,7 @@ spec:
               name: clair-intro
               protocol: TCP
           volumeMounts:
-            - name: cluster-trusted-ca
+            - name: certificates
               mountPath: /etc/pki/ca-trust/extracted/pem
               readOnly: true
             - mountPath: /clair/
@@ -78,12 +76,6 @@ spec:
               memory: 16Gi
       restartPolicy: Always
       volumes:
-        - name: cluster-trusted-ca
-          configMap:
-            name: cluster-trusted-ca
-            items:
-              - key: ca-bundle.crt
-                path: tls-ca-bundle.pem
         - name: config
           secret:
             secretName: clair-config-secret
@@ -93,6 +85,8 @@ spec:
             sources:
               - secret:
                   name: quay-config-tls
+              - secret:
+                  name: clair-config-secret
               - configMap: 
                   name: cluster-service-ca
               - configMap:

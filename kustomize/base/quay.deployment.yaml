@@ -115,3 +115,6 @@ spec:
             - name: extra-ca-certs
               readOnly: true
               mountPath: /conf/stack/extra_ca_certs
+            - name: extra-ca-certs
+              readOnly: true
+              mountPath: /etc/pki/ca-trust/extracted/pem

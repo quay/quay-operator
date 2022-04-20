@@ -20,8 +20,12 @@ spec:
           secret:
             secretName: quay-config-secret
         - name: extra-ca-certs
-          configMap:
-            name: cluster-service-ca
+          projected:
+            sources:
+              - configMap:
+                  name: cluster-service-ca
+              - configMap:
+                  name: cluster-trusted-ca
       containers:
         - name: quay-app-upgrade
           image: quay.io/projectquay/quay@sha256:5660d7174218e1cb21bf6ef406602dbe8c01c878c630a9f310fe3e5560d4c2cd
@@ -63,3 +67,6 @@ spec:
             - name: extra-ca-certs
               readOnly: true
               mountPath: /conf/stack/extra_ca_certs
+            - name: extra-ca-certs
+              readOnly: true
+              mountPath: /etc/pki/ca-trust/extracted/pem
