@@ -125,6 +125,26 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 			return nil, err
 		}
 
+		if olabels := v1.GetLabelsOverrideForComponent(quay, kind); olabels != nil {
+			if dep.Labels == nil {
+				dep.Labels = olabels
+			} else {
+				for key, value := range olabels {
+					dep.Labels[key] = value
+				}
+			}
+		}
+
+		if oannot := v1.GetAnnotationsOverrideForComponent(quay, kind); oannot != nil {
+			if dep.Annotations == nil {
+				dep.Annotations = oannot
+			} else {
+				for key, value := range oannot {
+					dep.Annotations[key] = value
+				}
+			}
+		}
+
 		dep.Spec.Template.Annotations[fieldGroupsAnnotation] = strings.Join(fgns, ",")
 		return dep, nil
 	}

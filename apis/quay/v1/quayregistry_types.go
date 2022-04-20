@@ -126,9 +126,11 @@ type Component struct {
 
 // Override describes configuration overrides for the given managed component
 type Override struct {
-	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
-	Env        []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-	Replicas   *int32             `json:"replicas,omitempty"`
+	VolumeSize  *resource.Quantity `json:"volumeSize,omitempty"`
+	Env         []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	Replicas    *int32             `json:"replicas,omitempty"`
+	Labels      map[string]string  `json:"labels,omitempty"`
+	Annotations map[string]string  `json:"annotations,omitempty"`
 }
 
 type ConditionType string
@@ -748,6 +750,40 @@ func GetEnvOverrideForComponent(quay *QuayRegistry, kind ComponentKind) []corev1
 		}
 
 		return cmp.Overrides.Env
+	}
+	return nil
+}
+
+// GetLabelsOverrideForComponent returns overriden labels for the provided component
+// nil is returned if there are no label overrides
+func GetLabelsOverrideForComponent(quay *QuayRegistry, kind ComponentKind) map[string]string {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+
+		if cmp.Overrides == nil {
+			return nil
+		}
+
+		return cmp.Overrides.Labels
+	}
+	return nil
+}
+
+// GetAnnotationsOverrideForComponent returns overriden annotations for the provided component
+// nil is returned if there are no annotation overrides
+func GetAnnotationsOverrideForComponent(quay *QuayRegistry, kind ComponentKind) map[string]string {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+
+		if cmp.Overrides == nil {
+			return nil
+		}
+
+		return cmp.Overrides.Annotations
 	}
 	return nil
 }

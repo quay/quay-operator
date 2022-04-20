@@ -53,6 +53,10 @@ spec:
                       description: Overrides holds information regarding component
                         specific configurations.
                       properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
                         env:
                           items:
                             description: EnvVar represents an environment variable
@@ -167,6 +171,10 @@ spec:
                             - name
                             type: object
                           type: array
+                        labels:
+                          additionalProperties:
+                            type: string
+                          type: object
                         replicas:
                           format: int32
                           type: integer
