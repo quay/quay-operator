@@ -352,10 +352,12 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			}
 		}
 
-		for key, val := range configFiles {
-			if strings.HasPrefix(key, "clair_extra_ca_cert_") {
-				cfgFiles["clair_extra_ca_cert_"] = val
-			}
+		// Add ssl key and cert to bundle
+		if val, ok := configFiles["clair-ssl.crt"]; ok {
+			cfgFiles["clair-ssl.crt"] = val
+		}
+		if val, ok := configFiles["clair-ssl.key"]; ok {
+			cfgFiles["clair-ssl.key"] = val
 		}
 
 		if quayHostname == "" {
