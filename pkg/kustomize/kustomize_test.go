@@ -251,6 +251,7 @@ var quayComponents = map[string][]client.Object{
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-registry-managed-secret-keys"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cluster-service-ca"}},
+		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "extra-ca-certs"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-proxy-config"}},
 	},
 	"clair": {

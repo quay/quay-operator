@@ -46,6 +46,15 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 		// `/conf/stack`, otherwise it will affect Quay's generated NGINX config
 		delete(configBundleSecret.Data, "ssl.cert")
 		delete(configBundleSecret.Data, "ssl.key")
+		delete(configBundleSecret.Data, "clair-ssl.key")
+		delete(configBundleSecret.Data, "clair-ssl.crt")
+
+		// Remove the ca certs since they are being mounted by extra-ca-certs
+		for key := range configBundleSecret.Data {
+			if strings.HasPrefix(key, "extra_ca_cert_") {
+				delete(configBundleSecret.Data, key)
+			}
+		}
 
 		return configBundleSecret, nil
 	}

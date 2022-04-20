@@ -40,8 +40,6 @@ spec:
                 secretKeyRef:
                   name: quay-proxy-config
                   key: NO_PROXY
-            - name: SSL_CERT_DIR
-              value: $SSL_CERT_DIR:/clair/
           ports:
             - containerPort: 8080
               name: clair-http
@@ -91,6 +89,8 @@ spec:
         - name: certificates
           projected:
             sources:
+              - secret:
+                  name: extra-ca-certs
               - secret:
                   name: quay-config-tls
               - configMap: 
