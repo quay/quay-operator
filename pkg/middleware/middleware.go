@@ -77,34 +77,40 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 			}
 		}
 
-		for kind, depsuffix := range map[v1.ComponentKind]string{
-			v1.ComponentClair:  "clair-app",
-			v1.ComponentMirror: "quay-mirror",
-			v1.ComponentQuay:   "quay-app",
-		} {
-			if !strings.HasSuffix(dep.Name, depsuffix) {
-				continue
-			}
+		// here we do an attempt to setting the default or overwriten number of replicas
+		// for clair, quay and mirror. we can't do that if horizontal pod autoscaler is
+		// in managed state as we would be stomping in the values defined by the hpa
+		// controller.
+		if !v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentHPA) {
+			for kind, depsuffix := range map[v1.ComponentKind]string{
+				v1.ComponentClair:  "clair-app",
+				v1.ComponentMirror: "quay-mirror",
+				v1.ComponentQuay:   "quay-app",
+			} {
+				if !strings.HasSuffix(dep.Name, depsuffix) {
+					continue
+				}
 
-			// if the number of replicas has been set through kustomization
-			// we do not override it, just break here and move on with it.
-			// we have to adopt this approach because during "upgrades" the
-			// number of replicas is set to zero and we don't want to stomp
-			// it.
-			if dep.Spec.Replicas != nil {
+				// if the number of replicas has been set through kustomization
+				// we do not override it, just break here and move on with it.
+				// we have to adopt this approach because during "upgrades" the
+				// number of replicas is set to zero and we don't want to stomp
+				// it.
+				if dep.Spec.Replicas != nil {
+					break
+				}
+
+				// if no number of replicas has been set in kustomization files
+				// we set its value to two or to the value provided by the user
+				// as an override (if provided).
+				desired := pointer.Int32(2)
+				if r := v1.GetReplicasOverrideForComponent(quay, kind); r != nil {
+					desired = r
+				}
+
+				dep.Spec.Replicas = desired
 				break
 			}
-
-			// if no number of replicas has been set in kustomization files
-			// we set its value to two or to the value provided by the user
-			// as an override (if provided).
-			desired := pointer.Int32(2)
-			if rs := v1.GetReplicasOverrideForComponent(quay, kind); rs != nil {
-				desired = rs
-			}
-
-			dep.Spec.Replicas = desired
-			break
 		}
 
 		if skipres {
