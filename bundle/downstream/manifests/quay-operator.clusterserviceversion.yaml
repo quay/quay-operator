@@ -197,9 +197,9 @@ spec:
                 - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
                   value: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos-rhel8:v3.6.0
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES
-                  value: registry.redhat.io/rhel8/postgresql-10:1
+                  value: registry.redhat.io/rhel8/postgresql-12:1
                 - name: RELATED_IMAGE_COMPONENT_REDIS
-                  value: registry.redhat.io/rhel8/redis-5:1
+                  value: registry.redhat.io/rhel8/redis-6:1
               serviceAccountName: quay-operator
       permissions:
       - rules:
