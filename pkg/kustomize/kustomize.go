@@ -304,6 +304,14 @@ func KustomizationFor(
 		ctx.DbRootPw = rootpw
 	}
 
+	userProvidedCaCerts := []string{}
+	for key, val := range quayConfigFiles {
+		if !strings.HasPrefix(key, "extra_ca_cert_") {
+			continue
+		}
+		userProvidedCaCerts = append(userProvidedCaCerts, strings.TrimPrefix(key, "extra_ca_cert_")+"="+string(val))
+	}
+
 	quayConfigTLSSources := []string{}
 	if ctx.ClusterWildcardCert != nil {
 		quayConfigTLSSources = append(quayConfigTLSSources, "ocp-cluster-wildcard.cert="+string(ctx.ClusterWildcardCert))
@@ -342,6 +350,14 @@ func KustomizationFor(
 				Name: configSecretPrefix,
 				KvPairSources: types.KvPairSources{
 					FileSources: configFiles,
+				},
+			},
+		},
+		{
+			GeneratorArgs: types.GeneratorArgs{
+				Name: "extra-ca-certs",
+				KvPairSources: types.KvPairSources{
+					LiteralSources: userProvidedCaCerts,
 				},
 			},
 		},

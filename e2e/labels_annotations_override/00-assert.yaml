@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-app
+  annotations:
+    a1: TESTING
+    a2: TESTING
+  labels:
+    l1: TESTING
+    l2: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-database
+  annotations:
+    a1: TESTING
+    a2: TESTING
+  labels:
+    l1: TESTING
+    l2: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-clair-app
+  annotations:
+    a1: TESTING
+    a2: TESTING
+  labels:
+    l1: TESTING
+    l2: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-redis
+  annotations:
+    a1: TESTING
+    a2: TESTING
+  labels:
+    l1: TESTING
+    l2: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-mirror
+  annotations:
+    a1: TESTING
+    a2: TESTING
+  labels:
+    l1: TESTING
+    l2: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-clair-postgres
+  annotations:
+    a1: TESTING
+    a2: TESTING
+  labels:
+    l1: TESTING
+    l2: TESTING

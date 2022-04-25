@@ -33,6 +33,8 @@ spec:
                   name: cluster-service-ca
               - configMap:
                   name: cluster-trusted-ca
+              - secret:
+                  name: extra-ca-certs      
       initContainers:
         - name: quay-mirror-init
           image: quay.io/projectquay/quay@sha256:5660d7174218e1cb21bf6ef406602dbe8c01c878c630a9f310fe3e5560d4c2cd

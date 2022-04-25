@@ -768,7 +768,19 @@ func GetLabelsOverrideForComponent(quay *QuayRegistry, kind ComponentKind) map[s
 
 		return cmp.Overrides.Labels
 	}
+
 	return nil
+}
+
+// ExceptionLabel checks if attempt to override label affects exceptional labels
+func ExceptionLabel(override string) bool {
+	for _, label := range []string{"quay-component", "app", "quay-operator/quayregistry"} {
+		if override == label {
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetAnnotationsOverrideForComponent returns overriden annotations for the provided component
@@ -785,6 +797,7 @@ func GetAnnotationsOverrideForComponent(quay *QuayRegistry, kind ComponentKind) 
 
 		return cmp.Overrides.Annotations
 	}
+
 	return nil
 }
 
