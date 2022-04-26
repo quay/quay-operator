@@ -179,6 +179,7 @@ func BaseQuayConfig() map[string]interface{} {
 		"FEATURE_DIRECT_LOGIN":               true,
 		"FEATURE_BUILD_SUPPORT":              false,
 		"TESTING":                            false,
+		"FEATURE_QUOTA_MANAGEMENT":           true,
 	}
 }
 
