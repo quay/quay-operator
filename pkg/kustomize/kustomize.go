@@ -315,9 +315,11 @@ func KustomizationFor(
 	quayConfigTLSSources := []string{}
 	if ctx.ClusterWildcardCert != nil {
 		quayConfigTLSSources = append(quayConfigTLSSources, "ocp-cluster-wildcard.cert="+string(ctx.ClusterWildcardCert))
+		userProvidedCaCerts = append(userProvidedCaCerts, "ocp-cluster-wildcard.crt="+string(ctx.ClusterWildcardCert))
 	}
 	if ctx.TLSCert != nil {
 		quayConfigTLSSources = append(quayConfigTLSSources, "ssl.cert="+string(ctx.TLSCert))
+		userProvidedCaCerts = append(userProvidedCaCerts, "ssl.crt="+string(ctx.TLSCert))
 	}
 	if ctx.TLSKey != nil {
 		quayConfigTLSSources = append(quayConfigTLSSources, "ssl.key="+string(ctx.TLSKey))
