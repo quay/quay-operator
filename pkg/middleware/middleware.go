@@ -124,7 +124,9 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 		// TODO we must not set annotations in objects where they are not needed. we also
 		// must stop mangling objects in this "middleware" thingy, what is the point of
 		// using kustomize if we keep changing stuff on the fly ?
-		if strings.Contains(dep.GetName(), "quay-database") {
+		isQuayDB := strings.Contains(dep.GetName(), "quay-database")
+		isClairDB := strings.Contains(dep.GetName(), "clair-postgres")
+		if isQuayDB || isClairDB {
 			delete(dep.Spec.Template.Annotations, "quay-registry-hostname")
 			delete(dep.Spec.Template.Annotations, "quay-buildmanager-hostname")
 			delete(dep.Spec.Template.Annotations, "quay-operator-service-endpoint")
