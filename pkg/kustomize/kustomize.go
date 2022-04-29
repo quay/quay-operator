@@ -629,7 +629,7 @@ func operatorServiceEndpoint() string {
 
 	endpoint := "http://quay-operator"
 	if ns := os.Getenv(podNamespaceKey); ns != "" {
-		endpoint = strings.Join([]string{endpoint, ns}, ".")
+		endpoint = fmt.Sprintf("http://quay-operator.%s.svc.cluster.local", ns)
 	}
 
 	return strings.Join([]string{endpoint, "7071"}, ":")
