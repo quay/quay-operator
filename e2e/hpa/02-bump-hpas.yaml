@@ -3,22 +3,19 @@ apiVersion: autoscaling/v1
 kind: HorizontalPodAutoscaler
 metadata:
   name: hpa-clair-app
-status:
-  currentReplicas: 3
-  desiredReplicas: 3
+spec:
+  minReplicas: 3
 ---
 apiVersion: autoscaling/v1
 kind: HorizontalPodAutoscaler
 metadata:
   name: hpa-quay-app
-status:
-  currentReplicas: 3
-  desiredReplicas: 3
+spec:
+  minReplicas: 3
 ---
 apiVersion: autoscaling/v1
 kind: HorizontalPodAutoscaler
 metadata:
   name: hpa-quay-mirror
-status:
-  currentReplicas: 3
-  desiredReplicas: 3
+spec:
+  minReplicas: 3

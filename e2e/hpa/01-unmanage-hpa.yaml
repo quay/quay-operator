@@ -27,24 +27,3 @@ spec:
     managed: true
   - kind: tls
     managed: true
----
-apiVersion: autoscaling/v1
-kind: HorizontalPodAutoscaler
-metadata:
-  name: hpa-clair-app
-spec:
-  minReplicas: 3
----
-apiVersion: autoscaling/v1
-kind: HorizontalPodAutoscaler
-metadata:
-  name: hpa-quay-app
-spec:
-  minReplicas: 3
----
-apiVersion: autoscaling/v1
-kind: HorizontalPodAutoscaler
-metadata:
-  name: hpa-quay-mirror
-spec:
-  minReplicas: 3

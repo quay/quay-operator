@@ -70,7 +70,7 @@ status:
   - message: Quay component healthy
     reason: ComponentReady
     status: "True"
-    type: ComponentBaseReady
+    type: ComponentQuayReady
   - message: Deployment hpa-quay-mirror healthy
     reason: ComponentReady
     status: "True"
@@ -87,28 +87,3 @@ status:
     reason: ComponentsCreationSuccess
     status: "False"
     type: RolloutBlocked
----
-apiVersion: autoscaling/v1
-kind: HorizontalPodAutoscaler
-metadata:
-  name: hpa-clair-app
-status:
-  currentReplicas: 3
-  desiredReplicas: 3
----
-apiVersion: autoscaling/v1
-kind: HorizontalPodAutoscaler
-metadata:
-  name: hpa-quay-app
-status:
-  currentReplicas: 3
-  desiredReplicas: 3
----
-apiVersion: autoscaling/v1
-kind: HorizontalPodAutoscaler
-metadata:
-  name: hpa-quay-mirror
-status:
-  currentReplicas: 3
-  desiredReplicas: 3
----
