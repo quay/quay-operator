@@ -75,6 +75,15 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 					UpsertContainerEnv(ref, oenv)
 				}
 			}
+
+			// Add additional default environment variables to Quay deployment
+			if kind == v1.ComponentQuay {
+				oenv := corev1.EnvVar{Name: "QUAY_VERSION", Value: string(v1.QuayVersionCurrent)}
+				for i := range dep.Spec.Template.Spec.Containers {
+					ref := &dep.Spec.Template.Spec.Containers[i]
+					UpsertContainerEnv(ref, oenv)
+				}
+			}
 		}
 
 		// here we do an attempt to setting the default or overwriten number of replicas
