@@ -18,6 +18,7 @@ spec:
         - name: NO_PROXY
         - name: TESTING
           value: TESTING
+        - name: QUAY_VERSION
 ---
 apiVersion: apps/v1
 kind: Deployment
