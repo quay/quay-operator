@@ -3,5 +3,6 @@ kind: TestSuite
 testDirs:
   - ./e2e
 timeout: 500
+parallel: 1
 suppress: 
  - "events"
