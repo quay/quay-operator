@@ -339,7 +339,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"quay", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres"}),
+		expected:    withComponents([]string{"job", "quay", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -386,7 +386,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"quay", "postgres", "clair", "mirror", "clairpostgres"}),
+		expected:    withComponents([]string{"job", "quay", "postgres", "clair", "mirror", "clairpostgres"}),
 		expectedErr: nil,
 	},
 	{
@@ -408,6 +408,7 @@ var inflateTests = []struct {
 		},
 		ctx: quaycontext.QuayRegistryContext{
 			SupportsObjectStorage: true,
+			DbUri:                 "postgresql://user:pass@db:5432/db",
 		},
 		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
@@ -436,6 +437,7 @@ var inflateTests = []struct {
 		},
 		ctx: quaycontext.QuayRegistryContext{
 			SupportsObjectStorage: true,
+			DbUri:                 "postgresql://user:pass@db:5432/db",
 		},
 		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
@@ -483,7 +485,123 @@ var inflateTests = []struct {
 				}),
 			},
 		},
-		expected:    withComponents([]string{"quay"}),
+		expected:    withComponents([]string{"job", "quay"}),
+		expectedErr: nil,
+	},
+	{
+		name: "PostgresConfigurationManuallyUpdated",
+		quayRegistry: &v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: false},
+				},
+			},
+			Status: v1.QuayRegistryStatus{
+				CurrentVersion: v1.QuayVersionCurrent,
+			},
+		},
+		ctx: quaycontext.QuayRegistryContext{
+			DbUri: "postgresql://olduser:oldpass@olddb:5432/olddatabase",
+		},
+		configBundle: &corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(map[string]interface{}{
+					"SERVER_HOSTNAME": "quay.io",
+					"DB_URI":          "postgresql://test-quay-database:postgres@test-quay-database:5432/test-quay-database",
+				}),
+			},
+		},
+		expected:    withComponents([]string{"job", "quay"}),
+		expectedErr: nil,
+	},
+	{
+		name: "NoChangeInDatabaseButUpgradedVersion",
+		quayRegistry: &v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: false},
+				},
+			},
+			Status: v1.QuayRegistryStatus{
+				CurrentVersion: "v0.0.0",
+			},
+		},
+		ctx: quaycontext.QuayRegistryContext{
+			DbUri: "postgresql://olduser:oldpass@olddb:5432/olddatabase",
+		},
+		configBundle: &corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(map[string]interface{}{
+					"SERVER_HOSTNAME": "quay.io",
+					"DB_URI":          "postgresql://olduser:oldpass@olddb:5432/olddatabase",
+				}),
+			},
+		},
+		expected:    withComponents([]string{"job", "quay"}),
+		expectedErr: nil,
+	},
+	{
+		name: "RerenderWithoutChanges",
+		quayRegistry: &v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+				},
+			},
+		},
+		ctx: quaycontext.QuayRegistryContext{
+			SupportsObjectStorage: true,
+			DbUri:                 "postgresql://user:pass@db:5432/db",
+		},
+		configBundle: &corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(
+					map[string]interface{}{
+						"SERVER_HOSTNAME": "quay.io",
+						"DB_URI":          "postgresql://user:pass@db:5432/db",
+					},
+				),
+			},
+		},
+		expected:    withComponents([]string{"quay", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres"}),
+		expectedErr: nil,
+	},
+	{
+		name: "RerenderWithDatabaseChanges",
+		quayRegistry: &v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+				},
+			},
+		},
+		ctx: quaycontext.QuayRegistryContext{
+			SupportsObjectStorage: true,
+			DbUri:                 "postgresql://user:pass@db:5432/db",
+		},
+		configBundle: &corev1.Secret{
+			Data: map[string][]byte{
+				"config.yaml": encode(
+					map[string]interface{}{
+						"SERVER_HOSTNAME": "quay.io",
+						"DB_URI":          "postgresql://new:new@new:5432/db",
+					},
+				),
+			},
+		},
+		expected:    withComponents([]string{"job", "quay", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres"}),
 		expectedErr: nil,
 	},
 }
