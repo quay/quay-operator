@@ -535,9 +535,12 @@ func Inflate(
 	}
 	parsedUserConfig["SECRET_KEY"] = ctx.SecretKey
 
+	var dbCfgHasChanged bool
 	if dbURI, ok := parsedUserConfig["DB_URI"].(string); ok && len(dbURI) > 0 {
+		dbCfgHasChanged = parsedUserConfig["DB_URI"] != ctx.DbUri
 		ctx.DbUri = dbURI
 	} else if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) && len(ctx.DbUri) == 0 {
+		dbCfgHasChanged = true
 		log.Info("managed `DB_URI` not found in config, generating new one")
 		user := quay.GetName() + "-quay-database"
 		name := quay.GetName() + "-quay-database"
@@ -585,7 +588,10 @@ func Inflate(
 	var overlay string
 	if rolloutBlocked(quay) {
 		overlay = configEditorOnlyOverlay()
-	} else if quay.Status.CurrentVersion != v1.QuayVersionCurrent {
+	} else if quay.Status.CurrentVersion != v1.QuayVersionCurrent || dbCfgHasChanged {
+		// we render the upgrade overlay directory only if the operator version or the
+		// database configuration has changed. this scales down quay and runs a job to
+		// migrate the database.
 		overlay = upgradeOverlayDir()
 	} else if !v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentTLS) {
 		overlay = unmanagedTLSOverlayDir()
