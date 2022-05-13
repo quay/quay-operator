@@ -53,22 +53,6 @@ yq e -i '
 ' "${CATALOG_PATH}"
 
 oc apply -n openshift-marketplace -f "${CATALOG_PATH}"
-info 'waiting for catalog source to become available...'
-for n in {1..60}; do
-	pkgmanifest="$(oc get packagemanifest "${OPERATOR_PKG_NAME}" -n openshift-marketplace -o jsonpath='{.status.catalogSource}' 2> /dev/null)"
-	if [ ! "$pkgmanifest" = "${OPERATOR_PKG_NAME}" ]; then
-		if [ "${n}" = "60" ]; then
-			error 'timed out waiting'
-			info 'catalog source pod yaml:'
-			oc -n openshift-marketplace get pods -l=olm.catalogSource="${OPERATOR_PKG_NAME}"
-			exit 1
-		fi
-		sleep 10
-		continue
-	fi
-	info 'catalog source installed and available'
-	break
-done
 
 info 'installing the operator'
 
