@@ -77,7 +77,7 @@ oc apply -f "${OG_PATH}"
 yq e -i '
 	.spec.channel = "test" |
 	.spec.startingCSV = env(OPERATOR_PKG_NAME) |
-	.spec.name = env(OPERATOR_PKG_NAME) |
+	.spec.name = "quay-operator" |
 	.spec.source = env(OPERATOR_PKG_NAME)
 ' "${SUBSCRIPTION_PATH}"
 oc apply -f "${SUBSCRIPTION_PATH}"
