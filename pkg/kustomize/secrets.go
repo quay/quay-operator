@@ -148,6 +148,9 @@ func FieldGroupFor(
 	case v1.ComponentClairPostgres:
 		return nil, nil
 
+	case v1.ComponentConfigEditor:
+		return nil, nil
+
 	case v1.ComponentQuay:
 		return nil, nil
 
@@ -282,6 +285,9 @@ func ContainsComponentConfig(
 		if certPresent && keyPresent {
 			return true, nil
 		}
+
+	case v1.ComponentConfigEditor:
+		return false, nil
 
 	case v1.ComponentQuay:
 		return false, nil

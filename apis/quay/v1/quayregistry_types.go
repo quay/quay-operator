@@ -54,6 +54,7 @@ const (
 	ComponentMirror        ComponentKind = "mirror"
 	ComponentMonitoring    ComponentKind = "monitoring"
 	ComponentTLS           ComponentKind = "tls"
+	ComponentConfigEditor  ComponentKind = "configeditor"
 )
 
 // AllComponents holds a list of all supported components.
@@ -69,6 +70,7 @@ var AllComponents = []ComponentKind{
 	ComponentMonitoring,
 	ComponentTLS,
 	ComponentClairPostgres,
+	ComponentConfigEditor,
 }
 
 var requiredComponents = []ComponentKind{
@@ -150,6 +152,7 @@ const (
 	ComponentMirrorReady        ConditionType = "ComponentMirrorReady"
 	ComponentMonitoringReady    ConditionType = "ComponentMonitoringReady"
 	ComponentTLSReady           ConditionType = "ComponentTLSReady"
+	ComponenntConfigEditorReady ConditionType = "ComponentConfigEditorReady"
 )
 
 type ConditionReason string
@@ -394,7 +397,7 @@ func EnsureDefaultComponents(ctx *quaycontext.QuayRegistryContext, quay *QuayReg
 			// the current components configuration. returns the check error.
 			if !ccheck.check() && ComponentIsManaged(quay.Spec.Components, cmp) {
 				return fmt.Errorf(
-					"Error validatingcomponent %s: %s", cmp, ccheck.msg,
+					"error validating component %s: %s", cmp, ccheck.msg,
 				)
 			}
 		}
@@ -645,6 +648,8 @@ func FieldGroupNameFor(cmp ComponentKind) (string, error) {
 	case ComponentMonitoring:
 		return "", nil
 	case ComponentTLS:
+		return "", nil
+	case ComponentConfigEditor:
 		return "", nil
 	case ComponentQuay:
 		return "", nil

@@ -1,0 +1,6 @@
+# Config Editor presents a Web-based interface for configuring the Red Hat Quay cluster.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: 
+  - ./config.deployment.yaml
+  - ./config.service.yaml
