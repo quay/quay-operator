@@ -18,6 +18,21 @@ The original version of the quay-operator is available on the _v1_ branch. The n
 
 This Operator can be installed on any Kubernetes cluster running the [Operator Lifecycle Manager](https://github.com/operator-framework/operator-lifecycle-manager). Simply create the provided `CatalogSource` to make the package available on the cluster, then create the `Subscription` to install it.
 
+You can find the latest operator release on [operatorhub.io](https://operatorhub.io/operator/project-quay).
+
+The fastest way to get started is by deploying the operator in an OCP/OKD cluster
+using the setup scripts provided in the `hack` directory:
+
+```sh
+./hack/storage.sh  # install noobaa via ODF operator
+./hack/deploy.sh
+oc create -n <your-namespace> -f ./config/samples/managed.quayregistry.yaml
+```
+
+Or run the steps one by one.
+
+### Step by step
+
 **Create the `CatalogSource`**:
 ```sh
 $ kubectl create -n openshift-marketplace -f ./bundle/quay-operator.catalogsource.yaml
@@ -29,8 +44,6 @@ $ kubectl get packagemanifest --all-namespaces | grep quay
 ```
 
 **Create the `OperatorGroup`**:
-
-NOTE: By default, the `targetNamespaces` field is specified to target the _quay-enterprise_ namespace. Update this value if the namespace the operator is deployed within differs. 
 
 ```sh
 $ kubectl create -n <your-namespace> -f ./bundle/quay-operator.operatorgroup.yaml

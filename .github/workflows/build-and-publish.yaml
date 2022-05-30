@@ -1,3 +1,5 @@
+# NOTE: set the REGISTRY secret to your own quay.io account in your fork to
+# test this workflow!
 ---
 name: Build and Publish Images
 
@@ -24,8 +26,6 @@ jobs:
     name: Set version from branch name
     env:
       BRANCH_PREFIX: redhat- # IMPORTANT! this must match the .on.push.branches prefix!
-      REGISTRY: quay.io/projectquay
-      REPO_NAME: ${{ github.event.repository.name }}
       TAG_SUFFIX: -unstable
     outputs:
       tag: ${{ steps.format-tag.outputs.tag }}
@@ -46,84 +46,16 @@ jobs:
         id: format-tag
         run: echo "::set-output name=tag::${{ steps.version-from-branch.outputs.version }}${{ env.TAG_SUFFIX }}"
 
-  quay-image:
+  build-and-publish:
     if: ${{ contains(github.ref, 'redhat-') }}
-    name: Calculate Quay Image Digest
+    name: Build and publish operator catalog index
     runs-on: 'ubuntu-latest'
     outputs:
       digest: ${{ steps.set-output.outputs.digest }}
     env:
-      IMAGE_REGISTRY: quay.io/projectquay
+      REGISTRY: ${{ secrets.REGISTRY || 'quay.io' }}
+      NAMESPACE: ${{ secrets.NAMESPACE || 'projectquay' }}
       TAG: ${{needs.set-version.outputs.tag}}
-    needs: set-version
-    steps:
-      - name: Pull Image
-        id: pull-image
-        run: docker pull "${IMAGE_REGISTRY}"/quay:"${TAG}"
-      - name: Set Output
-        id: set-output
-        run: echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE_REGISTRY}/quay:${TAG})"
-
-  clair-image:
-    if: ${{ contains(github.ref, 'redhat-') }}
-    name: Calculate Clair Image Digest
-    runs-on: 'ubuntu-latest'
-    outputs:
-      digest: ${{ steps.set-output.outputs.digest }}
-    env:
-      IMAGE_REGISTRY: quay.io/projectquay
-      TAG: nightly
-    steps:
-      - name: Pull Image
-        id: pull-image
-        run: docker pull "${IMAGE_REGISTRY}"/clair:"${TAG}"
-      - name: Set Output
-        id: set-output
-        run: echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE_REGISTRY}/clair:${TAG})"
-
-  builder-image:
-    if: ${{ contains(github.ref, 'redhat-') }}
-    name: Calculate Builder Image Digest
-    runs-on: 'ubuntu-latest'
-    outputs:
-      digest: ${{ steps.set-output.outputs.digest }}
-    env:
-      IMAGE_REGISTRY: quay.io/projectquay
-      TAG: ${{needs.set-version.outputs.tag}}
-    needs: set-version
-    steps:
-      - name: Pull Image
-        id: pull-image
-        run: docker pull "${IMAGE_REGISTRY}"/quay-builder:"${TAG}"
-      - name: Set Output
-        id: set-output
-        run: echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE_REGISTRY}/quay-builder:${TAG})"
-
-  qemu-builder-image:
-    if: ${{ contains(github.ref, 'redhat-') }}
-    name: Calculate Qemu Builder Image Digest
-    runs-on: 'ubuntu-latest'
-    outputs:
-      digest: ${{ steps.set-output.outputs.digest }}
-    env:
-      IMAGE_REGISTRY: quay.io/projectquay
-      TAG: main
-    steps:
-      - name: Pull Image
-        id: pull-image
-        run: docker pull "${IMAGE_REGISTRY}"/quay-builder-qemu:"${TAG}"
-      - name: Set Output
-        id: set-output
-        run: echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE_REGISTRY}/quay-builder-qemu:${TAG})"
-
-  operator-image:
-    if: ${{ contains(github.ref, 'redhat-') }}
-    name: Publish Operator Image
-    runs-on: 'ubuntu-latest'
-    outputs:
-      digest: ${{ steps.set-output.outputs.digest }}
-    env:
-      OPERATOR_IMAGE: quay.io/projectquay/quay-operator:${{needs.set-version.outputs.tag}}
     needs: set-version
     steps:
       - name: Check out the repo
@@ -131,100 +63,28 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch || github.ref_name }}
 
-      - name: Login to Quay.io
-        uses: docker/login-action@v1
+      - name: Install opm from OpenShift Mirror
+        uses: redhat-actions/openshift-tools-installer@v1
         with:
-          registry: quay.io
-          username: ${{ secrets.QUAY_USER }}
-          password: ${{ secrets.QUAY_TOKEN }}
+          opm: "latest"
 
-      - name: Build and push
-        id: docker_build
-        uses: docker/build-push-action@v2
-        with:
-          push: true
-          tags: ${{ env.OPERATOR_IMAGE }}
-
-      - name: Set digest output
-        id: set-output
-        run: |
-          docker pull "${OPERATOR_IMAGE}"
-          echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${OPERATOR_IMAGE})"
-
-  operator-index-images:
-    if: ${{ contains(github.ref, 'redhat-') }}
-    name: Publish Catalog Index Image
-    runs-on: 'ubuntu-latest'
-    needs: [quay-image, clair-image, builder-image, qemu-builder-image, operator-image, set-version]
-    env:
-      OPERATOR_NAME: quay-operator-test
-      BUNDLE: quay.io/projectquay/quay-operator-bundle
-      INDEX: quay.io/projectquay/quay-operator-index
-      TAG: ${{needs.set-version.outputs.tag}}
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.inputs.branch || github.ref_name }}
-
-      - name: Login to Quay.io
-        uses: docker/login-action@v1
-        with:
-          registry: quay.io
-          username: ${{ secrets.QUAY_USER }}
-          password: ${{ secrets.QUAY_TOKEN }}
-
-      - name: Update CSV Image Versions
-        uses: mikefarah/yq@master
-        with:
-          cmd: |
-            yq eval -i '
-              .metadata.name = strenv(OPERATOR_NAME) |
-              .metadata.annotations.quay-version = strenv(TAG) |
-              .metadata.annotations.containerImage = "${{needs.operator-image.outputs.digest}}" |
-              del(.spec.replaces) |
-              .spec.install.spec.deployments[0].name = strenv(OPERATOR_NAME) |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].image = "${{needs.operator-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_QUAY") .value = "${{needs.quay-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_CLAIR") .value = "${{needs.clair-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") .value = "${{needs.builder-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_BUILDER_QEMU") .value = "${{needs.qemu-builder-image.outputs.digest}}" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES") .value = "centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33" |
-              .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_REDIS") .value = "centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542"
-              ' bundle/manifests/quay-operator.clusterserviceversion.yaml
-
-      - name: Update Bundle Annotations
-        uses: mikefarah/yq@master
-        with:
-          cmd: |
-            yq eval -i '
-              .annotations."operators.operatorframework.io.bundle.channel.default.v1" = "test" |
-              .annotations."operators.operatorframework.io.bundle.channels.v1" = "test"
-              ' bundle/metadata/annotations.yaml
-
-      - name: Publish Bundle Image
-        uses: docker/build-push-action@v2
-        with:
-          context: ./bundle
-          file: ./bundle/Dockerfile
-          push: true
-          tags: ${{ env.BUNDLE }}:${{ env.TAG }}
-
-      - name: Get bundle image digest
-        id: bundle-image
-        run: |
-          docker pull ${{ env.BUNDLE }}:${{ env.TAG }}
-          echo "::set-output name=digest::$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.BUNDLE }}:${{ env.TAG }})"
-
-      - name: Publish Catalog Index
+      - name: Install yq
         env:
-          OPM_DOWNLOAD_URL: https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable-4.6
-          OPM_TAR: opm-linux.tar.gz
+          VERSION: v4.14.2
+          BINARY: yq_linux_amd64
         run: |
-          wget "${OPM_DOWNLOAD_URL}/${OPM_TAR}"
-          tar xvf "${OPM_TAR}"
-          ./opm index add --build-tool docker --bundles "${{steps.bundle-image.outputs.digest}}" --tag "${INDEX}:${TAG}"
-          docker push "${INDEX}:${TAG}"
+          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY} -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Login to Quay.io
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ secrets.REGISTRY || 'quay.io' }}
+          username: ${{ secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - id: build-and-publish
+        run: ./hack/build.sh
 
       - name: Notify slack
         if: ${{ contains(github.ref, 'redhat-') && always() }}

@@ -39,6 +39,17 @@ export OG_PATH=${OG_PATH:-'./bundle/quay-operator.operatorgroup.yaml'}
 export SUBSCRIPTION_PATH=${SUBSCRIPTION_PATH:-'./bundle/quay-operator.subscription.yaml'}
 export OPERATOR_PKG_NAME=${OPERATOR_PKG_NAME:-'quay-operator-test'}
 
+function cleanup {
+	# shellcheck disable=SC2046
+	if [ -x $(command -v git >/dev/null 2>&1) ]; then
+		git checkout "${CATALOG_PATH}" >/dev/null 2>&1
+		git checkout "${SUBSCRIPTION_PATH}" >/dev/null 2>&1
+		git checkout "${OG_PATH}" >/dev/null 2>&1
+	fi
+}
+
+trap cleanup EXIT
+
 info 'calculating catalog index image digest'
 
 docker pull "${CATALOG_IMAGE}"
@@ -83,10 +94,3 @@ for n in {1..60}; do
 	info 'CSV successfully installed'
 	break
 done
-
-# shellcheck disable=SC2046
-if [ -x $(command -v git >/dev/null 2>&1) ]; then
-	git checkout "${CATALOG_PATH}" >/dev/null 2>&1
-	git checkout "${SUBSCRIPTION_PATH}" >/dev/null 2>&1
-	git checkout "${OG_PATH}" >/dev/null 2>&1
-fi
