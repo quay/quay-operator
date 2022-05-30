@@ -11,8 +11,6 @@ on:
         options:
         - redhat-3.6
         - redhat-3.7
-  schedule:
-    - cron: '30 3 * * *' # run before e2e-nightly to ensure a fresh operator build
   push:
     # NOTE: if you trigger this on your branch, ensure its name follows the redhat-X.Y format!
     branches:

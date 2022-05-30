@@ -1,0 +1,66 @@
+---
+name: Build and Publish Images (scheduled)
+on:
+  schedule:
+    - cron: '0 3 * * *' # run before e2e-nightly to ensure a fresh operator build
+
+jobs:
+  trigger-3.6-build:
+    name: "Build and publish 3.6"
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: redhat-3.6
+    steps:
+    - uses: convictional/trigger-workflow-and-wait@v1.3.0
+      with:
+        owner: ${{ github.repository_owner }}
+        repo: 'quay-operator'
+        # see https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        workflow_file_name: build-and-publish.yaml
+        ref: ${{ env.BRANCH }}
+        wait_interval: 30
+        inputs: |
+          {
+            "branch": "${{ env.BRANCH }}"
+          }
+
+  trigger-3.7-build:
+    name: "Build and publish 3.7"
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: redhat-3.7
+    steps:
+    - uses: convictional/trigger-workflow-and-wait@v1.3.0
+      with:
+        owner: ${{ github.repository_owner }}
+        repo: 'quay-operator'
+        # see https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        workflow_file_name: build-and-publish.yaml
+        ref: ${{ env.BRANCH }}
+        wait_interval: 30
+        inputs: |
+          {
+            "branch": "${{ env.BRANCH }}"
+          }
+
+  trigger-3.8-build:
+    name: "Build and publish 3.8"
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: redhat-3.8
+    steps:
+    - uses: convictional/trigger-workflow-and-wait@v1.3.0
+      with:
+        owner: ${{ github.repository_owner }}
+        repo: 'quay-operator'
+        # see https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        workflow_file_name: build-and-publish.yaml
+        ref: ${{ env.BRANCH }}
+        wait_interval: 30
+        inputs: |
+          {
+            "branch": "${{ env.BRANCH }}"
+          }
