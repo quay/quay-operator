@@ -5,7 +5,7 @@ on:
     - cron: '0 3 * * *' # run before e2e-nightly to ensure a fresh operator build
 
 jobs:
-  trigger-3.6-build:
+  trigger-36-build:
     name: "Build and publish 3.6"
     runs-on: ubuntu-latest
     env:
@@ -25,7 +25,7 @@ jobs:
             "branch": "${{ env.BRANCH }}"
           }
 
-  trigger-3.7-build:
+  trigger-37-build:
     name: "Build and publish 3.7"
     runs-on: ubuntu-latest
     env:
@@ -45,7 +45,7 @@ jobs:
             "branch": "${{ env.BRANCH }}"
           }
 
-  trigger-3.8-build:
+  trigger-38-build:
     name: "Build and publish 3.8"
     runs-on: ubuntu-latest
     env:
