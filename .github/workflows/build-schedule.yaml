@@ -16,7 +16,7 @@ jobs:
         owner: ${{ github.repository_owner }}
         repo: 'quay-operator'
         # see https://docs.github.com/en/actions/security-guides/automatic-token-authentication
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.PAT }}
         workflow_file_name: build-and-publish.yaml
         ref: ${{ env.BRANCH }}
         wait_interval: 30
@@ -36,7 +36,7 @@ jobs:
         owner: ${{ github.repository_owner }}
         repo: 'quay-operator'
         # see https://docs.github.com/en/actions/security-guides/automatic-token-authentication
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.PAT }}
         workflow_file_name: build-and-publish.yaml
         ref: ${{ env.BRANCH }}
         wait_interval: 30
@@ -56,7 +56,7 @@ jobs:
         owner: ${{ github.repository_owner }}
         repo: 'quay-operator'
         # see https://docs.github.com/en/actions/security-guides/automatic-token-authentication
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.PAT }}
         workflow_file_name: build-and-publish.yaml
         ref: ${{ env.BRANCH }}
         wait_interval: 30
