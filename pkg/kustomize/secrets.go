@@ -384,12 +384,22 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 
 // clairConfigFor returns a Clair v4 config with the correct values.
 func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey string, configFiles map[string][]byte) ([]byte, error) {
+	// the default number for the clair's database connections pool is arbitralily defined to
+	// 10 when the HPA component is unmanaged. If HPA is managed we have more control over the
+	// max number running clair pods so we increase it to the magic number of 33. This number
+	// comes from the fact that the postgres database pod has a max of 1000 connections and
+	// if the HPA is defined to spawn at max 10 pods (each pod with an indexer, a matcher and
+	// a notifier).
+	poolsize := 10
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentHPA) {
+		poolsize = 33
+	}
 
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
 	dbname := "postgres"
 	user := "postgres"
 	password := "postgres"
-	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable", host, dbname, user, password)
+	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable pool_max_conns=%d", host, dbname, user, password, poolsize)
 
 	psk, err := base64.StdEncoding.DecodeString(preSharedKey)
 	if err != nil {
@@ -406,9 +416,8 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 			"migrations":             true,
 		},
 		"matcher": map[string]interface{}{
-			"connstring":    dbConn,
-			"max_conn_pool": 100,
-			"migrations":    true,
+			"connstring": dbConn,
+			"migrations": true,
 		},
 		"notifier": map[string]interface{}{
 			"connstring":        dbConn,
