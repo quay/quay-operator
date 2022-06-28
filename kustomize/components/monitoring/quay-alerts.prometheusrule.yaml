@@ -17,7 +17,7 @@ spec:
           labels:
             severity: warning
           annotations:
-            description: Pod {{`{{$labels.namespace}}`}}/{{`{{$labels.pod}}`}} was restarted {{`{{$value}}`}}
+            description: Pod {{$labels.namespace}}/{{$labels.pod}} was restarted {{$value}}
               times within the last hour
             message: Quay Pod is restarting frequently
             severity_level: warning
