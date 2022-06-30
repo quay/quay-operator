@@ -18,6 +18,19 @@ spec:
         quay-component: quay-mirror
     spec:
       serviceAccountName: quay-app
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            quay-component: quay-mirror
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            quay-component: quay-mirror
       volumes:
         - name: config
           projected:
