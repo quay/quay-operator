@@ -133,6 +133,35 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 			}
 		}
 
+		if olabels := v1.GetLabelsOverrideForComponent(quay, kind); olabels != nil {
+			if dep.Labels == nil {
+				dep.Labels = map[string]string{}
+			}
+			if dep.Spec.Template.Labels == nil {
+				dep.Spec.Template.Labels = map[string]string{}
+			}
+			for key, value := range olabels {
+				if v1.ExceptionLabel(key) {
+					continue
+				}
+				dep.Labels[key] = value
+				dep.Spec.Template.Labels[key] = value
+			}
+		}
+
+		if oannot := v1.GetAnnotationsOverrideForComponent(quay, kind); oannot != nil {
+			if dep.Annotations == nil {
+				dep.Annotations = map[string]string{}
+			}
+			if dep.Spec.Template.Annotations == nil {
+				dep.Spec.Template.Annotations = map[string]string{}
+			}
+			for key, value := range oannot {
+				dep.Annotations[key] = value
+				dep.Spec.Template.Annotations[key] = value
+			}
+		}
+
 		// TODO we must not set annotations in objects where they are not needed. we also
 		// must stop mangling objects in this "middleware" thingy, what is the point of
 		// using kustomize if we keep changing stuff on the fly ?

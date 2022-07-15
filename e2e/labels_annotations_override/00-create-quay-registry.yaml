@@ -1,0 +1,70 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: skynet
+spec:
+  components:
+  - kind: quay
+    managed: true
+    overrides:
+      annotations:
+        a1: TESTING
+        a2: TESTING
+      labels:
+        l1: TESTING
+        l2: TESTING
+  - kind: postgres
+    managed: true
+    overrides:
+      annotations:
+        a1: TESTING
+        a2: TESTING
+      labels:
+        l1: TESTING
+        l2: TESTING
+  - kind: clair
+    managed: true
+    overrides:
+      annotations:
+        a1: TESTING
+        a2: TESTING
+      labels:
+        l1: TESTING
+        l2: TESTING
+  - kind: redis
+    managed: true
+    overrides:
+      annotations:
+        a1: TESTING
+        a2: TESTING
+      labels:
+        l1: TESTING
+        l2: TESTING
+  - kind: horizontalpodautoscaler
+    managed: true
+  - kind: objectstorage
+    managed: true
+  - kind: route
+    managed: true
+  - kind: mirror
+    managed: true
+    overrides:
+      annotations:
+        a1: TESTING
+        a2: TESTING
+      labels:
+        l1: TESTING
+        l2: TESTING
+  - kind: monitoring
+    managed: true
+  - kind: tls
+    managed: true
+  - kind: clairpostgres
+    managed: true
+    overrides:
+      annotations:
+        a1: TESTING
+        a2: TESTING
+      labels:
+        l1: TESTING
+        l2: TESTING
