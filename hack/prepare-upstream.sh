@@ -1,5 +1,5 @@
 sed -i "s/createdAt:.*/createdAt: `date -u +'%Y-%m-%d %k:%m UTC'`/" bundle/manifests/quay-operator.clusterserviceversion.yaml
-sed -i "s/olm\.skipRange:.*/olm\.skipRange: \">=3.3.x <${RELEASE}\"/" bundle/manifests/quay-operator.clusterserviceversion.yaml
+sed -i "s/olm\.skipRange:.*/olm\.skipRange: \">=3.6.x <${RELEASE}\"/" bundle/manifests/quay-operator.clusterserviceversion.yaml
 sed -i "s/quay-version:.*/quay-version: ${RELEASE}/" bundle/manifests/quay-operator.clusterserviceversion.yaml
 sed -i "s/containerImage:.*/containerImage: quay.io\/projectquay\/quay-operator:v${RELEASE}/" bundle/manifests/quay-operator.clusterserviceversion.yaml
 sed -i "s/^  name: quay-operator.*/  name: quay-operator.v${RELEASE}/" bundle/manifests/quay-operator.clusterserviceversion.yaml
