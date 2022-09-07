@@ -185,7 +185,7 @@ const (
 
 // Condition is a single condition of a QuayRegistry.
 // Conditions should follow the "abnormal-true" principle in order to only bring the attention of users to "broken" states.
-// Example: a condition of `type: "Ready", status: "True"`` is less useful and should be omitted whereas `type: "NotReady", status: "True"`
+// Example: a condition of `type: "Ready", status: "True"“ is less useful and should be omitted whereas `type: "NotReady", status: "True"`
 // is more useful when trying to monitor when something is wrong.
 type Condition struct {
 	Type               ConditionType          `json:"type,omitempty"`
