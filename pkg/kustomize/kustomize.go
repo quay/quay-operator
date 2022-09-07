@@ -3,7 +3,7 @@ package kustomize
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+
 	"os"
 	"path/filepath"
 	"runtime"
@@ -203,7 +203,7 @@ func generate(
 				return nil
 			}
 
-			f, err := ioutil.ReadFile(path)
+			f, err := os.ReadFile(path)
 			if err != nil {
 				return err
 			}
