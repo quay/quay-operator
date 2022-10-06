@@ -33,9 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	quay "github.com/quay/quay-operator/apis/quay/v1"
-	redhatcop "github.com/quay/quay-operator/apis/redhatcop/v1alpha1"
 	quaycontroller "github.com/quay/quay-operator/controllers/quay"
-	redhatcopcontroller "github.com/quay/quay-operator/controllers/redhatcop"
 	"github.com/quay/quay-operator/pkg/configure"
 	// +kubebuilder:scaffold:imports
 )
@@ -53,7 +51,6 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	_ = quay.AddToScheme(scheme)
-	_ = redhatcop.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -111,15 +108,6 @@ func main() {
 		Mtx:    &mtx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistryStatus")
-		os.Exit(1)
-	}
-
-	if err = (&redhatcopcontroller.QuayEcosystemReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("QuayEcosystem"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "QuayEcosystem")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

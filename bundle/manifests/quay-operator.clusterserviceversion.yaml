@@ -36,8 +36,6 @@ metadata:
           }
         }
       ]
-    operators.operatorframework.io/internal-objects: |-
-      ["quayecosystems.redhatcop.redhat.io"]
     operators.openshift.io/infrastructure-features: '["disconnected", "proxy-aware", "fips"]'
   name: quay-operator.v3.6.1
   namespace: placeholder
@@ -106,11 +104,6 @@ spec:
           description: Externally accessible URL for the config editor UI.
           x-descriptors:
             - 'urn:alm:descriptor:org.w3:link'
-    - kind: QuayEcosystem
-      version: v1alpha1
-      name: quayecosystems.redhatcop.redhat.io
-      displayName: Quay Ecosystem
-      description: "[DEPRECATED] Old representation of a full Quay installation."
   description: Opinionated deployment of Quay on Kubernetes.
   displayName: Quay
   install:
@@ -173,13 +166,6 @@ spec:
           resources:
           - quayregistries
           - quayregistries/status
-          verbs:
-          - '*'
-        - apiGroups:
-          - redhatcop.redhat.io
-          resources:
-          - quayecosystems
-          - quayecosystems/status
           verbs:
           - '*'
         - apiGroups:
