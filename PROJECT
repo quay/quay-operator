@@ -5,7 +5,4 @@ resources:
 - group: quay.redhat.com
   kind: QuayRegistry
   version: v1
-- group: redhatcop.redhat.io
-  kind: QuayEcosystem
-  version: v1alpha1
 version: "2"
