@@ -1,17 +1,21 @@
 package controllers
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"encoding/pem"
 	"fmt"
 	"strings"
 	"time"
 
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
-	routev1 "github.com/openshift/api/route/v1"
+
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
+	routev1 "github.com/openshift/api/route/v1"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
+	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
+	"github.com/quay/quay-operator/pkg/kustomize"
+
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,11 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
-	v1 "github.com/quay/quay-operator/apis/quay/v1"
-	quaycontext "github.com/quay/quay-operator/pkg/context"
-	"github.com/quay/quay-operator/pkg/kustomize"
 )
 
 const (
@@ -41,11 +40,47 @@ const (
 	securityScannerV4PSK = "SECURITY_SCANNER_V4_PSK"
 )
 
-// checkDeprecatedManagedKeys populates the provided quay context with information we
+// setTLSContext verifies if provided bundle contains entries for ssl key and cert,
+// populate the data in provided QuayRegistryContext if found.
+func (r *QuayRegistryReconciler) setTLSContext(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, bundle *corev1.Secret,
+) error {
+	providedTLSCert := bundle.Data["ssl.cert"]
+	providedTLSKey := bundle.Data["ssl.key"]
+
+	if len(providedTLSCert) == 0 || len(providedTLSKey) == 0 {
+		r.Log.Info("TLS cert/key pair not provided, using default cluster wildcard cert")
+		return nil
+	}
+
+	r.Log.Info("provided TLS cert/key pair in `configBundleSecret` will be used")
+	qctx.TLSCert = providedTLSCert
+	qctx.TLSKey = providedTLSKey
+	return nil
+}
+
+// setBuildManagerContext verifies if the config bundle contains an entry pointing to the
+// buildman host. If it contains then sets it properly in the provided QuayRegistryContext
+func (r *QuayRegistryReconciler) setBuildManagerContext(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, bundle *corev1.Secret,
+) error {
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(bundle.Data["config.yaml"], &config); err != nil {
+		return err
+	}
+
+	if buildManagerHostname, ok := config["BUILDMAN_HOSTNAME"]; ok {
+		qctx.BuildManagerHostname = buildManagerHostname.(string)
+	}
+
+	return nil
+}
+
+// setDeprecatedManagedKeysContext populates the provided quay context with information we
 // persist between Reconcile calls. This function uses the old secret (<=3.6.4) and not
 // the new one (>=3.7.0).
-func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
-	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+func (r *QuayRegistryReconciler) setDeprecatedManagedKeysContext(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, bundle *corev1.Secret,
 ) error {
 	listOptions := &client.ListOptions{
 		Namespace: quay.GetNamespace(),
@@ -78,11 +113,11 @@ func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 	return nil
 }
 
-// checkManagedKeys populates the provided QuayRegistryContext with the information we
+// setManagedKeysContext populates the provided QuayRegistryContext with the information we
 // persist in between Reconcile calls. The information kept from one Reconcile loop to
 // the next is stored in a secret.
-func (r *QuayRegistryReconciler) checkManagedKeys(
-	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+func (r *QuayRegistryReconciler) setManagedKeysContext(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, bundle *corev1.Secret,
 ) error {
 
 	nsn := types.NamespacedName{
@@ -93,7 +128,7 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	var secret corev1.Secret
 	if err := r.Get(ctx, nsn, &secret); err != nil {
 		if errors.IsNotFound(err) {
-			return r.checkDeprecatedManagedKeys(ctx, qctx, quay)
+			return r.setDeprecatedManagedKeysContext(ctx, qctx, quay, bundle)
 		}
 		return err
 	}
@@ -107,33 +142,12 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	return nil
 }
 
-// checkManagedTLS verifies if provided bundle contains entries for ssl key and cert,
-// populate the data in provided QuayRegistryContext if found.
-func (r *QuayRegistryReconciler) checkManagedTLS(
-	qctx *quaycontext.QuayRegistryContext, bundle *corev1.Secret,
-) {
-	providedTLSCert := bundle.Data["ssl.cert"]
-	providedTLSKey := bundle.Data["ssl.key"]
-
-	if len(providedTLSCert) == 0 || len(providedTLSKey) == 0 {
-		r.Log.Info("TLS cert/key pair not provided, using default cluster wildcard cert")
-		return
-	}
-
-	r.Log.Info("provided TLS cert/key pair in `configBundleSecret` will be used")
-	qctx.TLSCert = providedTLSCert
-	qctx.TLSKey = providedTLSKey
-}
-
-// checkRoutesAvailable checks if the cluster supports Route objects. // XXX here
+// setRouteContext checks if the cluster supports Route objects. // XXX here
 // be dragons. This functions attempts to create a fake route and then read the
 // certificate used on it, this should be refactored. This is as wrong as it can
 // get.
-func (r *QuayRegistryReconciler) checkRoutesAvailable(
-	ctx context.Context,
-	qctx *quaycontext.QuayRegistryContext,
-	quay *v1.QuayRegistry,
-	bundle *corev1.Secret,
+func (r *QuayRegistryReconciler) setRouteContext(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, bundle *corev1.Secret,
 ) error {
 	// NOTE: The `route` component is unique because we allow users to set the
 	// `SERVER_HOSTNAME` field instead of controlling the entire fieldgroup. This
@@ -227,8 +241,48 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 	return r.Client.Delete(ctx, &rt)
 }
 
-func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
-	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+// Validates if the monitoring component can be run. We assume that we are
+// running in an Openshift environment with cluster monitoring enabled for our
+// monitoring component to work
+func (r *QuayRegistryReconciler) setMonitoringContext(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, bundle *corev1.Secret,
+) error {
+	if len(r.WatchNamespace) > 0 {
+		msg := "Monitoring is only supported in AllNamespaces mode. Disabling."
+		r.Log.Info(msg)
+		return fmt.Errorf(msg)
+	}
+
+	var serviceMonitors prometheusv1.ServiceMonitorList
+	if err := r.Client.List(ctx, &serviceMonitors); err != nil {
+		r.Log.Info("Unable to find ServiceMonitor CRD. Monitoring component disabled")
+		return err
+	}
+	r.Log.Info("cluster supports `ServiceMonitor` API")
+
+	var prometheusRules prometheusv1.PrometheusRuleList
+	if err := r.Client.List(ctx, &prometheusRules); err != nil {
+		r.Log.Info("Unable to find PrometheusRule CRD. Monitoring component disabled")
+		return err
+	}
+	r.Log.Info("cluster supports `PrometheusRules` API")
+
+	namespaceKey := types.NamespacedName{
+		Name: grafanaDashboardConfigNamespace,
+	}
+
+	var grafanaDashboardNamespace corev1.Namespace
+	if err := r.Client.Get(ctx, namespaceKey, &grafanaDashboardNamespace); err != nil {
+		return fmt.Errorf("unable to get grafana namespace: %s", err)
+	}
+
+	r.Log.Info(grafanaDashboardConfigNamespace + " found")
+	qctx.SupportsMonitoring = true
+	return nil
+}
+
+func (r *QuayRegistryReconciler) setObjectStorageContext(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, bundle *corev1.Secret,
 ) error {
 	dstorensn := types.NamespacedName{
 		Name:      fmt.Sprintf("%s-quay-datastore", quay.GetName()),
@@ -280,106 +334,4 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 
 	r.Log.Info("`ObjectBucketClaim` not found")
 	return nil
-}
-
-// checkBuildManagerAvailable verifies if the config bundle contains an entry pointing to the
-// buildman host. If it contains then sets it properly in the provided QuayRegistryContext
-func (r *QuayRegistryReconciler) checkBuildManagerAvailable(
-	qctx *quaycontext.QuayRegistryContext, bundle *corev1.Secret,
-) error {
-	var config map[string]interface{}
-	if err := yaml.Unmarshal(bundle.Data["config.yaml"], &config); err != nil {
-		return err
-	}
-
-	if buildManagerHostname, ok := config["BUILDMAN_HOSTNAME"]; ok {
-		qctx.BuildManagerHostname = buildManagerHostname.(string)
-	}
-
-	return nil
-}
-
-// Validates if the monitoring component can be run. We assume that we are
-// running in an Openshift environment with cluster monitoring enabled for our
-// monitoring component to work
-func (r *QuayRegistryReconciler) checkMonitoringAvailable(
-	ctx context.Context, qctx *quaycontext.QuayRegistryContext,
-) error {
-	if len(r.WatchNamespace) > 0 {
-		msg := "Monitoring is only supported in AllNamespaces mode. Disabling."
-		r.Log.Info(msg)
-		return fmt.Errorf(msg)
-	}
-
-	var serviceMonitors prometheusv1.ServiceMonitorList
-	if err := r.Client.List(ctx, &serviceMonitors); err != nil {
-		r.Log.Info("Unable to find ServiceMonitor CRD. Monitoring component disabled")
-		return err
-	}
-	r.Log.Info("cluster supports `ServiceMonitor` API")
-
-	var prometheusRules prometheusv1.PrometheusRuleList
-	if err := r.Client.List(ctx, &prometheusRules); err != nil {
-		r.Log.Info("Unable to find PrometheusRule CRD. Monitoring component disabled")
-		return err
-	}
-	r.Log.Info("cluster supports `PrometheusRules` API")
-
-	namespaceKey := types.NamespacedName{
-		Name: grafanaDashboardConfigNamespace,
-	}
-
-	var grafanaDashboardNamespace corev1.Namespace
-	if err := r.Client.Get(ctx, namespaceKey, &grafanaDashboardNamespace); err != nil {
-		return fmt.Errorf("unable to get grafana namespace: %s", err)
-	}
-
-	r.Log.Info(grafanaDashboardConfigNamespace + " found")
-	qctx.SupportsMonitoring = true
-	return nil
-}
-
-// configEditorCredentialsSecretFrom returns the name of the secret that contains the
-// credentials for the config editor. If the secret does not exist among the provided
-// list an empty string is returned instead.
-func configEditorCredentialsSecretFrom(objs []client.Object) string {
-	for _, obj := range objs {
-		if !strings.Contains(obj.GetName(), "quay-config-editor-credentials") {
-			continue
-		}
-
-		gvk := obj.GetObjectKind().GroupVersionKind()
-		if gvk.Version != "v1" {
-			continue
-		}
-		if gvk.Kind != "Secret" {
-			continue
-		}
-
-		return obj.GetName()
-	}
-	return ""
-}
-
-// Taken from https://stackoverflow.com/questions/46735347/how-can-i-fetch-a-certificate-from-a-url
-func getCertificatesPEM(address string) ([]byte, error) {
-	conn, err := tls.Dial("tcp", address, &tls.Config{
-		InsecureSkipVerify: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-	var b bytes.Buffer
-	for _, cert := range conn.ConnectionState().PeerCertificates {
-		err := pem.Encode(&b, &pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: cert.Raw,
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return b.Bytes(), nil
 }

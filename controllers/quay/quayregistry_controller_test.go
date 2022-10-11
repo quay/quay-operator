@@ -674,7 +674,7 @@ func Test_hasNecessaryConfig(t *testing.T) {
 			quay: quayWithUnmanagedComponents(v1.ComponentClairPostgres),
 		},
 		{
-			name:   "managed clair with unmanaged clairpostgres without	 config",
+			name: "managed clair with unmanaged clairpostgres without	 config",
 			experr: true,
 			cfg:    map[string][]byte{},
 			quay:   quayWithUnmanagedComponents(v1.ComponentClairPostgres),
@@ -682,7 +682,7 @@ func Test_hasNecessaryConfig(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			reconciler := QuayRegistryReconciler{}
-			err := reconciler.hasNecessaryConfig(tt.quay, tt.cfg)
+			err := reconciler.validateHasNecessaryConfig(tt.quay, tt.cfg)
 			if err != nil {
 				if tt.experr {
 					return
