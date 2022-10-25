@@ -219,11 +219,19 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 		return pvc, nil
 	}
 
-	if job, ok := obj.(*batchv1.Job); ok && skipres {
+	if job, ok := obj.(*batchv1.Job); ok {
+		for _, oenv := range v1.GetEnvOverrideForComponent(quay, v1.ComponentQuay) {
+			for i := range job.Spec.Template.Spec.Containers {
+				ref := &job.Spec.Template.Spec.Containers[i]
+				UpsertContainerEnv(ref, oenv)
+			}
+		}
 		// if we are deploying without resource requests we have to remove them
-		var noresources corev1.ResourceRequirements
-		for i := range job.Spec.Template.Spec.Containers {
-			job.Spec.Template.Spec.Containers[i].Resources = noresources
+		if skipres {
+			var noresources corev1.ResourceRequirements
+			for i := range job.Spec.Template.Spec.Containers {
+				job.Spec.Template.Spec.Containers[i].Resources = noresources
+			}
 		}
 	}
 
