@@ -7,7 +7,10 @@ metadata:
     categories: Integration & Delivery
     containerImage: registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-quay-operator-container:v3.4.0
     createdAt: 2021-01-05 16:01 UTC
-    description: Opinionated deployment of Red Hat Quay on Kubernetes.
+    description: |-
+      WARNING: This version of Quay has been deprecated. If you are installed on this version, please upgrade to a supported version.
+      Support for Quay extends only to thee last three y-stream releases. 
+      Opinionated deployment of Red Hat Quay on Kubernetes.
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
     alm-examples: |-
