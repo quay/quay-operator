@@ -29,8 +29,10 @@ type QuayRegistryContext struct {
 	SecretKey         string
 
 	// Database
-	DbUri    string
-	DbRootPw string
+	DbUri               string
+	DbRootPw            string
+	NeedsPgUpgrade      bool
+	NeedsClairPgUpgrade bool
 
 	// Config editor
 	ConfigEditorPw string

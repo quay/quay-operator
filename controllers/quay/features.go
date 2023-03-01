@@ -13,6 +13,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"gopkg.in/yaml.v2"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -337,6 +338,62 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 	r.Log.Info(grafanaDashboardConfigNamespace + " found")
 	qctx.SupportsMonitoring = true
 	return nil
+}
+
+// checkPostgresVersion returns the image name used by the currently deployed postgres version
+func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, component v1.ComponentKind,
+) error {
+	var deploymentName string
+	if component == v1.ComponentClairPostgres {
+		deploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres")
+	} else if component == v1.ComponentPostgres {
+		deploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database")
+	} else {
+		return fmt.Errorf("invalid component kind: %s", component)
+	}
+	r.Log.Info(fmt.Sprintf("getting %s version", component))
+
+	postgresDeployment := &appsv1.Deployment{}
+	if err := r.Client.Get(
+		ctx,
+		types.NamespacedName{
+			Name:      deploymentName,
+			Namespace: quay.GetNamespace(),
+		},
+		postgresDeployment,
+	); err != nil {
+		r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", component))
+		return nil
+	}
+
+	r.Log.Info(fmt.Sprintf("%s deployment found", component), "image", postgresDeployment.Spec.Template.Spec.Containers[0].Image)
+	deployedImageName := postgresDeployment.Spec.Template.Spec.Containers[0].Image
+	expectedImage, err := kustomize.ComponentImageFor(v1.ComponentPostgres)
+	if err != nil {
+		r.Log.Error(err, "failed to get postgres image")
+	}
+
+	var expectedName string
+	if expectedImage.NewName != "" {
+		expectedName = expectedImage.NewName
+	} else {
+		expectedName = expectedImage.Name
+	}
+	if strings.Split(deployedImageName, "@")[0] != expectedName {
+		if component == v1.ComponentClairPostgres {
+			r.Log.Info("clair-postgres needs to perform an upgrade, marking in context")
+			qctx.NeedsClairPgUpgrade = true
+		} else if component == v1.ComponentPostgres {
+			r.Log.Info("postgres needs to perform an upgrade, marking in context")
+			qctx.NeedsPgUpgrade = true
+		}
+	} else {
+		r.Log.Info(fmt.Sprintf("%s does not need to perform an upgrade", component))
+	}
+
+	return nil
+
 }
 
 // configEditorCredentialsSecretFrom returns the name of the secret that contains the

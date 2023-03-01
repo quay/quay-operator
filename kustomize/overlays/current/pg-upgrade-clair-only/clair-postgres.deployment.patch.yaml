@@ -1,0 +1,6 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clair-postgres
+spec:
+  replicas: 0

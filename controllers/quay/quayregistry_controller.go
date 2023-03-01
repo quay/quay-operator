@@ -200,6 +200,90 @@ func (r *QuayRegistryReconciler) checkMigrationStatus(
 	return r.Requeue, nil
 }
 
+// checkPostgresUpgradeStatus checks the postgres upgrade job status for a given QuayRegistry instance.
+// This function verifies if the job ran successfully and sets its condition properly. The
+// result of this function is always a ctrl.Result with a proper reschedule value. Once
+// postgres upgrade job has been finished this function sets quay.Status.CurrentVersion to the
+// value of v1.QuayVersionCurrent, indicating that we have migrated to the current version.
+func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
+	ctx context.Context, quay *v1.QuayRegistry, log logr.Logger,
+) (ctrl.Result, error) {
+	log.Info("checking postgres upgrade `Job` completion")
+
+	postgresUpgradeJobName := fmt.Sprintf("%s-%s", quay.GetName(), v1.PostgresUpgradeJobName)
+	clairPostgresUpgradeJobName := fmt.Sprintf("%s-%s", quay.GetName(), v1.ClairPostgresUpgradeJobName)
+
+	jobs := []string{postgresUpgradeJobName, clairPostgresUpgradeJobName}
+
+	for _, jobName := range jobs {
+		nsn := types.NamespacedName{
+			Name:      jobName,
+			Namespace: quay.GetNamespace(),
+		}
+
+		var job batchv1.Job
+		if err := r.Client.Get(ctx, nsn, &job); err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+
+			log.Error(err, "could not retrieve postgres upgrade `Job`")
+			return r.Requeue, nil
+		}
+
+		if job.Status.Active == 1 {
+			log.Info(fmt.Sprintf("%s running, requeueing reconcile...", jobName))
+			return r.Requeue, nil
+		}
+
+		if job.Status.Succeeded == 1 {
+			log.Info(fmt.Sprintf("%s upgrade complete", jobName))
+			continue
+		}
+
+		log.Info("upgrade job failed or crashed.", "upgrade-job-status", job.Status)
+		msg := "failed to run postgres upgrade"
+		for _, cond := range job.Status.Conditions {
+			if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+				msg = cond.Message
+				break
+			}
+		}
+
+		if err := r.updateWithCondition(
+			ctx,
+			quay,
+			v1.ConditionComponentsCreated,
+			metav1.ConditionFalse,
+			v1.ConditionReasonPostgresUpgradeFailed,
+			msg,
+		); err != nil {
+			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+		}
+
+		return r.Requeue, nil
+	}
+
+	condition := v1.Condition{
+		Type:               v1.ConditionComponentsCreated,
+		Status:             metav1.ConditionTrue,
+		Reason:             v1.ConditionReasonComponentsCreationSuccess,
+		Message:            "All registry components created",
+		LastUpdateTime:     metav1.Now(),
+		LastTransitionTime: metav1.Now(),
+	}
+	quay.Status.Conditions = v1.SetCondition(quay.Status.Conditions, condition)
+
+	if err := r.Client.Status().Update(ctx, quay); err != nil {
+		log.Error(err, "could not update status with current version")
+		return r.Requeue, nil
+	}
+
+	log.Info("successfully updated `status` after Quay upgrade")
+	return r.Requeue, nil
+
+}
+
 // createInitialBundleSecret creates a new config bundle secret for provided QuayRegistry
 // object, the created bundle contains a default quay config and is then populated as
 // ConfigBundleSecret. QuayRegistry is updated and a reschedule Result is returned.
@@ -289,6 +373,10 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.manageQuayDeletion(ctx, updatedQuay, log)
 	}
 
+	if v1.PostgresUpgradeRunning(updatedQuay) {
+		return r.checkPostgresUpgradeStatus(ctx, updatedQuay, log)
+	}
+
 	if v1.MigrationsRunning(updatedQuay) {
 		return r.checkMigrationStatus(ctx, updatedQuay, log)
 	}
@@ -346,6 +434,36 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			v1.ConditionReasonObjectStorageComponentDependencyError,
 			fmt.Sprintf("error checking for object storage support: %s", err),
 		)
+	}
+
+	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
+	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentPostgres) {
+		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
+		if err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonPostgresUpgradeFailed,
+				fmt.Sprintf("error checking for pg upgrade: %s", err),
+			)
+		}
+	}
+
+	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
+	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentClairPostgres) {
+		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
+		if err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonPostgresUpgradeFailed,
+				fmt.Sprintf("error checking for pg upgrade: %s", err),
+			)
+		}
 	}
 
 	if err := r.checkBuildManagerAvailable(quayContext, cbundle); err != nil {
@@ -526,6 +644,21 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "failed to update `registryEndpoint` of `QuayRegistry`")
 			return r.Requeue, nil
 		}
+	}
+
+	// if postgres needs to be updated, then we need to wait until the upgrade job
+	if quayContext.NeedsPgUpgrade || quayContext.NeedsClairPgUpgrade {
+		if err := r.updateWithCondition(
+			ctx,
+			updatedQuay,
+			v1.ConditionComponentsCreated,
+			metav1.ConditionFalse,
+			v1.ConditionReasonPostgresUpgradeInProgress,
+			"running postgres update operations",
+		); err != nil {
+			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+		}
+		return r.Requeue, nil
 	}
 
 	// if the version differ then it means that the operator was upgraded and we need
