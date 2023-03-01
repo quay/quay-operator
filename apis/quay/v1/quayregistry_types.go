@@ -105,9 +105,11 @@ var supportsAffinityOverride = []ComponentKind{
 }
 
 const (
-	ManagedKeysName         = "quay-registry-managed-secret-keys"
-	QuayConfigTLSSecretName = "quay-config-tls"
-	QuayUpgradeJobName      = "quay-app-upgrade"
+	ManagedKeysName             = "quay-registry-managed-secret-keys"
+	QuayConfigTLSSecretName     = "quay-config-tls"
+	QuayUpgradeJobName          = "quay-app-upgrade"
+	PostgresUpgradeJobName      = "quay-postgres-upgrade"
+	ClairPostgresUpgradeJobName = "clair-postgres-upgrade"
 )
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
@@ -166,13 +168,18 @@ type ConditionReason string
 // Below follow a list of all Reasons used while reporting QuayRegistry conditions through its
 // .status.conditions field.
 const (
-	ConditionReasonComponentNotReady                     ConditionReason = "ComponentNotReady"
-	ConditionReasonComponentReady                        ConditionReason = "ComponentReady"
-	ConditionReasonComponentUnmanaged                    ConditionReason = "ComponentNotManaged"
-	ConditionReasonHealthChecksPassing                   ConditionReason = "HealthChecksPassing"
-	ConditionReasonMigrationsInProgress                  ConditionReason = "MigrationsInProgress"
-	ConditionReasonMigrationsFailed                      ConditionReason = "MigrationsFailed"
-	ConditionReasonMigrationsJobMissing                  ConditionReason = "MigrationsJobMissing"
+	ConditionReasonComponentNotReady    ConditionReason = "ComponentNotReady"
+	ConditionReasonComponentReady       ConditionReason = "ComponentReady"
+	ConditionReasonComponentUnmanaged   ConditionReason = "ComponentNotManaged"
+	ConditionReasonHealthChecksPassing  ConditionReason = "HealthChecksPassing"
+	ConditionReasonMigrationsInProgress ConditionReason = "MigrationsInProgress"
+	ConditionReasonMigrationsFailed     ConditionReason = "MigrationsFailed"
+	ConditionReasonMigrationsJobMissing ConditionReason = "MigrationsJobMissing"
+
+	ConditionReasonPostgresUpgradeInProgress ConditionReason = "PostgresUpgradeInProgress"
+	ConditionReasonPostgresUpgradeFailed     ConditionReason = "PostgresUpgradeFailed"
+	ConditionReasonPostgresUpgradeJobMissing ConditionReason = "PostgresUpgradeJobMissing"
+
 	ConditionReasonComponentsCreationSuccess             ConditionReason = "ComponentsCreationSuccess"
 	ConditionReasonUpgradeUnsupported                    ConditionReason = "UpgradeUnsupported"
 	ConditionReasonComponentCreationFailed               ConditionReason = "ComponentCreationFailed"
@@ -286,6 +293,16 @@ func MigrationsRunning(quay *QuayRegistry) bool {
 		return false
 	}
 	return created.Reason == ConditionReasonMigrationsInProgress
+}
+
+// PostgresUpgradeRunning returns true if the status for provided QuayRegistry indicates that
+// the database upgrade is running.
+func PostgresUpgradeRunning(quay *QuayRegistry) bool {
+	created := GetCondition(quay.Status.Conditions, ConditionComponentsCreated)
+	if created == nil {
+		return false
+	}
+	return created.Reason == ConditionReasonPostgresUpgradeInProgress
 }
 
 // FlaggedForDeletion returns a boolean indicating if provided QuayRegistry object has

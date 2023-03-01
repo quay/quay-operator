@@ -155,7 +155,7 @@ spec:
                 - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
                   value: quay.io/projectquay/quay-builder-qemu:main
                 - name: RELATED_IMAGE_COMPONENT_POSTGRES
-                  value: centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33
+                  value: centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2
                 - name: RELATED_IMAGE_COMPONENT_REDIS
                   value: centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542
               serviceAccountName: quay-operator
