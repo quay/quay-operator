@@ -91,6 +91,33 @@ func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 	return imageOverride, nil
 }
 
+// ComponentImageFor checks for an environment variable indicating which component container image
+// to use. If set, returns a Kustomize image override for the given component.
+func postgresUpgradeImage() (types.Image, error) {
+	imageOverride := types.Image{
+		Name: "centos/postgresql-12-centos7",
+	}
+
+	image := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES_UPGRADE")
+	if image == "" {
+		return imageOverride, nil
+	}
+
+	if len(strings.Split(image, "@")) == 2 {
+		imageOverride.NewName = strings.Split(image, "@")[0]
+		imageOverride.Digest = strings.Split(image, "@")[1]
+	} else if len(strings.Split(image, ":")) == 2 {
+		imageOverride.NewName = strings.Split(image, ":")[0]
+		imageOverride.NewTag = strings.Split(image, ":")[1]
+	} else {
+		return types.Image{}, fmt.Errorf(
+			"image override must be reference by tag or digest: %s", image,
+		)
+	}
+
+	return imageOverride, nil
+}
+
 func kustomizeDir() string {
 	_, filename, _, _ := runtime.Caller(0)
 	path := filepath.Join(filepath.Dir(filename))
@@ -469,6 +496,14 @@ func KustomizationFor(
 		if image.NewName != "" || image.Digest != "" {
 			images = append(images, image)
 		}
+	}
+
+	if ctx.NeedsPgUpgrade || ctx.NeedsClairPgUpgrade {
+		pgImage, err := postgresUpgradeImage()
+		if err != nil {
+			return nil, err
+		}
+		images = append(images, pgImage)
 	}
 
 	return &types.Kustomization{

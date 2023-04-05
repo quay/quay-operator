@@ -67,7 +67,9 @@ digest "${REGISTRY}/${NAMESPACE}/clair:nightly" CLAIR_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:main" BUILDER_QEMU_DIGEST
 # shellcheck disable=SC2034
-POSTGRES_DIGEST='centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33'
+POSTGRES_DIGEST='centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2'
+# shellcheck disable=SC2034
+POSTGRES_UPGRADE_DIGEST='centos/postgresql-12-centos7@sha256:be8803d45d64870f8dfd018f3110af62e2e1558d64191faea461005e1bd03243'
 # shellcheck disable=SC2034
 REDIS_DIGEST='centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542'
 
@@ -96,6 +98,7 @@ yq eval -i '
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") .value = strenv(BUILDER_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_BUILDER_QEMU") .value = strenv(BUILDER_QEMU_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES") .value = strenv(POSTGRES_DIGEST) |
+	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES_UPGRADE") .value = strenv(POSTGRES_UPGRADE_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_REDIS") .value = strenv(REDIS_DIGEST)
 	' "${CSV_PATH}"
 

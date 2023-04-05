@@ -674,7 +674,7 @@ func Test_hasNecessaryConfig(t *testing.T) {
 			quay: quayWithUnmanagedComponents(v1.ComponentClairPostgres),
 		},
 		{
-			name:   "managed clair with unmanaged clairpostgres without	 config",
+			name:   "managed clair with unmanaged clairpostgres without config",
 			experr: true,
 			cfg:    map[string][]byte{},
 			quay:   quayWithUnmanagedComponents(v1.ComponentClairPostgres),
