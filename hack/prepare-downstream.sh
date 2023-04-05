@@ -22,7 +22,8 @@ sed -i "s|quay.io/projectquay/quay:|registry-proxy.engineering.redhat.com/rh-osb
 sed -i "s|quay.io/projectquay/clair:|registry-proxy.engineering.redhat.com/rh-osbs/quay-clair-rhel8:v|" bundle/manifests/quay-operator.clusterserviceversion.yaml
 sed -i "s|quay.io/projectquay/quay-builder:master|registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-rhel8:v${RELEASE}|" bundle/manifests/quay-operator.clusterserviceversion.yaml
 sed -i "s|quay.io/projectquay/quay-builder-qemu:main|registry-proxy.engineering.redhat.com/rh-osbs/quay-quay-builder-qemu-rhcos-rhel8:v${RELEASE}|" bundle/manifests/quay-operator.clusterserviceversion.yaml
-sed -i "s|centos/postgresql-10-centos7.*|registry.redhat.io/rhel8/postgresql-10:1|" bundle/manifests/quay-operator.clusterserviceversion.yaml
+sed -i "s|centos/postgresql-13-centos7.*|registry.redhat.io/rhel8/postgresql-13|" bundle/manifests/quay-operator.clusterserviceversion.yaml
+sed -i "s|centos/postgresql-12-centos7.*|registry.redhat.io/rhel8/postgresql-12|" bundle/manifests/quay-operator.clusterserviceversion.yaml
 sed -i "s|centos/redis-32-centos7.*|registry.redhat.io/rhel8/redis-5:1|" bundle/manifests/quay-operator.clusterserviceversion.yaml
 
 sed -i "s|- base64data: .*|- base64data: ${LOGO}|" bundle/manifests/quay-operator.clusterserviceversion.yaml

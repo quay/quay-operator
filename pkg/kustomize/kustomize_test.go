@@ -166,6 +166,43 @@ var kustomizationForTests = []struct {
 		},
 		"",
 	},
+	{
+		"ComponentImageOverridesPostgresUpgrade",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "redis", Managed: true},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{
+			NeedsPgUpgrade: true,
+		},
+		&types.Kustomization{
+			TypeMeta: types.TypeMeta{
+				APIVersion: types.KustomizationVersion,
+				Kind:       types.KustomizationKind,
+			},
+			Resources: []string{},
+			Components: []string{
+				"../components/clair",
+				"../components/redis",
+				"../components/postgres",
+				"../components/pgupgrade",
+			},
+			Images: []types.Image{
+				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
+				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
+				{Name: "centos/redis-32-centos7", NewName: "redis", NewTag: "buster"},
+				{Name: "centos/postgresql-13-centos7", NewName: "postgres", NewTag: "latest"},
+				{Name: "centos/postgresql-12-centos7", NewName: "postgres_upgrade", NewTag: "latest"},
+			},
+			SecretGenerator: []types.SecretArgs{},
+		},
+		"",
+	},
 }
 
 func TestKustomizationFor(t *testing.T) {
