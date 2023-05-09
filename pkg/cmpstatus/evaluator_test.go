@@ -7,7 +7,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	asv2b2 "k8s.io/api/autoscaling/v2beta2"
+	asv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -237,7 +237,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
 						OwnerReferences: []metav1.OwnerReference{
@@ -250,7 +250,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-mirror",
 						OwnerReferences: []metav1.OwnerReference{
@@ -263,7 +263,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-clair-app",
 						OwnerReferences: []metav1.OwnerReference{
@@ -570,7 +570,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
 						OwnerReferences: []metav1.OwnerReference{
@@ -583,7 +583,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-mirror",
 						OwnerReferences: []metav1.OwnerReference{
@@ -596,7 +596,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-clair-app",
 						OwnerReferences: []metav1.OwnerReference{
@@ -949,7 +949,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
 						OwnerReferences: []metav1.OwnerReference{
@@ -962,7 +962,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-mirror",
 						OwnerReferences: []metav1.OwnerReference{
@@ -975,7 +975,7 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-clair-app",
 						OwnerReferences: []metav1.OwnerReference{
@@ -1277,7 +1277,7 @@ func TestEvaluate(t *testing.T) {
 			if err := ocsv1a1.AddToScheme(scheme); err != nil {
 				t.Fatalf("unexpected error adding ocs to scheme: %s", err)
 			}
-			if err := asv2b2.AddToScheme(scheme); err != nil {
+			if err := asv2.AddToScheme(scheme); err != nil {
 				t.Fatalf("unexpected error adding hpa to scheme: %s", err)
 			}
 			if err := appsv1.AddToScheme(scheme); err != nil {

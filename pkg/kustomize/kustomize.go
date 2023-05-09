@@ -16,7 +16,7 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"golang.org/x/net/http/httpproxy"
 	apps "k8s.io/api/apps/v1"
-	autoscaling "k8s.io/api/autoscaling/v2beta2"
+	autoscaling "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -174,7 +174,7 @@ func ModelFor(gvk schema.GroupVersionKind) client.Object {
 		return &route.Route{}
 	case schema.GroupVersionKind{Group: "objectbucket.io", Version: "v1alpha1", Kind: "ObjectBucketClaim"}.String():
 		return &objectbucket.ObjectBucketClaim{}
-	case schema.GroupVersionKind{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscaler"}.String():
+	case schema.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}.String():
 		return &autoscaling.HorizontalPodAutoscaler{}
 	case schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String():
 		return &batchv1.Job{}
