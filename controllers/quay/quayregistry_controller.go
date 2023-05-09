@@ -27,10 +27,14 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/tidwall/sjson"
 	"gopkg.in/yaml.v2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -797,6 +801,23 @@ func encode(value interface{}) []byte {
 	return yamlified
 }
 
+func convertHpaToV2beta2(hpa *autoscalingv2.HorizontalPodAutoscaler) (*autoscalingv2beta2.HorizontalPodAutoscaler, error) {
+	m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(hpa)
+	if err != nil {
+		return nil, err
+	}
+
+	u := &unstructured.Unstructured{Object: m}
+	u.SetAPIVersion("autoscaling/v2beta2")
+
+	v2beta2hpa := &autoscalingv2beta2.HorizontalPodAutoscaler{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, v2beta2hpa); err != nil {
+		return nil, err
+	}
+
+	return v2beta2hpa, nil
+}
+
 func (r *QuayRegistryReconciler) createOrUpdateObject(
 	ctx context.Context, obj client.Object, quay v1.QuayRegistry, log logr.Logger,
 ) error {
@@ -852,11 +873,22 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		return nil
 	}
 
+	hpaGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}
+
 	opts := []client.PatchOption{
 		client.ForceOwnership,
 		client.FieldOwner("quay-operator"),
 	}
-	if err := r.Client.Patch(ctx, obj, client.Apply, opts...); err != nil {
+	err := r.Client.Patch(ctx, obj, client.Apply, opts...)
+	if meta.IsNoMatchError(err) && gvk == hpaGVK {
+		var hpa *autoscalingv2beta2.HorizontalPodAutoscaler
+		hpa, err = convertHpaToV2beta2(obj.(*autoscalingv2.HorizontalPodAutoscaler))
+		if err != nil {
+			return err
+		}
+		err = r.Client.Patch(ctx, hpa, client.Apply, opts...)
+	}
+	if err != nil {
 		log.Error(err, "failed to create/update object")
 		return err
 	}
