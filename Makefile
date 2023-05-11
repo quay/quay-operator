@@ -11,6 +11,8 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+arch=$(shell uname -m)
+
 all: manager
 
 # Run tests
@@ -19,7 +21,7 @@ test: generate fmt vet manifests
 
 test-e2e:
 	mkdir -p ./bin
-	curl -L https://github.com/kudobuilder/kuttl/releases/download/v0.11.1/kubectl-kuttl_0.11.1_linux_x86_64 -o ./bin/kuttl;
+	curl -L https://github.com/kudobuilder/kuttl/releases/download/v0.11.1/kubectl-kuttl_0.11.1_linux_$(arch) -o ./bin/kuttl;
 	chmod +x ./bin/kuttl;
 	./bin/kuttl test;
 

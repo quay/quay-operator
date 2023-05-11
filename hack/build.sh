@@ -62,16 +62,15 @@ docker build -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}"
 digest "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" OPERATOR_DIGEST
 
-digest "${REGISTRY}/${NAMESPACE}/quay:${TAG}" QUAY_DIGEST
+digest "${REGISTRY}/${NAMESPACE}/quay:3.8.5" QUAY_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/clair:nightly" CLAIR_DIGEST
-digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
-digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:main" BUILDER_QEMU_DIGEST
+digest "${REGISTRY}/${NAMESPACE}/quay-builder:3.9-unstable" BUILDER_DIGEST
+digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
+digest docker.io/redis:7.0 REDIS_DIGEST
 # shellcheck disable=SC2034
-POSTGRES_DIGEST='centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2'
+POSTGRES_DIGEST='quay.io/morana/postgresql-15-c9s@sha256:b98610d9faba6c9ab5cf7e307407f13534aa6b538bd12f71df96c29a62f569c1'
 # shellcheck disable=SC2034
-POSTGRES_UPGRADE_DIGEST='centos/postgresql-12-centos7@sha256:be8803d45d64870f8dfd018f3110af62e2e1558d64191faea461005e1bd03243'
-# shellcheck disable=SC2034
-REDIS_DIGEST='centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542'
+POSTGRES_UPGRADE_DIGEST='quay.io/morana/postgresql-13-c9s@sha256:bb6d8f4cc267c7de8266a3b7e8cbb64397af86712e2c1de49fd355999941e900'
 
 # need exporting so that yq can see them
 export OPERATOR_DIGEST

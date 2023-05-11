@@ -10,7 +10,7 @@ COPY apis/ apis/
 COPY controllers/ controllers/
 COPY pkg/ pkg/
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod vendor -o manager main.go
+RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod vendor -o manager main.go
 
 FROM scratch
 WORKDIR /workspace
