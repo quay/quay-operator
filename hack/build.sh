@@ -68,9 +68,9 @@ digest "${REGISTRY}/${NAMESPACE}/quay-builder:3.9-unstable" BUILDER_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
 digest docker.io/redis:7.0 REDIS_DIGEST
 # shellcheck disable=SC2034
-POSTGRES_DIGEST='quay.io/morana/postgresql-15-c9s@sha256:b98610d9faba6c9ab5cf7e307407f13534aa6b538bd12f71df96c29a62f569c1'
+POSTGRES_DIGEST='quay.io/sclorg/postgresql-15-c9s@sha256:593910f2d4b895f4924261a3b8b2aa6457892100a01a0c0ad661cd378d810d65'
 # shellcheck disable=SC2034
-POSTGRES_UPGRADE_DIGEST='quay.io/morana/postgresql-13-c9s@sha256:bb6d8f4cc267c7de8266a3b7e8cbb64397af86712e2c1de49fd355999941e900'
+POSTGRES_UPGRADE_DIGEST='quay.io/sclorg/postgresql-13-c9s@sha256:efe7ca31ff169cc8d5f458cc0da4e844b6646a7c1fe76ac4d61a79dcc749f5d1'
 
 # need exporting so that yq can see them
 export OPERATOR_DIGEST
