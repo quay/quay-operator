@@ -302,7 +302,7 @@ func PostgresUpgradeRunning(quay *QuayRegistry) bool {
 	if created == nil {
 		return false
 	}
-	return created.Reason == ConditionReasonPostgresUpgradeInProgress
+	return created.Reason == ConditionReasonPostgresUpgradeInProgress || created.Reason == ConditionReasonPostgresUpgradeFailed
 }
 
 // FlaggedForDeletion returns a boolean indicating if provided QuayRegistry object has
