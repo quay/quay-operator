@@ -26,7 +26,7 @@ set -e
 export OPERATOR_NAME='quay-operator-test'
 export REGISTRY=${REGISTRY:-'quay.io'}
 export NAMESPACE=${NAMESPACE:-'projectquay'}
-export TAG=${TAG:-'3.6-unstable'}
+export TAG=${TAG:-'3.9-unstable'}
 export CSV_PATH=${CSV_PATH:-'bundle/manifests/quay-operator.clusterserviceversion.yaml'}
 export ANNOTATIONS_PATH=${ANNOTATIONS_PATH:-'bundle/metadata/annotations.yaml'}
 
@@ -65,13 +65,13 @@ digest "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" OPERATOR_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay:${TAG}" QUAY_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/clair:nightly" CLAIR_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
-digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:main" BUILDER_QEMU_DIGEST
+digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
 # shellcheck disable=SC2034
-POSTGRES_DIGEST='centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2'
+POSTGRES_DIGEST='quay.io/sclorg/postgresql-15-c9s@sha256:593910f2d4b895f4924261a3b8b2aa6457892100a01a0c0ad661cd378d810d65'
 # shellcheck disable=SC2034
-POSTGRES_UPGRADE_DIGEST='centos/postgresql-12-centos7@sha256:be8803d45d64870f8dfd018f3110af62e2e1558d64191faea461005e1bd03243'
+POSTGRES_UPGRADE_DIGEST='quay.io/sclorg/postgresql-15-c9s@sha256:593910f2d4b895f4924261a3b8b2aa6457892100a01a0c0ad661cd378d810d65'
 # shellcheck disable=SC2034
-REDIS_DIGEST='centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542'
+digest "docker.io/redis:7.0" REDIS_DIGEST
 
 # need exporting so that yq can see them
 export OPERATOR_DIGEST

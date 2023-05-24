@@ -18,6 +18,9 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     container: docker.io/library/golang:latest
+    strategy:
+      matrix:
+        platform: ['amd64','ppc64le']
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -30,22 +33,41 @@ jobs:
       - name: Git Diff
         run: git diff --exit-code
       - name: Go Build
-        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -mod vendor -o manager main.go
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.platform }} GO111MODULE=on go build -mod vendor -o manager main.go
   tests:
     name: Tests
     runs-on: ubuntu-latest
     container: docker.io/library/golang:latest
+    strategy:
+      matrix:
+        go-version: ['1.20']
+        platform: ['amd64','ppc64le']
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: OS Dependencies
-        run: apt-get update && apt-get install -y tar make gcc
-      - name: Install Kubebuilder
+        run: apt-get update && apt-get install -y tar make gcc docker.io
+      - name: Install Required Packages
         run: |
-          os=$(go env GOOS)
-          arch=$(go env GOARCH)
-          curl -L https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_${os}_${arch}.tar.gz | tar -xz -C /tmp/
-          mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
-          export PATH=$PATH:/usr/local/kubebuilder/bin
-      - name: Tests
-        run: go test -v ./...
+          arch=${{ matrix.platform }}
+          curl -L https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_linux_${arch}.tar.gz | tar -xz -C /tmp/
+          curl -L https://github.com/etcd-io/etcd/releases/download/v3.4.26/etcd-v3.4.26-linux-${arch}.tar.gz | tar -xz -C /tmp/
+          curl -L https://dl.k8s.io/v1.24.13/kubernetes-server-linux-${arch}.tar.gz | tar -xz -C /tmp/
+          mkdir kubebuilder
+          mkdir kubebuilder/bin
+          mv /tmp/kubebuilder_2.3.1_linux_${arch}/bin/kubebuilder kubebuilder/bin
+          mv /tmp/etcd-v3.4.26-linux-${arch}/etcd kubebuilder/bin
+          mv /tmp/kubernetes/server/bin/kubectl kubebuilder/bin
+          mv /tmp/kubernetes/server/bin/kube-apiserver kubebuilder/bin
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Test on ${{ matrix.platform }} 
+        run: >-
+          docker run
+          --rm
+          --platform linux/${{ matrix.platform }} 
+          -v ${{ github.workspace }}:/build
+          -v ${{ github.workspace }}/kubebuilder/bin:/usr/local/kubebuilder/bin
+          -w /build
+          quay.io/projectquay/golang:${{ matrix.go-version }}
+          go test ./...
