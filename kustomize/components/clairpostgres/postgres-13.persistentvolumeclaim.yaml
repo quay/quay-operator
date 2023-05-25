@@ -1,7 +1,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: clair-postgres-migration
+  name: clair-postgres-13
+  labels:
+    quay-component: clair-postgres
+  annotations:
+    quay-component: clair-postgres
 spec:
   accessModes:
     - ReadWriteOnce

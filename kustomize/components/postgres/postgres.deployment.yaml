@@ -29,7 +29,7 @@ spec:
             secretName: postgres-bootstrap
         - name: postgres-data
           persistentVolumeClaim:
-            claimName: quay-database
+            claimName: quay-database-13
       containers:
         - name: postgres
           image: centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2

@@ -537,6 +537,16 @@ func KustomizationFor(
 					Name: "quay-config-secret",
 				},
 			},
+			{
+				Name: "CLAIR_POSTGRES_HOSTNAME",
+				ObjRef: types.Target{
+					APIVersion: "v1",
+					Gvk: resid.Gvk{
+						Kind: "Service",
+					},
+					Name: "clair-postgres",
+				},
+			},
 		},
 	}, nil
 }

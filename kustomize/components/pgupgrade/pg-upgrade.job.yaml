@@ -21,65 +21,7 @@ spec:
             secretName: postgres-bootstrap
         - name: postgres-data
           persistentVolumeClaim:
-            claimName: quay-database
-        - name: migration-data
-          persistentVolumeClaim:
-            claimName: postgres-migration
-      initContainers:
-        - name: postgres-old
-          image: centos/postgresql-12-centos7@sha256:be8803d45d64870f8dfd018f3110af62e2e1558d64191faea461005e1bd03243
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 5432
-              protocol: TCP
-          env:
-            - name: POSTGRESQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: database-username
-            - name: POSTGRESQL_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: database-name
-            - name: POSTGRESQL_UPGRADE
-              value: copy
-            - name: POSTGRESQL_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: database-root-password
-            - name: POSTGRESQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: database-password
-            - name: POSTGRESQL_SHARED_BUFFERS
-              value: 256MB
-            - name: POSTGRESQL_MAX_CONNECTIONS
-              value: "2000"
-          volumeMounts:
-            - name: postgres-conf-sample
-              mountPath: /usr/share/pgsql/postgresql.conf.sample
-              subPath: postgresql.conf.sample
-            - name: postgres-data
-              mountPath: /var/lib/pgsql/data
-            - name: migration-data
-              mountPath: /var/lib/pgsql/backup
-            - name: postgres-bootstrap
-              mountPath: /usr/share/container-scripts/postgresql/start/create-extensions.sh
-              subPath: create-extensions.sh
-              readOnly: true
-          resources:
-            requests:
-              cpu: 500m
-              memory: 2Gi
-          command:
-            - "/bin/bash"
-            - "-c"
-            - "cp -r /var/lib/pgsql/data /var/lib/pgsql/backup/quay && run-postgresql --help"
-
+            claimName: quay-database-13
       containers:
         - name: postgres-new
           image: centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2
@@ -88,28 +30,16 @@ spec:
             - containerPort: 5432
               protocol: TCP
           env:
-            - name: POSTGRESQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: database-username
-            - name: POSTGRESQL_DATABASE
+            - name: POSTGRESQL_MIGRATION_REMOTE_HOST
               valueFrom:
                 secretKeyRef:
                   name: postgres-config-secret
                   key: database-name
-            - name: POSTGRESQL_ADMIN_PASSWORD
+            - name: POSTGRESQL_MIGRATION_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: postgres-config-secret
                   key: database-root-password
-            - name: POSTGRESQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: database-password
-            - name: POSTGRESQL_UPGRADE
-              value: copy
             - name: POSTGRESQL_SHARED_BUFFERS
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS
@@ -120,8 +50,6 @@ spec:
               subPath: postgresql.conf.sample
             - name: postgres-data
               mountPath: /var/lib/pgsql/data
-            - name: migration-data
-              mountPath: /var/lib/pgsql/backup
             - name: postgres-bootstrap
               mountPath: /usr/share/container-scripts/postgresql/start/create-extensions.sh
               subPath: create-extensions.sh

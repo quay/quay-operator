@@ -1,7 +1,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-migration
+  name: quay-database-13
+  labels:
+    quay-component: postgres
+  annotations:
+    quay-component: postgres
 spec:
   accessModes:
     - ReadWriteOnce
