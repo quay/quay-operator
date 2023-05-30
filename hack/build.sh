@@ -58,7 +58,7 @@ function digest() {
 	ret=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE}")
 }
 
-docker buildx build --push --platform "linux/amd64,linux/s390x,linux/ppc64le"  -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
+docker buildx build --push --platform "linux/amd64,linux/ppc64le"  -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
 digest "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" OPERATOR_DIGEST
 
 digest "${REGISTRY}/${NAMESPACE}/quay:${TAG}" QUAY_DIGEST
@@ -106,17 +106,27 @@ yq eval -i '
 	.annotations."operators.operatorframework.io.bundle.channels.v1" = "test"
 	' "${ANNOTATIONS_PATH}"
 
-docker buildx build --push -f ./bundle/Dockerfile --platform "linux/amd64,linux/s390x,linux/ppc64le"  -t "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" ./bundle
+docker buildx build --push -f ./bundle/Dockerfile --platform "linux/amd64,linux/ppc64le"  -t "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" ./bundle
 digest "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" BUNDLE_DIGEST
 
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
+AMD64_DIGEST=$(docker manifest inspect --verbose quay.io/jcho0/quay-operator-bundle:3.9-unstable | \
+    jq -r 'if type=="object"
+        then .Descriptor.digest
+        else .[] | select(.Descriptor.platform.architecture=="amd64" and .Descriptor.platform.os=="linux") | .Descriptor.digest
+	end')
+
+POWER_DIGEST=$(docker manifest inspect --verbose quay.io/jcho0/quay-operator-bundle:3.9-unstable | \
+    jq -r 'if type=="object"
+        then .Descriptor.digest
+        else .[] | select(.Descriptor.platform.architecture=="ppc64le" and .Descriptor.platform.os=="linux") | .Descriptor.digest
+        end')
+
+
+opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${AMD64_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
-docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
+opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${POWER_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
 docker manifest create --amend "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}" \
 	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64" \
-	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x" \
 	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
 docker manifest push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}"
