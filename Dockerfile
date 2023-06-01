@@ -1,4 +1,4 @@
-FROM golang:1.17 as builder
+FROM registry.access.redhat.com/ubi8/go-toolset:1.19 as builder
 
 WORKDIR /workspace
 COPY go.mod go.mod
@@ -10,7 +10,7 @@ COPY apis/ apis/
 COPY controllers/ controllers/
 COPY pkg/ pkg/
 
-RUN CGO_ENABLED=0 GOOS=linux GO111MODULE=on go build -mod vendor -o manager main.go
+RUN CGO_ENABLED=0 go build -mod vendor -o manager main.g
 
 FROM scratch
 WORKDIR /workspace
