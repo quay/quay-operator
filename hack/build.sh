@@ -61,15 +61,15 @@ function digest() {
 docker buildx build --push --platform "linux/amd64,linux/ppc64le,linux/s390x"  -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
 digest "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" OPERATOR_DIGEST
 
-digest "${REGISTRY}/${NAMESPACE}/quay:3.8.5" QUAY_DIGEST
+digest "${REGISTRY}/${NAMESPACE}/quay:${TAG}" QUAY_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/clair:nightly" CLAIR_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
 digest docker.io/redis:7.0 REDIS_DIGEST
 # shellcheck disable=SC2034
-POSTGRES_DIGEST='quay.io/sclorg/postgresql-15-c9s@sha256:593910f2d4b895f4924261a3b8b2aa6457892100a01a0c0ad661cd378d810d65'
+POSTGRES_DIGEST='quay.io/sclorg/postgresql-13-c9s@sha256:efe7ca31ff169cc8d5f458cc0da4e844b6646a7c1fe76ac4d61a79dcc749f5d1'
 # shellcheck disable=SC2034
-POSTGRES_UPGRADE_DIGEST='quay.io/sclorg/postgresql-13-c9s@sha256:efe7ca31ff169cc8d5f458cc0da4e844b6646a7c1fe76ac4d61a79dcc749f5d1'
+POSTGRES_UPGRADE_DIGEST='centos/postgresql-12-centos7@sha256:be8803d45d64870f8dfd018f3110af62e2e1558d64191faea461005e1bd03243'
 
 # need exporting so that yq can see them
 export OPERATOR_DIGEST
@@ -136,5 +136,5 @@ docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
 docker manifest create --amend "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}" \
 	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64" \
 	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le" \
-  "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
+        "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
 docker manifest push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}"
