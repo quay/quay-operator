@@ -1,4 +1,3 @@
-
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
@@ -19,7 +18,7 @@ test: generate fmt vet manifests
 
 test-e2e:
 	mkdir -p ./bin
-	curl -L https://github.com/kudobuilder/kuttl/releases/download/v0.11.1/kubectl-kuttl_0.11.1_linux_x86_64 -o ./bin/kuttl;
+	curl -L https://github.com/kudobuilder/kuttl/releases/download/v0.15.0/kubectl-kuttl_0.15.0_linux_$(shell uname -m) -o ./bin/kuttl;
 	chmod +x ./bin/kuttl;
 	./bin/kuttl test;
 
