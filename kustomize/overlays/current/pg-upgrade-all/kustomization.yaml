@@ -8,3 +8,4 @@ patchesStrategicMerge:
   - ./quay.deployment.patch.yaml
   - ./postgres.deployment.patch.yaml
   - ./clair-postgres.deployment.patch.yaml
+  - ./clair.deployment.patch.yaml

@@ -5,3 +5,4 @@ bases:
   - ../../../tmp
 patchesStrategicMerge:
   - ./clair-postgres.deployment.patch.yaml
+  - ./clair.deployment.patch.yaml
