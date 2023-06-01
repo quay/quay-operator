@@ -10,7 +10,7 @@ COPY apis/ apis/
 COPY controllers/ controllers/
 COPY pkg/ pkg/
 
-RUN CGO_ENABLED=0 go build -mod vendor -o manager main.g
+RUN CGO_ENABLED=0 go build -mod vendor -o manager main.go
 
 FROM scratch
 WORKDIR /workspace
