@@ -58,19 +58,18 @@ function digest() {
 	ret=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE}")
 }
 
-docker buildx build --push --platform "linux/amd64,linux/ppc64le"  -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
+docker buildx build --push --platform "linux/amd64,linux/ppc64le,linux/s390x"  -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
 digest "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" OPERATOR_DIGEST
 
 digest "${REGISTRY}/${NAMESPACE}/quay:${TAG}" QUAY_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/clair:nightly" CLAIR_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
+digest docker.io/redis:7.0 REDIS_DIGEST
 # shellcheck disable=SC2034
-POSTGRES_DIGEST='quay.io/sclorg/postgresql-13-c9s@sha256:593910f2d4b895f4924261a3b8b2aa6457892100a01a0c0ad661cd378d810d65'
+POSTGRES_DIGEST='quay.io/sclorg/postgresql-13-c9s@sha256:efe7ca31ff169cc8d5f458cc0da4e844b6646a7c1fe76ac4d61a79dcc749f5d1'
 # shellcheck disable=SC2034
 POSTGRES_UPGRADE_DIGEST='centos/postgresql-12-centos7@sha256:be8803d45d64870f8dfd018f3110af62e2e1558d64191faea461005e1bd03243'
-# shellcheck disable=SC2034
-digest "docker.io/redis:7.0" REDIS_DIGEST
 
 # need exporting so that yq can see them
 export OPERATOR_DIGEST
@@ -106,27 +105,36 @@ yq eval -i '
 	.annotations."operators.operatorframework.io.bundle.channels.v1" = "test"
 	' "${ANNOTATIONS_PATH}"
 
-docker buildx build --push -f ./bundle/Dockerfile --platform "linux/amd64,linux/ppc64le"  -t "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" ./bundle
+docker buildx build --push -f ./bundle/Dockerfile --platform "linux/amd64,linux/ppc64le,linux/s390x"  -t "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" ./bundle
 digest "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" BUNDLE_DIGEST
 
-AMD64_DIGEST=$(docker manifest inspect --verbose quay.io/jcho0/quay-operator-bundle:3.9-unstable | \
+AMD64_DIGEST=$(docker manifest inspect --verbose ${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
     jq -r 'if type=="object"
         then .Descriptor.digest
         else .[] | select(.Descriptor.platform.architecture=="amd64" and .Descriptor.platform.os=="linux") | .Descriptor.digest
 	end')
 
-POWER_DIGEST=$(docker manifest inspect --verbose quay.io/jcho0/quay-operator-bundle:3.9-unstable | \
+POWER_DIGEST=$(docker manifest inspect --verbose ${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
     jq -r 'if type=="object"
         then .Descriptor.digest
         else .[] | select(.Descriptor.platform.architecture=="ppc64le" and .Descriptor.platform.os=="linux") | .Descriptor.digest
         end')
 
-
+Z_DIGEST=$(docker manifest inspect --verbose ${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
+    jq -r 'if type=="object"
+        then .Descriptor.digest
+        else .[] | select(.Descriptor.platform.architecture=="s390x" and .Descriptor.platform.os=="linux") | .Descriptor.digest
+        end')
+        
 opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${AMD64_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
 opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${POWER_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
+opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${Z_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
+docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
+
 docker manifest create --amend "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}" \
 	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64" \
-	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
+	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le" \
+        "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
 docker manifest push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}"
