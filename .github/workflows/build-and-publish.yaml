@@ -56,9 +56,6 @@ jobs:
       NAMESPACE: ${{ secrets.NAMESPACE || 'projectquay' }}
       TAG: ${{needs.set-version.outputs.tag}}
     needs: set-version
-    strategy:
-      matrix:
-        platform: ['amd64', 's390x']
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
@@ -73,10 +70,9 @@ jobs:
       - name: Install yq
         env:
           VERSION: v4.14.2
+          BINARY: yq_linux_amd64
         run: |
-          ARCH=$(uname -m)
-          if [ "$ARCH" == "x86_64" ] ; then ARCH="amd64" ; elif [ "$ARCH" == "aarch64" ] ; then ARCH="arm64" ; fi
-          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/yq_linux_${ARCH} -O /usr/local/bin/yq
+          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY} -O /usr/local/bin/yq
           chmod +x /usr/local/bin/yq
 
       - name: Login to Quay.io
