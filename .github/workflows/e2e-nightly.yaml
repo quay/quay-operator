@@ -28,9 +28,6 @@ jobs:
       NAMESPACE: quay-operator-e2e-nightly
       WAIT_TIMEOUT: 10m
       KUBECONFIG: ${{ github.workspace }}/kubeconfig
-    strategy:
-      matrix:
-        platform: ['amd64', 's390x']
     steps:
       - name: check out the repo
         uses: actions/checkout@v2
@@ -45,10 +42,9 @@ jobs:
       - name: install yq
         env:
           VERSION: v4.14.2
+          BINARY: yq_linux_amd64
         run: |
-          ARCH=$(uname -m)
-          if [ "$ARCH" == "x86_64" ] ; then ARCH="amd64" ; elif [ "$ARCH" == "aarch64" ] ; then ARCH="arm64" ; fi
-          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/yq_linux_${ARCH} -O /usr/local/bin/yq
+          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY} -O /usr/local/bin/yq
           chmod +x /usr/local/bin/yq
 
       - name: setup kubeconfig
