@@ -68,6 +68,10 @@ jobs:
         uses: redhat-actions/openshift-tools-installer@v1
         with:
           opm: "latest"
+      
+      - name: Install skopeo
+        run: |
+          sudo apt-get -y install skopeo
 
       - name: Install yq
         env:
