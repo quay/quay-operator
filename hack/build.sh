@@ -108,9 +108,12 @@ yq eval -i '
 docker buildx build --push -f ./bundle/Dockerfile --platform "linux/amd64,linux/ppc64le,linux/s390x"  -t "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" ./bundle
 digest "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" BUNDLE_DIGEST
 
-AMD64_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:3.9-unstable | jq -r '.manifests[0].digest')
-POWER_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:3.9-unstable | jq -r '.manifests[1].digest')
-Z_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:3.9-unstable | jq -r '.manifests[2].digest')
+AMD64_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
+               jq -r '.manifests[] | select(.platform.architecture == "amd64" and .platform.os == "linux").digest')
+POWER_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
+               jq -r '.manifests[] | select(.platform.architecture == "ppc64le" and .platform.os == "linux").digest')
+Z_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
+           jq -r '.manifests[] | select(.platform.architecture == "s390x" and .platform.os == "linux").digest')
         
 opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${AMD64_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
