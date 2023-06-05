@@ -54,6 +54,7 @@ const (
 	ComponentMirror        ComponentKind = "mirror"
 	ComponentMonitoring    ComponentKind = "monitoring"
 	ComponentTLS           ComponentKind = "tls"
+	ComponentConfigEditor  ComponentKind = "configeditor"
 )
 
 // AllComponents holds a list of all supported components.
@@ -69,6 +70,7 @@ var AllComponents = []ComponentKind{
 	ComponentMonitoring,
 	ComponentTLS,
 	ComponentClairPostgres,
+	ComponentConfigEditor,
 }
 
 var requiredComponents = []ComponentKind{
@@ -161,6 +163,7 @@ const (
 	ComponentMirrorReady        ConditionType = "ComponentMirrorReady"
 	ComponentMonitoringReady    ConditionType = "ComponentMonitoringReady"
 	ComponentTLSReady           ConditionType = "ComponentTLSReady"
+	ComponenntConfigEditorReady ConditionType = "ComponentConfigEditorReady"
 )
 
 type ConditionReason string
@@ -686,6 +689,8 @@ func FieldGroupNameFor(cmp ComponentKind) (string, error) {
 	case ComponentMonitoring:
 		return "", nil
 	case ComponentTLS:
+		return "", nil
+	case ComponentConfigEditor:
 		return "", nil
 	case ComponentQuay:
 		return "", nil

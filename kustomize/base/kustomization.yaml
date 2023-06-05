@@ -8,6 +8,4 @@ resources:
   - ./quay.deployment.yaml
   - ./quay.service.yaml
   - ./cluster-service-ca.configmap.yaml
-  - ./config.deployment.yaml
-  - ./config.service.yaml
   - ./cluster-trusted-ca.configmap.yaml

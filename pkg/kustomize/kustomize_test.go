@@ -278,9 +278,7 @@ func TestFlattenSecret(t *testing.T) {
 var quayComponents = map[string][]client.Object{
 	"quay": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
-		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
-		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-secret"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-tls"}},
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cluster-service-ca"}},
@@ -333,6 +331,10 @@ var quayComponents = map[string][]client.Object{
 	"job": {
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
 	},
+	"configeditor": {
+		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
+		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-config-editor"}},
+	},
 }
 
 func withComponents(components []string) []client.Object {
@@ -365,6 +367,7 @@ var inflateTests = []struct {
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "mirror", Managed: true},
 					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "configeditor", Managed: true},
 				},
 			},
 		},
@@ -376,7 +379,7 @@ var inflateTests = []struct {
 				"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
 			},
 		},
-		expected:    withComponents([]string{"job", "quay", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres"}),
+		expected:    withComponents([]string{"job", "quay", "clair", "postgres", "redis", "objectstorage", "mirror", "horizontalpodautoscaler", "clairpostgres", "configeditor"}),
 		expectedErr: nil,
 	},
 	{
@@ -651,6 +654,8 @@ func TestInflate(t *testing.T) {
 	for _, test := range inflateTests {
 		t.Run(test.name, func(t *testing.T) {
 			pieces, err := Inflate(&test.ctx, test.quayRegistry, test.configBundle, log, false)
+
+			t.Logf("%v\n%v\n", test.expected, pieces)
 
 			assert.NotNil(pieces, test.name)
 			assert.Equal(len(test.expected), len(pieces), test.name)
