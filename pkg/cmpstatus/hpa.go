@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	asv2b2 "k8s.io/api/autoscaling/v2beta2"
+	asv2 "k8s.io/api/autoscaling/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,7 +45,7 @@ func (h *HPA) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, e
 			Name:      fmt.Sprintf("%s-%s", reg.Name, hpasuffix),
 		}
 
-		var hpa asv2b2.HorizontalPodAutoscaler
+		var hpa asv2.HorizontalPodAutoscaler
 		if err := h.Client.Get(ctx, nsn, &hpa); err != nil {
 			if errors.IsNotFound(err) {
 				return qv1.Condition{

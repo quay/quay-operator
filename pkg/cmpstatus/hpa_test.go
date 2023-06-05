@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	asv2b2 "k8s.io/api/autoscaling/v2beta2"
+	asv2 "k8s.io/api/autoscaling/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -87,7 +87,7 @@ func TestHPACheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
 					},
@@ -118,7 +118,7 @@ func TestHPACheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
 						OwnerReferences: []metav1.OwnerReference{
@@ -131,7 +131,7 @@ func TestHPACheck(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-mirror",
 						OwnerReferences: []metav1.OwnerReference{
@@ -144,7 +144,7 @@ func TestHPACheck(t *testing.T) {
 						},
 					},
 				},
-				&asv2b2.HorizontalPodAutoscaler{
+				&asv2.HorizontalPodAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-clair-app",
 						OwnerReferences: []metav1.OwnerReference{
