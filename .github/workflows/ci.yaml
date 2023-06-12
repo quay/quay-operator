@@ -37,21 +37,30 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
-    container: docker.io/library/golang:latest
     strategy:
       matrix:
-        platform: [amd64, ppc64le, s390x]
+        platform: [amd64, ppc64le]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: OS Dependencies
-        run: apt-get update && apt-get install -y tar make gcc
-      - name: Install Kubebuilder
-        run: |
-          os=$(go env GOOS)
-          arch=$(go env GOARCH)
-          curl -L https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_${os}_${arch}.tar.gz | tar -xz -C /tmp/
-          mv /tmp/kubebuilder_2.3.1_${os}_${arch} /usr/local/kubebuilder
-          export PATH=$PATH:/usr/local/kubebuilder/bin
-      - name: Tests
-        run: go test -v ./...
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Test on ${{ matrix.platform }}
+        run: >-
+          docker run
+          --rm
+          --platform linux/${{ matrix.platform }}
+          -v ${{ github.workspace }}:/build
+          -w /build
+          docker.io/library/golang:latest
+          /bin/bash -c '
+          apt-get update && apt-get install -y tar make gcc;
+          mkdir -p /usr/local/kubebuilder/bin;
+          curl -L https://github.com/kubernetes-sigs/kubebuilder/releases/download/v3.10.0/kubebuilder_linux_${{ matrix.platform }} -o /usr/local/kubebuilder/bin/kubebuilder;
+          curl -L https://dl.k8s.io/v1.27.2/bin/linux/${{ matrix.platform }}/kube-apiserver -o /usr/local/kubebuilder/bin/kube-apiserver;
+          curl -L https://dl.k8s.io/v1.27.2/bin/linux/${{ matrix.platform }}/kubectl -o /usr/local/kubebuilder/bin/kubectl;
+          curl -L https://github.com/etcd-io/etcd/releases/download/v3.4.26/etcd-v3.4.26-linux-${{ matrix.platform }}.tar.gz | tar -xz -C /tmp/;
+          mv /tmp/etcd-v3.4.26-linux-${{ matrix.platform }}/etcd /usr/local/kubebuilder/bin;
+          chmod -R 700 /usr/local/kubebuilder/bin;
+          export PATH=$PATH:/usr/local/kubebuilder/bin;
+          go test -v ./...;'
