@@ -134,3 +134,4 @@ spec:
             - "run-postgresql"
           args:
             - "--version"
+  backoffLimit: 20
