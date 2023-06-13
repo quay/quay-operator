@@ -37,6 +37,7 @@ type DistributedStorageArgs struct {
 	AzureAccountName string `default:"" validate:"" json:"azure_account_name,omitempty" yaml:"azure_account_name,omitempty"`
 	AzureAccountKey  string `default:"" validate:"" json:"azure_account_key,omitempty" yaml:"azure_account_key,omitempty"`
 	SASToken         string `default:"" validate:"" json:"sas_token,omitempty" yaml:"sas_token,omitempty"`
+	EndpointURL      string `default:"" validate:"" json:"endpoint_url,omitempty" yaml:"endpoint_url,omitempty"`
 	// Args for Cloudfront
 	CloudfrontDistributionDomain string `default:"" validate:"" json:"cloudfront_distribution_domain,omitempty" yaml:"cloudfront_distribution_domain,omitempty"`
 	CloudfrontKeyID              string `default:"" validate:"" json:"cloudfront_key_id,omitempty" yaml:"cloudfront_key_id,omitempty"`
@@ -49,4 +50,10 @@ type DistributedStorageArgs struct {
 	SwiftCaCertPath  string                 `default:"" validate:"" json:"ca_cert_path,omitempty" yaml:"ca_cert_path,omitempty"`
 	SwiftTempURLKey  string                 `default:"" validate:"" json:"temp_url_key,omitempty" yaml:"temp_url_key,omitempty"`
 	SwiftOsOptions   map[string]interface{} `default:"" validate:"" json:"os_options,omitempty" yaml:"os_options,omitempty"`
+	// Args for CloudFlare
+	CloudflareDomain string `default:"" validate:"" json:"cloudflare_domain,omitempty" yaml:"cloudflare_domain,omitempty"`
+	// Args for MultiCDNStorage
+	DefaultProvider string `default:"" validate:"" json:"default_provider,omitempty" yaml:"default_provider,omitempty"`
+	Providers map[string]interface{} `default:"" validate:"" json:"providers,omitempty" yaml:"providers,omitempty"`
+	StorageConfig map[string]interface{} `default:"" validate:"" json:"storage_config,omitempty" yaml:"storage_config,omitempty"`
 }

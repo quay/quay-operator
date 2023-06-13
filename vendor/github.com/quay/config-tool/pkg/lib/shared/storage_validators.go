@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -137,6 +136,7 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 
 			accessKey = value.AccessKeyID
 			secretKey = value.SecretAccessKey
+			token = value.SessionToken
 
 		}
 		if ok, err := validateMinioGateway(opts, storageName, endpoint, accessKey, secretKey, bucketName, token, isSecure, fgName); !ok {
@@ -187,12 +187,17 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 		accountKey := args.AzureAccountKey
 		containerName := args.AzureContainer
 		token = args.SASToken
+		if args.EndpointURL != "" {
+			endpoint = args.EndpointURL
+		} else {
+			endpoint = fmt.Sprintf("https://%s.blob.core.windows.net", accountName)
+		}
 
 		if len(errors) > 0 {
 			return false, errors
 		}
 
-		if ok, err := validateAzureGateway(opts, storageName, accountName, accountKey, containerName, token, fgName); !ok {
+		if ok, err := validateAzureGateway(opts, endpoint, storageName, accountName, accountKey, containerName, token, fgName); !ok {
 			errors = append(errors, err)
 		}
 
@@ -290,6 +295,39 @@ func ValidateStorage(opts Options, storageName string, storageType string, args 
 		if ok, err := validateSwift(opts, storageName, args.SwiftAuthVersion, args.SwiftUser, args.SwiftPassword, args.SwiftContainer, args.SwiftAuthURL, args.SwiftOsOptions, fgName); !ok {
 			errors = append(errors, err)
 		}
+	case "CloudFlareStorage":
+		// Check access key
+		if ok, err := ValidateRequiredString(args.S3AccessKey, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_access_key", fgName); !ok {
+			errors = append(errors, err)
+		}
+		// Check secret key
+		if ok, err := ValidateRequiredString(args.S3SecretKey, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_secret_key", fgName); !ok {
+			errors = append(errors, err)
+		}
+		// Check bucket name
+		if ok, err := ValidateRequiredString(args.S3Bucket, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".s3_bucket", fgName); !ok {
+			errors = append(errors, err)
+		}
+		// Check distribution domain
+		if ok, err := ValidateRequiredString(args.CloudflareDomain, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".cloudflare_domain", fgName); !ok {
+			errors = append(errors, err)
+		}
+	case "MultiCDNStorage":
+		// Check provider map
+		if ok, err := ValidateRequiredObject(args.Providers, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".providers", fgName); !ok {
+			errors = append(errors, err)
+		}
+
+		// Check default provider
+		if ok, err := ValidateRequiredString(args.DefaultProvider, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".default_provider", fgName); !ok {
+			errors = append(errors, err)
+		}
+
+		// Check storage config
+		if ok, err := ValidateRequiredObject(args.StorageConfig, "DISTRIBUTED_STORAGE_CONFIG."+storageName+".storage_config", fgName); !ok {
+			errors = append(errors, err)
+		}
+
 	default:
 		newError := ValidationError{
 			Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
@@ -367,7 +405,7 @@ func validateMinioGateway(opts Options, storageName, endpoint, accessKey, secret
 
 }
 
-func validateAzureGateway(opts Options, storageName, accountName, accountKey, containerName, token, fgName string) (bool, ValidationError) {
+func validateAzureGateway(opts Options, endpointURL, storageName, accountName, accountKey, containerName, token, fgName string) (bool, ValidationError) {
 
 	credentials, err := azblob.NewSharedKeyCredential(accountName, accountKey)
 	if err != nil {
@@ -379,7 +417,7 @@ func validateAzureGateway(opts Options, storageName, accountName, accountKey, co
 	}
 
 	p := azblob.NewPipeline(credentials, azblob.PipelineOptions{})
-	u, err := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net", accountName))
+	u, err := url.Parse(endpointURL)
 
 	serviceURL := azblob.NewServiceURL(*u, p)
 	containerURL := serviceURL.NewContainerURL(containerName)
@@ -389,17 +427,14 @@ func validateAzureGateway(opts Options, storageName, accountName, accountKey, co
 
 	_, err = containerURL.GetAccountInfo(ctx)
 	if err != nil {
-		re := regexp.MustCompile(`Code: (\w+)`)
-		message := re.FindStringSubmatch(err.Error())
 		return false, ValidationError{
 			FieldGroup: fgName,
 			Tags:       []string{"DISTRIBUTED_STORAGE_CONFIG"},
-			Message:    "Could not connect to Azure storage. Error: " + message[1],
+			Message:    "Could not connect to Azure storage. Error: " + err.Error(),
 		}
 	}
 
 	return true, ValidationError{}
-
 }
 
 func validateSwift(opts Options, storageName string, authVersion int, swiftUser, swiftPassword, containerName, authUrl string, osOptions map[string]interface{}, fgName string) (bool, ValidationError) {
