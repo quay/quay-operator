@@ -89,6 +89,8 @@ type Version struct {
 }
 
 // ListVersionsResult is an element in the list object versions response
+// and has a special Unmarshaler because we need to preserver the order
+// of <Version>  and <DeleteMarker> in ListVersionsResult.Versions slice
 type ListVersionsResult struct {
 	Versions []Version
 
@@ -119,14 +121,13 @@ func (l *ListVersionsResult) UnmarshalXML(d *xml.Decoder, start xml.StartElement
 			return err
 		}
 
-		switch se := t.(type) {
-		case xml.StartElement:
+		se, ok := t.(xml.StartElement)
+		if ok {
 			tagName := se.Name.Local
 			switch tagName {
 			case "Name", "Prefix",
 				"Delimiter", "EncodingType",
-				"KeyMarker", "VersionIdMarker",
-				"NextKeyMarker", "NextVersionIdMarker":
+				"KeyMarker", "NextKeyMarker":
 				var s string
 				if err = d.DecodeElement(&s, &se); err != nil {
 					return err
@@ -135,6 +136,20 @@ func (l *ListVersionsResult) UnmarshalXML(d *xml.Decoder, start xml.StartElement
 				if v.IsValid() {
 					v.SetString(s)
 				}
+			case "VersionIdMarker":
+				// VersionIdMarker is a special case because of 'Id' instead of 'ID' in field name
+				var s string
+				if err = d.DecodeElement(&s, &se); err != nil {
+					return err
+				}
+				l.VersionIDMarker = s
+			case "NextVersionIdMarker":
+				// NextVersionIdMarker is a special case because of 'Id' instead of 'ID' in field name
+				var s string
+				if err = d.DecodeElement(&s, &se); err != nil {
+					return err
+				}
+				l.NextVersionIDMarker = s
 			case "IsTruncated": //        bool
 				var b bool
 				if err = d.DecodeElement(&b, &se); err != nil {
@@ -246,6 +261,12 @@ type ObjectPart struct {
 
 	// Size of the uploaded part data.
 	Size int64
+
+	// Checksum values of each part.
+	ChecksumCRC32  string
+	ChecksumCRC32C string
+	ChecksumSHA1   string
+	ChecksumSHA256 string
 }
 
 // ListObjectPartsResult container for ListObjectParts response.
@@ -284,6 +305,12 @@ type completeMultipartUploadResult struct {
 	Bucket   string
 	Key      string
 	ETag     string
+
+	// Checksum values, hash of hashes of parts.
+	ChecksumCRC32  string
+	ChecksumCRC32C string
+	ChecksumSHA1   string
+	ChecksumSHA256 string
 }
 
 // CompletePart sub container lists individual part numbers and their
@@ -294,6 +321,12 @@ type CompletePart struct {
 	// Part number identifies the part.
 	PartNumber int
 	ETag       string
+
+	// Checksum values
+	ChecksumCRC32  string
+	ChecksumCRC32C string
+	ChecksumSHA1   string
+	ChecksumSHA256 string
 }
 
 // completeMultipartUpload container for completing multipart upload.
@@ -320,14 +353,15 @@ type deletedObject struct {
 	VersionID string `xml:"VersionId,omitempty"`
 	// These fields are ignored.
 	DeleteMarker          bool
-	DeleteMarkerVersionID string
+	DeleteMarkerVersionID string `xml:"DeleteMarkerVersionId,omitempty"`
 }
 
 // nonDeletedObject container for Error element (failed deletion) in MultiObjects Delete XML response
 type nonDeletedObject struct {
-	Key     string
-	Code    string
-	Message string
+	Key       string
+	Code      string
+	Message   string
+	VersionID string `xml:"VersionId"`
 }
 
 // deletedMultiObjects container for MultiObjects Delete XML request

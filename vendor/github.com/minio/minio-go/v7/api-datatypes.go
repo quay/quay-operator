@@ -45,27 +45,29 @@ type StringMap map[string]string
 // on the first line is initialize it.
 func (m *StringMap) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	*m = StringMap{}
-	type xmlMapEntry struct {
-		XMLName xml.Name
-		Value   string `xml:",chardata"`
+	type Item struct {
+		Key   string
+		Value string
 	}
 	for {
-		var e xmlMapEntry
+		var e Item
 		err := d.Decode(&e)
 		if err == io.EOF {
 			break
-		} else if err != nil {
+		}
+		if err != nil {
 			return err
 		}
-		(*m)[e.XMLName.Local] = e.Value
+		(*m)[e.Key] = e.Value
 	}
 	return nil
 }
 
 // Owner name.
 type Owner struct {
-	DisplayName string `json:"name"`
-	ID          string `json:"id"`
+	XMLName     xml.Name `xml:"Owner" json:"owner"`
+	DisplayName string   `xml:"ID" json:"name"`
+	ID          string   `xml:"DisplayName" json:"id"`
 }
 
 // UploadInfo contains information about the
@@ -83,6 +85,20 @@ type UploadInfo struct {
 	// not to be confused with `Expires` HTTP header.
 	Expiration       time.Time
 	ExpirationRuleID string
+
+	// Verified checksum values, if any.
+	ChecksumCRC32  string
+	ChecksumCRC32C string
+	ChecksumSHA1   string
+	ChecksumSHA256 string
+}
+
+// RestoreInfo contains information of the restore operation of an archived object
+type RestoreInfo struct {
+	// Is the restoring operation is still ongoing
+	OngoingRestore bool
+	// When the restored copy of the archived object will be removed
+	ExpiryTime time.Time
 }
 
 // ObjectInfo container for object metadata.
@@ -103,7 +119,7 @@ type ObjectInfo struct {
 	Metadata http.Header `json:"metadata" xml:"-"`
 
 	// x-amz-meta-* headers stripped "x-amz-meta-" prefix containing the first value.
-	UserMetadata StringMap `json:"userMetadata"`
+	UserMetadata StringMap `json:"userMetadata,omitempty"`
 
 	// x-amz-tagging values in their k/v values.
 	UserTags map[string]string `json:"userTags"`
@@ -115,14 +131,7 @@ type ObjectInfo struct {
 	Owner Owner
 
 	// ACL grant.
-	Grant []struct {
-		Grantee struct {
-			ID          string `xml:"ID"`
-			DisplayName string `xml:"DisplayName"`
-			URI         string `xml:"URI"`
-		} `xml:"Grantee"`
-		Permission string `xml:"Permission"`
-	} `xml:"Grant"`
+	Grant []Grant
 
 	// The class of storage used to store the object.
 	StorageClass string `json:"storageClass"`
@@ -133,7 +142,7 @@ type ObjectInfo struct {
 	VersionID      string `xml:"VersionId"`
 
 	// x-amz-replication-status value is either in one of the following states
-	// - COMPLETE
+	// - COMPLETED
 	// - PENDING
 	// - FAILED
 	// - REPLICA (on the destination)
@@ -143,6 +152,14 @@ type ObjectInfo struct {
 	// not to be confused with `Expires` HTTP header.
 	Expiration       time.Time
 	ExpirationRuleID string
+
+	Restore *RestoreInfo
+
+	// Checksum values
+	ChecksumCRC32  string
+	ChecksumCRC32C string
+	ChecksumSHA1   string
+	ChecksumSHA256 string
 
 	// Error
 	Err error `json:"-"`
