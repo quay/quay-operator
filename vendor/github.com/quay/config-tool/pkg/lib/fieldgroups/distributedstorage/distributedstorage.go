@@ -228,6 +228,13 @@ func NewDistributedStorageArgs(storageArgs map[string]interface{}) (*shared.Dist
 		}
 	}
 
+	if value, ok := storageArgs["endpoint_url"]; ok {
+		newDistributedStorageArgs.EndpointURL, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("endpoint_url must be of type string")
+		}
+	}
+
 	if value, ok := storageArgs["storage_path"]; ok {
 		newDistributedStorageArgs.StoragePath, ok = value.(string)
 		if !ok {
@@ -246,6 +253,36 @@ func NewDistributedStorageArgs(storageArgs map[string]interface{}) (*shared.Dist
 		newDistributedStorageArgs.CloudfrontKeyID, ok = value.(string)
 		if !ok {
 			return newDistributedStorageArgs, errors.New("cloudfront_key_id must be of type string")
+		}
+	}
+
+	// CloudFlare provider
+	if value, ok := storageArgs["cloudflare_domain"]; ok {
+		newDistributedStorageArgs.CloudflareDomain, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("cloudflare_domain must be of type string")
+		}
+	}
+
+	// Multi CDN provider
+	if value, ok := storageArgs["storage_config"]; ok {
+		newDistributedStorageArgs.StorageConfig, ok = value.(map[string]interface{})
+		if !ok {
+			return newDistributedStorageArgs, errors.New("storage_config must be of type map[string]string")
+		}
+	}
+
+	if value, ok := storageArgs["providers"]; ok {
+		newDistributedStorageArgs.Providers, ok = value.(map[string]interface{})
+		if !ok {
+			return newDistributedStorageArgs, errors.New("providers must be of type map[string]string")
+		}
+	}
+
+	if value, ok := storageArgs["default_provider"]; ok {
+		newDistributedStorageArgs.DefaultProvider, ok = value.(string)
+		if !ok {
+			return newDistributedStorageArgs, errors.New("default_provider must be of type string")
 		}
 	}
 
