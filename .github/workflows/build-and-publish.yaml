@@ -11,7 +11,7 @@ on:
         required: true
         type: choice
         options:
-        - redhat-3.6
+        - redhat-3.9
         - redhat-3.7
         - redhat-3.8
   push:

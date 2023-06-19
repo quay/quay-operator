@@ -6,10 +6,10 @@ on:
 
 jobs:
   trigger-36-build:
-    name: "Build and publish 3.6"
+    name: "Build and publish 3.9"
     runs-on: ubuntu-latest
     env:
-      BRANCH: redhat-3.6
+      BRANCH: redhat-3.9
     steps:
     - uses: convictional/trigger-workflow-and-wait@v1.3.0
       with:
