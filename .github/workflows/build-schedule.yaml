@@ -5,11 +5,11 @@ on:
     - cron: '0 3 * * *' # run before e2e-nightly to ensure a fresh operator build
 
 jobs:
-  trigger-36-build:
-    name: "Build and publish 3.6"
+  trigger-39-build:
+    name: "Build and publish 3.9"
     runs-on: ubuntu-latest
     env:
-      BRANCH: redhat-3.6
+      BRANCH: redhat-3.9
     steps:
     - uses: convictional/trigger-workflow-and-wait@v1.3.0
       with:
