@@ -9,7 +9,7 @@ metadata:
 spec:
   template:
     spec:
-      restartPolicy: OnFailure
+      restartPolicy: Never
       terminationGracePeriodSeconds: 180
       serviceAccountName: clair-postgres
       volumes:
