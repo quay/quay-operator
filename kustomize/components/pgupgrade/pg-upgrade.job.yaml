@@ -9,7 +9,7 @@ metadata:
 spec:
   template:
     spec:
-      restartPolicy: Never
+      restartPolicy: OnFailure
       terminationGracePeriodSeconds: 180
       serviceAccountName: quay-database
       volumes:
@@ -134,4 +134,4 @@ spec:
             - "run-postgresql"
           args:
             - "--version"
-  backoffLimit: 20
+  backoffLimit: 50

@@ -15,6 +15,7 @@ spec:
       labels:
         quay-component: clair-app
     spec:
+      terminationGracePeriodSeconds: 0
       serviceAccountName: clair-app
       affinity:
         podAntiAffinity:
