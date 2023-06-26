@@ -115,11 +115,11 @@ POWER_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-oper
 Z_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
            jq -r '.manifests[] | select(.platform.architecture == "s390x" and .platform.os == "linux").digest')
         
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${AMD64_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
+opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${AMD64_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64" --binary-image "quay.io/operator-framework/opm:latest@sha256:0b10c3c3f713f11c805505e0aa686ce2a347b814814c5e110a084903e513babe"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${POWER_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
+opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${POWER_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le" --binary-image "quay.io/operator-framework/opm:latest@sha256:fff91f41f24f237ae8f0fce06f8c2556b0b2fa6d98323c2beb32d5c664c5bd48"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${Z_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
+opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${Z_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x" --binary-image "quay.io/operator-framework/opm:latest@sha256:8620bcf64de1497435c3fe29fa50f4d577a354d8039cdf37b14a824c568fe308"
 docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
 
 docker manifest create --amend "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}" \
