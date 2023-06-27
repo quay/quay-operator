@@ -1,9 +1,0 @@
-# Overlay variant for upgrading to current Project Quay release.
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-bases:
-  - ../../../tmp
-patchesStrategicMerge:
-  # Scale the app and postgres pods to 0 pods in order to run all upgrades
-  - ./quay.deployment.patch.yaml
-  - ./postgres.deployment.patch.yaml

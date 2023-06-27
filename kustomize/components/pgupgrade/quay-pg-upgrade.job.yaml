@@ -1,23 +1,15 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: batch/v1
+kind: Job
 metadata:
-  name: quay-database
+  name: quay-postgres-upgrade
   labels:
-    quay-component: postgres
+    quay-component: quay-postgres-upgrade
   annotations:
-    quay-component: postgres
+    quay-component: quay-postgres-upgrade
 spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      quay-component: postgres
   template:
-    metadata:
-      labels:
-        quay-component: postgres
     spec:
+      restartPolicy: OnFailure
       terminationGracePeriodSeconds: 180
       serviceAccountName: quay-database
       volumes:
@@ -31,33 +23,23 @@ spec:
           persistentVolumeClaim:
             claimName: quay-postgres-13
       containers:
-        - name: postgres
+        - name: postgres-upgrade
           image: centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
               protocol: TCP
           env:
-            - name: POSTGRESQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: database-username
-            - name: POSTGRESQL_DATABASE
+            - name: POSTGRESQL_MIGRATION_REMOTE_HOST
               valueFrom:
                 secretKeyRef:
                   name: postgres-config-secret
                   key: database-name
-            - name: POSTGRESQL_ADMIN_PASSWORD
+            - name: POSTGRESQL_MIGRATION_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: postgres-config-secret
                   key: database-root-password
-            - name: POSTGRESQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-config-secret
-                  key: database-password
             - name: POSTGRESQL_SHARED_BUFFERS
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS
@@ -68,11 +50,14 @@ spec:
               subPath: postgresql.conf.sample
             - name: postgres-data
               mountPath: /var/lib/pgsql/data
-            - name: postgres-bootstrap
-              mountPath: /usr/share/container-scripts/postgresql/start/create-extensions.sh
-              subPath: create-extensions.sh
-              readOnly: true
           resources:
             requests:
               cpu: 500m
               memory: 2Gi
+          command:
+          - "/bin/sh"
+          - "-c"
+          args:
+          - >
+            run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
+  backoffLimit: 50
