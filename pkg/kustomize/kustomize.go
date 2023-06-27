@@ -95,10 +95,10 @@ func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 // to use. If set, returns a Kustomize image override for the given component.
 func postgresUpgradeImage() (types.Image, error) {
 	imageOverride := types.Image{
-		Name: "centos/postgresql-12-centos7",
+		Name: "centos/postgresql-10-centos7",
 	}
 
-	image := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES_UPGRADE")
+	image := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS")
 	if image == "" {
 		return imageOverride, nil
 	}
@@ -142,18 +142,6 @@ func unmanagedTLSOverlayDir() string {
 
 func configEditorOnlyOverlay() string {
 	return filepath.Join(kustomizeDir(), "overlays", "current", "config-only")
-}
-
-func postgresUpgradeAllOverlayDir() string {
-	return filepath.Join(kustomizeDir(), "overlays", "current", "pg-upgrade-all")
-}
-
-func postgresUpgradeQuayOnlyOverlayDir() string {
-	return filepath.Join(kustomizeDir(), "overlays", "current", "pg-upgrade-quay-only")
-}
-
-func postgresUpgradeClairOnlyOverlayDir() string {
-	return filepath.Join(kustomizeDir(), "overlays", "current", "pg-upgrade-clair-only")
 }
 
 func rolloutBlocked(quay *v1.QuayRegistry) bool {
@@ -443,13 +431,6 @@ func KustomizationFor(
 	if overlay == upgradeOverlayDir() {
 		componentPaths = []string{"../components/job"}
 	}
-	if ctx.NeedsPgUpgrade {
-		componentPaths = append(componentPaths, "../components/pgupgrade")
-	}
-	if ctx.NeedsClairPgUpgrade {
-		componentPaths = append(componentPaths, "../components/clairpgupgrade")
-	}
-
 	for _, component := range quay.Spec.Components {
 		if !component.Managed || component.Kind == v1.ComponentQuay {
 			continue
@@ -483,6 +464,13 @@ func KustomizationFor(
 				},
 			},
 		)
+	}
+
+	if ctx.NeedsPgUpgrade {
+		componentPaths = append(componentPaths, "../components/pgupgrade")
+	}
+	if ctx.NeedsClairPgUpgrade {
+		componentPaths = append(componentPaths, "../components/clairpgupgrade")
 	}
 
 	images := []types.Image{}
@@ -641,12 +629,6 @@ func Inflate(
 	var overlay string
 	if rolloutBlocked(quay) {
 		overlay = configEditorOnlyOverlay()
-	} else if ctx.NeedsPgUpgrade && ctx.NeedsClairPgUpgrade {
-		overlay = postgresUpgradeAllOverlayDir()
-	} else if ctx.NeedsPgUpgrade {
-		overlay = postgresUpgradeQuayOnlyOverlayDir()
-	} else if ctx.NeedsClairPgUpgrade {
-		overlay = postgresUpgradeClairOnlyOverlayDir()
 	} else if quay.Status.CurrentVersion != v1.QuayVersionCurrent || dbCfgHasChanged {
 		// we render the upgrade overlay directory only if the operator version or the
 		// database configuration has changed. this scales down quay and runs a job to

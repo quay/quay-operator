@@ -185,7 +185,6 @@ var kustomizationForTests = []struct {
 				APIVersion: types.KustomizationVersion,
 				Kind:       types.KustomizationKind,
 			},
-			Resources: []string{},
 			Components: []string{
 				"../components/clair",
 				"../components/redis",
@@ -197,7 +196,7 @@ var kustomizationForTests = []struct {
 				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
 				{Name: "centos/redis-32-centos7", NewName: "redis", NewTag: "buster"},
 				{Name: "centos/postgresql-13-centos7", NewName: "postgres", NewTag: "latest"},
-				{Name: "centos/postgresql-12-centos7", NewName: "postgres_upgrade", NewTag: "latest"},
+				{Name: "centos/postgresql-10-centos7", NewName: "postgres_previous", NewTag: "latest"},
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},

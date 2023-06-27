@@ -27,6 +27,7 @@ import (
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/tidwall/sjson"
 	"gopkg.in/yaml.v2"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -242,6 +243,61 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 
 		if job.Status.Succeeded == 1 {
 			log.Info(fmt.Sprintf("%s upgrade complete", jobName))
+			var oldPostgresDeploymentName string
+			if jobName == clairPostgresUpgradeJobName {
+				oldPostgresDeploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres-old")
+			} else {
+				oldPostgresDeploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database-old")
+			}
+			oldPostgresDeployment := &appsv1.Deployment{}
+			if err := r.Client.Get(
+				ctx,
+				types.NamespacedName{
+					Name:      oldPostgresDeploymentName,
+					Namespace: quay.GetNamespace(),
+				},
+				oldPostgresDeployment,
+			); err != nil {
+				r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", oldPostgresDeploymentName))
+				continue
+			}
+
+			// Remove owner reference
+			obj, err := v1.RemoveOwnerReference(quay, oldPostgresDeployment)
+			if err != nil {
+				log.Error(err, "could not remove owner reference from old postgres deployment")
+			}
+
+			// Delete old postgres deployment
+			if err := r.Client.Delete(
+				ctx,
+				obj,
+			); err != nil {
+				r.Log.Error(err, fmt.Sprintf("%s deployment could not be deleted", oldPostgresDeploymentName))
+			}
+
+			// Remove owner reference from old pvc so user can delete when ready
+			var oldPostgresPVCName string
+			if jobName == clairPostgresUpgradeJobName {
+				oldPostgresPVCName = fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres")
+			} else {
+				oldPostgresPVCName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database")
+			}
+			oldPostgresPVC := &corev1.PersistentVolumeClaim{}
+			if err := r.Client.Get(
+				ctx,
+				types.NamespacedName{
+					Name:      oldPostgresPVCName,
+					Namespace: quay.GetNamespace(),
+				},
+				oldPostgresPVC,
+			); err != nil {
+				r.Log.Info(fmt.Sprintf("%s pvc not found, skipping", oldPostgresDeploymentName))
+				continue
+			}
+			if _, err := v1.RemoveOwnerReference(quay, oldPostgresPVC); err != nil {
+				log.Error(err, "could not remove owner reference from old postgres pvc")
+			}
 			continue
 		}
 
