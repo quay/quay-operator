@@ -9,90 +9,49 @@ metadata:
 spec:
   template:
     spec:
-      restartPolicy: Never
+      restartPolicy: OnFailure
       terminationGracePeriodSeconds: 180
       serviceAccountName: clair-postgres
       volumes:
         - name: clair-postgres-conf-sample
           configMap:
             name: clair-postgres-conf-sample
-        - name: postgres-data
+        - name: clair-postgres-13
           persistentVolumeClaim:
-            claimName: clair-postgres
-        - name: migration-data
-          persistentVolumeClaim:
-            claimName: clair-postgres-migration
-      initContainers:
-        - name: postgres-old
-          image: centos/postgresql-12-centos7@sha256:be8803d45d64870f8dfd018f3110af62e2e1558d64191faea461005e1bd03243
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 5432
-              protocol: TCP
-          env:
-            - name: POSTGRESQL_UPGRADE
-              value: copy
-            - name: POSTGRESQL_USER
-              value: postgres
-            - name: POSTGRESQL_DATABASE
-              value: postgres
-            - name: POSTGRESQL_PASSWORD
-              value: postgres
-            - name: POSTGRESQL_ADMIN_PASSWORD
-              value: postgres
-            - name: POSTGRESQL_MAX_CONNECTIONS
-              value: "1000"
-          volumeMounts:
-            - name: clair-postgres-conf-sample
-              mountPath: /usr/share/pgsql/postgresql.conf.sample
-              subPath: postgresql.conf.sample
-            - name: postgres-data
-              mountPath: /var/lib/pgsql/data
-            - name: migration-data
-              mountPath: /var/lib/pgsql/backup
-          resources:
-            requests:
-              cpu: 500m
-              memory: 2Gi
-          command:
-            - "/bin/bash"
-            - "-c"
-            - "cp -r /var/lib/pgsql/data /var/lib/pgsql/backup/clair && run-postgresql --help"
-
+            claimName: clair-postgres-13
       containers:
-        - name: postgres-new
+        - name: clair-postgres-13
           image: centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
               protocol: TCP
           env:
-            - name: POSTGRESQL_UPGRADE
-              value: copy
-            - name: POSTGRESQL_USER
+            - name: POSTGRESQL_MIGRATION_REMOTE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: clair-config-secret
+                  key: clair-db-host
+            - name: POSTGRESQL_MIGRATION_ADMIN_PASSWORD
               value: postgres
-            - name: POSTGRESQL_DATABASE
-              value: postgres
-            - name: POSTGRESQL_PASSWORD
-              value: postgres
-            - name: POSTGRESQL_ADMIN_PASSWORD
-              value: postgres
+            - name: POSTGRESQL_SHARED_BUFFERS
+              value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS
-              value: "1000"
+              value: "2000"
           volumeMounts:
             - name: clair-postgres-conf-sample
               mountPath: /usr/share/pgsql/postgresql.conf.sample
               subPath: postgresql.conf.sample
-            - name: postgres-data
+            - name: clair-postgres-13
               mountPath: /var/lib/pgsql/data
-            - name: migration-data
-              mountPath: /var/lib/pgsql/backup
           resources:
             requests:
               cpu: 500m
               memory: 2Gi
           command:
-            - "run-postgresql"
+          - "/bin/sh"
+          - "-c"
           args:
-            - "--version"
-  backoffLimit: 20
+          - >
+            run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
+  backoffLimit: 50

@@ -1,8 +1,0 @@
-# Overlay variant for upgrading to current Project Quay release.
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-bases:
-  - ../../../tmp
-patchesStrategicMerge:
-  - ./clair-postgres.deployment.patch.yaml
-  - ./clair.deployment.patch.yaml

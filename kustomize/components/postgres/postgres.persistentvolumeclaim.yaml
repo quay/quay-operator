@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: quay-database
+  name: quay-postgres-13
   labels:
     quay-component: postgres
   annotations:
