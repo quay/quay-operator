@@ -16,6 +16,7 @@ package controllers
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"strings"
@@ -34,13 +35,13 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -952,7 +953,8 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		client.FieldOwner("quay-operator"),
 	}
 	err := r.Client.Patch(ctx, obj, client.Apply, opts...)
-	if meta.IsNoMatchError(err) && gvk == hpaGVK {
+	gdferr := &discovery.ErrGroupDiscoveryFailed{}
+	if goerrors.As(err, &gdferr) && gvk == hpaGVK {
 		var hpa *autoscalingv2beta2.HorizontalPodAutoscaler
 		hpa, err = convertHpaToV2beta2(obj.(*autoscalingv2.HorizontalPodAutoscaler))
 		if err != nil {
