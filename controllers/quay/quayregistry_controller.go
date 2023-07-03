@@ -921,10 +921,12 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 			return err
 		}
 
-		if err := wait.Poll(
+		if err := wait.PollUntilContextTimeout(
+			ctx,
 			creationPollInterval,
 			creationPollTimeout,
-			func() (bool, error) {
+			false,
+			func(ctx context.Context) (bool, error) {
 				if err := r.Client.Create(ctx, obj); err != nil {
 					if errors.IsAlreadyExists(err) {
 						log.Info("immutable resource being deleted, retry")
