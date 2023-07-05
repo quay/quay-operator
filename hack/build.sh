@@ -13,7 +13,9 @@
 #  * a valid login session to a container registry.
 #  * `docker`
 #  * `yq`
+#  * `jq`
 #  * `opm`
+#  * `skopeo`
 #
 # NOTE: this script will modify the following files:
 #  - bundle/manifests/quay-operator.clusterserviceversion.yaml
@@ -88,6 +90,7 @@ yq eval -i '
 	.metadata.name = strenv(OPERATOR_NAME) |
 	.metadata.annotations.quay-version = strenv(TAG) |
 	.metadata.annotations.containerImage = strenv(OPERATOR_DIGEST) |
+	.metadata.labels += {"operatorframework.io/arch.amd64": "supported", "operatorframework.io/arch.s390x": "supported", "operatorframework.io/arch.ppc64le": "supported", "operatorframework.io/os.linux": "supported"} |
 	del(.spec.replaces) |
 	.spec.install.spec.deployments[0].name = strenv(OPERATOR_NAME) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].image = strenv(OPERATOR_DIGEST) |
