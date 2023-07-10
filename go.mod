@@ -9,7 +9,7 @@ require (
 	github.com/onsi/gomega v1.27.8
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.53.1
-	github.com/quay/clair/config v1.1.3
+	github.com/quay/clair/config v1.3.0
 	github.com/quay/config-tool v0.1.15
 	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/sjson v1.2.3
@@ -102,13 +102,11 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.1 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
-	golang.org/x/tools v0.9.1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect

@@ -324,8 +324,8 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/quay/clair/config v1.1.3
-## explicit; go 1.16
+# github.com/quay/clair/config v1.3.0
+## explicit; go 1.17
 github.com/quay/clair/config
 # github.com/quay/config-tool v0.1.15
 ## explicit; go 1.16
@@ -393,9 +393,6 @@ golang.org/x/crypto/blake2b
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/md4
 golang.org/x/crypto/pbkdf2
-# golang.org/x/mod v0.10.0
-## explicit; go 1.17
-golang.org/x/mod/semver
 # golang.org/x/net v0.10.0
 ## explicit; go 1.17
 golang.org/x/net/context
@@ -421,7 +418,6 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sys v0.8.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
-golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
@@ -459,24 +455,6 @@ golang.org/x/text/width
 # golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.9.1
-## explicit; go 1.18
-golang.org/x/tools/cmd/stringer
-golang.org/x/tools/go/gcexportdata
-golang.org/x/tools/go/internal/packagesdriver
-golang.org/x/tools/go/packages
-golang.org/x/tools/go/types/objectpath
-golang.org/x/tools/internal/event
-golang.org/x/tools/internal/event/core
-golang.org/x/tools/internal/event/keys
-golang.org/x/tools/internal/event/label
-golang.org/x/tools/internal/gcimporter
-golang.org/x/tools/internal/gocommand
-golang.org/x/tools/internal/packagesinternal
-golang.org/x/tools/internal/pkgbits
-golang.org/x/tools/internal/tokeninternal
-golang.org/x/tools/internal/typeparams
-golang.org/x/tools/internal/typesinternal
 # gomodules.xyz/jsonpatch/v2 v2.2.0
 ## explicit; go 1.12
 gomodules.xyz/jsonpatch/v2
