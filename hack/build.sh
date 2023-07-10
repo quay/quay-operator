@@ -13,7 +13,9 @@
 #  * a valid login session to a container registry.
 #  * `docker`
 #  * `yq`
+#  * `jq`
 #  * `opm`
+#  * `skopeo`
 #
 # NOTE: this script will modify the following files:
 #  - bundle/manifests/quay-operator.clusterserviceversion.yaml
