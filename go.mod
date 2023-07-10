@@ -11,7 +11,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.53.1
 	github.com/quay/clair/config v1.1.3
 	github.com/quay/config-tool v0.1.15
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/sjson v1.2.3
 	golang.org/x/net v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
