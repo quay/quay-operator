@@ -90,10 +90,11 @@ CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
 # This target called from the prepare-release github action.
-# CHANNEL       - operator channel (eg. stable-3.6, preview-3.6)
-# RELEASE       - quay-operator tag (eg. 3.6.0-alpha.4)
-# QUAY_RELEASE  - quay version (eg. 3.6.0-alpha.4)
-# CLAIR_RELEASE - clair version (eg. 4.3.5)
+# CHANNEL         - operator channel (eg. stable-3.6, candidate-3.9)
+# DEFAULT_CHANNEL - latest stable channel (eg. stable-3.8)
+# RELEASE         - quay tag (eg. 3.6.0-alpha.4)
+# CLAIR_RELEASE   - clair version (eg. 4.3.5)
+# REPLACES        - previous z-stream, do not set when releasing a y-stream (eg. quay-operator.v3.6.0-alpha.3)
 prepare-release:
 	@./hack/prepare-upstream.sh
 
