@@ -94,9 +94,3 @@ endif
 # REPLACES        - previous z-stream, do not set when releasing a y-stream (eg. quay-operator.v3.6.0-alpha.3)
 prepare-release:
 	@./hack/prepare-upstream.sh
-
-# CHANNEL       - operator channel (eg. stable-3.6)
-# RELEASE       - quay-operator tag (eg. 3.6.0-alpha.4)
-# REPLACES      - previous z-stream, do not set when releasing a y-stream
-prepare-downstream-release:
-	@./hack/prepare-downstream.sh
