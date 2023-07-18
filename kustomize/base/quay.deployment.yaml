@@ -142,4 +142,6 @@ spec:
               readOnly: true
               mountPath: /conf/stack/extra_ca_certs
             - name: postgres-certs
+              mountPath: /run/secrets/postgres
+            - name: postgres-cert-store
               mountPath: /.postgres
