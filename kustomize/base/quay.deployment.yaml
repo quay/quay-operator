@@ -44,7 +44,7 @@ spec:
               optional: true
         - name: postgres-certs-store
           emptyDir:
-            sizeLimit: 5m
+            sizeLimit: 5Mi
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
