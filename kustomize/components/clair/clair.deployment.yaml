@@ -29,7 +29,7 @@ spec:
                   - clair-app
               topologyKey: "kubernetes.io/hostname"
       containers:
-        - image: quay.io/projectquay/clair@sha256:77ffab0e44458d5725f2e9e5f2f57bda74b3bd073030611ca7cf5d753130c858
+        - image: quay.io/projectquay/clair:nightly
           imagePullPolicy: IfNotPresent
           name: clair-app
           env:

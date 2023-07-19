@@ -67,11 +67,9 @@ digest "${REGISTRY}/${NAMESPACE}/quay:${TAG}" QUAY_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/clair:nightly" CLAIR_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
-digest docker.io/redis:7.0 REDIS_DIGEST
-# shellcheck disable=SC2034
-POSTGRES_DIGEST='quay.io/sclorg/postgresql-13-c9s@sha256:efe7ca31ff169cc8d5f458cc0da4e844b6646a7c1fe76ac4d61a79dcc749f5d1'
-# shellcheck disable=SC2034
-POSTGRES_OLD_DIGEST='centos/postgresql-10-centos7@sha256:de1560cb35e5ec643e7b3a772ebaac8e3a7a2a8e8271d9e91ff023539b4dfb33'
+digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_DIGEST
+digest centos/postgresql-10-centos7:latest POSTGRES_OLD_DIGEST
+digest docker.io/library/redis:7.0 REDIS_DIGEST
 
 # need exporting so that yq can see them
 export OPERATOR_DIGEST
@@ -80,6 +78,7 @@ export CLAIR_DIGEST
 export BUILDER_DIGEST
 export BUILDER_QEMU_DIGEST
 export POSTGRES_DIGEST
+export POSTGRES_OLD_DIGEST
 export REDIS_DIGEST
 
 

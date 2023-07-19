@@ -380,7 +380,13 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	} else {
 		expectedName = expectedImage.Name
 	}
-	if strings.Split(deployedImageName, "@")[0] != expectedName {
+	currentName := deployedImageName
+	if len(strings.Split(currentName, "@")) == 2 {
+		currentName = strings.Split(currentName, "@")[0]
+	} else if len(strings.Split(currentName, ":")) == 2 {
+		currentName = strings.Split(currentName, ":")[0]
+	}
+	if currentName != expectedName {
 		if component == v1.ComponentClairPostgres {
 			r.Log.Info("clair-postgres needs to perform an upgrade, marking in context")
 			qctx.NeedsClairPgUpgrade = true
