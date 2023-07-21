@@ -1,5 +1,10 @@
+# Overlay variant for upgrading to current Project Quay release.
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 resources:
-  - ./pg-upgrade.job.yaml
-  - ./pg-upgrade.persistentvolumeclaim.yaml
+  - ./quay-pg-upgrade.job.yaml
+  - ./quay-pg-old.persistentvolumeclaim.yaml
+  - ./quay-pg-old.deployment.yaml
+patchesStrategicMerge:
+  - ./quay.deployment.patch.yaml
+  - ./quay-pg.deployment.patch.yaml

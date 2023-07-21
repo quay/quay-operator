@@ -375,6 +375,7 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			return nil, err
 		}
 		cfgFiles["config.yaml"] = cfg
+		cfgFiles["clair-db-host"] = []byte(strings.TrimSpace(strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")))
 
 		return cfgFiles, nil
 	default:
