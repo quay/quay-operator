@@ -155,11 +155,11 @@ spec:
                       - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
                         value: quay.io/projectquay/quay-builder-qemu:main
                       - name: RELATED_IMAGE_COMPONENT_POSTGRES
-                        value: centos/postgresql-13-centos7@sha256:71b24684d64da46f960682cc4216222a7e4ed8b1a31dd5a865b3e71afdea20d2
-                      - name: RELATED_IMAGE_COMPONENT_POSTGRES_UPGRADE
-                        value: centos/postgresql-12-centos7@sha256:be8803d45d64870f8dfd018f3110af62e2e1558d64191faea461005e1bd03243
+                        value: quay.io/sclorg/postgresql-13-c9s:latest
+                      - name: RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS
+                        value: centos/postgresql-10-centos7:latest
                       - name: RELATED_IMAGE_COMPONENT_REDIS
-                        value: centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542
+                        value: docker.io/library/redis:7.0
                 serviceAccountName: quay-operator
       permissions:
         - rules:

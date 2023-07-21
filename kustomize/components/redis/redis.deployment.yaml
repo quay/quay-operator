@@ -19,7 +19,7 @@ spec:
       serviceAccountName: quay-redis
       containers:
         - name: redis-master
-          image: centos/redis-32-centos7@sha256:06dbb609484330ec6be6090109f1fa16e936afcf975d1cbc5fff3e6c7cae7542
+          image: docker.io/library/redis:7.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 6379
