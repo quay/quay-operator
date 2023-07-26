@@ -37,7 +37,7 @@ metadata:
   name: odf-operator
   namespace: openshift-storage
 spec:
-  channel: stable-4.9
+  channel: stable-4.13
   installPlanApproval: Automatic
   name: odf-operator
   source: redhat-operators
@@ -66,11 +66,11 @@ metadata:
   name: noobaa
   namespace: openshift-storage
 spec:
+ dbType: postgres
  dbResources:
    requests:
      cpu: '0.1'
      memory: 1Gi
- dbType: postgres
  coreResources:
    requests:
      cpu: '0.1'
