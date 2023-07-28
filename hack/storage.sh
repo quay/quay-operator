@@ -6,6 +6,9 @@
 #  * a valid login session to an OCP cluster, with cluster admin privileges
 #  * `oc`
 
+export TAG=${TAG:-"4"}
+VERSION=$(oc version | grep 'Client Version' | cut -f2 -d ":" | cut -f2 -d ".")
+
 # prints pre-formatted info output.
 function info {
 	echo "INFO $(date '+%Y-%m-%dT%H:%M:%S') $*"
@@ -37,7 +40,7 @@ metadata:
   name: odf-operator
   namespace: openshift-storage
 spec:
-  channel: stable-4.13
+  channel: stable-${TAG}.${VERSION}
   installPlanApproval: Automatic
   name: odf-operator
   source: redhat-operators
