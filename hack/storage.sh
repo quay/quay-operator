@@ -6,8 +6,7 @@
 #  * a valid login session to an OCP cluster, with cluster admin privileges
 #  * `oc`
 
-export TAG=${TAG:-"4"}
-VERSION=$(oc version | grep 'Client Version' | cut -f2 -d ":" | cut -f2 -d ".")
+VERSION=$(oc get clusterversion version -o jsonpath='{range .status.history[?(@.state=="Completed")]}{.version}{"\n"}{end}' | head -n1 | cut -d. -f1-2)
 
 # prints pre-formatted info output.
 function info {
@@ -40,7 +39,7 @@ metadata:
   name: odf-operator
   namespace: openshift-storage
 spec:
-  channel: stable-${TAG}.${VERSION}
+  channel: stable-${VERSION}
   installPlanApproval: Automatic
   name: odf-operator
   source: redhat-operators
