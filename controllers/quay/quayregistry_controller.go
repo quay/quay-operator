@@ -17,6 +17,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -298,6 +299,19 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 			if _, err := v1.RemoveOwnerReference(quay, oldPostgresPVC); err != nil {
 				log.Error(err, "could not remove owner reference from old postgres pvc")
 			}
+
+			// If user has set POSTGRES_UPGRADE_RETAIN_BACKUP=true, then we should not delete the old PVC
+			if os.Getenv("POSTGRES_UPGRADE_RETAIN_BACKUP") == "true" {
+				continue
+			}
+
+			// Delete old PVC
+			if err := r.Client.Delete(ctx, oldPostgresPVC); err != nil {
+				r.Log.Error(err, fmt.Sprintf("Failed to delete PVC %s", oldPostgresPVC.Name))
+			} else {
+				r.Log.Info(fmt.Sprintf("Successfully deleted PVC %s", oldPostgresPVC.Name))
+			}
+
 			continue
 		}
 
