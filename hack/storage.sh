@@ -6,6 +6,8 @@
 #  * a valid login session to an OCP cluster, with cluster admin privileges
 #  * `oc`
 
+VERSION=$(oc get clusterversion version -o jsonpath='{range .status.history[?(@.state=="Completed")]}{.version}{"\n"}{end}' | head -n1 | cut -d. -f1-2)
+
 # prints pre-formatted info output.
 function info {
 	echo "INFO $(date '+%Y-%m-%dT%H:%M:%S') $*"
@@ -37,7 +39,7 @@ metadata:
   name: odf-operator
   namespace: openshift-storage
 spec:
-  channel: stable-4.9
+  channel: stable-${VERSION}
   installPlanApproval: Automatic
   name: odf-operator
   source: redhat-operators
@@ -66,11 +68,11 @@ metadata:
   name: noobaa
   namespace: openshift-storage
 spec:
+ dbType: postgres
  dbResources:
    requests:
      cpu: '0.1'
      memory: 1Gi
- dbType: postgres
  coreResources:
    requests:
      cpu: '0.1'
