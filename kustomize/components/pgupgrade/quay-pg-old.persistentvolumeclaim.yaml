@@ -2,6 +2,10 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: quay-database
+  labels:
+    quay-component: postgres
+  annotations:
+    quay-component: postgres
 spec:
   accessModes:
     - ReadWriteOnce
