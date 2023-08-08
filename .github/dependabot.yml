@@ -6,3 +6,8 @@ updates:
       interval: weekly
     assignees:
       - dmage
+    groups:
+      k8s:
+        patterns:
+          - k8s.io/*
+          - sigs.k8s.io/*
