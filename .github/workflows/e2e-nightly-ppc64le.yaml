@@ -1,0 +1,88 @@
+---
+name: E2E Nightly ppc64le
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to run tests from. Defaults to redhat-3.10'
+        required: false
+      tag:
+        description: 'quay-operator-index tag. Defaults to 3.10-unstable'
+        required: false
+  schedule:
+    - cron: '15 11 * * *'
+
+jobs:
+  deploy:
+    name: Deploy the operator
+    runs-on: 'ubuntu-latest'
+    env:
+      BRANCH: ${{ github.event.inputs.branch || 'redhat-3.10' }}
+      TAG: ${{ github.event.inputs.tag || '3.10-unstable' }}
+      CATALOG_PATH: ./bundle/quay-operator.catalogsource.yaml
+      OG_PATH: ./bundle/quay-operator.operatorgroup.yaml
+      SUBSCRIPTION_PATH: ./bundle/quay-operator.subscription.yaml
+      QUAY_SAMPLE_PATH: ./config/samples/managed.quayregistry.yaml
+      OPERATOR_PKG_NAME: quay-operator-test
+      NAMESPACE: quay-operator-e2e-nightly
+      WAIT_TIMEOUT: 10m
+      KUBECONFIG: ${{ github.workspace }}/quaye2e/auth/kubeconfig
+    steps:
+      - name: check out the repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - name: install CLI tools from OpenShift Mirror
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4"
+
+      - name: create ppc64le cluster
+        env:
+          IBMCLOUD_API_KEY: ${{ secrets.PPC64LE_IBMCLOUD_API_KEY }}
+        run: |
+          mkdir -p ${{ github.workspace }}/quaye2e/
+          mkdir -p ~/.powervs
+          printf "${{ secrets.PPC64LE_INSTALL_CONFIG }}" | base64 --decode > ${{ github.workspace }}/quaye2e/install-config.yaml
+          printf "${{ secrets.PPC64LE_POWERVS_CONFIG }}" | base64 --decode > ~/.powervs/config.json
+          printf "${{ secrets.PPC64LE_PULL_SECRET }}" | base64 --decode > ~/.pull-secret
+          ./hack/ppc64le/create_cluster.sh
+
+      - name: setup storage
+        run: ./hack/storage.sh
+
+      - name: deploy
+        env:
+          CATALOG_IMAGE: quay.io/projectquay/quay-operator-index:${{ env.TAG }}
+        run: ./hack/deploy.sh
+
+      - name: E2E Tests
+        env:
+          KUBECONFIG: ${{ github.workspace }}/quaye2e/auth/kubeconfig
+        run: make test-e2e
+
+      - name: teardown deployment
+        if: always()
+        run: ./hack/teardown.sh
+
+      - name: destroy ppc64le cluster
+        if: always()
+        env:
+          IBMCLOUD_API_KEY: ${{ secrets.PPC64LE_IBMCLOUD_API_KEY }}
+        run: |
+          ./hack/ppc64le/destroy_cluster.sh
+
+      # - name: Notify slack
+      #   if: ${{ always() }}
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_CHANNEL: team-quay-bots
+      #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      #     SLACK_COLOR: ${{ job.status }}
+      #     SLACK_TITLE: "${{ github.workflow }}: ${{ job.status }}"
+      #     SLACK_MESSAGE: |
+      #       * **Repo**:     ${{ github.repository }}
+      #       * **Workflow**: ${{ github.workflow }}
+      #       * **Result**:   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
