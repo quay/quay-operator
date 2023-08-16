@@ -11,7 +11,7 @@ jobs:
     env:
       BRANCH: redhat-3.9
     steps:
-    - uses: convictional/trigger-workflow-and-wait@v1.3.0
+    - uses: convictional/trigger-workflow-and-wait@v1.6.5
       with:
         owner: ${{ github.repository_owner }}
         repo: 'quay-operator'
@@ -31,7 +31,7 @@ jobs:
     env:
       BRANCH: redhat-3.7
     steps:
-    - uses: convictional/trigger-workflow-and-wait@v1.3.0
+    - uses: convictional/trigger-workflow-and-wait@v1.6.5
       with:
         owner: ${{ github.repository_owner }}
         repo: 'quay-operator'
@@ -51,7 +51,7 @@ jobs:
     env:
       BRANCH: redhat-3.8
     steps:
-    - uses: convictional/trigger-workflow-and-wait@v1.3.0
+    - uses: convictional/trigger-workflow-and-wait@v1.6.5
       with:
         owner: ${{ github.repository_owner }}
         repo: 'quay-operator'
