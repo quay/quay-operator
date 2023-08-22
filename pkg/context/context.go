@@ -8,6 +8,10 @@ type QuayRegistryContext struct {
 	ServerHostname       string
 	BuildManagerHostname string
 
+	// Cluster CA Resource Versions
+	ClusterServiceCAHash string
+	ClusterTrustedCAHash string
+
 	// TLS
 	ClusterWildcardCert []byte
 	TLSCert             []byte
