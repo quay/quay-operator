@@ -651,7 +651,7 @@ func Inflate(
 	}
 
 	for index, resource := range resources {
-		obj, err := middleware.Process(quay, resource, skipres)
+		obj, err := middleware.Process(quay, ctx, resource, skipres)
 		if err != nil {
 			return nil, err
 		}

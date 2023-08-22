@@ -475,6 +475,17 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	quayContext := quaycontext.NewQuayRegistryContext()
 	r.checkManagedTLS(quayContext, cbundle)
 
+	if err := r.checkClusterCAHash(ctx, quayContext, updatedQuay); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("unable to check cluster CA certs: %s", err),
+		)
+	}
+
 	if err := r.checkManagedKeys(ctx, quayContext, updatedQuay); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
