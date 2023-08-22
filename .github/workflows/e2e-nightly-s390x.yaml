@@ -1,0 +1,67 @@
+---
+name: E2E Nightly
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to run tests from. Defaults to redhat-3.10'
+        required: true
+      tag:
+        description: 'quay-operator-index tag. Defaults to 3.10-unstable'
+        required: false
+  schedule:
+    - cron: '30 5 * * *'
+
+jobs:
+  deploy:
+    name: Deploy the operator
+    runs-on: 'ubuntu-latest'
+    env:
+      BRANCH: ${{ github.event.inputs.branch || 'redhat-3.10' }}
+      TAG: ${{ github.event.inputs.tag || '3.10-unstable' }}
+      CATALOG_PATH: ./bundle/quay-operator.catalogsource.yaml
+      OG_PATH: ./bundle/quay-operator.operatorgroup.yaml
+      SUBSCRIPTION_PATH: ./bundle/quay-operator.subscription.yaml
+      QUAY_SAMPLE_PATH: ./config/samples/managed.quayregistry.yaml
+      OPERATOR_PKG_NAME: quay-operator-test
+      NAMESPACE: quay-operator-e2e-nightly
+      WAIT_TIMEOUT: 10m
+      KUBECONFIG: ${{ github.workspace }}/kubeconfig
+    steps:
+      - name: check out the repo
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - name: install CLI tools from OpenShift Mirror
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4"
+
+      - name: install yq
+        env:
+          VERSION: v4.14.2
+          BINARY: yq_linux_amd64
+        run: |
+          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY} -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: setup kubeconfig
+        run: |
+          printf "${{ secrets.s390x_KUBE_CONFIG }}" | base64 --decode > "${KUBECONFIG}"
+
+      - name: deploy
+        env:
+          CATALOG_IMAGE: quay.io/projectquay/quay-operator-index:${{ env.TAG }}
+        run: ./hack/deploy.sh
+
+      - name: E2E Tests
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+        run: make test-e2e
+
+      - name: teardown deployment
+        if: always()
+        run: ./hack/teardown.sh
+
