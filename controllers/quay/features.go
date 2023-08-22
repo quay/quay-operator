@@ -3,7 +3,9 @@ package controllers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"strings"
@@ -105,6 +107,60 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	qctx.DbRootPw = string(secret.Data[dbRootPw])
 	qctx.ConfigEditorPw = string(secret.Data[configEditorPw])
 	qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
+	return nil
+}
+
+// checkClusterCAHash populates the provided QuayRegistryContext with revision version of the cluster provided CA configmaps.
+// We must track these revisions so that we can force a restart of the QuayRegistry pods when the CA configmaps are updated.
+func (r *QuayRegistryReconciler) checkClusterCAHash(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) error {
+
+	hashConfigMapContents := func(data map[string]string, key string) string {
+		certData, exists := data[key]
+		if !exists {
+			return ""
+		}
+		hash := sha256.Sum256([]byte(certData))
+		hashStr := hex.EncodeToString(hash[:])
+		return hashStr[len(hashStr)-8:]
+	}
+
+	// Get cluster-service-ca hash
+	clusterServiceCAnsn := types.NamespacedName{
+		Name:      fmt.Sprintf("%s-%s", quay.Name, v1.ClusterServiceCAName),
+		Namespace: quay.Namespace,
+	}
+	var clusterServiceCA corev1.ConfigMap
+	if err := r.Get(ctx, clusterServiceCAnsn, &clusterServiceCA); err == nil {
+		qctx.ClusterServiceCAHash = hashConfigMapContents(clusterServiceCA.Data, "service-ca.crt")
+		if currentHash, exists := clusterServiceCA.Annotations[v1.ClusterServiceCAName]; !exists || currentHash != qctx.ClusterServiceCAHash {
+			r.Log.Info("Detected change in cluster-service-ca configmap, updating annotation to trigger restart")
+			clusterServiceCA.Annotations[v1.ClusterServiceCAName] = qctx.ClusterServiceCAHash
+			if err := r.Update(ctx, &clusterServiceCA); err != nil {
+				r.Log.Error(err, "unable to update cluster-service-ca configmap annotations")
+				return err
+			}
+		}
+	}
+
+	clusterTrustedCAnsn := types.NamespacedName{
+		Name:      fmt.Sprintf("%s-%s", quay.Name, v1.ClusterTrustedCAName),
+		Namespace: quay.Namespace,
+	}
+	var clusterTrustedCA corev1.ConfigMap
+	if err := r.Get(ctx, clusterTrustedCAnsn, &clusterTrustedCA); err == nil {
+		qctx.ClusterTrustedCAHash = hashConfigMapContents(clusterTrustedCA.Data, "ca-bundle.crt")
+		if currentHash, exists := clusterTrustedCA.Annotations[v1.ClusterTrustedCAName]; !exists || currentHash != qctx.ClusterTrustedCAHash {
+			r.Log.Info("Detected change in cluster-trusted-ca configmap, updating annotation to trigger restart")
+			clusterTrustedCA.Annotations[v1.ClusterTrustedCAName] = qctx.ClusterTrustedCAHash
+			if err := r.Update(ctx, &clusterTrustedCA); err != nil {
+				r.Log.Error(err, "unable to update cluster-trusted-ca configmap annotations")
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

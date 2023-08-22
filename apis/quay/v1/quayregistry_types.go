@@ -110,6 +110,8 @@ const (
 	QuayUpgradeJobName          = "quay-app-upgrade"
 	PostgresUpgradeJobName      = "quay-postgres-upgrade"
 	ClairPostgresUpgradeJobName = "clair-postgres-upgrade"
+	ClusterServiceCAName        = "cluster-service-ca"
+	ClusterTrustedCAName        = "cluster-trusted-ca"
 )
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
