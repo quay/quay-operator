@@ -50,7 +50,7 @@ jobs:
 
       - name: setup kubeconfig
         run: |
-          printf "${{ secrets.s390x_KUBE_CONFIG }}" | base64 --decode > "${KUBECONFIG}"
+          printf "${{ secrets.s390x_KUBE_CONFIG }}" > "${KUBECONFIG}"
 
       - name: deploy
         env:
