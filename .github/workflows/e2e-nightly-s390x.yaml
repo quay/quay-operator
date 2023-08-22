@@ -2,6 +2,7 @@
 name: E2E Nightly s390x
 
 on:
+  push:
   workflow_dispatch:
     inputs:
       branch:
