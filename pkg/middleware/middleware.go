@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	route "github.com/openshift/api/route/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +28,7 @@ const (
 // Process applies any additional middleware steps to a managed k8s object that cannot be
 // accomplished using the Kustomize toolchain. if skipres is set all resource requests are
 // trimmed from the objects thus deploying quay with a much smaller footprint.
-func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Object, error) {
+func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj client.Object, skipres bool) (client.Object, error) {
 	objectMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -88,6 +89,12 @@ func Process(quay *v1.QuayRegistry, obj client.Object, skipres bool) (client.Obj
 		if oaff := v1.GetAffinityForComponent(quay, kind); oaff != nil {
 			dep.Spec.Template.Spec.Affinity = oaff
 		}
+
+		// Add annotations to track the hash of the cluster service CA. This is to ensure that we redeploy when the cluster service CA changes.
+		dep.Annotations[v1.ClusterServiceCAName] = qctx.ClusterServiceCAHash
+		dep.Annotations[v1.ClusterTrustedCAName] = qctx.ClusterTrustedCAHash
+		dep.Spec.Template.Annotations[v1.ClusterServiceCAName] = qctx.ClusterServiceCAHash
+		dep.Spec.Template.Annotations[v1.ClusterTrustedCAName] = qctx.ClusterTrustedCAHash
 
 		// here we do an attempt to setting the default or overwriten number of replicas
 		// for clair, quay and mirror. we can't do that if horizontal pod autoscaler is
