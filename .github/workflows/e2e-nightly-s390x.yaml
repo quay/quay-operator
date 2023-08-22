@@ -7,7 +7,7 @@ on:
     inputs:
       branch:
         description: 'Branch to run tests from. Defaults to redhat-3.10'
-        required: true
+        required: false
       tag:
         description: 'quay-operator-index tag. Defaults to 3.10-unstable'
         required: false
@@ -19,7 +19,7 @@ jobs:
     name: Deploy the operator
     runs-on: 'ubuntu-latest'
     env:
-      BRANCH: ${{ github.event.inputs.branch || 'redhat-3.10' }}
+      BRANCH: ${{ github.event.inputs.branch || 'IBMZ-e2e' }}
       TAG: ${{ github.event.inputs.tag || '3.10-unstable' }}
       CATALOG_PATH: ./bundle/quay-operator.catalogsource.yaml
       OG_PATH: ./bundle/quay-operator.operatorgroup.yaml
