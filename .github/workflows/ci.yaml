@@ -38,9 +38,6 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     container: docker.io/library/golang:latest
-    strategy:
-      matrix:
-        platform: [amd64, ppc64le, s390x]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
