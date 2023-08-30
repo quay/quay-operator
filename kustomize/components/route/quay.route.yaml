@@ -6,7 +6,7 @@ metadata:
     quay-component: quay-app-route
   annotations:
     quay-component: route
-    haproxy.router.openshift.io/timeout: 60s
+    haproxy.router.openshift.io/timeout: 5m
 spec:
   host: $(SERVER_HOSTNAME)
   to:
