@@ -178,6 +178,10 @@ func createUpdatedSecret(reconfigureRequest request, oldSecret corev1.Secret) co
 
 	for fullFilePathname, encodedCert := range reconfigureRequest.Certs {
 		certName := strings.Split(fullFilePathname, "/")[len(strings.Split(fullFilePathname, "/"))-1]
+		// We must strip out cluster provisioned CA certs, as they will be mounted into the pod from separate config maps
+		if certName == "service-ca.crt" || certName == "ca-bundle.crt" {
+			continue
+		}
 		if strings.HasPrefix(fullFilePathname, "extra_ca_certs/") {
 			certName = "extra_ca_cert_" + strings.ReplaceAll(certName, "extra_ca_cert_", "")
 		}
