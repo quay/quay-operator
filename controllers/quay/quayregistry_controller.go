@@ -427,6 +427,7 @@ func (r *QuayRegistryReconciler) GetConfigBundleSecret(
 func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Mtx.Lock()
 	defer r.Mtx.Unlock()
+	return ctrl.Result{RequeueAfter: time.Minute}, nil
 
 	regid := fmt.Sprintf("%s/%s", req.NamespacedName.Namespace, req.NamespacedName.Name)
 	log := r.Log.WithValues("quayregistry", regid)
