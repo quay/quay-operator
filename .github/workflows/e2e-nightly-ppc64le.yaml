@@ -11,7 +11,7 @@ on:
         description: 'quay-operator-index tag. Defaults to 3.10-unstable'
         required: false
   schedule:
-    - cron: '15 11 * * *'
+    - cron: '0 0 * * 3,5'
 
 jobs:
   deploy:
@@ -74,15 +74,16 @@ jobs:
         run: |
           ./hack/ppc64le/destroy_cluster.sh
 
-      # - name: Notify slack
-      #   if: ${{ always() }}
-      #   uses: rtCamp/action-slack-notify@v2
-      #   env:
-      #     SLACK_CHANNEL: team-quay-bots
-      #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-      #     SLACK_COLOR: ${{ job.status }}
-      #     SLACK_TITLE: "${{ github.workflow }}: ${{ job.status }}"
-      #     SLACK_MESSAGE: |
-      #       * **Repo**:     ${{ github.repository }}
-      #       * **Workflow**: ${{ github.workflow }}
-      #       * **Result**:   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - name: Notify slack
+        if: ${{ always() }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: team-quay-bots
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "${{ github.workflow }}: ${{ job.status }}"
+          SLACK_MESSAGE: |
+            * **Repo**: ${{ github.repository }}
+            * **Workflow**: ${{ github.workflow }}
+            * **Result**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            * **Contact**: @yshaikh
