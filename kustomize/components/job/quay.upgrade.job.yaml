@@ -69,3 +69,4 @@ spec:
             - name: extra-ca-certs
               readOnly: true
               mountPath: /conf/stack/extra_ca_certs
+          terminationMessagePolicy: FallbackToLogsOnError
