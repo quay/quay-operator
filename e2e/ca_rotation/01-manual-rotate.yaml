@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+assert:
+  - 01-assert.yaml
+commands:
+  # This is how we manually rotate the cert as per https://docs.openshift.com/container-platform/4.13/security/certificates/service-serving-certificate.html#manually-rotate-service-ca_service-serving-certificate
+- script: |
+    kubectl delete secret/signing-key -n openshift-service-ca;
+    for I in $(oc get ns -o jsonpath='{range .items[*]} {.metadata.name}{"\n"} {end}'); \
+          do oc delete pods --all -n $I; \
+          sleep 1; \
+          done
+  timeout: 3000

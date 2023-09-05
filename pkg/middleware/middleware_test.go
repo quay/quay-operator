@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	route "github.com/openshift/api/route/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -230,7 +231,8 @@ func TestProcess(t *testing.T) {
 	for _, test := range processTests {
 
 		t.Run(test.name, func(t *testing.T) {
-			processedObj, err := Process(test.quay, test.obj, false)
+			quayContext := quaycontext.NewQuayRegistryContext()
+			processedObj, err := Process(test.quay, quayContext, test.obj, false)
 			if test.expectedError != nil {
 				assert.Error(err, test.name)
 			} else {
