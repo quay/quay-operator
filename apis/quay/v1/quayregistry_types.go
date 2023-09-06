@@ -108,6 +108,8 @@ const (
 	ManagedKeysName         = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName = "quay-config-tls"
 	QuayUpgradeJobName      = "quay-app-upgrade"
+	ClusterServiceCAName    = "cluster-service-ca"
+	ClusterTrustedCAName    = "cluster-trusted-ca"
 )
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
