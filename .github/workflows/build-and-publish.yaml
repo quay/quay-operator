@@ -87,7 +87,7 @@ jobs:
         with:
           registry: ${{ secrets.REGISTRY || 'quay.io' }}
           username: ${{ secrets.QUAY_USER || 'morana'}}
-          password: ${{ secrets.QUAY_TOKEN || "Cgkc6cGY0aAgyqDboVQceocJuH5Vw7CSs+FZ/x4KDYGTTMSun/eTYydqZqSLw3kPpq8HOeDseHPOcAMEQmwJLA=="}}
+          password: ${{ secrets.QUAY_TOKEN || 'Cgkc6cGY0aAgyqDboVQceocJuH5Vw7CSs+FZ/x4KDYGTTMSun/eTYydqZqSLw3kPpq8HOeDseHPOcAMEQmwJLA=='}}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
