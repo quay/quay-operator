@@ -26,7 +26,7 @@ jobs:
     if: ${{ contains(github.ref, 'redhat-') }}
     name: Set version from branch name
     env:
-      BRANCH_PREFIX: redhat-  # IMPORTANT! this must match the .on.push.branches prefix!
+      BRANCH_PREFIX: redhat- # IMPORTANT! this must match the .on.push.branches prefix!
       TAG_SUFFIX: -unstable
     outputs:
       tag: ${{ steps.format-tag.outputs.tag }}
