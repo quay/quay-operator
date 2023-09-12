@@ -16,19 +16,18 @@ on:
         - redhat-3.8
         - redhat-3.9
         - redhat-3.10
-        - test
   push:
     # NOTE: if you trigger this on your branch, ensure its name follows the redhat-X.Y format!
     branches:
-      - test # IMPORTANT! this must match the .jobs.set-version.env.BRANCH_PREFIX env (save the **).
+      - redhat-** # IMPORTANT! this must match the .jobs.set-version.env.BRANCH_PREFIX env (save the **).
 
 jobs:
   set-version:
-    #if: ${{ contains(github.ref, 'redhat-') }}
+    if: ${{ contains(github.ref, 'redhat-') }}
     name: Set version from branch name
     env:
-      BRANCH_PREFIX: test # IMPORTANT! this must match the .on.push.branches prefix!
-      #TAG_SUFFIX: -unstable
+      BRANCH_PREFIX: redhat-  # IMPORTANT! this must match the .on.push.branches prefix!
+      TAG_SUFFIX: -unstable
     outputs:
       tag: ${{ steps.format-tag.outputs.tag }}
     runs-on: 'ubuntu-latest'
@@ -49,14 +48,14 @@ jobs:
         run: echo "::set-output name=tag::${{ steps.version-from-branch.outputs.version }}${{ env.TAG_SUFFIX }}"
 
   build-and-publish:
-    #if: ${{ contains(github.ref, 'redhat-') }}
+    if: ${{ contains(github.ref, 'redhat-') }}
     name: Build and publish operator catalog index
     runs-on: 'ubuntu-latest'
     outputs:
       digest: ${{ steps.set-output.outputs.digest }}
     env:
       REGISTRY: ${{ secrets.REGISTRY || 'quay.io' }}
-      NAMESPACE: ${{ secrets.NAMESPACE || 'morana' }}
+      NAMESPACE: ${{ secrets.NAMESPACE || 'projectquay' }}
       TAG: ${{needs.set-version.outputs.tag}}
     needs: set-version
     steps:
@@ -86,8 +85,8 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: ${{ secrets.REGISTRY || 'quay.io' }}
-          username: ${{ secrets.QUAY_USER || 'morana'}}
-          password: ${{ secrets.QUAY_TOKEN || 'Cgkc6cGY0aAgyqDboVQceocJuH5Vw7CSs+FZ/x4KDYGTTMSun/eTYydqZqSLw3kPpq8HOeDseHPOcAMEQmwJLA=='}}
+          username: ${{ secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
