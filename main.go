@@ -82,6 +82,8 @@ func main() {
 		o.EncodeTime = zapcore.RFC3339TimeEncoder
 	})))
 
+	ctrl.Log.Info("Starting the Quay Operator", "namespace", namespace)
+
 	disableHTTP2 := func(c *tls.Config) {
 		if enableHTTP2 {
 			return
