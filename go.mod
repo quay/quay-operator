@@ -13,6 +13,7 @@ require (
 	github.com/quay/config-tool v0.1.15
 	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/sjson v1.2.3
+	go.uber.org/zap v1.25.0
 	golang.org/x/net v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -103,7 +104,6 @@ require (
 	github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.13.0 // indirect
