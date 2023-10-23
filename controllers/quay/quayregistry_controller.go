@@ -41,10 +41,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -964,8 +964,8 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		client.FieldOwner("quay-operator"),
 	}
 	err := r.Client.Patch(ctx, obj, client.Apply, opts...)
-	gdferr := &discovery.ErrGroupDiscoveryFailed{}
-	if goerrors.As(err, &gdferr) && gvk == hpaGVK {
+	rdferr := &apiutil.ErrResourceDiscoveryFailed{}
+	if goerrors.As(err, &rdferr) && gvk == hpaGVK {
 		var hpa *autoscalingv2beta2.HorizontalPodAutoscaler
 		hpa, err = convertHpaToV2beta2(obj.(*autoscalingv2.HorizontalPodAutoscaler))
 		if err != nil {
