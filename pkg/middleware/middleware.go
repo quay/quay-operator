@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -122,7 +122,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 				// if no number of replicas has been set in kustomization files
 				// we set its value to two or to the value provided by the user
 				// as an override (if provided).
-				desired := pointer.Int32(2)
+				desired := ptr.To[int32](2)
 				if r := v1.GetReplicasOverrideForComponent(quay, kind); r != nil {
 					desired = r
 				}
