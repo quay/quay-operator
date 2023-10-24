@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -25,12 +26,16 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	quay "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontroller "github.com/quay/quay-operator/controllers/quay"
@@ -55,32 +60,73 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var namespace string
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+	enableHTTP2 := false
+	metricsAddr := ":8080"
+	secureMetrics := false
+	enableLeaderElection := false
+	namespace := ""
+	flag.BoolVar(&enableHTTP2, "enable-http2", enableHTTP2, "If HTTP/2 should be enabled for the metrics and webhook servers.")
+	flag.StringVar(&metricsAddr, "metrics-addr", metricsAddr, "The address the metric endpoint binds to.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", secureMetrics, "If the metrics endpoint should be served securely.")
+	flag.BoolVar(&enableLeaderElection, "enable-leader-election", enableLeaderElection,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&namespace, "namespace", "", "The Kubernetes namespace that the controller will watch.")
+	flag.StringVar(&namespace, "namespace", namespace, "The Kubernetes namespace that the controller will watch.")
 	flag.Parse()
 
 	// if this environment variable is set the operator removes all resource requirements
 	// (requests and limits), this is useful for development purposes.
 	skipres := os.Getenv("SKIP_RESOURCE_REQUESTS") == "true"
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true), zap.JSONEncoder(func(o *zapcore.EncoderConfig) {
+		o.EncodeTime = zapcore.RFC3339TimeEncoder
+	})))
+
+	ctrl.Log.Info("Starting the Quay Operator", "namespace", namespace)
+
+	disableHTTP2 := func(c *tls.Config) {
+		if enableHTTP2 {
+			return
+		}
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	cacheOptions := cache.Options{}
+	if namespace != "" {
+		cacheOptions.DefaultNamespaces = map[string]cache.Config{
+			namespace: {},
+		}
+	}
+
+	clientOptions := client.Options{
+		Cache: &client.CacheOptions{
+			DisableFor: []client.Object{
+				&quay.QuayRegistry{},
+			},
+		},
+	}
+
+	metricsOptions := metricsserver.Options{
+		BindAddress:   metricsAddr,
+		SecureServing: secureMetrics,
+		TLSOpts:       []func(*tls.Config){disableHTTP2},
+	}
+
+	webhookServerOptions := webhook.Options{
+		Port:    9443,
+		TLSOpts: []func(config *tls.Config){disableHTTP2},
+	}
+
+	webhookServer := webhook.NewServer(webhookServerOptions)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "7daa4ab6.quay.redhat.com",
-		Namespace:          namespace,
-		ClientDisableCacheFor: []client.Object{
-			&quay.QuayRegistry{},
-		},
+		Scheme:           scheme,
+		Cache:            cacheOptions,
+		Client:           clientOptions,
+		LeaderElection:   enableLeaderElection,
+		LeaderElectionID: "7daa4ab6.quay.redhat.com",
+		Metrics:          metricsOptions,
+		WebhookServer:    webhookServer,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
