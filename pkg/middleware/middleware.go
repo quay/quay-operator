@@ -60,8 +60,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		return configBundleSecret, nil
 	}
 
-	// we have to set a special annotation in the config editor deployment, this annotation is
-	// then used as an environment variable and consumed by the app. we also need to remove
+	// we need to remove
 	// all unused annotations from postgres deployment to avoid its redeployment.
 	if dep, ok := obj.(*appsv1.Deployment); ok {
 		// override any environment variable being provided through the component
@@ -178,10 +177,6 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			delete(dep.Spec.Template.Annotations, "quay-registry-hostname")
 			delete(dep.Spec.Template.Annotations, "quay-buildmanager-hostname")
 			delete(dep.Spec.Template.Annotations, "quay-operator-service-endpoint")
-			return dep, nil
-		}
-
-		if !strings.Contains(dep.GetName(), "quay-config-editor") {
 			return dep, nil
 		}
 

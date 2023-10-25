@@ -94,19 +94,9 @@ spec:
             description: Observed conditions of Quay components.
             x-descriptors:
               - 'urn:alm:descriptor:io.kubernetes.conditions'
-          - path: configEditorCredentialsSecret
-            displayName: Config Editor Credentials Secret
-            description: Name of the secret containing credentials for the Quay config editor.
-            x-descriptors:
-              - 'urn:alm:descriptor:io.kubernetes:Secret'
           - path: registryEndpoint
             displayName: Registry Endpoint
             description: Externally accessible URL for container pull/push and web frontend.
-            x-descriptors:
-              - 'urn:alm:descriptor:org.w3:link'
-          - path: configEditorEndpoint
-            displayName: Config Editor Endpoint
-            description: Externally accessible URL for the config editor UI.
             x-descriptors:
               - 'urn:alm:descriptor:org.w3:link'
   description: Opinionated deployment of Quay on Kubernetes.

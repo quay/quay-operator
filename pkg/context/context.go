@@ -38,9 +38,6 @@ type QuayRegistryContext struct {
 	NeedsPgUpgrade      bool
 	NeedsClairPgUpgrade bool
 
-	// Config editor
-	ConfigEditorPw string
-
 	// Clair integration
 	SecurityScannerV4PSK string
 }

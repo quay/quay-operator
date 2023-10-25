@@ -684,10 +684,6 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	v1.EnsureConfigEditorEndpoint(quayContext, updatedQuay)
-	cfgsecret := configEditorCredentialsSecretFrom(deploymentObjects)
-	updatedQuay.Status.ConfigEditorCredentialsSecret = cfgsecret
-
 	rolloutBlocked := v1.GetCondition(
 		updatedQuay.Status.Conditions,
 		v1.ConditionTypeRolloutBlocked,
