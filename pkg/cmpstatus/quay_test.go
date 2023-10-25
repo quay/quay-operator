@@ -137,125 +137,7 @@ func TestQuayCheck(t *testing.T) {
 				Message: "Deployment registry-quay-app: something went wrong",
 			},
 		},
-		{
-			name: "missing config editor deployment",
-			quay: qv1.QuayRegistry{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "registry",
-					UID:  "uid",
-				},
-			},
-			objs: []client.Object{
-				&batchv1.Job{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-app-upgrade",
-					},
-					Status: batchv1.JobStatus{
-						Succeeded: 1,
-					},
-				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
-			},
-			cond: qv1.Condition{
-				Type:    qv1.ComponentQuayReady,
-				Status:  metav1.ConditionFalse,
-				Reason:  qv1.ConditionReasonComponentNotReady,
-				Message: "Deployment registry-quay-config-editor not found",
-			},
-		},
-		{
-			name: "faulty config editor deployment",
-			quay: qv1.QuayRegistry{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "registry",
-					UID:  "uid",
-				},
-			},
-			objs: []client.Object{
-				&batchv1.Job{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-app-upgrade",
-					},
-					Status: batchv1.JobStatus{
-						Succeeded: 1,
-					},
-				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-config-editor",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionFalse,
-								Message: "something went wrong",
-							},
-						},
-					},
-				},
-			},
-			cond: qv1.Condition{
-				Type:    qv1.ComponentQuayReady,
-				Status:  metav1.ConditionFalse,
-				Reason:  qv1.ConditionReasonComponentNotReady,
-				Message: "Deployment registry-quay-config-editor: something went wrong",
-			},
-		},
+
 		{
 			name: "all deployments working",
 			quay: qv1.QuayRegistry{
@@ -276,29 +158,6 @@ func TestQuayCheck(t *testing.T) {
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-config-editor",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								Kind:       "QuayRegistry",
@@ -474,29 +333,6 @@ func TestQuayCheck(t *testing.T) {
 						},
 					},
 				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-config-editor",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentQuayReady,
@@ -551,77 +387,6 @@ func TestQuayCheck(t *testing.T) {
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Status:  metav1.ConditionFalse,
 				Message: "Deployment registry-quay-app has zero replicas available",
-			},
-		},
-		{
-			name: "zero available replicas for config editor",
-			quay: qv1.QuayRegistry{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "registry",
-					UID:  "uid",
-				},
-			},
-			objs: []client.Object{
-				&batchv1.Job{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-app-upgrade",
-					},
-					Status: batchv1.JobStatus{
-						Succeeded: 1,
-					},
-				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-config-editor",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 0,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
-			},
-			cond: qv1.Condition{
-				Type:    qv1.ComponentQuayReady,
-				Reason:  qv1.ConditionReasonComponentNotReady,
-				Status:  metav1.ConditionFalse,
-				Message: "Deployment registry-quay-config-editor has zero replicas available",
 			},
 		},
 	} {

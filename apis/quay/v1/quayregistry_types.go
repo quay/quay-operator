@@ -213,11 +213,6 @@ type QuayRegistryStatus struct {
 	RegistryEndpoint string `json:"registryEndpoint,omitempty"`
 	// LastUpdate is the timestamp when the Operator last processed this instance.
 	LastUpdate string `json:"lastUpdated,omitempty"`
-	// ConfigEditorEndpoint is the external access point for a web-based reconfiguration interface
-	// for the Quay registry instance.
-	ConfigEditorEndpoint string `json:"configEditorEndpoint,omitempty"`
-	// ConfigEditorCredentialsSecret is the Kubernetes `Secret` containing the config editor password.
-	ConfigEditorCredentialsSecret string `json:"configEditorCredentialsSecret,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
 }
@@ -557,28 +552,6 @@ func EnsureRegistryEndpoint(
 	}
 
 	return quay.Status.RegistryEndpoint == orig
-}
-
-// EnsureConfigEditorEndpoint sets the `status.configEditorEndpoint` field. If routes are
-// not supported or route component is unmanaged this sets configEditorEndpoint to empty
-// string.
-func EnsureConfigEditorEndpoint(ctx *quaycontext.QuayRegistryContext, quay *QuayRegistry) {
-	if !ctx.SupportsRoutes {
-		quay.Status.ConfigEditorEndpoint = ""
-		return
-	}
-
-	if !ComponentIsManaged(quay.Spec.Components, ComponentRoute) {
-		quay.Status.ConfigEditorEndpoint = ""
-		return
-	}
-
-	quay.Status.ConfigEditorEndpoint = fmt.Sprintf(
-		"https://%s-quay-config-editor-%s.%s",
-		quay.GetName(),
-		quay.GetNamespace(),
-		ctx.ClusterHostname,
-	)
 }
 
 // Owns verifies if a QuayRegistry object owns provided Object.

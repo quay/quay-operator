@@ -105,7 +105,7 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 		for _, component := range quay.Spec.Components {
 
 			var contains bool
-			// HPA and Monitoring don't have fields associated with them so we skip. Route should not change based on config either since fields are optional when managed. ClairPostgres cannot be set through the config editor
+			// HPA and Monitoring don't have fields associated with them so we skip. Route should not change based on config either since fields are optional when managed.
 			if component.Kind == v1.ComponentHPA || component.Kind == v1.ComponentMonitoring || component.Kind == v1.ComponentRoute || component.Kind == v1.ComponentClairPostgres {
 				newComponents = append(newComponents, component)
 				continue

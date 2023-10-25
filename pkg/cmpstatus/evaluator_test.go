@@ -770,29 +770,6 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-config-editor",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
 			},
 			conds: []qv1.Condition{
 				{
@@ -1129,29 +1106,6 @@ func TestEvaluate(t *testing.T) {
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
-					},
-					Status: appsv1.DeploymentStatus{
-						AvailableReplicas: 1,
-						Conditions: []appsv1.DeploymentCondition{
-							{
-								Type:    appsv1.DeploymentAvailable,
-								Status:  corev1.ConditionTrue,
-								Message: "all good",
-							},
-						},
-					},
-				},
-				&appsv1.Deployment{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-config-editor",
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								Kind:       "QuayRegistry",
