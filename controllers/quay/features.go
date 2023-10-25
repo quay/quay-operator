@@ -237,10 +237,12 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 	// Wait until `status.ingress` is populated (should be immediately).
 	r.Log.Info("cluster supports `Routes` API")
 	var rt routev1.Route
-	if err := wait.Poll(
+	if err := wait.PollUntilContextTimeout(
+		ctx,
 		time.Second,
 		5*time.Minute,
-		func() (done bool, err error) {
+		false,
+		func(ctx context.Context) (done bool, err error) {
 			routensn := types.NamespacedName{
 				Name:      fmt.Sprintf("%s-test-route", quay.GetName()),
 				Namespace: quay.GetNamespace(),

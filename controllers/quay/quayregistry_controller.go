@@ -16,6 +16,7 @@ package controllers
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"strings"
@@ -34,7 +35,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -932,10 +933,12 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 			return err
 		}
 
-		if err := wait.Poll(
+		if err := wait.PollUntilContextTimeout(
+			ctx,
 			creationPollInterval,
 			creationPollTimeout,
-			func() (bool, error) {
+			false,
+			func(ctx context.Context) (bool, error) {
 				if err := r.Client.Create(ctx, obj); err != nil {
 					if errors.IsAlreadyExists(err) {
 						log.Info("immutable resource being deleted, retry")
@@ -961,7 +964,8 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		client.FieldOwner("quay-operator"),
 	}
 	err := r.Client.Patch(ctx, obj, client.Apply, opts...)
-	if meta.IsNoMatchError(err) && gvk == hpaGVK {
+	rdferr := &apiutil.ErrResourceDiscoveryFailed{}
+	if goerrors.As(err, &rdferr) && gvk == hpaGVK {
 		var hpa *autoscalingv2beta2.HorizontalPodAutoscaler
 		hpa, err = convertHpaToV2beta2(obj.(*autoscalingv2.HorizontalPodAutoscaler))
 		if err != nil {

@@ -1,4 +1,4 @@
-FROM golang:1.17 as builder
+FROM quay.io/projectquay/golang:1.20 as builder
 
 WORKDIR /workspace
 COPY go.mod go.mod
