@@ -40,7 +40,6 @@ const (
 	secretKey            = "SECRET_KEY"
 	dbURI                = "DB_URI"
 	dbRootPw             = "DB_ROOT_PW"
-	configEditorPw       = "CONFIG_EDITOR_PW"
 	securityScannerV4PSK = "SECURITY_SCANNER_V4_PSK"
 )
 
@@ -73,7 +72,6 @@ func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 		qctx.SecretKey = string(secret.Data[secretKey])
 		qctx.DbUri = string(secret.Data[dbURI])
 		qctx.DbRootPw = string(secret.Data[dbRootPw])
-		qctx.ConfigEditorPw = string(secret.Data[configEditorPw])
 		qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
 		break
 	}
@@ -105,7 +103,6 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	qctx.SecretKey = string(secret.Data[secretKey])
 	qctx.DbUri = string(secret.Data[dbURI])
 	qctx.DbRootPw = string(secret.Data[dbRootPw])
-	qctx.ConfigEditorPw = string(secret.Data[configEditorPw])
 	qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
 	return nil
 }
@@ -458,28 +455,6 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 
 	return nil
 
-}
-
-// configEditorCredentialsSecretFrom returns the name of the secret that contains the
-// credentials for the config editor. If the secret does not exist among the provided
-// list an empty string is returned instead.
-func configEditorCredentialsSecretFrom(objs []client.Object) string {
-	for _, obj := range objs {
-		if !strings.Contains(obj.GetName(), "quay-config-editor-credentials") {
-			continue
-		}
-
-		gvk := obj.GetObjectKind().GroupVersionKind()
-		if gvk.Version != "v1" {
-			continue
-		}
-		if gvk.Kind != "Secret" {
-			continue
-		}
-
-		return obj.GetName()
-	}
-	return ""
 }
 
 // Taken from https://stackoverflow.com/questions/46735347/how-can-i-fetch-a-certificate-from-a-url

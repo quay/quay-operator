@@ -47,8 +47,6 @@ const (
 	podNamespaceKey = "MY_POD_NAMESPACE"
 
 	componentImagePrefix = "RELATED_IMAGE_COMPONENT_"
-
-	configEditorUser = "quayconfig"
 )
 
 // ComponentImageFor checks for an environment variable indicating which component container image
@@ -138,10 +136,6 @@ func upgradeOverlayDir() string {
 
 func unmanagedTLSOverlayDir() string {
 	return filepath.Join(kustomizeDir(), "overlays", "current", "unmanaged-tls")
-}
-
-func configEditorOnlyOverlay() string {
-	return filepath.Join(kustomizeDir(), "overlays", "current", "config-only")
 }
 
 func rolloutBlocked(quay *v1.QuayRegistry) bool {
@@ -316,13 +310,6 @@ func KustomizationFor(
 		configFiles = append(configFiles, filepath.Join("bundle", key))
 	}
 
-	if len(ctx.ConfigEditorPw) == 0 {
-		var err error
-		if ctx.ConfigEditorPw, err = generateRandomString(16); err != nil {
-			return nil, err
-		}
-	}
-
 	if ctx.DbRootPw == "" {
 		rootpw, err := generateRandomString(32)
 		if err != nil {
@@ -400,7 +387,6 @@ func KustomizationFor(
 						"SECRET_KEY=" + ctx.SecretKey,
 						"DB_URI=" + ctx.DbUri,
 						"DB_ROOT_PW=" + ctx.DbRootPw,
-						"CONFIG_EDITOR_PW=" + ctx.ConfigEditorPw,
 						"SECURITY_SCANNER_V4_PSK=" + ctx.SecurityScannerV4PSK,
 					},
 				},
@@ -411,17 +397,6 @@ func KustomizationFor(
 				Name: v1.QuayConfigTLSSecretName,
 				KvPairSources: types.KvPairSources{
 					LiteralSources: quayConfigTLSSources,
-				},
-			},
-		},
-		{
-			GeneratorArgs: types.GeneratorArgs{
-				Name: "quay-config-editor-credentials",
-				KvPairSources: types.KvPairSources{
-					LiteralSources: []string{
-						"username=" + configEditorUser,
-						"password=" + ctx.ConfigEditorPw,
-					},
 				},
 			},
 		},
@@ -627,9 +602,7 @@ func Inflate(
 	ctx.TLSKey = tlsKey
 
 	var overlay string
-	if rolloutBlocked(quay) {
-		overlay = configEditorOnlyOverlay()
-	} else if quay.Status.CurrentVersion != v1.QuayVersionCurrent || dbCfgHasChanged {
+	if quay.Status.CurrentVersion != v1.QuayVersionCurrent || dbCfgHasChanged {
 		// we render the upgrade overlay directory only if the operator version or the
 		// database configuration has changed. this scales down quay and runs a job to
 		// migrate the database.
@@ -667,7 +640,7 @@ func Inflate(
 }
 
 func operatorServiceEndpoint() string {
-	// For local development, use ngrok or some other tool to expose local server to config editor.
+	// For local development, use ngrok or some other tool to expose local server
 	if devEndpoint := os.Getenv("DEV_OPERATOR_ENDPOINT"); devEndpoint != "" {
 		return devEndpoint
 	}
