@@ -497,15 +497,19 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	if err := r.checkRoutesAvailable(ctx, quayContext, updatedQuay, cbundle); err != nil {
-		return r.reconcileWithCondition(
-			ctx,
-			&quay,
-			v1.ConditionTypeRolloutBlocked,
-			metav1.ConditionTrue,
-			v1.ConditionReasonRouteComponentDependencyError,
-			fmt.Sprintf("could not check for `Routes` API: %s", err),
-		)
+	routeManaged := v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentRoute)
+	tlsManaged := v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentTLS)
+	if routeManaged || tlsManaged {
+		if err := r.checkRoutesAvailable(ctx, quayContext, updatedQuay, cbundle); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonRouteComponentDependencyError,
+				fmt.Sprintf("could not check for `Routes` API: %s", err),
+			)
+		}
 	}
 
 	osmanaged := v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentObjectStorage)
