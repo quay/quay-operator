@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
@@ -430,7 +430,7 @@ var validateOverridesTests = []struct {
 			Spec: QuayRegistrySpec{
 				Components: []Component{
 					{Kind: "postgres", Managed: true},
-					{Kind: "redis", Managed: true, Overrides: &Override{Replicas: pointer.Int32(10)}},
+					{Kind: "redis", Managed: true, Overrides: &Override{Replicas: ptr.To[int32](10)}},
 					{Kind: "clair", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "route", Managed: true},

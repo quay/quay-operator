@@ -9,7 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -160,7 +160,7 @@ func TestMirrorCheck(t *testing.T) {
 							Kind:    qv1.ComponentMirror,
 							Managed: true,
 							Overrides: &qv1.Override{
-								Replicas: pointer.Int32(0),
+								Replicas: ptr.To[int32](0),
 							},
 						},
 					},

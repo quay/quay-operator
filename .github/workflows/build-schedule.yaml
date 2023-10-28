@@ -20,7 +20,7 @@ jobs:
         workflow_file_name: build-and-publish.yaml
         ref: ${{ env.BRANCH }}
         wait_interval: 30
-        inputs: |
+        client_payload: |
           {
             "branch": "${{ env.BRANCH }}"
           }
@@ -40,7 +40,7 @@ jobs:
         workflow_file_name: build-and-publish.yaml
         ref: ${{ env.BRANCH }}
         wait_interval: 30
-        inputs: |
+        client_payload: |
           {
             "branch": "${{ env.BRANCH }}"
           }
@@ -60,7 +60,7 @@ jobs:
         workflow_file_name: build-and-publish.yaml
         ref: ${{ env.BRANCH }}
         wait_interval: 30
-        inputs: |
+        client_payload: |
           {
             "branch": "${{ env.BRANCH }}"
           }

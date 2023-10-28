@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi8/go-toolset:1.19 as builder
+FROM --platform=$BUILDPLATFORM quay.io/projectquay/golang:1.20 as builder
 
 ARG TARGETOS TARGETARCH
 WORKDIR /workspace
