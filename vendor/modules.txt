@@ -264,7 +264,7 @@ github.com/munnerz/goautoneg
 # github.com/ncw/swift v1.0.52
 ## explicit
 github.com/ncw/swift
-# github.com/onsi/ginkgo/v2 v2.11.0
+# github.com/onsi/ginkgo/v2 v2.13.0
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
