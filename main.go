@@ -19,9 +19,6 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	"fmt"
-	"log"
-	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -39,7 +36,6 @@ import (
 
 	quay "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontroller "github.com/quay/quay-operator/controllers/quay"
-	"github.com/quay/quay-operator/pkg/configure"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -157,12 +153,6 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
-
-	setupLog.Info("starting server on port 7071")
-	go func() {
-		http.HandleFunc("/reconfigure", configure.ReconfigureHandler(mgr.GetClient()))
-		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%v", operatorPort), nil))
-	}()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
