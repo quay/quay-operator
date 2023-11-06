@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.13.0
   name: quayregistries.quay.redhat.com
 spec:
   group: quay.redhat.com
@@ -166,6 +165,7 @@ spec:
                                               type: object
                                             type: array
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       weight:
                                         description: Weight associated with matching
                                           the corresponding nodeSelectorTerm, in the
@@ -276,10 +276,12 @@ spec:
                                               type: object
                                             type: array
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       type: array
                                   required:
                                   - nodeSelectorTerms
                                   type: object
+                                  x-kubernetes-map-type: atomic
                               type: object
                             podAffinity:
                               description: Describes pod affinity scheduling rules
@@ -366,6 +368,7 @@ spec:
                                                   ANDed.
                                                 type: object
                                             type: object
+                                            x-kubernetes-map-type: atomic
                                           namespaceSelector:
                                             description: A label query over the set
                                               of namespaces that the term applies
@@ -375,9 +378,6 @@ spec:
                                               field. null selector and null or empty
                                               namespaces list means "this pod's namespace".
                                               An empty selector ({}) matches all namespaces.
-                                              This field is beta-level and is only
-                                              honored when PodAffinityNamespaceSelector
-                                              feature is enabled.
                                             properties:
                                               matchExpressions:
                                                 description: matchExpressions is a
@@ -432,6 +432,7 @@ spec:
                                                   ANDed.
                                                 type: object
                                             type: object
+                                            x-kubernetes-map-type: atomic
                                           namespaces:
                                             description: namespaces specifies a static
                                               list of namespace names that the term
@@ -440,7 +441,7 @@ spec:
                                               field and the ones selected by namespaceSelector.
                                               null or empty namespaces list and null
                                               namespaceSelector means "this pod's
-                                              namespace"
+                                              namespace".
                                             items:
                                               type: string
                                             type: array
@@ -542,6 +543,7 @@ spec:
                                               only "value". The requirements are ANDed.
                                             type: object
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       namespaceSelector:
                                         description: A label query over the set of
                                           namespaces that the term applies to. The
@@ -550,9 +552,7 @@ spec:
                                           in the namespaces field. null selector and
                                           null or empty namespaces list means "this
                                           pod's namespace". An empty selector ({})
-                                          matches all namespaces. This field is beta-level
-                                          and is only honored when PodAffinityNamespaceSelector
-                                          feature is enabled.
+                                          matches all namespaces.
                                         properties:
                                           matchExpressions:
                                             description: matchExpressions is a list
@@ -602,6 +602,7 @@ spec:
                                               only "value". The requirements are ANDed.
                                             type: object
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       namespaces:
                                         description: namespaces specifies a static
                                           list of namespace names that the term applies
@@ -609,7 +610,7 @@ spec:
                                           the namespaces listed in this field and
                                           the ones selected by namespaceSelector.
                                           null or empty namespaces list and null namespaceSelector
-                                          means "this pod's namespace"
+                                          means "this pod's namespace".
                                         items:
                                           type: string
                                         type: array
@@ -714,6 +715,7 @@ spec:
                                                   ANDed.
                                                 type: object
                                             type: object
+                                            x-kubernetes-map-type: atomic
                                           namespaceSelector:
                                             description: A label query over the set
                                               of namespaces that the term applies
@@ -723,9 +725,6 @@ spec:
                                               field. null selector and null or empty
                                               namespaces list means "this pod's namespace".
                                               An empty selector ({}) matches all namespaces.
-                                              This field is beta-level and is only
-                                              honored when PodAffinityNamespaceSelector
-                                              feature is enabled.
                                             properties:
                                               matchExpressions:
                                                 description: matchExpressions is a
@@ -780,6 +779,7 @@ spec:
                                                   ANDed.
                                                 type: object
                                             type: object
+                                            x-kubernetes-map-type: atomic
                                           namespaces:
                                             description: namespaces specifies a static
                                               list of namespace names that the term
@@ -788,7 +788,7 @@ spec:
                                               field and the ones selected by namespaceSelector.
                                               null or empty namespaces list and null
                                               namespaceSelector means "this pod's
-                                              namespace"
+                                              namespace".
                                             items:
                                               type: string
                                             type: array
@@ -891,6 +891,7 @@ spec:
                                               only "value". The requirements are ANDed.
                                             type: object
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       namespaceSelector:
                                         description: A label query over the set of
                                           namespaces that the term applies to. The
@@ -899,9 +900,7 @@ spec:
                                           in the namespaces field. null selector and
                                           null or empty namespaces list means "this
                                           pod's namespace". An empty selector ({})
-                                          matches all namespaces. This field is beta-level
-                                          and is only honored when PodAffinityNamespaceSelector
-                                          feature is enabled.
+                                          matches all namespaces.
                                         properties:
                                           matchExpressions:
                                             description: matchExpressions is a list
@@ -951,6 +950,7 @@ spec:
                                               only "value". The requirements are ANDed.
                                             type: object
                                         type: object
+                                        x-kubernetes-map-type: atomic
                                       namespaces:
                                         description: namespaces specifies a static
                                           list of namespace names that the term applies
@@ -958,7 +958,7 @@ spec:
                                           the namespaces listed in this field and
                                           the ones selected by namespaceSelector.
                                           null or empty namespaces list and null namespaceSelector
-                                          means "this pod's namespace"
+                                          means "this pod's namespace".
                                         items:
                                           type: string
                                         type: array
@@ -1028,6 +1028,7 @@ spec:
                                     required:
                                     - key
                                     type: object
+                                    x-kubernetes-map-type: atomic
                                   fieldRef:
                                     description: 'Selects a field of the pod: supports
                                       metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
@@ -1046,6 +1047,7 @@ spec:
                                     required:
                                     - fieldPath
                                     type: object
+                                    x-kubernetes-map-type: atomic
                                   resourceFieldRef:
                                     description: 'Selects a resource of the container:
                                       only resources limits and requests (limits.cpu,
@@ -1071,6 +1073,7 @@ spec:
                                     required:
                                     - resource
                                     type: object
+                                    x-kubernetes-map-type: atomic
                                   secretKeyRef:
                                     description: Selects a key of a secret in the
                                       pod's namespace
@@ -1092,6 +1095,7 @@ spec:
                                     required:
                                     - key
                                     type: object
+                                    x-kubernetes-map-type: atomic
                                 type: object
                             required:
                             - name
@@ -1178,9 +1182,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
