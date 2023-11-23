@@ -17,7 +17,6 @@ function error {
 	>&2 echo "ERROR $(date '+%Y-%m-%dT%H:%M:%S') $*"
 }
 
-RESOURCE_GROUP=Default
 CLUSTER_ID=quay-e2e
 OCP_INSTALL_DIR=quaye2e
 CCO_DIR=ccodir
@@ -26,8 +25,20 @@ PULL_SEC_LOC=~/.pull-secret
 info 'oc client version:'
 oc version
 
+if [[ -d $OCP_INSTALL_DIR &&  -f $OCP_INSTALL_DIR/install-config.yaml ]]; then
+    info 'found install config'
+else
+    error 'missing install config or dir'
+    exit 1
+fi
+
+# Read Resource Group from install-config.yaml; use Default if cannot find
+RESOURCE_GROUP=$(grep powervsResourceGroup $OCP_INSTALL_DIR/install-config.yaml | awk '{print $2}')
+[[ -z "$RESOURCE_GROUP" ]] && RESOURCE_GROUP=Default
+
+
 # Install openshift-install amd64 version and extract ccoctl
-curl -LO https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/stable-4.13/openshift-install-linux.tar.gz
+curl -LO https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/stable-4.14/openshift-install-linux.tar.gz
 tar zxvf openshift-install-linux.tar.gz
 info 'openshift-install version:'
 ./openshift-install version
@@ -38,17 +49,9 @@ oc image extract "$CCO_IMAGE" --file="/usr/bin/ccoctl" -a $PULL_SEC_LOC
 chmod 775 ccoctl
 
 
-
-if [[ -d $OCP_INSTALL_DIR &&  -f $OCP_INSTALL_DIR/install-config.yaml ]]; then
-    info 'found install config'
-else
-    error 'missing install config or dir'
-    exit 1
-fi
-
 # delete the amd64 version of openshift-install and install ppc64le version
 rm -f openshift-install-linux.tar.gz openshift-install
-curl -LO https://mirror.openshift.com/pub/openshift-v4/ppc64le/clients/ocp/stable-4.13/openshift-install-linux-amd64.tar.gz
+curl -LO https://mirror.openshift.com/pub/openshift-v4/ppc64le/clients/ocp/stable-4.14/openshift-install-linux-amd64.tar.gz
 tar zxvf openshift-install-linux-amd64.tar.gz
 info 'openshift-install version:'
 ./openshift-install version
