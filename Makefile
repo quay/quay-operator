@@ -3,6 +3,9 @@ IMG ?= controller:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd"
 
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION = 1.28.0
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -13,8 +16,8 @@ endif
 all: manager
 
 # Run tests
-test: generate fmt vet manifests
-	go test ./... -coverprofile cover.out
+test: manifests generate fmt vet envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
 test-e2e:
 	mkdir -p ./bin
@@ -31,15 +34,15 @@ run: generate fmt vet manifests
 	QUAY_VERSION=dev go run main.go
 
 # Install CRDs into a cluster
-install: manifests
+install: manifests kustomize
 	kustomize build config/crd | kubectl apply -f -
 
 # Uninstall CRDs from a cluster
-uninstall: manifests
+uninstall: manifests kustomize
 	kustomize build config/crd | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests
+deploy: manifests kustomize
 	cd config/manager && kustomize edit set image controller=${IMG}
 	kustomize build config/default | kubectl apply -f -
 
@@ -69,18 +72,42 @@ docker-build: test
 docker-push:
 	docker push ${IMG}
 
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
-ifeq (, $(shell which controller-gen))
-	@{ \
-	set -e ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.13.0;\
-	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
-else
-CONTROLLER_GEN=$(shell which controller-gen)
-endif
+##@ Build Dependencies
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+## Tool Binaries
+KUBECTL ?= kubectl
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.2.1
+CONTROLLER_TOOLS_VERSION ?= v0.13.0
+
+.PHONY: kustomize
+kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
+$(KUSTOMIZE): $(LOCALBIN)
+	@if test -x $(LOCALBIN)/kustomize && ! $(LOCALBIN)/kustomize version | grep -q $(KUSTOMIZE_VERSION); then \
+		echo "$(LOCALBIN)/kustomize version is not expected $(KUSTOMIZE_VERSION). Removing it before installing."; \
+		rm -rf $(LOCALBIN)/kustomize; \
+	fi
+	test -s $(LOCALBIN)/kustomize || GOBIN=$(LOCALBIN) GO111MODULE=on go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
+
+.PHONY: controller-gen
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
+$(CONTROLLER_GEN): $(LOCALBIN)
+	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 # This target called from the prepare-release github action.
 # CHANNEL         - operator channel (eg. stable-3.6, candidate-3.9)
