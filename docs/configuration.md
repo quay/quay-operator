@@ -1,6 +1,6 @@
 # Configuration
 
-Quay is a powerful container registry platform with many features and components, and is highly configurable. The Quay Operator attempts to mitigate the potential headaches of configuration in a few different ways. 
+Quay is a powerful container registry platform with many features and components, and is highly configurable. The Quay Operator attempts to mitigate the potential headaches of configuration in a few different ways.
 
 ## Quay Config File
 
@@ -16,9 +16,9 @@ $ kubectl get secret -n <namespace> <quayregistry-name>-quay-config-secret-22dbk
 
 ## Managed Components
 
-The Quay Operator is capable of managing the lifecycle of many of Quay's dependencies, called _components_. Some examples are the main database, object storage, image security scanning, and more. Each of these components usually include relevant config fields in `config.yaml`. When the Operator is managing a component, it will populate the necessary config fields for you. If you choose to use an unmanaged component (provide your own database, for example), then you are responsible for providing the necessary config fields in the `config.yaml`. 
+The Quay Operator is capable of managing the lifecycle of many of Quay's dependencies, called _components_. Some examples are the main database, object storage, image security scanning, and more. Each of these components usually include relevant config fields in `config.yaml`. When the Operator is managing a component, it will populate the necessary config fields for you. If you choose to use an unmanaged component (provide your own database, for example), then you are responsible for providing the necessary config fields in the `config.yaml`.
 
-## Configuring Quay 
+## Configuring Quay
 
 ### Zero-Config, Batteries-Included
 
@@ -26,15 +26,15 @@ If you opt to have all components of Quay fully managed by the Operator and desi
 
 Note that previous config `Secrets` will not be deleted by the Operator after reconfiguration. They are kept around in case of misconfiguration and a rollback to a previous configuration is necessary to restore the registry service.
 
-### Quay Config Editor
+### Quay Config Editor - DEPRECATED
 
 Quay includes a standalone web application for configuration. The Quay Operator will create a Kubernetes `Service` and expose it at the URL specified in `status.configEditorEndpoint` on the `QuayRegistry` after creation. Access it using a web browser.
 
-#### Config Editor Credentials
+#### Config Editor Credentials - DEPRECATED
 
 The password for the config editor is randomly generated during every reconcile. The username/password are contained in a `Secret` in the same namespace referenced in `status.configEditorCredentialsSecret` on the `QuayRegistry` object.
 
-#### Reconfiguring Quay 
+#### Reconfiguring Quay
 
 Once you have finished making changes to the Quay config using the editor, click the button to validate your changes. If it passes validation, click the button **Reconfigure Quay**. This will send your changes to an HTTP server ran by the Quay Operator, which will create a new `Secret` from the config bundle, and change the `spec.configBundleSecret` field on the `QuayRegistry` to reference it. This will kick off a normal reconcile loop. Once completed, Quay will now be configured with your changes.
 
@@ -49,6 +49,7 @@ All that is needed to configure Quay using the Operator is to change the `Secret
 1. Create a `Secret` with your configuration fields in a `config.yaml`:
 
 `config.yaml`:
+
 ```yaml
 REGISTRY_TITLE: My Awesome Quay
 ```
@@ -60,6 +61,7 @@ $ kubectl create secret generic --from-file config.yaml=./config.yaml test-confi
 2. Update the `QuayRegistry` to reference the created `Secret`:
 
 `test.quayregistry.yaml`
+
 ```yaml
 apiVersion: quay.redhat.com/v1
 kind: QuayRegistry

@@ -16,7 +16,7 @@ import (
 )
 
 // Quay checks a quay registry base component status. In order to evaluate the status for the
-// base component we need to verify if quay and config-editor deployments succeed.
+// base component we need to verify if quay deployment succeeds.
 type Quay struct {
 	Client client.Client
 	deploy deploy
@@ -27,7 +27,7 @@ func (q *Quay) Name() string {
 	return "quay"
 }
 
-// Check verifies if the quay and config-editor deployment associated with provided quay registry
+// Check verifies if the quay deployment associated with provided quay registry
 // were created and rolled out as expected.
 func (q *Quay) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, error) {
 	var zero qv1.Condition
@@ -49,8 +49,7 @@ func (q *Quay) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, 
 	replicas := qv1.GetReplicasOverrideForComponent(&reg, qv1.ComponentQuay)
 	scaleddown := replicas != nil && *replicas == 0
 
-	// we need to check two distinct deployments, the quay app and its config editor.
-	for _, depsuffix := range []string{"quay-app", "quay-config-editor"} {
+	for _, depsuffix := range []string{"quay-app"} {
 		depname := fmt.Sprintf("%s-%s", reg.Name, depsuffix)
 		nsn := types.NamespacedName{
 			Namespace: reg.Namespace,
