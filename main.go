@@ -44,10 +44,6 @@ var (
 	setupLog = ctrl.Log.WithName("setup")
 )
 
-const (
-	operatorPort = 7071
-)
-
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
