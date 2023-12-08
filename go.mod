@@ -12,7 +12,7 @@ require (
 	github.com/quay/clair/config v1.1.3
 	github.com/quay/config-tool v0.1.15
 	github.com/stretchr/testify v1.8.4
-	github.com/tidwall/sjson v1.2.3
+	github.com/tidwall/sjson v1.2.5
 	go.uber.org/zap v1.25.0
 	golang.org/x/net v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -98,7 +98,7 @@ require (
 	github.com/rs/xid v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/tidwall/gjson v1.10.2 // indirect
+	github.com/tidwall/gjson v1.14.2 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca // indirect
