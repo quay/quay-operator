@@ -6,8 +6,8 @@ package yaml
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/kustomize/kyaml/errors"
 	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/sliceutil"
+	"sigs.k8s.io/kustomize/kyaml/utils"
 	"sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/labels"
 )
 
@@ -52,7 +53,7 @@ func Parse(value string) (*RNode, error) {
 // ReadFile parses a single Resource from a yaml file.
 // To parse multiple resources, consider a kio.ByteReader
 func ReadFile(path string) (*RNode, error) {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func WriteFile(node *RNode, path string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(path, []byte(out), 0600)
+	return errors.WrapPrefixf(os.WriteFile(path, []byte(out), 0600), "writing RNode to file")
 }
 
 // UpdateFile reads the file at path, applies the filter to it, and write the result back.
@@ -241,11 +242,12 @@ func (rn *RNode) IsTaggedNull() bool {
 // IsNilOrEmpty is true if the node is nil,
 // has no YNode, or has YNode that appears empty.
 func (rn *RNode) IsNilOrEmpty() bool {
-	return rn.IsNil() ||
-		IsYNodeTaggedNull(rn.YNode()) ||
-		IsYNodeEmptyMap(rn.YNode()) ||
-		IsYNodeEmptySeq(rn.YNode()) ||
-		IsYNodeZero(rn.YNode())
+	return rn.IsNil() || IsYNodeNilOrEmpty(rn.YNode())
+}
+
+// IsStringValue is true if the RNode is not nil and is scalar string node
+func (rn *RNode) IsStringValue() bool {
+	return !rn.IsNil() && IsYNodeString(rn.YNode())
 }
 
 // GetMeta returns the ResourceMeta for an RNode
@@ -414,12 +416,11 @@ func (rn *RNode) SetApiVersion(av string) {
 // given field, so this function cannot be used to make distinctions
 // between these cases.
 func (rn *RNode) getMapFieldValue(field string) *yaml.Node {
-	for i := 0; i < len(rn.Content()); i = IncrementFieldIndex(i) {
-		if rn.Content()[i].Value == field {
-			return rn.Content()[i+1]
-		}
-	}
-	return nil
+	var result *yaml.Node
+	visitMappingNodeFields(rn.Content(), func(key, value *yaml.Node) {
+		result = value
+	}, field)
+	return result
 }
 
 // GetName returns the name, or empty string if
@@ -434,31 +435,33 @@ func (rn *RNode) getMetaStringField(fName string) string {
 	if md == nil {
 		return ""
 	}
-	f := md.Field(fName)
-	if f.IsNilOrEmpty() {
-		return ""
-	}
-	return GetValue(f.Value)
+	var result string
+	visitMappingNodeFields(md.Content, func(key, value *yaml.Node) {
+		if !IsYNodeNilOrEmpty(value) {
+			result = value.Value
+		}
+	}, fName)
+	return result
 }
 
-// getMetaData returns the RNode holding the value of the metadata field.
+// getMetaData returns the *yaml.Node of the metadata field.
 // Return nil if field not found (no error).
-func (rn *RNode) getMetaData() *RNode {
+func (rn *RNode) getMetaData() *yaml.Node {
 	if IsMissingOrNull(rn) {
 		return nil
 	}
-	var n *RNode
+	content := rn.Content()
 	if rn.YNode().Kind == DocumentNode {
 		// get the content if this is the document node
-		n = NewRNode(rn.Content()[0])
-	} else {
-		n = rn
+		content = content[0].Content
 	}
-	mf := n.Field(MetadataField)
-	if mf.IsNilOrEmpty() {
-		return nil
-	}
-	return mf.Value
+	var mf *yaml.Node
+	visitMappingNodeFields(content, func(key, value *yaml.Node) {
+		if !IsYNodeNilOrEmpty(value) {
+			mf = value
+		}
+	}, MetadataField)
+	return mf
 }
 
 // SetName sets the metadata name field.
@@ -490,14 +493,14 @@ func (rn *RNode) SetNamespace(ns string) error {
 }
 
 // GetAnnotations gets the metadata annotations field.
-// If the field is missing, returns an empty map.
+// If the annotations field is missing, returns an empty map.
 // Use another method to check for missing metadata.
-func (rn *RNode) GetAnnotations() map[string]string {
-	meta := rn.getMetaData()
-	if meta == nil {
-		return make(map[string]string)
-	}
-	return rn.getMapFromMeta(meta, AnnotationsField)
+// If specific annotations are provided, then the map is
+// restricted to only those entries with keys that match
+// one of the specific annotations. If no annotations are
+// provided, then the map will contain all entries.
+func (rn *RNode) GetAnnotations(annotations ...string) map[string]string {
+	return rn.getMapFromMeta(AnnotationsField, annotations...)
 }
 
 // SetAnnotations tries to set the metadata annotations field.
@@ -506,24 +509,45 @@ func (rn *RNode) SetAnnotations(m map[string]string) error {
 }
 
 // GetLabels gets the metadata labels field.
-// If the field is missing, returns an empty map.
+// If the labels field is missing, returns an empty map.
 // Use another method to check for missing metadata.
-func (rn *RNode) GetLabels() map[string]string {
+// If specific labels are provided, then the map is
+// restricted to only those entries with keys that match
+// one of the specific labels. If no labels are
+// provided, then the map will contain all entries.
+func (rn *RNode) GetLabels(labels ...string) map[string]string {
+	return rn.getMapFromMeta(LabelsField, labels...)
+}
+
+// getMapFromMeta returns a map, sometimes empty, from the fName
+// field in the node's metadata field.
+// If specific fields are provided, then the map is
+// restricted to only those entries with keys that match
+// one of the specific fields. If no fields are
+// provided, then the map will contain all entries.
+func (rn *RNode) getMapFromMeta(fName string, fields ...string) map[string]string {
 	meta := rn.getMetaData()
 	if meta == nil {
 		return make(map[string]string)
 	}
-	return rn.getMapFromMeta(meta, LabelsField)
-}
 
-// getMapFromMeta returns map, sometimes empty, from metadata.
-func (rn *RNode) getMapFromMeta(meta *RNode, fName string) map[string]string {
-	result := make(map[string]string)
-	if f := meta.Field(fName); !f.IsNilOrEmpty() {
-		_ = f.Value.VisitFields(func(node *MapNode) error {
-			result[GetValue(node.Key)] = GetValue(node.Value)
-			return nil
-		})
+	var result map[string]string
+
+	visitMappingNodeFields(meta.Content, func(_, fNameValue *yaml.Node) {
+		// fName is found in metadata; create the map from its content
+		expectedSize := len(fields)
+		if expectedSize == 0 {
+			expectedSize = len(fNameValue.Content) / 2 //nolint: gomnd
+		}
+		result = make(map[string]string, expectedSize)
+
+		visitMappingNodeFields(fNameValue.Content, func(key, value *yaml.Node) {
+			result[key.Value] = value.Value
+		}, fields...)
+	}, fName)
+
+	if result == nil {
+		return make(map[string]string)
 	}
 	return result
 }
@@ -690,9 +714,9 @@ func (rn *RNode) Fields() ([]string, error) {
 		return nil, errors.Wrap(err)
 	}
 	var fields []string
-	for i := 0; i < len(rn.Content()); i += 2 {
-		fields = append(fields, rn.Content()[i].Value)
-	}
+	visitMappingNodeFields(rn.Content(), func(key, value *yaml.Node) {
+		fields = append(fields, key.Value)
+	})
 	return fields, nil
 }
 
@@ -703,13 +727,12 @@ func (rn *RNode) FieldRNodes() ([]*RNode, error) {
 		return nil, errors.Wrap(err)
 	}
 	var fields []*RNode
-	for i := 0; i < len(rn.Content()); i += 2 {
-		yNode := rn.Content()[i]
+	visitMappingNodeFields(rn.Content(), func(key, value *yaml.Node) {
 		// for each key node in the input mapping node contents create equivalent rNode
 		rNode := &RNode{}
-		rNode.SetYNode(yNode)
+		rNode.SetYNode(key)
 		fields = append(fields, rNode)
-	}
+	})
 	return fields, nil
 }
 
@@ -719,13 +742,11 @@ func (rn *RNode) Field(field string) *MapNode {
 	if rn.YNode().Kind != yaml.MappingNode {
 		return nil
 	}
-	for i := 0; i < len(rn.Content()); i = IncrementFieldIndex(i) {
-		isMatchingField := rn.Content()[i].Value == field
-		if isMatchingField {
-			return &MapNode{Key: NewRNode(rn.Content()[i]), Value: NewRNode(rn.Content()[i+1])}
-		}
-	}
-	return nil
+	var result *MapNode
+	visitMappingNodeFields(rn.Content(), func(key, value *yaml.Node) {
+		result = &MapNode{Key: NewRNode(key), Value: NewRNode(value)}
+	}, field)
+	return result
 }
 
 // VisitFields calls fn for each field in the RNode.
@@ -744,6 +765,59 @@ func (rn *RNode) VisitFields(fn func(node *MapNode) error) error {
 		}
 	}
 	return nil
+}
+
+// visitMappingNodeFields calls fn for fields in the content, in content order.
+// The caller is responsible to ensure the node is a mapping node. If fieldNames
+// are specified, then fn is called only for the fields that match the given
+// fieldNames.
+func visitMappingNodeFields(content []*yaml.Node, fn func(key, value *yaml.Node), fieldNames ...string) {
+	switch len(fieldNames) {
+	case 0: // visit all fields
+		visitFieldsWhileTrue(content, func(key, value *yaml.Node, _ int) bool {
+			fn(key, value)
+			return true
+		})
+	case 1: // visit single field
+		visitFieldsWhileTrue(content, func(key, value *yaml.Node, _ int) bool {
+			if key == nil {
+				return true
+			}
+			if fieldNames[0] == key.Value {
+				fn(key, value)
+				return false
+			}
+			return true
+		})
+	default: // visit specified fields
+		fieldsStillToVisit := make(map[string]bool, len(fieldNames))
+		for _, fieldName := range fieldNames {
+			fieldsStillToVisit[fieldName] = true
+		}
+		visitFieldsWhileTrue(content, func(key, value *yaml.Node, _ int) bool {
+			if key == nil {
+				return true
+			}
+			if fieldsStillToVisit[key.Value] {
+				fn(key, value)
+				delete(fieldsStillToVisit, key.Value)
+			}
+			return len(fieldsStillToVisit) > 0
+		})
+	}
+}
+
+// visitFieldsWhileTrue calls fn for the fields in content, in content order,
+// until either fn returns false or all fields have been visited. The caller
+// should ensure that content is from a mapping node, or fits the same expected
+// pattern (consecutive key/value entries in the slice).
+func visitFieldsWhileTrue(content []*yaml.Node, fn func(key, value *yaml.Node, keyIndex int) bool) {
+	for i := 0; i < len(content); i += 2 {
+		continueVisiting := fn(content[i], content[i+1], i)
+		if !continueVisiting {
+			return
+		}
+	}
 }
 
 // Elements returns the list of elements in the RNode.
@@ -931,8 +1005,22 @@ func deAnchor(yn *yaml.Node) (res *yaml.Node, err error) {
 	case yaml.ScalarNode:
 		return yn, nil
 	case yaml.AliasNode:
-		return deAnchor(yn.Alias)
-	case yaml.DocumentNode, yaml.MappingNode, yaml.SequenceNode:
+		result, err := deAnchor(yn.Alias)
+		if err != nil {
+			return nil, err
+		}
+		return CopyYNode(result), nil
+	case yaml.MappingNode:
+		toMerge, err := removeMergeTags(yn)
+		if err != nil {
+			return nil, err
+		}
+		err = mergeAll(yn, toMerge)
+		if err != nil {
+			return nil, err
+		}
+		fallthrough
+	case yaml.DocumentNode, yaml.SequenceNode:
 		for i := range yn.Content {
 			yn.Content[i], err = deAnchor(yn.Content[i])
 			if err != nil {
@@ -943,6 +1031,105 @@ func deAnchor(yn *yaml.Node) (res *yaml.Node, err error) {
 	default:
 		return nil, fmt.Errorf("cannot deAnchor kind %q", yn.Kind)
 	}
+}
+
+// isMerge returns if the node is tagged with !!merge
+func isMerge(yn *yaml.Node) bool {
+	return yn.Tag == MergeTag
+}
+
+// findMergeValues receives either a MappingNode, a AliasNode or a potentially
+// mixed list of MappingNodes and AliasNodes. It returns a list of MappingNodes.
+func findMergeValues(yn *yaml.Node) ([]*yaml.Node, error) {
+	if yn == nil {
+		return []*yaml.Node{}, nil
+	}
+	switch yn.Kind {
+	case MappingNode:
+		return []*yaml.Node{yn}, nil
+	case AliasNode:
+		if yn.Alias != nil && yn.Alias.Kind != MappingNode {
+			return nil, errors.Errorf("invalid map merge: received alias for a non-map value")
+		}
+		return []*yaml.Node{yn.Alias}, nil
+	case SequenceNode:
+		mergeValues := []*yaml.Node{}
+		for i := 0; i < len(yn.Content); i++ {
+			if yn.Content[i].Kind == SequenceNode {
+				return nil, errors.Errorf("invalid map merge: received a nested sequence")
+			}
+			newMergeValues, err := findMergeValues(yn.Content[i])
+			if err != nil {
+				return nil, err
+			}
+			mergeValues = append(newMergeValues, mergeValues...)
+		}
+		return mergeValues, nil
+	default:
+		return nil, errors.Errorf("map merge requires map or sequence of maps as the value")
+	}
+}
+
+// getMergeTagValue receives a MappingNode yaml node, and it searches for
+// merge tagged keys and return its value yaml node. If the key is duplicated,
+// it fails.
+func getMergeTagValue(yn *yaml.Node) (*yaml.Node, error) {
+	var result *yaml.Node
+	var err error
+	visitFieldsWhileTrue(yn.Content, func(key, value *yaml.Node, _ int) bool {
+		if isMerge(key) {
+			if result != nil {
+				err = fmt.Errorf("duplicate merge key")
+				result = nil
+				return false
+			}
+			result = value
+		}
+		return true
+	})
+	return result, err
+}
+
+// removeMergeTags removes all merge tags and returns a ordered list of yaml
+// nodes to merge and a error
+func removeMergeTags(yn *yaml.Node) ([]*yaml.Node, error) {
+	if yn == nil || yn.Content == nil {
+		return nil, nil
+	}
+	if yn.Kind != yaml.MappingNode {
+		return nil, nil
+	}
+	value, err := getMergeTagValue(yn)
+	if err != nil {
+		return nil, err
+	}
+	toMerge, err := findMergeValues(value)
+	if err != nil {
+		return nil, err
+	}
+	err = NewRNode(yn).PipeE(Clear("<<"))
+	if err != nil {
+		return nil, err
+	}
+	return toMerge, nil
+}
+
+func mergeAll(yn *yaml.Node, toMerge []*yaml.Node) error {
+	// We only need to start with a copy of the existing node because we need to
+	// maintain duplicated keys and style
+	rn := NewRNode(yn).Copy()
+	toMerge = append(toMerge, yn)
+	for i := range toMerge {
+		rnToMerge := NewRNode(toMerge[i]).Copy()
+		err := rnToMerge.VisitFields(func(node *MapNode) error {
+			return rn.PipeE(MapEntrySetter{Key: node.Key, Value: node.Value})
+		})
+		if err != nil {
+			return err
+		}
+	}
+	*yn = *rn.value
+	return nil
 }
 
 // GetValidatedMetadata returns metadata after subjecting it to some tests.
@@ -1063,7 +1250,6 @@ func checkKey(key string, elems []*Node) bool {
 	return count == len(elems)
 }
 
-// Deprecated: use pipes instead.
 // GetSlice returns the contents of the slice field at the given path.
 func (rn *RNode) GetSlice(path string) ([]interface{}, error) {
 	value, err := rn.GetFieldValue(path)
@@ -1076,7 +1262,6 @@ func (rn *RNode) GetSlice(path string) ([]interface{}, error) {
 	return nil, fmt.Errorf("node %s is not a slice", path)
 }
 
-// Deprecated: use pipes instead.
 // GetString returns the contents of the string field at the given path.
 func (rn *RNode) GetString(path string) (string, error) {
 	value, err := rn.GetFieldValue(path)
@@ -1089,7 +1274,6 @@ func (rn *RNode) GetString(path string) (string, error) {
 	return "", fmt.Errorf("node %s is not a string: %v", path, value)
 }
 
-// Deprecated: use slash paths instead.
 // GetFieldValue finds period delimited fields.
 // TODO: When doing kustomize var replacement, which is likely a
 // a primary use of this function and the reason it returns interface{}
@@ -1098,7 +1282,7 @@ func (rn *RNode) GetString(path string) (string, error) {
 // assuming we keep the var feature in kustomize.
 // The other end of this is: refvar.go:updateNodeValue.
 func (rn *RNode) GetFieldValue(path string) (interface{}, error) {
-	fields := convertSliceIndex(strings.Split(path, "."))
+	fields := convertSliceIndex(utils.SmarterPathSplitter(path, "."))
 	rn, err := rn.Pipe(Lookup(fields...))
 	if err != nil {
 		return nil, err
