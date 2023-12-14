@@ -36,6 +36,23 @@ type response struct {
 	Status string `json:"status,omitempty"`
 }
 
+// validateToken compares the provided token with the one stored in Kubernetes secret.
+func validateToken(k8sClient client.Client, token, secretName, namespace string) bool {
+	log := ctrl.Log.WithName("server").WithName("Reconfigure")
+	var secret corev1.Secret
+	nsn := types.NamespacedName{
+		Namespace: namespace,
+		Name:      secretName,
+	}
+	if err := k8sClient.Get(context.Background(), nsn, &secret); err != nil {
+		log.Error(err, "failed to fetch credentials")
+		return false
+	}
+
+	validCredential := string(secret.Data["password"])
+	return token == validCredential
+}
+
 // ReconfigureHandler listens for HTTP requests containing a reconfiguration bundle from config-tool,
 // creates a new k8s `Secret`, and updates the associated `QuayRegistry` to trigger a re-deployment.
 func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +87,21 @@ func ReconfigureHandler(k8sClient client.Client) func(w http.ResponseWriter, r *
 				reconfigureRequest.Namespace,
 			)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Extract Bearer token from Authorization header
+		authHeader := r.Header.Get("Authorization")
+		splitToken := strings.Split(authHeader, "Bearer ")
+		if len(splitToken) != 2 {
+			http.Error(w, "Invalid token format", http.StatusNotFound)
+			return
+		}
+		token := splitToken[1]
+
+		// Validate token
+		if !validateToken(k8sClient, token, quay.Status.ConfigEditorCredentialsSecret, reconfigureRequest.Namespace) {
+			http.Error(w, "Invalid token", http.StatusNotFound)
 			return
 		}
 
