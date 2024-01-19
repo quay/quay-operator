@@ -3,3 +3,5 @@ tmp
 cover.out
 kubeconfig
 .DS_Store
+.vscode
+.idea

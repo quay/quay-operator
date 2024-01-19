@@ -362,6 +362,15 @@ func ComponentIsManaged(components []Component, name ComponentKind) bool {
 	return false
 }
 
+func ComponentIsExplicitlyDefined(components []Component, name ComponentKind) bool {
+	for _, c := range components {
+		if c.Kind == name {
+			return true
+		}
+	}
+	return false
+}
+
 // RequiredComponent returns whether the given component is required for Quay or not.
 func RequiredComponent(component ComponentKind) bool {
 	for _, c := range requiredComponents {
