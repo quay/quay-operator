@@ -208,16 +208,8 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 		qctx.ServerHostname = fieldGroup.ServerHostname
 	}
 
-	// for _, c := range quay.Spec.Components {
-	// 	if c.Kind == v1.ComponentRoute {
-	// 		// return c.Managed
-	// 		fmt.Println()
-	// 	}
-	// }
-
+	// If route is unmanaged and not explicilty defined then skip routes check
 	routeExplicitlyDefined := v1.ComponentIsExplicitlyDefined(quay.Spec.Components, v1.ComponentRoute)
-
-	// If route is unmanaged, skip routes check
 	routeManaged := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentRoute)
 	if routeExplicitlyDefined && !routeManaged {
 		return nil
