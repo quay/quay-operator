@@ -192,6 +192,8 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 	// NOTE: The `route` component is unique because we allow users to set the
 	// `SERVER_HOSTNAME` field instead of controlling the entire fieldgroup. This
 	// value is then passed to the created `Route` using a Kustomize variable.
+
+	// REFACTOR: The below `qctx` obj setting the hostname should be put in a separate function.
 	var config map[string]interface{}
 	if err := yaml.Unmarshal(bundle.Data["config.yaml"], &config); err != nil {
 		return fmt.Errorf("unable to parse config.yaml: %w", err)
@@ -204,6 +206,21 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 
 	if fieldGroup.ServerHostname != "" {
 		qctx.ServerHostname = fieldGroup.ServerHostname
+	}
+
+	// for _, c := range quay.Spec.Components {
+	// 	if c.Kind == v1.ComponentRoute {
+	// 		// return c.Managed
+	// 		fmt.Println()
+	// 	}
+	// }
+
+	routeExplicitlyDefined := v1.ComponentIsExplicitlyDefined(quay.Spec.Components, v1.ComponentRoute)
+
+	// If route is unmanaged, skip routes check
+	routeManaged := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentRoute)
+	if routeExplicitlyDefined && !routeManaged {
+		return nil
 	}
 
 	fakeRoute := v1.EnsureOwnerReference(
