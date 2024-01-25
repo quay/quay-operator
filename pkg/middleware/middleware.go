@@ -7,6 +7,7 @@ import (
 	route "github.com/openshift/api/route/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -224,6 +225,20 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		}
 
 		return pvc, nil
+	}
+
+	if _, ok := obj.(*autoscalingv1.HorizontalPodAutoscaler); ok {
+		componentMap := map[string]v1.ComponentKind{
+			"mirror": v1.ComponentMirror,
+			"clair":  v1.ComponentClair,
+		}
+		// If the HPA is not for a managed component, return nil
+		if component, ok := componentMap[quayComponentLabel]; ok {
+			if !v1.ComponentIsManaged(quay.Spec.Components, component) {
+				return nil, nil
+			}
+		}
+		return obj, nil
 	}
 
 	if job, ok := obj.(*batchv1.Job); ok {

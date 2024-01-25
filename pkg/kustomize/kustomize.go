@@ -618,11 +618,19 @@ func Inflate(
 		resources[index] = obj
 	}
 
-	for index, resource := range resources {
-		resources[index] = v1.EnsureOwnerReference(quay, resource)
+	var filteredResources []client.Object
+	for _, resource := range resources {
+		if resource == nil {
+			continue
+		}
+		filteredResources = append(filteredResources, resource)
 	}
 
-	return resources, err
+	for index, resource := range filteredResources {
+		filteredResources[index] = v1.EnsureOwnerReference(quay, resource)
+	}
+
+	return filteredResources, err
 }
 
 func operatorServiceEndpoint() string {
