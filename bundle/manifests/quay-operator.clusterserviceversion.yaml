@@ -6,7 +6,8 @@ metadata:
     capabilities: Full Lifecycle
     categories: Integration & Delivery
     containerImage: quay.io/projectquay/quay-operator:v3.6.1
-    createdAt: 2021-04-23 10:04 UTC
+    createdAt: 2021-04-23T10:04:00Z
+    support: Project Quay
     description: Opinionated deployment of Quay on Kubernetes.
     quay-version: v3.6.1
     repository: https://github.com/quay/quay-operator
