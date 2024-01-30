@@ -7,7 +7,7 @@ import (
 	"bytes"
 	"io"
 
-	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
+	yaml "sigs.k8s.io/yaml/goyaml.v3"
 )
 
 const (
@@ -87,9 +87,23 @@ var MappingNode yaml.Kind = yaml.MappingNode
 var ScalarNode yaml.Kind = yaml.ScalarNode
 var SequenceNode yaml.Kind = yaml.SequenceNode
 
+func nodeKindString(k yaml.Kind) string {
+	return map[yaml.Kind]string{
+		yaml.SequenceNode: "SequenceNode",
+		yaml.MappingNode:  "MappingNode",
+		yaml.ScalarNode:   "ScalarNode",
+		yaml.DocumentNode: "DocumentNode",
+		yaml.AliasNode:    "AliasNode",
+	}[k]
+}
+
 var DoubleQuotedStyle yaml.Style = yaml.DoubleQuotedStyle
 var FlowStyle yaml.Style = yaml.FlowStyle
 var FoldedStyle yaml.Style = yaml.FoldedStyle
 var LiteralStyle yaml.Style = yaml.LiteralStyle
 var SingleQuotedStyle yaml.Style = yaml.SingleQuotedStyle
 var TaggedStyle yaml.Style = yaml.TaggedStyle
+
+const (
+	MergeTag = "!!merge"
+)
