@@ -29,7 +29,7 @@ export POSTGRES_PREVIOUS_DIGEST
 export REDIS_DIGEST
 
 yq eval -i '
-    .metadata.annotations.createdAt = (now | tz("UTC") | format_datetime("2006-01-02 15:04 UTC")) |
+    .metadata.annotations.createdAt = (now | tz("UTC")) |
     .metadata.annotations["olm.skipRange"] = (">=3.6.x <${RELEASE}" | envsubst) |
     .metadata.annotations["quay-version"] = strenv(RELEASE) |
     .metadata.annotations.containerImage = ("quay.io/projectquay/quay-operator:${RELEASE}" | envsubst) |
