@@ -1,4 +1,3 @@
-# Overlay variant for upgrading to current Project Quay release.
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 resources:
@@ -6,5 +5,4 @@ resources:
   - ./clair-pg-old.persistentvolumeclaim.yaml
   - ./clair-pg-old.deployment.yaml
 patchesStrategicMerge:
-  - ./clair.deployment.patch.yaml
   - ./clair-pg.deployment.patch.yaml
