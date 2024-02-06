@@ -370,11 +370,12 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
 		}
 
-		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey, configFiles)
+		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey)
 		if err != nil {
 			return nil, err
 		}
 		cfgFiles["config.yaml"] = cfg
+		cfgFiles["01_user_config.yaml"] = configFiles["clair-config.yaml"]
 		cfgFiles["clair-db-host"] = []byte(strings.TrimSpace(strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")))
 
 		return cfgFiles, nil
@@ -384,7 +385,7 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 }
 
 // clairConfigFor returns a Clair v4 config with the correct values.
-func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey string, configFiles map[string][]byte) ([]byte, error) {
+func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
 	// the default number for the clair's database connections pool is arbitralily defined to
 	// 10 when the HPA component is unmanaged. If HPA is managed we have more control over the
 	// max number running clair pods so we increase it to the magic number of 33. This number
@@ -439,14 +440,6 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 		"metrics": map[string]interface{}{
 			"name": "prometheus",
 		},
-	}
-
-	// Overwrite default values with user provided clair configuration.
-	if clairConfig, ok := configFiles["clair-config.yaml"]; ok {
-		err := yaml.Unmarshal(clairConfig, &cfg)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return yaml.Marshal(cfg)

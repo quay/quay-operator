@@ -19,15 +19,15 @@ spec:
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: quay-component
-                  operator: In
-                  values:
-                  - clair-app
-              topologyKey: "kubernetes.io/hostname"
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: quay-component
+                      operator: In
+                      values:
+                        - clair-app
+                topologyKey: "kubernetes.io/hostname"
       containers:
         - image: quay.io/projectquay/clair:nightly
           imagePullPolicy: IfNotPresent
@@ -65,6 +65,9 @@ spec:
               readOnly: true
             - mountPath: /clair/
               name: config
+            - mountPath: /clair/config.yaml.d/01_user_config.yaml
+              name: config
+              subPath: 01_user_config.yaml
             - mountPath: /var/run/certs
               name: certificates
           startupProbe:
@@ -105,8 +108,7 @@ spec:
                   name: extra-ca-certs
               - secret:
                   name: quay-config-tls
-              - configMap: 
+              - configMap:
                   name: cluster-service-ca
               - configMap:
                   name: cluster-trusted-ca
-
