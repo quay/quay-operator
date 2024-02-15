@@ -156,6 +156,16 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			}
 		}
 
+		if oresources := v1.GetResourceOverridesForComponent(quay, kind); oresources != nil {
+			ref := &dep.Spec.Template.Spec.Containers[0]
+			if oresources.Requests != nil {
+				ref.Resources.Requests = oresources.Requests
+			}
+			if oresources.Limits != nil {
+				ref.Resources.Limits = oresources.Limits
+			}
+		}
+
 		if oannot := v1.GetAnnotationsOverrideForComponent(quay, kind); oannot != nil {
 			if dep.Annotations == nil {
 				dep.Annotations = map[string]string{}

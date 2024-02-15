@@ -1108,6 +1108,31 @@ spec:
                         replicas:
                           format: int32
                           type: integer
+                        resources:
+                          description: Resources describes the resource limits and
+                            requests for a component.
+                          properties:
+                            limits:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: ResourceList is a set of (resource name,
+                                quantity) pairs.
+                              type: object
+                            requests:
+                              additionalProperties:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              description: ResourceList is a set of (resource name,
+                                quantity) pairs.
+                              type: object
+                          type: object
                         volumeSize:
                           anyOf:
                           - type: integer

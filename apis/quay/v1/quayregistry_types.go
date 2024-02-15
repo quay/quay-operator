@@ -92,6 +92,14 @@ var supportsEnvOverride = []ComponentKind{
 	ComponentRedis,
 }
 
+var supportsResourceOverrides = []ComponentKind{
+	ComponentQuay,
+	ComponentClair,
+	ComponentMirror,
+	ComponentPostgres,
+	ComponentClairPostgres,
+}
+
 var supportsReplicasOverride = []ComponentKind{
 	ComponentClair,
 	ComponentMirror,
@@ -142,6 +150,13 @@ type Override struct {
 	Affinity    *corev1.Affinity   `json:"affinity,omitempty"`
 	Labels      map[string]string  `json:"labels,omitempty"`
 	Annotations map[string]string  `json:"annotations,omitempty"`
+	Resources   *Resources         `json:"resources,omitempty"`
+}
+
+// Resources describes the resource limits and requests for a component.
+type Resources struct {
+	Limits   corev1.ResourceList `json:"limits,omitempty"`
+	Requests corev1.ResourceList `json:"requests,omitempty"`
 }
 
 type ConditionType string
@@ -491,6 +506,7 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		hasaffinity := hasAffinity(component)
 		hasvolume := component.Overrides.VolumeSize != nil
 		hasreplicas := component.Overrides.Replicas != nil
+		hasresources := component.Overrides.Resources != nil
 		hasenvvar := len(component.Overrides.Env) > 0
 		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas
 
@@ -531,6 +547,13 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		if hasreplicas && !ComponentSupportsOverride(component.Kind, "replicas") {
 			return fmt.Errorf(
 				"component %s does not support replicas overrides",
+				component.Kind,
+			)
+		}
+
+		if hasresources && !ComponentSupportsOverride(component.Kind, "resources") {
+			return fmt.Errorf(
+				"component %s does not support resources overrides",
 				component.Kind,
 			)
 		}
@@ -713,6 +736,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 		components = supportsReplicasOverride
 	case "affinity":
 		components = supportsAffinityOverride
+	case "resources":
+		components = supportsResourceOverrides
 	}
 
 	for _, cmp := range components {
@@ -756,6 +781,24 @@ func GetVolumeSizeOverrideForComponent(
 
 		if component.Overrides != nil && component.Overrides.VolumeSize != nil {
 			qt = component.Overrides.VolumeSize
+		}
+		return
+	}
+	return
+}
+
+// GetResourceOverridesForComponent returns the resource overrides set by the user for the
+// provided component. Returns nil if not set.
+func GetResourceOverridesForComponent(
+	quay *QuayRegistry, kind ComponentKind,
+) (resources *Resources) {
+	for _, component := range quay.Spec.Components {
+		if component.Kind != kind {
+			continue
+		}
+
+		if component.Overrides != nil && component.Overrides.Resources != nil {
+			resources = component.Overrides.Resources
 		}
 		return
 	}
