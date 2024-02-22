@@ -440,6 +440,13 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 		"metrics": map[string]interface{}{
 			"name": "prometheus",
 		},
+		"updaters": map[string]interface{}{
+			"config": map[string]interface{}{
+				"rhel": map[string]interface{}{
+					"ignore_unpatched": true,
+				},
+			},
+		},
 	}
 
 	return yaml.Marshal(cfg)
