@@ -66,7 +66,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 	if dep, ok := obj.(*appsv1.Deployment); ok {
 		// override any environment variable being provided through the component
 		// Override.Env property. XXX this does not include InitContainers.
-		component := labels.Set(objectMeta.GetAnnotations()).Get("quay-component")
+		component := strings.ReplaceAll(labels.Set(objectMeta.GetAnnotations()).Get("quay-component"), "-", "")
 		kind := v1.ComponentKind(component)
 		if v1.ComponentIsManaged(quay.Spec.Components, kind) {
 			for _, oenv := range v1.GetEnvOverrideForComponent(quay, kind) {
