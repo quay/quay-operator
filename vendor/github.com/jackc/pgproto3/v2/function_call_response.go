@@ -39,10 +39,8 @@ func (dst *FunctionCallResponse) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *FunctionCallResponse) Encode(dst []byte) []byte {
-	dst = append(dst, 'V')
-	sp := len(dst)
-	dst = pgio.AppendInt32(dst, -1)
+func (src *FunctionCallResponse) Encode(dst []byte) ([]byte, error) {
+	dst, sp := beginMessage(dst, 'V')
 
 	if src.Result == nil {
 		dst = pgio.AppendInt32(dst, -1)
@@ -51,9 +49,7 @@ func (src *FunctionCallResponse) Encode(dst []byte) []byte {
 		dst = append(dst, src.Result...)
 	}
 
-	pgio.SetInt32(dst[sp:], int32(len(dst[sp:])))
-
-	return dst
+	return finishMessage(dst, sp)
 }
 
 // MarshalJSON implements encoding/json.Marshaler.
@@ -80,4 +76,22 @@ func (src FunctionCallResponse) MarshalJSON() ([]byte, error) {
 		Type:   "FunctionCallResponse",
 		Result: formattedValue,
 	})
+}
+
+// UnmarshalJSON implements encoding/json.Unmarshaler.
+func (dst *FunctionCallResponse) UnmarshalJSON(data []byte) error {
+	// Ignore null, like in the main JSON package.
+	if string(data) == "null" {
+		return nil
+	}
+
+	var msg struct {
+		Result map[string]string
+	}
+	err := json.Unmarshal(data, &msg)
+	if err != nil {
+		return err
+	}
+	dst.Result, err = getValueFromJSON(msg.Result)
+	return err
 }
