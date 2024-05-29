@@ -301,8 +301,9 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 				log.Error(err, "could not remove owner reference from old postgres pvc")
 			}
 
-			// If user has set POSTGRES_UPGRADE_RETAIN_BACKUP=true, then we should not delete the old PVC
-			if os.Getenv("POSTGRES_UPGRADE_RETAIN_BACKUP") == "true" {
+			// If user did not set POSTGRES_UPGRADE_DELETE_BACKUP or POSTGRES_UPGRADE_DELETE_BACKUP=false, then we should not delete the old PVC
+			delBackup, exists := os.LookupEnv("POSTGRES_UPGRADE_DELETE_BACKUP")
+			if !exists || (exists && delBackup == "false") {
 				continue
 			}
 
