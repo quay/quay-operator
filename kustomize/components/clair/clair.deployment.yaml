@@ -63,10 +63,11 @@ spec:
             - name: cluster-trusted-ca
               mountPath: /etc/pki/ca-trust/extracted/pem
               readOnly: true
-            - mountPath: /clair/
-              name: config
-            - mountPath: /clair/config.yaml.d/01_user_config.yaml
-              name: config
+            - name: config
+              mountPath: /clair/config.yaml
+              subPath: config.yaml
+            - name: config
+              mountPath: /clair/config.yaml.d/01_user_config.yaml
               subPath: 01_user_config.yaml
             - mountPath: /var/run/certs
               name: certificates
