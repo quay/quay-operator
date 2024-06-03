@@ -33,7 +33,7 @@ yq eval -i '
     .metadata.annotations["olm.skipRange"] = (">=3.6.x <${RELEASE}" | envsubst) |
     .metadata.annotations["quay-version"] = strenv(RELEASE) |
     .metadata.annotations.containerImage = ("quay.io/projectquay/quay-operator:${RELEASE}" | envsubst) |
-    .metadata.name = ("quay-operator.v${RELEASE}" | envsubst) |
+    .metadata.name = ("project-quay.v${RELEASE}" | envsubst) |
     .spec.install.spec.deployments[0].spec.template.spec.containers[0].image = ("quay.io/projectquay/quay-operator:${RELEASE}" | envsubst) |
     .spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= (
         select(.name == "RELATED_IMAGE_COMPONENT_BUILDER").value = ("quay.io/projectquay/quay-builder:${RELEASE}" | envsubst) |
@@ -49,5 +49,8 @@ yq eval -i '
 
 yq eval -i '
     .annotations["operators.operatorframework.io.bundle.channel.default.v1"] = strenv(DEFAULT_CHANNEL) |
-    .annotations["operators.operatorframework.io.bundle.channels.v1"] = strenv(CHANNEL)
+    .annotations["operators.operatorframework.io.bundle.channels.v1"] = strenv(CHANNEL) |
+    .annotations["operators.operatorframework.io.bundle.package.v1"] = "project-quay"
 ' ./bundle/metadata/annotations.yaml
+
+mv ./bundle/manifests/quay-operator.clusterserviceversion.yaml ./bundle/manifests/project-quay.clusterserviceversion.yaml
