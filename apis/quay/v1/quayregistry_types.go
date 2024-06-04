@@ -136,12 +136,13 @@ type Component struct {
 
 // Override describes configuration overrides for the given managed component
 type Override struct {
-	VolumeSize  *resource.Quantity `json:"volumeSize,omitempty"`
-	Env         []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-	Replicas    *int32             `json:"replicas,omitempty"`
-	Affinity    *corev1.Affinity   `json:"affinity,omitempty"`
-	Labels      map[string]string  `json:"labels,omitempty"`
-	Annotations map[string]string  `json:"annotations,omitempty"`
+	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
+	Env        []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	// +nullable
+	Replicas    *int32            `json:"replicas,omitempty"`
+	Affinity    *corev1.Affinity  `json:"affinity,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type ConditionType string
