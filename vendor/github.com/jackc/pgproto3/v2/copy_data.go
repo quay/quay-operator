@@ -3,8 +3,6 @@ package pgproto3
 import (
 	"encoding/hex"
 	"encoding/json"
-
-	"github.com/jackc/pgio"
 )
 
 type CopyData struct {
@@ -25,11 +23,10 @@ func (dst *CopyData) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *CopyData) Encode(dst []byte) []byte {
-	dst = append(dst, 'd')
-	dst = pgio.AppendInt32(dst, int32(4+len(src.Data)))
+func (src *CopyData) Encode(dst []byte) ([]byte, error) {
+	dst, sp := beginMessage(dst, 'd')
 	dst = append(dst, src.Data...)
-	return dst
+	return finishMessage(dst, sp)
 }
 
 // MarshalJSON implements encoding/json.Marshaler.
@@ -41,4 +38,22 @@ func (src CopyData) MarshalJSON() ([]byte, error) {
 		Type: "CopyData",
 		Data: hex.EncodeToString(src.Data),
 	})
+}
+
+// UnmarshalJSON implements encoding/json.Unmarshaler.
+func (dst *CopyData) UnmarshalJSON(data []byte) error {
+	// Ignore null, like in the main JSON package.
+	if string(data) == "null" {
+		return nil
+	}
+
+	var msg struct {
+		Data string
+	}
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return err
+	}
+
+	dst.Data = []byte(msg.Data)
+	return nil
 }
