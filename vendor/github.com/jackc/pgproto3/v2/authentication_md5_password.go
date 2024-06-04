@@ -2,6 +2,7 @@ package pgproto3
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 
 	"github.com/jackc/pgio"
@@ -14,6 +15,9 @@ type AuthenticationMD5Password struct {
 
 // Backend identifies this message as sendable by the PostgreSQL backend.
 func (*AuthenticationMD5Password) Backend() {}
+
+// Backend identifies this message as an authentication response.
+func (*AuthenticationMD5Password) AuthenticationResponse() {}
 
 // Decode decodes src into dst. src must contain the complete message with the exception of the initial 1 byte message
 // type identifier and 4 byte message length.
@@ -34,10 +38,39 @@ func (dst *AuthenticationMD5Password) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *AuthenticationMD5Password) Encode(dst []byte) []byte {
-	dst = append(dst, 'R')
-	dst = pgio.AppendInt32(dst, 12)
+func (src *AuthenticationMD5Password) Encode(dst []byte) ([]byte, error) {
+	dst, sp := beginMessage(dst, 'R')
 	dst = pgio.AppendUint32(dst, AuthTypeMD5Password)
 	dst = append(dst, src.Salt[:]...)
-	return dst
+	return finishMessage(dst, sp)
+}
+
+// MarshalJSON implements encoding/json.Marshaler.
+func (src AuthenticationMD5Password) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type string
+		Salt [4]byte
+	}{
+		Type: "AuthenticationMD5Password",
+		Salt: src.Salt,
+	})
+}
+
+// UnmarshalJSON implements encoding/json.Unmarshaler.
+func (dst *AuthenticationMD5Password) UnmarshalJSON(data []byte) error {
+	// Ignore null, like in the main JSON package.
+	if string(data) == "null" {
+		return nil
+	}
+
+	var msg struct {
+		Type string
+		Salt [4]byte
+	}
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return err
+	}
+
+	dst.Salt = msg.Salt
+	return nil
 }

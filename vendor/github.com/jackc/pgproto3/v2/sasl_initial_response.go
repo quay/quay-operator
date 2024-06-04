@@ -2,7 +2,6 @@ package pgproto3
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 
@@ -39,10 +38,8 @@ func (dst *SASLInitialResponse) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *SASLInitialResponse) Encode(dst []byte) []byte {
-	dst = append(dst, 'p')
-	sp := len(dst)
-	dst = pgio.AppendInt32(dst, -1)
+func (src *SASLInitialResponse) Encode(dst []byte) ([]byte, error) {
+	dst, sp := beginMessage(dst, 'p')
 
 	dst = append(dst, []byte(src.AuthMechanism)...)
 	dst = append(dst, 0)
@@ -50,9 +47,7 @@ func (src *SASLInitialResponse) Encode(dst []byte) []byte {
 	dst = pgio.AppendInt32(dst, int32(len(src.Data)))
 	dst = append(dst, src.Data...)
 
-	pgio.SetInt32(dst[sp:], int32(len(dst[sp:])))
-
-	return dst
+	return finishMessage(dst, sp)
 }
 
 // MarshalJSON implements encoding/json.Marshaler.
@@ -64,6 +59,25 @@ func (src SASLInitialResponse) MarshalJSON() ([]byte, error) {
 	}{
 		Type:          "SASLInitialResponse",
 		AuthMechanism: src.AuthMechanism,
-		Data:          hex.EncodeToString(src.Data),
+		Data:          string(src.Data),
 	})
+}
+
+// UnmarshalJSON implements encoding/json.Unmarshaler.
+func (dst *SASLInitialResponse) UnmarshalJSON(data []byte) error {
+	// Ignore null, like in the main JSON package.
+	if string(data) == "null" {
+		return nil
+	}
+
+	var msg struct {
+		AuthMechanism string
+		Data          string
+	}
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return err
+	}
+	dst.AuthMechanism = msg.AuthMechanism
+	dst.Data = []byte(msg.Data)
+	return nil
 }
