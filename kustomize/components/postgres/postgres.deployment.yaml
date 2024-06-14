@@ -20,6 +20,8 @@ spec:
     spec:
       terminationGracePeriodSeconds: 180
       serviceAccountName: quay-database
+      securityContext:
+        fsGroup: 2000
       volumes:
         - name: postgres-conf-sample
           configMap:
