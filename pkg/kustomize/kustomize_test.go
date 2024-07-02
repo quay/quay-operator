@@ -189,7 +189,7 @@ var kustomizationForTests = []struct {
 				"../components/clair",
 				"../components/redis",
 				"../components/postgres",
-				"../components/pgupgrade/scale-down-clair",
+				"../components/pgupgrade/base",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
