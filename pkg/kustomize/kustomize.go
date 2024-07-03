@@ -434,7 +434,7 @@ func KustomizationFor(
 	}
 
 	if ctx.NeedsPgUpgrade {
-		componentPaths = append(componentPaths, "../components/pgupgrade/base")
+		componentPaths = append(componentPaths, "../components/pgupgrade")
 	}
 	if ctx.NeedsClairPgUpgrade {
 		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClair) {
