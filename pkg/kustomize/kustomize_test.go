@@ -189,7 +189,7 @@ var kustomizationForTests = []struct {
 				"../components/clair",
 				"../components/redis",
 				"../components/postgres",
-				"../components/pgupgrade/base",
+				"../components/pgupgrade",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
@@ -224,7 +224,7 @@ var kustomizationForTests = []struct {
 			Components: []string{
 				"../components/redis",
 				"../components/postgres",
-				"../components/pgupgrade/base",
+				"../components/pgupgrade",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
