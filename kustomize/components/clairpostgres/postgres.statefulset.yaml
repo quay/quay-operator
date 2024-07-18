@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: clair-postgres
   labels:
@@ -7,9 +7,8 @@ metadata:
   annotations:
     quay-component: clair-postgres
 spec:
+  serviceName: clair-postgres
   replicas: 1
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       quay-component: clair-postgres
@@ -57,3 +56,4 @@ spec:
             requests:
               cpu: 500m
               memory: 2Gi
+  volumeClaimTemplates: []
