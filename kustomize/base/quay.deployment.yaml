@@ -33,18 +33,6 @@ spec:
                   name: cluster-trusted-ca
               - secret:
                   name: extra-ca-certs
-        - name: postgres-certs
-          projected:
-            sources:
-            - secret:
-              name: postgresql-ca
-              optional: true
-            - secret:
-              name: postgresql-client-certs
-              optional: true
-        - name: postgres-certs-store
-          emptyDir:
-            sizeLimit: 5Mi
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -141,7 +129,3 @@ spec:
             - name: extra-ca-certs
               readOnly: true
               mountPath: /conf/stack/extra_ca_certs
-            - name: postgres-certs
-              mountPath: /run/secrets/postgres
-            - name: postgres-cert-store
-              mountPath: /.postgres
