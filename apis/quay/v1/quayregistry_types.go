@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	quaycontext "github.com/quay/quay-operator/pkg/context"
@@ -762,6 +763,10 @@ func GetReplicasOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *in
 		}
 
 		if cmp.Overrides == nil {
+			return ptr.To[int32](2)
+		}
+
+		if cmp.Overrides.Replicas == nil {
 			return nil
 		}
 
