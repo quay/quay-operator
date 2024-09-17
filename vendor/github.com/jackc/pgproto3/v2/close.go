@@ -3,8 +3,7 @@ package pgproto3
 import (
 	"bytes"
 	"encoding/json"
-
-	"github.com/jackc/pgio"
+	"errors"
 )
 
 type Close struct {
@@ -36,18 +35,12 @@ func (dst *Close) Decode(src []byte) error {
 }
 
 // Encode encodes src into dst. dst will include the 1 byte message type identifier and the 4 byte message length.
-func (src *Close) Encode(dst []byte) []byte {
-	dst = append(dst, 'C')
-	sp := len(dst)
-	dst = pgio.AppendInt32(dst, -1)
-
+func (src *Close) Encode(dst []byte) ([]byte, error) {
+	dst, sp := beginMessage(dst, 'C')
 	dst = append(dst, src.ObjectType)
 	dst = append(dst, src.Name...)
 	dst = append(dst, 0)
-
-	pgio.SetInt32(dst[sp:], int32(len(dst[sp:])))
-
-	return dst
+	return finishMessage(dst, sp)
 }
 
 // MarshalJSON implements encoding/json.Marshaler.
@@ -61,4 +54,28 @@ func (src Close) MarshalJSON() ([]byte, error) {
 		ObjectType: string(src.ObjectType),
 		Name:       src.Name,
 	})
+}
+
+// UnmarshalJSON implements encoding/json.Unmarshaler.
+func (dst *Close) UnmarshalJSON(data []byte) error {
+	// Ignore null, like in the main JSON package.
+	if string(data) == "null" {
+		return nil
+	}
+
+	var msg struct {
+		ObjectType string
+		Name       string
+	}
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return err
+	}
+
+	if len(msg.ObjectType) != 1 {
+		return errors.New("invalid length for Close.ObjectType")
+	}
+
+	dst.ObjectType = byte(msg.ObjectType[0])
+	dst.Name = msg.Name
+	return nil
 }

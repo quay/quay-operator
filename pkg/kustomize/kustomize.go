@@ -434,14 +434,13 @@ func KustomizationFor(
 	}
 
 	if ctx.NeedsPgUpgrade {
-		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClair) {
-			componentPaths = append(componentPaths, "../components/pgupgrade/scale-down-clair")
-		} else {
-			componentPaths = append(componentPaths, "../components/pgupgrade/base")
-		}
+		componentPaths = append(componentPaths, "../components/pgupgrade")
 	}
 	if ctx.NeedsClairPgUpgrade {
-		componentPaths = append(componentPaths, "../components/clairpgupgrade")
+		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClair) {
+			componentPaths = append(componentPaths, "../components/clairpgupgrade/scale-down-clair")
+		}
+		componentPaths = append(componentPaths, "../components/clairpgupgrade/base")
 	}
 
 	images := []types.Image{}

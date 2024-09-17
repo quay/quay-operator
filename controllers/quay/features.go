@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/pem"
+	err "errors"
 	"fmt"
 	"strings"
 	"time"
@@ -373,7 +374,7 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 	if len(r.WatchNamespace) > 0 {
 		msg := "Monitoring is only supported in AllNamespaces mode. Disabling."
 		r.Log.Info(msg)
-		return fmt.Errorf(msg)
+		return err.New(msg)
 	}
 
 	var serviceMonitors prometheusv1.ServiceMonitorList
