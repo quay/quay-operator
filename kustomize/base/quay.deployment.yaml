@@ -144,4 +144,4 @@ spec:
             - name: postgres-certs
               mountPath: /run/secrets/postgresql
             - name: postgres-certs-store
-              mountPath: /.postgressql
+              mountPath: /.postgresql
