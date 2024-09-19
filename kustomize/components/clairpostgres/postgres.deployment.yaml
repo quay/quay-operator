@@ -26,10 +26,10 @@ spec:
             name: clair-postgres-conf-sample
         - name: postgres-data
           persistentVolumeClaim:
-            claimName: clair-postgres-13
+            claimName: clair-postgres-15
       containers:
         - name: clair-postgres
-          image: quay.io/sclorg/postgresql-13-c9s:latest
+          image: quay.io/sclorg/postgresql-15-c9s:latest
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 5432
