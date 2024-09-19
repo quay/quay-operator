@@ -61,7 +61,7 @@ func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 		v1.ComponentQuay:     "quay.io/projectquay/quay",
 		v1.ComponentClair:    "quay.io/projectquay/clair",
 		v1.ComponentRedis:    "docker.io/library/redis",
-		v1.ComponentPostgres: "quay.io/sclorg/postgresql-13-c9s",
+		v1.ComponentPostgres: "quay.io/sclorg/postgresql-15-c9s",
 	}
 
 	imageOverride := types.Image{
@@ -92,7 +92,7 @@ func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 // to use. If set, returns a Kustomize image override for the given component.
 func postgresUpgradeImage() (types.Image, error) {
 	imageOverride := types.Image{
-		Name: "centos/postgresql-10-centos7",
+		Name: "quay.io/sclorg/postgresql-13-c9s",
 	}
 
 	image := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS")

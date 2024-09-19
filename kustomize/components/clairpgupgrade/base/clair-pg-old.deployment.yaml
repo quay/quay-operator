@@ -29,7 +29,7 @@ spec:
             claimName: clair-postgres
       containers:
         - name: postgres
-          image: centos/postgresql-10-centos7:latest
+          image: quay.io/sclorg/postgresql-13-c9s:latest
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 5432

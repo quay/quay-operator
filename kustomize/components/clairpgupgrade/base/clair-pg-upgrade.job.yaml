@@ -16,12 +16,12 @@ spec:
         - name: clair-postgres-conf-sample
           configMap:
             name: clair-postgres-conf-sample
-        - name: clair-postgres-13
+        - name: clair-postgres-15
           persistentVolumeClaim:
-            claimName: clair-postgres-13
+            claimName: clair-postgres-15
       containers:
-        - name: clair-postgres-13
-          image: quay.io/sclorg/postgresql-13-c9s:latest
+        - name: clair-postgres-15
+          image: quay.io/sclorg/postgresql-15-c9s:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
@@ -42,7 +42,7 @@ spec:
             - name: clair-postgres-conf-sample
               mountPath: /usr/share/pgsql/postgresql.conf.sample
               subPath: postgresql.conf.sample
-            - name: clair-postgres-13
+            - name: clair-postgres-15
               mountPath: /var/lib/pgsql/data
           resources:
             requests:
