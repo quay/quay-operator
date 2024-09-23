@@ -158,9 +158,9 @@ spec:
                       - name: RELATED_IMAGE_COMPONENT_BUILDER_QEMU
                         value: quay.io/projectquay/quay-builder-qemu:main
                       - name: RELATED_IMAGE_COMPONENT_POSTGRES
-                        value: quay.io/sclorg/postgresql-15-c9s:latest
-                      - name: RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS
                         value: quay.io/sclorg/postgresql-13-c9s:latest
+                      - name: RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS
+                        value: centos/postgresql-10-centos7:latest
                       - name: RELATED_IMAGE_COMPONENT_REDIS
                         value: docker.io/library/redis:7.0
                 serviceAccountName: quay-operator
