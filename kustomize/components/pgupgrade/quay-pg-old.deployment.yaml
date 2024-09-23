@@ -32,7 +32,7 @@ spec:
             claimName: quay-database
       containers:
         - name: postgres
-          image: quay.io/sclorg/postgresql-13-c9s:latest
+          image: centos/postgresql-10-centos7:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432

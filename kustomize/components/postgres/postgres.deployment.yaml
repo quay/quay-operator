@@ -29,10 +29,10 @@ spec:
             secretName: postgres-bootstrap
         - name: postgres-data
           persistentVolumeClaim:
-            claimName: quay-postgres-15
+            claimName: quay-postgres-13
       containers:
         - name: postgres
-          image: quay.io/sclorg/postgresql-15-c9s:latest
+          image: quay.io/sclorg/postgresql-13-c9s:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
