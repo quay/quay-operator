@@ -61,3 +61,4 @@ spec:
           - >
             run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
   backoffLimit: 50
+
