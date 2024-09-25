@@ -3,4 +3,4 @@ kind: Component
 patchesStrategicMerge:
   - ./clair.deployment.patch.yaml
 resources:
-  - "../base"
+  - ../base
