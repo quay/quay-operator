@@ -49,6 +49,18 @@ spec:
                   name: extra-ca-certs      
               - secret:
                   name: quay-config-tls
+        - name: postgres-certs
+          projected:
+            sources:
+            - secret:
+                name: postgresql-ca
+                optional: true
+            - secret:
+                name: postgresql-client-certs
+                optional: true
+        - name: postgres-certs-store
+          emptyDir:
+            sizeLimit: 5Mi
       initContainers:
         - name: quay-mirror-init
           image: quay.io/projectquay/quay:latest
@@ -99,6 +111,10 @@ spec:
             - name: extra-ca-certs
               readOnly: true
               mountPath: /conf/stack/extra_ca_certs
+            - name: postgres-certs
+              mountPath: /run/secrets/postgresql
+            - name: postgres-certs-store
+              mountPath: /.postgresql
           resources:
             requests:
               cpu: 500m
