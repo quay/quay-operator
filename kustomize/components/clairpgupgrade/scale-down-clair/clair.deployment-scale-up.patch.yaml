@@ -4,3 +4,4 @@ metadata:
   name: clair-postgres
 spec:
   replicas: 2
+  
