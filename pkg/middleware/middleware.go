@@ -199,7 +199,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		var override *resource.Quantity
 		switch quayComponentLabel {
 		case "postgres":
-			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
+			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentQuayPostgres)
 		case "clair-postgres":
 			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
 		}

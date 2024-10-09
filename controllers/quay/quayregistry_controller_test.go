@@ -499,7 +499,7 @@ func Test_hasNecessaryConfig(t *testing.T) {
 			name:   "unmanaged postgres without config",
 			experr: true,
 			cfg:    map[string][]byte{},
-			quay:   quayWithUnmanagedComponents(v1.ComponentPostgres),
+			quay:   quayWithUnmanagedComponents(v1.ComponentQuayPostgres),
 		},
 		{
 			name:   "unmanaged postgres with config",
@@ -507,7 +507,7 @@ func Test_hasNecessaryConfig(t *testing.T) {
 			cfg: map[string][]byte{
 				"config.yaml": []byte("DB_CONNECTION_ARGS: 'a'\nDB_URI: 'b'"),
 			},
-			quay: quayWithUnmanagedComponents(v1.ComponentPostgres),
+			quay: quayWithUnmanagedComponents(v1.ComponentQuayPostgres),
 		},
 		{
 			name:   "unmanaged clair without config",
