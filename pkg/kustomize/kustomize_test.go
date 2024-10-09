@@ -723,7 +723,7 @@ func TestInflate(t *testing.T) {
 					}
 					assert.Equal(string(managedKeys.Data["SECRET_KEY"]), config["SECRET_KEY"], test.name)
 
-					if test.ctx.DbUri == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentPostgres) {
+					if test.ctx.DbUri == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentQuayPostgres) {
 						assert.Greater(len(string(managedKeys.Data["DB_URI"])), 0, test.name)
 						assert.Greater(len(config["DB_URI"].(string)), 0, test.name)
 					} else {

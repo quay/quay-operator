@@ -52,16 +52,18 @@ const (
 // to use. If set, returns a Kustomize image override for the given component.
 func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 	envVarFor := map[v1.ComponentKind]string{
-		v1.ComponentQuay:     componentImagePrefix + "QUAY",
-		v1.ComponentClair:    componentImagePrefix + "CLAIR",
-		v1.ComponentRedis:    componentImagePrefix + "REDIS",
-		v1.ComponentPostgres: componentImagePrefix + "POSTGRES",
+		v1.ComponentQuay:          componentImagePrefix + "QUAY",
+		v1.ComponentClair:         componentImagePrefix + "CLAIR",
+		v1.ComponentRedis:         componentImagePrefix + "REDIS",
+		v1.ComponentQuayPostgres:  componentImagePrefix + "QUAY_POSTGRES",
+		v1.ComponentClairPostgres: componentImagePrefix + "CLAIR_POSTGRES",
 	}
 	defaultImagesFor := map[v1.ComponentKind]string{
-		v1.ComponentQuay:     "quay.io/projectquay/quay",
-		v1.ComponentClair:    "quay.io/projectquay/clair",
-		v1.ComponentRedis:    "docker.io/library/redis",
-		v1.ComponentPostgres: "quay.io/sclorg/postgresql-13-c9s",
+		v1.ComponentQuay:          "quay.io/projectquay/quay",
+		v1.ComponentClair:         "quay.io/projectquay/clair",
+		v1.ComponentRedis:         "docker.io/library/redis",
+		v1.ComponentQuayPostgres:  "quay.io/sclorg/postgresql-13-c9s",
+		v1.ComponentClairPostgres: "quay.io/sclorg/postgresql-15-c9s",
 	}
 
 	imageOverride := types.Image{
@@ -439,8 +441,9 @@ func KustomizationFor(
 	if ctx.NeedsClairPgUpgrade {
 		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClair) {
 			componentPaths = append(componentPaths, "../components/clairpgupgrade/scale-down-clair")
+		} else {
+			componentPaths = append(componentPaths, "../components/clairpgupgrade/base")
 		}
-		componentPaths = append(componentPaths, "../components/clairpgupgrade/base")
 
 	}
 
@@ -551,7 +554,7 @@ func Inflate(
 	if dbURI, ok := parsedUserConfig["DB_URI"].(string); ok && len(dbURI) > 0 {
 		dbCfgHasChanged = parsedUserConfig["DB_URI"] != ctx.DbUri
 		ctx.DbUri = dbURI
-	} else if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) && len(ctx.DbUri) == 0 {
+	} else if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentQuayPostgres) && len(ctx.DbUri) == 0 {
 		dbCfgHasChanged = true
 		log.Info("managed `DB_URI` not found in config, generating new one")
 		user := quay.GetName() + "-quay-database"

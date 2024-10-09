@@ -78,7 +78,7 @@ func FieldGroupFor(
 		}
 		return fieldGroup, nil
 
-	case v1.ComponentPostgres:
+	case v1.ComponentQuayPostgres:
 		fieldGroup, err := database.NewDatabaseFieldGroup(map[string]interface{}{})
 		if err != nil {
 			return nil, err
@@ -236,7 +236,7 @@ func ContainsComponentConfig(
 	case v1.ComponentClair:
 		fields = (&securityscanner.SecurityScannerFieldGroup{}).Fields()
 
-	case v1.ComponentPostgres:
+	case v1.ComponentQuayPostgres:
 		fields = (&database.DatabaseFieldGroup{}).Fields()
 
 	case v1.ComponentClairPostgres:
@@ -309,7 +309,7 @@ func ContainsComponentConfig(
 // componentConfigFilesFor returns specific config files for managed components of a Quay registry.
 func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryContext, component v1.ComponentKind, quay *v1.QuayRegistry, configFiles map[string][]byte) (map[string][]byte, error) {
 	switch component {
-	case v1.ComponentPostgres:
+	case v1.ComponentQuayPostgres:
 		dbConfig, ok := configFiles["postgres.config.yaml"]
 		if !ok {
 			return nil, fmt.Errorf("cannot generate managed component config file for `postgres` if `postgres.config.yaml` is missing")

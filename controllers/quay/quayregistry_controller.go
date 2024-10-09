@@ -524,8 +524,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
-	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentPostgres) {
-		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
+	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentQuayPostgres) {
+		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentQuayPostgres)
 		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,

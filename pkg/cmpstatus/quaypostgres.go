@@ -30,9 +30,9 @@ func (p *Postgres) Name() string {
 func (p *Postgres) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, error) {
 	var zero qv1.Condition
 
-	if !qv1.ComponentIsManaged(reg.Spec.Components, qv1.ComponentPostgres) {
+	if !qv1.ComponentIsManaged(reg.Spec.Components, qv1.ComponentQuayPostgres) {
 		return qv1.Condition{
-			Type:           qv1.ComponentPostgresReady,
+			Type:           qv1.ComponentQuayPostgresReady,
 			Status:         metav1.ConditionTrue,
 			Reason:         qv1.ConditionReasonComponentUnmanaged,
 			Message:        "Postgres not managed by the operator",
@@ -49,7 +49,7 @@ func (p *Postgres) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Conditi
 	if err := p.Client.Get(ctx, nsn, &dep); err != nil {
 		if errors.IsNotFound(err) {
 			return qv1.Condition{
-				Type:           qv1.ComponentPostgresReady,
+				Type:           qv1.ComponentQuayPostgresReady,
 				Status:         metav1.ConditionFalse,
 				Reason:         qv1.ConditionReasonComponentNotReady,
 				Message:        "Postgres deployment not found",
@@ -61,7 +61,7 @@ func (p *Postgres) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Conditi
 
 	if !qv1.Owns(reg, &dep) {
 		return qv1.Condition{
-			Type:           qv1.ComponentPostgresReady,
+			Type:           qv1.ComponentQuayPostgresReady,
 			Status:         metav1.ConditionFalse,
 			Reason:         qv1.ConditionReasonComponentNotReady,
 			Message:        "Postgres deployment not owned by QuayRegistry",
@@ -70,6 +70,6 @@ func (p *Postgres) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Conditi
 	}
 
 	cond := p.deploy.check(dep)
-	cond.Type = qv1.ComponentPostgresReady
+	cond.Type = qv1.ComponentQuayPostgresReady
 	return cond, nil
 }
