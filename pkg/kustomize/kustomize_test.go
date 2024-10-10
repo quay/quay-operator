@@ -76,7 +76,6 @@ var kustomizationForTests = []struct {
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
-					{Kind: "clairpostgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
 				},
@@ -92,7 +91,6 @@ var kustomizationForTests = []struct {
 			Components: []string{
 				"../components/postgres",
 				"../components/clair",
-				"../components/clairpostgres",
 				"../components/redis",
 			},
 			Images: []types.Image{
@@ -100,7 +98,6 @@ var kustomizationForTests = []struct {
 				{Name: "quay.io/projectquay/clair", NewName: "clair", Digest: "sha256:abc123"},
 				{Name: "docker.io/library/redis", NewName: "redis", Digest: "sha256:abc123"},
 				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "postgres", Digest: "sha256:abc123"},
-				{Name: "quay.io/sclorg/postgresql-15-c9s", NewName: "clairpostgres", Digest: "sha256:abc123"},
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -113,7 +110,6 @@ var kustomizationForTests = []struct {
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
-					{Kind: "clairpostgres", Managed: true},
 					{Kind: "redis", Managed: true},
 				},
 			},
@@ -128,7 +124,6 @@ var kustomizationForTests = []struct {
 			Components: []string{
 				"../components/postgres",
 				"../components/clair",
-				"../components,clairpostgres",
 				"../components/redis",
 			},
 			Images: []types.Image{
@@ -136,7 +131,6 @@ var kustomizationForTests = []struct {
 				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
 				{Name: "docker.io/library/redis", NewName: "redis", NewTag: "buster"},
 				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "postgres", NewTag: "latest"},
-				{Name: "quay.io/sclorg/postgresql-15-c9s", NewName: "clairpostgres", NewTag: "latest"},
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -149,7 +143,6 @@ var kustomizationForTests = []struct {
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: false},
 					{Kind: "clair", Managed: true},
-					{Kind: "clairpostgres", Managed: false},
 					{Kind: "redis", Managed: true},
 				},
 			},
@@ -170,7 +163,6 @@ var kustomizationForTests = []struct {
 				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
 				{Name: "docker.io/library/redis", NewName: "redis", NewTag: "buster"},
 				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "postgres", NewTag: "latest"},
-				{Name: "quay.io/sclorg/postgresql-15-c9s", NewName: "clairpostgres", NewTag: "latest"},
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -183,7 +175,6 @@ var kustomizationForTests = []struct {
 				Components: []v1.Component{
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
-					{Kind: "clairpostgres", Managed: true},
 					{Kind: "redis", Managed: true},
 				},
 			},
@@ -198,7 +189,6 @@ var kustomizationForTests = []struct {
 			},
 			Components: []string{
 				"../components/clair",
-				"../components/clairpostgres",
 				"../components/redis",
 				"../components/postgres",
 				"../components/pgupgrade",
@@ -209,8 +199,6 @@ var kustomizationForTests = []struct {
 				{Name: "docker.io/library/redis", NewName: "redis", NewTag: "buster"},
 				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "postgres", NewTag: "latest"},
 				{Name: "centos/postgresql-10-centos7", NewName: "postgres_previous", NewTag: "latest"},
-				{Name: "quay.io/sclorg/postgresql-15-c9s", NewName: "clairpostgres", NewTag: "latest"},
-				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "clairpostgres_previous", NewTag: "latest"},
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -221,7 +209,6 @@ var kustomizationForTests = []struct {
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
-					{Kind: "postgres", Managed: true},
 					{Kind: "clairpostgres", Managed: true},
 					{Kind: "clair", Managed: false},
 					{Kind: "redis", Managed: true},
@@ -238,15 +225,12 @@ var kustomizationForTests = []struct {
 			},
 			Components: []string{
 				"../components/redis",
-				"../components/postgres",
-				"../components/pgupgrade",
+				"../components/clairpostgres",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
 				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
 				{Name: "docker.io/library/redis", NewName: "redis", NewTag: "buster"},
-				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "postgres", NewTag: "latest"},
-				{Name: "centos/postgresql-10-centos7", NewName: "postgres_previous", NewTag: "latest"},
 				{Name: "quay.io/sclorg/postgresql-15-c9s", NewName: "clairpostgres", NewTag: "latest"},
 				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "clairpostgres_previous", NewTag: "latest"},
 			},
