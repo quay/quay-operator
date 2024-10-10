@@ -83,6 +83,7 @@ var requiredComponents = []ComponentKind{
 var supportsVolumeOverride = []ComponentKind{
 	ComponentPostgres,
 	ComponentClair,
+	ComponentClairPostgres,
 }
 
 var supportsEnvOverride = []ComponentKind{
@@ -91,6 +92,7 @@ var supportsEnvOverride = []ComponentKind{
 	ComponentMirror,
 	ComponentPostgres,
 	ComponentRedis,
+	ComponentClairPostgres,
 }
 
 var supportsResourceOverrides = []ComponentKind{
@@ -312,6 +314,16 @@ func MigrationsRunning(quay *QuayRegistry) bool {
 // PostgresUpgradeRunning returns true if the status for provided QuayRegistry indicates that
 // the database upgrade is running.
 func PostgresUpgradeRunning(quay *QuayRegistry) bool {
+	created := GetCondition(quay.Status.Conditions, ConditionComponentsCreated)
+	if created == nil {
+		return false
+	}
+	return created.Reason == ConditionReasonPostgresUpgradeInProgress || created.Reason == ConditionReasonPostgresUpgradeFailed
+}
+
+// ClairPostgresUpgradeRunning returns true if the status for provided QuayRegistry indicates that
+// the database upgrade is running.
+func ClairPostgresUpgradeRunning(quay *QuayRegistry) bool {
 	created := GetCondition(quay.Status.Conditions, ConditionComponentsCreated)
 	if created == nil {
 		return false

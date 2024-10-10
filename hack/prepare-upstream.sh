@@ -21,11 +21,15 @@ digest() {
 
 POSTGRES_DIGEST=$(digest POSTGRES)
 POSTGRES_PREVIOUS_DIGEST=$(digest POSTGRES_PREVIOUS)
+POSTGRES_CLAIR_DIGEST=$(digest POSTGRES_CLAIR)
+POSTGRES_CLAIR_PREVIOUS_DIGEST=$(digest POSTGRES_CLAIR_PREVIOUS)
 REDIS_DIGEST=$(digest REDIS)
 
 # export variables for yq
 export POSTGRES_DIGEST
 export POSTGRES_PREVIOUS_DIGEST
+export POSTGRES_CLAIR_DIGEST
+export POSTGRES_CLAIR_PREVIOUS_DIGEST
 export REDIS_DIGEST
 
 yq eval -i '
@@ -41,6 +45,8 @@ yq eval -i '
         select(.name == "RELATED_IMAGE_COMPONENT_QUAY").value = ("quay.io/projectquay/quay:${RELEASE}" | envsubst) |
         select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES").value = strenv(POSTGRES_DIGEST) |
         select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS").value = strenv(POSTGRES_PREVIOUS_DIGEST) |
+        select(.name == "RELATED_IMAGE_COMPONENT_CLAIR_POSTGRES").value = strenv(POSTGRES_CLAIR_DIGEST) |
+        select(.name == "RELATED_IMAGE_COMPONENT_CLAIR_POSTGRES_PREVIOUS").value = strenv(POSTGRES_CLAIR_PREVIOUS_DIGEST) |
         select(.name == "RELATED_IMAGE_COMPONENT_REDIS").value = strenv(REDIS_DIGEST)
     ) |
     .spec.version = strenv(RELEASE) |

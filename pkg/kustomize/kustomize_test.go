@@ -204,6 +204,7 @@ var kustomizationForTests = []struct {
 		},
 		"",
 	},
+
 	{
 		"ClairPostgresUpgradeUnmanagedClair",
 		&v1.QuayRegistry{
@@ -216,7 +217,7 @@ var kustomizationForTests = []struct {
 			},
 		},
 		quaycontext.QuayRegistryContext{
-			NeedsPgUpgrade: true,
+			NeedsClairPgUpgrade: true,
 		},
 		&types.Kustomization{
 			TypeMeta: types.TypeMeta{
@@ -226,6 +227,7 @@ var kustomizationForTests = []struct {
 			Components: []string{
 				"../components/redis",
 				"../components/clairpostgres",
+				"../components/clairpgupgrade/base",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
@@ -262,7 +264,6 @@ func TestKustomizationFor(t *testing.T) {
 			assert.Nil(kustomization, test.name)
 		} else {
 			assert.NotNil(kustomization, test.name)
-
 			assert.Equal(len(test.expected.Components), len(kustomization.Components), test.name)
 			for _, expectedComponent := range test.expected.Components {
 				assert.Contains(kustomization.Components, expectedComponent, test.name)

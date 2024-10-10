@@ -3,7 +3,6 @@ package kustomize
 import (
 	"errors"
 	"fmt"
-
 	"os"
 	"path/filepath"
 	"runtime"
@@ -55,8 +54,8 @@ func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 		v1.ComponentQuay:          componentImagePrefix + "QUAY",
 		v1.ComponentClair:         componentImagePrefix + "CLAIR",
 		v1.ComponentRedis:         componentImagePrefix + "REDIS",
-		v1.ComponentPostgres:      componentImagePrefix + "QUAY_POSTGRES",
-		v1.ComponentClairPostgres: componentImagePrefix + "CLAIR_POSTGRES",
+		v1.ComponentPostgres:      componentImagePrefix + "POSTGRES",
+		v1.ComponentClairPostgres: componentImagePrefix + "CLAIRPOSTGRES",
 	}
 	defaultImagesFor := map[v1.ComponentKind]string{
 		v1.ComponentQuay:          "quay.io/projectquay/quay",
@@ -93,11 +92,16 @@ func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 // ComponentImageFor checks for an environment variable indicating which component container image
 // to use. If set, returns a Kustomize image override for the given component.
 func postgresUpgradeImage() (types.Image, error) {
+	fmt.Println("Entering postgresUpgradeImage function")
 	imageOverride := types.Image{
 		Name: "centos/postgresql-10-centos7",
 	}
 
 	image := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS")
+	fmt.Printf("RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS: %s\n", image)
+	imagenew := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES")
+	fmt.Printf("RELATED_IMAGE_COMPONENT_POSTGRES: %s\n", imagenew)
+
 	if image == "" {
 		return imageOverride, nil
 	}
@@ -113,7 +117,41 @@ func postgresUpgradeImage() (types.Image, error) {
 			"image override must be reference by tag or digest: %s", image,
 		)
 	}
+	fmt.Printf("Final imageOverride: %+v\n", imageOverride)
+	return imageOverride, nil
+}
 
+func clairpostgresUpgradeImage() (types.Image, error) {
+	fmt.Println("Entering clairpostgresUpgradeImage function")
+
+	imageOverride := types.Image{
+		Name: "quay.io/sclorg/postgresql-13-c9s",
+	}
+
+	image := os.Getenv("RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES_PREVIOUS")
+	fmt.Printf("RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES_PREVIOUS: %s\n", image)
+
+	if image == "" {
+		fmt.Println("Using default imageOverride")
+		return imageOverride, nil
+	}
+
+	if len(strings.Split(image, "@")) == 2 {
+		imageOverride.NewName = strings.Split(image, "@")[0]
+		imageOverride.Digest = strings.Split(image, "@")[1]
+		fmt.Printf("Image with digest - NewName: %s, Digest: %s\n", imageOverride.NewName, imageOverride.Digest)
+	} else if len(strings.Split(image, ":")) == 2 {
+		imageOverride.NewName = strings.Split(image, ":")[0]
+		imageOverride.NewTag = strings.Split(image, ":")[1]
+		fmt.Printf("Image with tag - NewName: %s, NewTag: %s\n", imageOverride.NewName, imageOverride.NewTag)
+	} else {
+		fmt.Printf("Invalid image format: %s\n", image)
+		return types.Image{}, fmt.Errorf(
+			"image override must be reference by tag or digest: %s", image,
+		)
+	}
+
+	fmt.Printf("Final imageOverride: %+v\n", imageOverride)
 	return imageOverride, nil
 }
 
@@ -460,12 +498,20 @@ func KustomizationFor(
 		}
 	}
 
-	if ctx.NeedsPgUpgrade || ctx.NeedsClairPgUpgrade {
+	if ctx.NeedsPgUpgrade {
 		pgImage, err := postgresUpgradeImage()
 		if err != nil {
 			return nil, err
 		}
 		images = append(images, pgImage)
+	}
+
+	if ctx.NeedsClairPgUpgrade {
+		clairPgImage, err := clairpostgresUpgradeImage()
+		if err != nil {
+			return nil, err
+		}
+		images = append(images, clairPgImage)
 	}
 
 	return &types.Kustomization{
