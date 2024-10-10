@@ -414,7 +414,7 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 		upgradeField     *bool
 	}{
 		v1.ComponentClairPostgres: {"clair-postgres", &qctx.NeedsClairPgUpgrade},
-		v1.ComponentPostgres:  {"quay-database", &qctx.NeedsPgUpgrade},
+		v1.ComponentPostgres:      {"quay-database", &qctx.NeedsPgUpgrade},
 	}
 
 	info, ok := componentInfo[component]

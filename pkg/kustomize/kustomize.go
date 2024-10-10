@@ -55,14 +55,14 @@ func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 		v1.ComponentQuay:          componentImagePrefix + "QUAY",
 		v1.ComponentClair:         componentImagePrefix + "CLAIR",
 		v1.ComponentRedis:         componentImagePrefix + "REDIS",
-		v1.ComponentPostgres:  componentImagePrefix + "QUAY_POSTGRES",
+		v1.ComponentPostgres:      componentImagePrefix + "QUAY_POSTGRES",
 		v1.ComponentClairPostgres: componentImagePrefix + "CLAIR_POSTGRES",
 	}
 	defaultImagesFor := map[v1.ComponentKind]string{
 		v1.ComponentQuay:          "quay.io/projectquay/quay",
 		v1.ComponentClair:         "quay.io/projectquay/clair",
 		v1.ComponentRedis:         "docker.io/library/redis",
-		v1.ComponentPostgres:  "quay.io/sclorg/postgresql-13-c9s",
+		v1.ComponentPostgres:      "quay.io/sclorg/postgresql-13-c9s",
 		v1.ComponentClairPostgres: "quay.io/sclorg/postgresql-15-c9s",
 	}
 
