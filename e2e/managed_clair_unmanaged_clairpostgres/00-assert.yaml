@@ -32,7 +32,7 @@ status:
   - type: ComponentHPAReady
   - type: ComponentRouteReady
   - type: ComponentMonitoringReady
-  - type: ComponentQuayPostgresReady
+  - type: ComponentPostgresReady
   - type: ComponentObjectStorageReady
   - type: ComponentClairReady
   - message: ClairPostgres not managed by the operator

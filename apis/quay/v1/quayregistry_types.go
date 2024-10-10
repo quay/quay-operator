@@ -45,7 +45,7 @@ type ComponentKind string
 // Follow a list of constants representing all supported components.
 const (
 	ComponentQuay          ComponentKind = "quay"
-	ComponentQuayPostgres  ComponentKind = "postgres"
+	ComponentPostgres      ComponentKind = "postgres"
 	ComponentClair         ComponentKind = "clair"
 	ComponentClairPostgres ComponentKind = "clairpostgres"
 	ComponentRedis         ComponentKind = "redis"
@@ -60,7 +60,7 @@ const (
 // AllComponents holds a list of all supported components.
 var AllComponents = []ComponentKind{
 	ComponentQuay,
-	ComponentQuayPostgres,
+	ComponentPostgres,
 	ComponentClair,
 	ComponentRedis,
 	ComponentHPA,
@@ -73,7 +73,7 @@ var AllComponents = []ComponentKind{
 }
 
 var requiredComponents = []ComponentKind{
-	ComponentQuayPostgres,
+	ComponentPostgres,
 	ComponentObjectStorage,
 	ComponentRoute,
 	ComponentRedis,
@@ -81,23 +81,25 @@ var requiredComponents = []ComponentKind{
 }
 
 var supportsVolumeOverride = []ComponentKind{
-	ComponentQuayPostgres,
+	ComponentPostgres,
 	ComponentClair,
+	ComponentClairPostgres,
 }
 
 var supportsEnvOverride = []ComponentKind{
 	ComponentQuay,
 	ComponentClair,
 	ComponentMirror,
-	ComponentQuayPostgres,
+	ComponentPostgres,
 	ComponentRedis,
+	ComponentClairPostgres,
 }
 
 var supportsResourceOverrides = []ComponentKind{
 	ComponentQuay,
 	ComponentClair,
 	ComponentMirror,
-	ComponentQuayPostgres,
+	ComponentPostgres,
 	ComponentClairPostgres,
 }
 
@@ -170,7 +172,7 @@ const (
 	ConditionTypeRolloutBlocked ConditionType = "RolloutBlocked"
 	ConditionComponentsCreated  ConditionType = "ComponentsCreated"
 	ComponentQuayReady          ConditionType = "ComponentQuayReady"
-	ComponentQuayPostgresReady  ConditionType = "ComponentQuayPostgresReady"
+	ComponentPostgresReady      ConditionType = "ComponentPostgresReady"
 	ComponentClairReady         ConditionType = "ComponentClairReady"
 	ComponentClairPostgresReady ConditionType = "ComponentClairPostgresReady"
 	ComponentRedisReady         ConditionType = "ComponentRedisReady"
@@ -678,7 +680,7 @@ func FieldGroupNameFor(cmp ComponentKind) (string, error) {
 	switch cmp {
 	case ComponentClair:
 		return "SecurityScanner", nil
-	case ComponentQuayPostgres:
+	case ComponentPostgres:
 		return "Database", nil
 	case ComponentClairPostgres:
 		return "", nil
@@ -901,7 +903,7 @@ func RemoveUnusedConditions(quay *QuayRegistry) {
 		ConditionTypeRolloutBlocked,
 		ConditionComponentsCreated,
 		ComponentQuayReady,
-		ComponentQuayPostgresReady,
+		ComponentPostgresReady,
 		ComponentClairReady,
 		ComponentClairPostgresReady,
 		ComponentRedisReady,

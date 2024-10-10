@@ -45,6 +45,7 @@ var kustomizationForTests = []struct {
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "mirror", Managed: true},
 				},
@@ -61,6 +62,7 @@ var kustomizationForTests = []struct {
 				"../components/postgres",
 				"../components/clair",
 				"../components/redis",
+				"../components/clairpostgres",
 				"../components/objectstorage",
 				"../components/mirror",
 			},
@@ -207,14 +209,14 @@ var kustomizationForTests = []struct {
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
-					{Kind: "postgres", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
 					{Kind: "clair", Managed: false},
 					{Kind: "redis", Managed: true},
 				},
 			},
 		},
 		quaycontext.QuayRegistryContext{
-			NeedsPgUpgrade: true,
+			NeedsClairPgUpgrade: true,
 		},
 		&types.Kustomization{
 			TypeMeta: types.TypeMeta{
@@ -223,15 +225,15 @@ var kustomizationForTests = []struct {
 			},
 			Components: []string{
 				"../components/redis",
-				"../components/postgres",
-				"../components/pgupgrade",
+				"../components/clairpostgres",
+				"../components/clairpgupgrade/base",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
 				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
 				{Name: "docker.io/library/redis", NewName: "redis", NewTag: "buster"},
-				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "postgres", NewTag: "latest"},
-				{Name: "centos/postgresql-10-centos7", NewName: "postgres_previous", NewTag: "latest"},
+				{Name: "quay.io/sclorg/postgresql-15-c9s", NewName: "clairpostgres", NewTag: "latest"},
+				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "clairpostgres_previous", NewTag: "latest"},
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
@@ -723,7 +725,7 @@ func TestInflate(t *testing.T) {
 					}
 					assert.Equal(string(managedKeys.Data["SECRET_KEY"]), config["SECRET_KEY"], test.name)
 
-					if test.ctx.DbUri == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentQuayPostgres) {
+					if test.ctx.DbUri == "" && v1.ComponentIsManaged(test.quayRegistry.Spec.Components, v1.ComponentPostgres) {
 						assert.Greater(len(string(managedKeys.Data["DB_URI"])), 0, test.name)
 						assert.Greater(len(config["DB_URI"].(string)), 0, test.name)
 					} else {

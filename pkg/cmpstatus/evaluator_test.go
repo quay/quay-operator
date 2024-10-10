@@ -38,7 +38,7 @@ func TestEvaluate(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind:    qv1.ComponentQuayPostgres,
+							Kind:    qv1.ComponentPostgres,
 							Managed: true,
 						},
 						{
@@ -100,7 +100,7 @@ func TestEvaluate(t *testing.T) {
 					Message: "PrometheusRule registry-quay-prometheus-rules not found",
 				},
 				{
-					Type:    qv1.ComponentQuayPostgresReady,
+					Type:    qv1.ComponentPostgresReady,
 					Status:  metav1.ConditionFalse,
 					Reason:  qv1.ConditionReasonComponentNotReady,
 					Message: "Postgres deployment not found",
@@ -166,7 +166,7 @@ func TestEvaluate(t *testing.T) {
 							Managed: true,
 						},
 						{
-							Kind:    qv1.ComponentQuayPostgres,
+							Kind:    qv1.ComponentPostgres,
 							Managed: true,
 						},
 						{
@@ -435,7 +435,7 @@ func TestEvaluate(t *testing.T) {
 					Message: "ServiceMonitor and PrometheusRules created",
 				},
 				{
-					Type:    qv1.ComponentQuayPostgresReady,
+					Type:    qv1.ComponentPostgresReady,
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
 					Message: "Deployment registry-quay-database healthy",
@@ -499,7 +499,7 @@ func TestEvaluate(t *testing.T) {
 							Managed: true,
 						},
 						{
-							Kind:    qv1.ComponentQuayPostgres,
+							Kind:    qv1.ComponentPostgres,
 							Managed: true,
 						},
 						{
@@ -791,7 +791,7 @@ func TestEvaluate(t *testing.T) {
 					Message: "ServiceMonitor and PrometheusRules created",
 				},
 				{
-					Type:    qv1.ComponentQuayPostgresReady,
+					Type:    qv1.ComponentPostgresReady,
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
 					Message: "Deployment registry-quay-database healthy",
@@ -855,7 +855,7 @@ func TestEvaluate(t *testing.T) {
 							Managed: true,
 						},
 						{
-							Kind:    qv1.ComponentQuayPostgres,
+							Kind:    qv1.ComponentPostgres,
 							Managed: true,
 						},
 						{
@@ -1170,7 +1170,7 @@ func TestEvaluate(t *testing.T) {
 					Message: "ServiceMonitor and PrometheusRules created",
 				},
 				{
-					Type:    qv1.ComponentQuayPostgresReady,
+					Type:    qv1.ComponentPostgresReady,
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
 					Message: "Deployment registry-quay-database healthy",

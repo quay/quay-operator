@@ -32,14 +32,14 @@ func TestPostgresCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind:    qv1.ComponentQuayPostgres,
+							Kind:    qv1.ComponentPostgres,
 							Managed: false,
 						},
 					},
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentQuayPostgresReady,
+				Type:    qv1.ComponentPostgresReady,
 				Status:  metav1.ConditionTrue,
 				Reason:  qv1.ConditionReasonComponentUnmanaged,
 				Message: "Postgres not managed by the operator",
@@ -55,14 +55,14 @@ func TestPostgresCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind:    qv1.ComponentQuayPostgres,
+							Kind:    qv1.ComponentPostgres,
 							Managed: true,
 						},
 					},
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentQuayPostgresReady,
+				Type:    qv1.ComponentPostgresReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Message: "Postgres deployment not found",
@@ -78,7 +78,7 @@ func TestPostgresCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind:    qv1.ComponentQuayPostgres,
+							Kind:    qv1.ComponentPostgres,
 							Managed: true,
 						},
 					},
@@ -92,7 +92,7 @@ func TestPostgresCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentQuayPostgresReady,
+				Type:    qv1.ComponentPostgresReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Message: "Postgres deployment not owned by QuayRegistry",
@@ -108,7 +108,7 @@ func TestPostgresCheck(t *testing.T) {
 				Spec: qv1.QuayRegistrySpec{
 					Components: []qv1.Component{
 						{
-							Kind:    qv1.ComponentQuayPostgres,
+							Kind:    qv1.ComponentPostgres,
 							Managed: true,
 						},
 					},
@@ -140,7 +140,7 @@ func TestPostgresCheck(t *testing.T) {
 				},
 			},
 			cond: qv1.Condition{
-				Type:    qv1.ComponentQuayPostgresReady,
+				Type:    qv1.ComponentPostgresReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
 				Message: "Deployment registry-quay-database: something went wrong",
