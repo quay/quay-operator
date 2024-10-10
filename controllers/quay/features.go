@@ -413,7 +413,7 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 		upgradeField     *bool
 	}{
 		v1.ComponentClairPostgres: {"clair-postgres", &qctx.NeedsClairPgUpgrade},
-		v1.ComponentQuayPostgres:  {"quay-database", &qctx.NeedsPgUpgrade},
+		v1.ComponentPostgres:      {"quay-database", &qctx.NeedsPgUpgrade},
 	}
 
 	info, ok := componentInfo[component]
@@ -442,7 +442,7 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 
 	expectedImage, err := kustomize.ComponentImageFor(component)
 	if err != nil {
-		return fmt.Errorf("failed to get image for %s: %w", component, err)
+		r.Log.Error(err, "failed to get postgres image")
 	}
 
 	expectedName := expectedImage.NewName

@@ -3,7 +3,6 @@ package kustomize
 import (
 	"errors"
 	"fmt"
-
 	"os"
 	"path/filepath"
 	"runtime"
@@ -55,14 +54,14 @@ func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 		v1.ComponentQuay:          componentImagePrefix + "QUAY",
 		v1.ComponentClair:         componentImagePrefix + "CLAIR",
 		v1.ComponentRedis:         componentImagePrefix + "REDIS",
-		v1.ComponentQuayPostgres:  componentImagePrefix + "QUAY_POSTGRES",
-		v1.ComponentClairPostgres: componentImagePrefix + "CLAIR_POSTGRES",
+		v1.ComponentPostgres:      componentImagePrefix + "POSTGRES",
+		v1.ComponentClairPostgres: componentImagePrefix + "CLAIRPOSTGRES",
 	}
 	defaultImagesFor := map[v1.ComponentKind]string{
 		v1.ComponentQuay:          "quay.io/projectquay/quay",
 		v1.ComponentClair:         "quay.io/projectquay/clair",
 		v1.ComponentRedis:         "docker.io/library/redis",
-		v1.ComponentQuayPostgres:  "quay.io/sclorg/postgresql-13-c9s",
+		v1.ComponentPostgres:      "quay.io/sclorg/postgresql-13-c9s",
 		v1.ComponentClairPostgres: "quay.io/sclorg/postgresql-15-c9s",
 	}
 
@@ -98,6 +97,31 @@ func postgresUpgradeImage() (types.Image, error) {
 	}
 
 	image := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS")
+	if image == "" {
+		return imageOverride, nil
+	}
+
+	if len(strings.Split(image, "@")) == 2 {
+		imageOverride.NewName = strings.Split(image, "@")[0]
+		imageOverride.Digest = strings.Split(image, "@")[1]
+	} else if len(strings.Split(image, ":")) == 2 {
+		imageOverride.NewName = strings.Split(image, ":")[0]
+		imageOverride.NewTag = strings.Split(image, ":")[1]
+	} else {
+		return types.Image{}, fmt.Errorf(
+			"image override must be reference by tag or digest: %s", image,
+		)
+	}
+	return imageOverride, nil
+}
+
+func clairpostgresUpgradeImage() (types.Image, error) {
+	imageOverride := types.Image{
+		Name: "quay.io/sclorg/postgresql-13-c9s",
+	}
+
+	image := os.Getenv("RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES_PREVIOUS")
+
 	if image == "" {
 		return imageOverride, nil
 	}
@@ -460,12 +484,20 @@ func KustomizationFor(
 		}
 	}
 
-	if ctx.NeedsPgUpgrade || ctx.NeedsClairPgUpgrade {
+	if ctx.NeedsPgUpgrade {
 		pgImage, err := postgresUpgradeImage()
 		if err != nil {
 			return nil, err
 		}
 		images = append(images, pgImage)
+	}
+
+	if ctx.NeedsClairPgUpgrade {
+		clairPgImage, err := clairpostgresUpgradeImage()
+		if err != nil {
+			return nil, err
+		}
+		images = append(images, clairPgImage)
 	}
 
 	return &types.Kustomization{
@@ -554,7 +586,7 @@ func Inflate(
 	if dbURI, ok := parsedUserConfig["DB_URI"].(string); ok && len(dbURI) > 0 {
 		dbCfgHasChanged = parsedUserConfig["DB_URI"] != ctx.DbUri
 		ctx.DbUri = dbURI
-	} else if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentQuayPostgres) && len(ctx.DbUri) == 0 {
+	} else if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) && len(ctx.DbUri) == 0 {
 		dbCfgHasChanged = true
 		log.Info("managed `DB_URI` not found in config, generating new one")
 		user := quay.GetName() + "-quay-database"
