@@ -161,9 +161,9 @@ spec:
                         value: quay.io/sclorg/postgresql-13-c9s:latest
                       - name: RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS
                         value: centos/postgresql-10-centos7:latest
-                      - name: RELATED_IMAGE_COMPONENT_CLAIR_POSTGRES
+                      - name: RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES
                         value: quay.io/sclorg/postgresql-15-c9s:latest
-                      - name: RELATED_IMAGE_COMPONENT_CLAIR_POSTGRES_PREVIOUS
+                      - name: RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES_PREVIOUS
                         value: quay.io/sclorg/postgresql-13-c9s:latest
                       - name: RELATED_IMAGE_COMPONENT_REDIS
                         value: docker.io/library/redis:7.0

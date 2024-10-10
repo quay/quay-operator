@@ -45,8 +45,8 @@ yq eval -i '
         select(.name == "RELATED_IMAGE_COMPONENT_QUAY").value = ("quay.io/projectquay/quay:${RELEASE}" | envsubst) |
         select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES").value = strenv(POSTGRES_DIGEST) |
         select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS").value = strenv(POSTGRES_PREVIOUS_DIGEST) |
-        select(.name == "RELATED_IMAGE_COMPONENT_CLAIR_POSTGRES").value = strenv(POSTGRES_CLAIR_DIGEST) |
-        select(.name == "RELATED_IMAGE_COMPONENT_CLAIR_POSTGRES_PREVIOUS").value = strenv(POSTGRES_CLAIR_PREVIOUS_DIGEST) |
+        select(.name == "RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES").value = strenv(POSTGRES_CLAIR_DIGEST) |
+        select(.name == "RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES_PREVIOUS").value = strenv(POSTGRES_CLAIR_PREVIOUS_DIGEST) |
         select(.name == "RELATED_IMAGE_COMPONENT_REDIS").value = strenv(REDIS_DIGEST)
     ) |
     .spec.version = strenv(RELEASE) |
