@@ -45,7 +45,7 @@ type ComponentKind string
 // Follow a list of constants representing all supported components.
 const (
 	ComponentQuay          ComponentKind = "quay"
-	ComponentPostgres      ComponentKind = "postgres"
+	ComponentPostgres  ComponentKind = "postgres"
 	ComponentClair         ComponentKind = "clair"
 	ComponentClairPostgres ComponentKind = "clairpostgres"
 	ComponentRedis         ComponentKind = "redis"
@@ -170,7 +170,7 @@ const (
 	ConditionTypeRolloutBlocked ConditionType = "RolloutBlocked"
 	ConditionComponentsCreated  ConditionType = "ComponentsCreated"
 	ComponentQuayReady          ConditionType = "ComponentQuayReady"
-	ComponentPostgresReady      ConditionType = "ComponentPostgresReady"
+	ComponentPostgresReady  ConditionType = "ComponentPostgresReady"
 	ComponentClairReady         ConditionType = "ComponentClairReady"
 	ComponentClairPostgresReady ConditionType = "ComponentClairPostgresReady"
 	ComponentRedisReady         ConditionType = "ComponentRedisReady"
