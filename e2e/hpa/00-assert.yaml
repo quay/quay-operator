@@ -45,7 +45,7 @@ status:
   - message: Deployment hpa-quay-database healthy
     reason: ComponentReady
     status: "True"
-    type: ComponentQuayPostgresReady
+    type: ComponentPostgresReady
   - message: Object bucket claim bound
     reason: ComponentReady
     status: "True"
