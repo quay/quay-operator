@@ -69,6 +69,8 @@ digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
 digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_DIGEST
 digest centos/postgresql-10-centos7:latest POSTGRES_OLD_DIGEST
+digest quay.io/sclorg/postgresql-15-c9s:latest POSTGRES_CLAIR_DIGEST
+digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_CLAIR_OLD_DIGEST
 digest docker.io/library/redis:7.0 REDIS_DIGEST
 
 # need exporting so that yq can see them
@@ -79,6 +81,8 @@ export BUILDER_DIGEST
 export BUILDER_QEMU_DIGEST
 export POSTGRES_DIGEST
 export POSTGRES_OLD_DIGEST
+export POSTGRES_CLAIR_DIGEST
+export POSTGRES_CLAIR_OLD_DIGEST
 export REDIS_DIGEST
 
 
@@ -98,6 +102,8 @@ yq eval -i '
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_BUILDER_QEMU") .value = strenv(BUILDER_QEMU_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES") .value = strenv(POSTGRES_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS") .value = strenv(POSTGRES_OLD_DIGEST) |
+	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES") .value = strenv(POSTGRES_CLAIR_DIGEST) |
+	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES_PREVIOUS") .value = strenv(POSTGRES_CLAIR_OLD_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_REDIS") .value = strenv(REDIS_DIGEST)
 	' "${CSV_PATH}"
 

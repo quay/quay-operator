@@ -408,14 +408,20 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, component v1.ComponentKind,
 ) error {
-	var deploymentName string
-	if component == v1.ComponentClairPostgres {
-		deploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres")
-	} else if component == v1.ComponentPostgres {
-		deploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database")
-	} else {
+	componentInfo := map[v1.ComponentKind]struct {
+		deploymentSuffix string
+		upgradeField     *bool
+	}{
+		v1.ComponentClairPostgres: {"clair-postgres", &qctx.NeedsClairPgUpgrade},
+		v1.ComponentPostgres:      {"quay-database", &qctx.NeedsPgUpgrade},
+	}
+
+	info, ok := componentInfo[component]
+	if !ok {
 		return fmt.Errorf("invalid component kind: %s", component)
 	}
+
+	deploymentName := fmt.Sprintf("%s-%s", quay.GetName(), info.deploymentSuffix)
 	r.Log.Info(fmt.Sprintf("getting %s version", component))
 
 	postgresDeployment := &appsv1.Deployment{}
@@ -431,39 +437,41 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 		return nil
 	}
 
-	r.Log.Info(fmt.Sprintf("%s deployment found", component), "image", postgresDeployment.Spec.Template.Spec.Containers[0].Image)
 	deployedImageName := postgresDeployment.Spec.Template.Spec.Containers[0].Image
-	expectedImage, err := kustomize.ComponentImageFor(v1.ComponentPostgres)
+	r.Log.Info(fmt.Sprintf("%s deployment found", component), "image", deployedImageName)
+
+	expectedImage, err := kustomize.ComponentImageFor(component)
 	if err != nil {
 		r.Log.Error(err, "failed to get postgres image")
 	}
 
-	var expectedName string
-	if expectedImage.NewName != "" {
-		expectedName = expectedImage.NewName
-	} else {
+	expectedName := expectedImage.NewName
+	if expectedName == "" {
 		expectedName = expectedImage.Name
 	}
-	currentName := deployedImageName
-	if len(strings.Split(currentName, "@")) == 2 {
-		currentName = strings.Split(currentName, "@")[0]
-	} else if len(strings.Split(currentName, ":")) == 2 {
-		currentName = strings.Split(currentName, ":")[0]
-	}
+
+	currentName := extractImageName(deployedImageName)
+
 	if currentName != expectedName {
-		if component == v1.ComponentClairPostgres {
-			r.Log.Info("clair-postgres needs to perform an upgrade, marking in context")
-			qctx.NeedsClairPgUpgrade = true
-		} else if component == v1.ComponentPostgres {
-			r.Log.Info("postgres needs to perform an upgrade, marking in context")
-			qctx.NeedsPgUpgrade = true
-		}
+		r.Log.Info(fmt.Sprintf("%s needs to perform an upgrade, marking in context", component))
+		*info.upgradeField = true
 	} else {
 		r.Log.Info(fmt.Sprintf("%s does not need to perform an upgrade", component))
 	}
 
 	return nil
+}
 
+func extractImageName(imageName string) string {
+	parts := strings.Split(imageName, "@")
+	if len(parts) > 1 {
+		return parts[0]
+	}
+	parts = strings.Split(imageName, ":")
+	if len(parts) > 1 {
+		return parts[0]
+	}
+	return imageName
 }
 
 // Taken from https://stackoverflow.com/questions/46735347/how-can-i-fetch-a-certificate-from-a-url

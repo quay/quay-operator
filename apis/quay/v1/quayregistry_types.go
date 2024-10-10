@@ -83,6 +83,7 @@ var requiredComponents = []ComponentKind{
 var supportsVolumeOverride = []ComponentKind{
 	ComponentPostgres,
 	ComponentClair,
+	ComponentClairPostgres,
 }
 
 var supportsEnvOverride = []ComponentKind{
@@ -91,6 +92,7 @@ var supportsEnvOverride = []ComponentKind{
 	ComponentMirror,
 	ComponentPostgres,
 	ComponentRedis,
+	ComponentClairPostgres,
 }
 
 var supportsResourceOverrides = []ComponentKind{

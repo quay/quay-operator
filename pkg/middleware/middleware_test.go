@@ -183,6 +183,7 @@ var processTests = []struct {
 					{Kind: "route", Managed: true},
 					{Kind: "tls", Managed: true},
 					{Kind: "postgres", Managed: true, Overrides: &v1.Override{VolumeSize: parseResourceString("70Gi")}},
+					{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{VolumeSize: parseResourceString("60Gi")}},
 					{Kind: "clair", Managed: true, Overrides: &v1.Override{VolumeSize: parseResourceString("60Gi")}},
 				},
 			},
