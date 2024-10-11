@@ -201,7 +201,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		case "postgres":
 			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
 		case "clair-postgres":
-			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
+			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClairPostgres)
 		}
 
 		// If override was not provided
