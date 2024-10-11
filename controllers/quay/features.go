@@ -344,7 +344,8 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 		return nil
 	}
 
-	return fmt.Errorf("`ObjectBucketClaim` not found")
+	r.Log.Info("`ObjectBucketClaim` not found")
+	return nil
 }
 
 // checkBuildManagerAvailable verifies if the config bundle contains an entry pointing to the
