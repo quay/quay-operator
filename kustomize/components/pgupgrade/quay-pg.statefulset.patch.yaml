@@ -1,6 +1,6 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: clair-postgres
+  name: quay-database
 spec:
   replicas: 0
