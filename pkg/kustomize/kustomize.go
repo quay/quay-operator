@@ -221,6 +221,8 @@ func ModelFor(gvk schema.GroupVersionKind) client.Object {
 		return &prometheusv1.ServiceMonitor{}
 	case schema.GroupVersionKind{Group: "monitoring.coreos.com", Version: "v1", Kind: "PrometheusRule"}.String():
 		return &prometheusv1.PrometheusRule{}
+	case schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"}.String():
+		return &apps.StatefulSet{}
 	default:
 		panic(fmt.Sprintf("Missing model for GVK %s", gvk.String()))
 	}
