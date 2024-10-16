@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: quay-database
   labels:
@@ -7,8 +7,9 @@ metadata:
   annotations:
     quay-component: postgres
 spec:
-  serviceName: quay-database
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       quay-component: postgres
@@ -75,4 +76,3 @@ spec:
             requests:
               cpu: 500m
               memory: 2Gi
-  volumeClaimTemplates: []
