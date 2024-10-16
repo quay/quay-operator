@@ -246,12 +246,16 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 		if job.Status.Succeeded == 1 {
 			log.Info(fmt.Sprintf("%s upgrade complete", jobName))
 			var oldPostgresDeploymentName string
+			var postgresDeploymentName string
 			if jobName == clairPostgresUpgradeJobName {
 				oldPostgresDeploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres-old")
+				postgresDeploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres")
 			} else {
 				oldPostgresDeploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database-old")
+				postgresDeploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database")
 			}
 			oldPostgresDeployment := &appsv1.Deployment{}
+			postgresDeployment := &appsv1.Deployment{}
 			if err := r.Client.Get(
 				ctx,
 				types.NamespacedName{
@@ -263,7 +267,20 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 				r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", oldPostgresDeploymentName))
 				continue
 			}
-
+			if err := r.Client.Get(
+				ctx,
+				types.NamespacedName{
+					Name:      postgresDeploymentName,
+					Namespace: quay.GetNamespace(),
+				},
+				postgresDeployment,
+			); err != nil {
+				r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", postgresDeploymentName))
+				continue
+			}
+			if err := r.Client.Delete(ctx, postgresDeployment); err != nil {
+				r.Log.Error(err, fmt.Sprintf("%s deployment could not be deleted", postgresDeploymentName))
+			}
 			// Remove owner reference
 			obj, err := v1.RemoveOwnerReference(quay, oldPostgresDeployment)
 			if err != nil {
