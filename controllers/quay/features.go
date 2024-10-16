@@ -410,8 +410,8 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, component v1.ComponentKind,
 ) error {
 	componentInfo := map[v1.ComponentKind]struct {
-		deploymentSuffix string
-		upgradeField     *bool
+		resourceSuffix string
+		upgradeField   *bool
 	}{
 		v1.ComponentClairPostgres: {"clair-postgres", &qctx.NeedsClairPgUpgrade},
 		v1.ComponentPostgres:      {"quay-database", &qctx.NeedsPgUpgrade},
@@ -422,23 +422,63 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 		return fmt.Errorf("invalid component kind: %s", component)
 	}
 
-	deploymentName := fmt.Sprintf("%s-%s", quay.GetName(), info.deploymentSuffix)
+	resourceName := fmt.Sprintf("%s-%s", quay.GetName(), info.resourceSuffix)
 	r.Log.Info(fmt.Sprintf("getting %s version", component))
 
-	postgresDeployment := &appsv1.Deployment{}
-	if err := r.Client.Get(
-		ctx,
-		types.NamespacedName{
-			Name:      deploymentName,
-			Namespace: quay.GetNamespace(),
-		},
-		postgresDeployment,
-	); err != nil {
-		r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", component))
-		return nil
+	var deployedImageName string
+
+	if component == v1.ComponentClairPostgres {
+		statefulSet := &appsv1.StatefulSet{}
+		err := r.Client.Get(
+			ctx,
+			types.NamespacedName{
+				Name:      resourceName,
+				Namespace: quay.GetNamespace(),
+			},
+			statefulSet,
+		)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return err
+			}
+			// NOTE: Check for Deployment to support migration from Deployment to StatefulSet.
+			// This ensures compatibility with both old and new setups during the upgrade process.
+			deployment := &appsv1.Deployment{}
+			err = r.Client.Get(
+				ctx,
+				types.NamespacedName{
+					Name:      resourceName,
+					Namespace: quay.GetNamespace(),
+				},
+				deployment,
+			)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					r.Log.Info(fmt.Sprintf("%s statefulset and deployment not found, skipping", component))
+					return nil
+				}
+				return err
+			}
+			deployedImageName = deployment.Spec.Template.Spec.Containers[0].Image
+		} else {
+			deployedImageName = statefulSet.Spec.Template.Spec.Containers[0].Image
+		}
+	} else {
+		deployment := &appsv1.Deployment{}
+		if err := r.Client.Get(
+			ctx,
+			types.NamespacedName{
+				Name:      resourceName,
+				Namespace: quay.GetNamespace(),
+			},
+			deployment,
+		); err != nil {
+			r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", component))
+			return nil
+		}
+		deployedImageName = deployment.Spec.Template.Spec.Containers[0].Image
 	}
 
-	deployedImageName := postgresDeployment.Spec.Template.Spec.Containers[0].Image
 	r.Log.Info(fmt.Sprintf("%s deployment found", component), "image", deployedImageName)
 
 	expectedImage, err := kustomize.ComponentImageFor(component)

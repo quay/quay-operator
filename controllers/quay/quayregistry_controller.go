@@ -548,7 +548,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				v1.ConditionTypeRolloutBlocked,
 				metav1.ConditionTrue,
 				v1.ConditionReasonPostgresUpgradeFailed,
-				fmt.Sprintf("error checking for pg upgrade: %s", err),
+				fmt.Sprintf("error checking for clair pg upgrade: %s", err),
 			)
 		}
 	}
