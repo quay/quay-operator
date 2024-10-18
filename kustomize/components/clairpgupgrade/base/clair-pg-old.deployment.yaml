@@ -57,3 +57,16 @@ spec:
             requests:
               cpu: 500m
               memory: 2Gi
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  if kubectl get deployment clair-postgres -o jsonpath='{.spec.replicas}' | grep -q 0; then
+                    exit 0
+                  else
+                    exit 1
+                  fi
+            initialDelaySeconds: 10
+            periodSeconds: 5
