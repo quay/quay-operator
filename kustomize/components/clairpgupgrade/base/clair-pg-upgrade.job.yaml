@@ -31,7 +31,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: clair-config-secret
-                  key: clair-db-host
+                  key: clair-db-old-host
             - name: POSTGRESQL_MIGRATION_ADMIN_PASSWORD
               value: postgres
             - name: POSTGRESQL_SHARED_BUFFERS
@@ -49,9 +49,9 @@ spec:
               cpu: 500m
               memory: 2Gi
           command:
-          - "/bin/sh"
-          - "-c"
+            - "/bin/sh"
+            - "-c"
           args:
-          - >
-            run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
+            - >
+              run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
   backoffLimit: 50
