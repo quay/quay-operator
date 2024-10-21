@@ -27,6 +27,15 @@ spec:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: clair-postgres-13
+      initContainers:
+        - name: check-postgres-scale-down
+          image: quay.io/sclorg/postgresql-13-c9s:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for 30 seconds before starting the main container..."
+              sleep 30
       containers:
         - name: postgres
           image: quay.io/sclorg/postgresql-13-c9s:latest
