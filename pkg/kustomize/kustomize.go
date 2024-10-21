@@ -460,11 +460,19 @@ func KustomizationFor(
 	}
 
 	if ctx.NeedsPgUpgrade {
-		componentPaths = append(componentPaths, "../components/pgupgrade")
+		if ctx.PgUpradeInitializing {
+			componentPaths = append(componentPaths, "../components/pgupgrade/initialize")
+		} else {
+			componentPaths = append(componentPaths, "../components/pgupgrade/base")
+		}
 	}
+
 	if ctx.NeedsClairPgUpgrade {
 		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClair) {
 			componentPaths = append(componentPaths, "../components/clairpgupgrade/scale-down-clair")
+		}
+		if ctx.ClairPgUpradeInitializing {
+			componentPaths = append(componentPaths, "../components/clairpgupgrade/initialize")
 		} else {
 			componentPaths = append(componentPaths, "../components/clairpgupgrade/base")
 		}

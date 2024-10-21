@@ -197,9 +197,10 @@ const (
 	ConditionReasonMigrationsFailed     ConditionReason = "MigrationsFailed"
 	ConditionReasonMigrationsJobMissing ConditionReason = "MigrationsJobMissing"
 
-	ConditionReasonPostgresUpgradeInProgress ConditionReason = "PostgresUpgradeInProgress"
-	ConditionReasonPostgresUpgradeFailed     ConditionReason = "PostgresUpgradeFailed"
-	ConditionReasonPostgresUpgradeJobMissing ConditionReason = "PostgresUpgradeJobMissing"
+	ConditionReasonPostgresUpgradeInitializing ConditionReason = "PostgresUpgradeInitializing"
+	ConditionReasonPostgresUpgradeInProgress   ConditionReason = "PostgresUpgradeInProgress"
+	ConditionReasonPostgresUpgradeFailed       ConditionReason = "PostgresUpgradeFailed"
+	ConditionReasonPostgresUpgradeJobMissing   ConditionReason = "PostgresUpgradeJobMissing"
 
 	ConditionReasonComponentsCreationSuccess             ConditionReason = "ComponentsCreationSuccess"
 	ConditionReasonUpgradeUnsupported                    ConditionReason = "UpgradeUnsupported"

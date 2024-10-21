@@ -33,10 +33,14 @@ type QuayRegistryContext struct {
 	SecretKey         string
 
 	// Database
-	DbUri               string
-	DbRootPw            string
-	NeedsPgUpgrade      bool
-	NeedsClairPgUpgrade bool
+	DbUri    string
+	DbRootPw string
+
+	// Upgrade flags
+	NeedsPgUpgrade            bool
+	PgUpradeInitializing      bool
+	NeedsClairPgUpgrade       bool
+	ClairPgUpradeInitializing bool
 
 	// Clair integration
 	SecurityScannerV4PSK string

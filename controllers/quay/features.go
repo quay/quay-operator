@@ -463,6 +463,45 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	return nil
 }
 
+func (r *QuayRegistryReconciler) checkPostgresUpgradeInitializationStatusForComponent(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, component v1.ComponentKind,
+) error {
+	componentInfo := map[v1.ComponentKind]struct {
+		deploymentSuffix string
+		upgradeField     *bool
+	}{
+		v1.ComponentClairPostgres: {"clair-postgres", &qctx.ClairPgUpradeInitializing},
+		v1.ComponentPostgres:      {"quay-database", &qctx.PgUpradeInitializing},
+	}
+
+	info, ok := componentInfo[component]
+	if !ok {
+		return fmt.Errorf("invalid component kind: %s", component)
+	}
+
+	deploymentName := fmt.Sprintf("%s-%s", quay.GetName(), info.deploymentSuffix)
+	r.Log.Info(fmt.Sprintf("checking deployment termination status for %s", component))
+
+	postgresDeployment := &appsv1.Deployment{}
+	if err := r.Client.Get(
+		ctx,
+		types.NamespacedName{
+			Name:      deploymentName,
+			Namespace: quay.GetNamespace(),
+		},
+		postgresDeployment,
+	); err != nil {
+		r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", component))
+		return nil
+	}
+
+	// if the deployment is found, we need to set initiliztion to true
+	*info.upgradeField = true
+
+	return nil
+
+}
+
 func extractImageName(imageName string) string {
 	parts := strings.Split(imageName, "@")
 	if len(parts) > 1 {

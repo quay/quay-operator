@@ -191,7 +191,7 @@ var kustomizationForTests = []struct {
 				"../components/clair",
 				"../components/redis",
 				"../components/postgres",
-				"../components/pgupgrade",
+				"../components/pgupgrade/base",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
@@ -227,6 +227,42 @@ var kustomizationForTests = []struct {
 				"../components/redis",
 				"../components/clairpostgres",
 				"../components/clairpgupgrade/base",
+			},
+			Images: []types.Image{
+				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
+				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
+				{Name: "docker.io/library/redis", NewName: "redis", NewTag: "buster"},
+				{Name: "quay.io/sclorg/postgresql-15-c9s", NewName: "clairpostgres", NewTag: "latest"},
+				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "clairpostgres_previous", NewTag: "latest"},
+			},
+			SecretGenerator: []types.SecretArgs{},
+		},
+		"",
+	},
+	{
+		"ClairPostgresUpgradeInitializing",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "clair", Managed: false},
+					{Kind: "redis", Managed: true},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{
+			NeedsClairPgUpgrade:       true,
+			ClairPgUpradeInitializing: true,
+		},
+		&types.Kustomization{
+			TypeMeta: types.TypeMeta{
+				APIVersion: types.KustomizationVersion,
+				Kind:       types.KustomizationKind,
+			},
+			Components: []string{
+				"../components/redis",
+				"../components/clairpostgres",
+				"../components/clairpgupgrade/initialize",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},

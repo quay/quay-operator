@@ -10,7 +10,7 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
-      terminationGracePeriodSeconds: 180
+      terminationGracePeriodSeconds: 600
       serviceAccountName: clair-postgres
       volumes:
         - name: clair-postgres-conf-sample
@@ -49,9 +49,9 @@ spec:
               cpu: 500m
               memory: 2Gi
           command:
-          - "/bin/sh"
-          - "-c"
+            - "/bin/sh"
+            - "-c"
           args:
-          - >
-            run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
+            - >
+              run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
   backoffLimit: 50

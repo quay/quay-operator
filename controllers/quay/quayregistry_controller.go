@@ -536,11 +536,35 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				fmt.Sprintf("error checking for pg upgrade: %s", err),
 			)
 		}
+
+		err = r.checkPostgresUpgradeInitializationStatusForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
+		if err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonPostgresUpgradeFailed,
+				fmt.Sprintf("error checking for pg upgrade: %s", err),
+			)
+		}
 	}
 
 	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
 	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentClairPostgres) {
 		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
+		if err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonPostgresUpgradeFailed,
+				fmt.Sprintf("error checking for pg upgrade: %s", err),
+			)
+		}
+
+		err = r.checkPostgresUpgradeInitializationStatusForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
 		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
@@ -727,6 +751,21 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			log.Error(err, "failed to update `registryEndpoint` of `QuayRegistry`")
 			return r.Requeue, nil
 		}
+	}
+
+	// If postgres pods are still terminating, requeue
+	if quayContext.ClairPgUpradeInitializing || quayContext.PgUpradeInitializing {
+		if err := r.updateWithCondition(
+			ctx,
+			updatedQuay,
+			v1.ConditionComponentsCreated,
+			metav1.ConditionFalse,
+			v1.ConditionReasonPostgresUpgradeInitializing,
+			"running postgres update initialization",
+		); err != nil {
+			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
+		}
+		return r.Requeue, nil
 	}
 
 	// if postgres needs to be updated, then we need to wait until the upgrade job

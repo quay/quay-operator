@@ -7,4 +7,5 @@ resources:
   - ./quay-pg-old.deployment.yaml
 patchesStrategicMerge:
   - ./quay.deployment.patch.yaml
-  - ./quay-pg.deployment.patch.yaml
+components:
+  - ../initialize
