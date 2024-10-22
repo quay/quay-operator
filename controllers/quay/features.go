@@ -408,7 +408,7 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 // checkPostgresVersion returns the image name used by the currently deployed postgres version
 func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, component v1.ComponentKind,
-) error {
+) (err error, scaledDown bool) {
 	componentInfo := map[v1.ComponentKind]struct {
 		deploymentSuffix string
 		upgradeField     *bool
@@ -419,7 +419,7 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 
 	info, ok := componentInfo[component]
 	if !ok {
-		return fmt.Errorf("invalid component kind: %s", component)
+		return fmt.Errorf("invalid component kind: %s", component), false
 	}
 
 	deploymentName := fmt.Sprintf("%s-%s", quay.GetName(), info.deploymentSuffix)
@@ -435,7 +435,7 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 		postgresDeployment,
 	); err != nil {
 		r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", component))
-		return nil
+		return nil, true
 	}
 
 	deployedImageName := postgresDeployment.Spec.Template.Spec.Containers[0].Image
@@ -458,9 +458,45 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 		*info.upgradeField = true
 	} else {
 		r.Log.Info(fmt.Sprintf("%s does not need to perform an upgrade", component))
+		return nil, true
 	}
 
-	return nil
+	// at this point we have determined that these postgres deployments need to be upgraded and can set them to 0 replicas
+	// so that the upgrade job can run with no interference
+	r.Log.Info(fmt.Sprintf("scaling down %s deployment", component))
+	postgresDeployment.Spec.Replicas = &[]int32{0}[0]
+	postgresDeployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &[]int64{600}[0]
+	if err := r.Client.Update(ctx, postgresDeployment); err != nil {
+		r.Log.Error(err, "unable to update postgres deployment replicas")
+	}
+	// now we wait to ensure that the deployment has scaled down before we proceed
+
+	terminatingPods := []corev1.Pod{}
+	podList := &corev1.PodList{}
+	labelSelector, err := metav1.LabelSelectorAsSelector(postgresDeployment.Spec.Selector)
+	if err != nil {
+		r.Log.Error(err, "unable to get label selector for postgres deployment")
+	}
+	err = r.Client.List(ctx, podList, &client.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		r.Log.Error(err, "unable to list pods for postgres deployment")
+		return err, false
+	}
+
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodRunning {
+			terminatingPods = append(terminatingPods, pod)
+		}
+	}
+
+	if len(terminatingPods) > 0 {
+		r.Log.Info(fmt.Sprintf("Found %d pods in terminating status", len(terminatingPods)))
+		return nil, false
+	}
+
+	return nil, true
 }
 
 func extractImageName(imageName string) string {
