@@ -10,7 +10,7 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
-      terminationGracePeriodSeconds: 180
+      terminationGraceperiodSeconds: 600
       serviceAccountName: quay-database
       volumes:
         - name: postgres-conf-sample
@@ -55,10 +55,9 @@ spec:
               cpu: 500m
               memory: 2Gi
           command:
-          - "/bin/sh"
-          - "-c"
+            - "/bin/sh"
+            - "-c"
           args:
-          - >
-            run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
+            - >
+              run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
   backoffLimit: 50
-

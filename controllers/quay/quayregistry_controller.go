@@ -553,7 +553,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
 	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentPostgres) {
-		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
+		err, scaledDown := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
 		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
@@ -564,11 +564,14 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				fmt.Sprintf("error checking for pg upgrade: %s", err),
 			)
 		}
+		if !scaledDown {
+			return r.Requeue, nil
+		}
 	}
 
 	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
 	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentClairPostgres) {
-		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
+		err, scaledDown := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
 		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
@@ -578,6 +581,9 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				v1.ConditionReasonPostgresUpgradeFailed,
 				fmt.Sprintf("error checking for pg upgrade: %s", err),
 			)
+		}
+		if !scaledDown {
+			return r.Requeue, nil
 		}
 	}
 
