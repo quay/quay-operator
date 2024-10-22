@@ -278,6 +278,34 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 				r.Log.Error(err, fmt.Sprintf("%s deployment could not be deleted", oldPostgresDeploymentName))
 			}
 
+			oldPostgresServiceName := fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres-old")
+			oldPostgresService := &corev1.Service{}
+			if err := r.Client.Get(
+				ctx,
+				types.NamespacedName{
+					Name:      oldPostgresServiceName,
+					Namespace: quay.GetNamespace(),
+				},
+				oldPostgresService,
+			); err != nil {
+				r.Log.Info(fmt.Sprintf("%s service not found, skipping", oldPostgresServiceName))
+				continue
+			}
+
+			// Remove owner reference from old service
+			obj, err = v1.RemoveOwnerReference(quay, oldPostgresService)
+			if err != nil {
+				log.Error(err, "could not remove owner reference from old postgres service")
+			}
+
+			// Delete old postgres deployment
+			if err := r.Client.Delete(
+				ctx,
+				obj,
+			); err != nil {
+				r.Log.Error(err, fmt.Sprintf("%s service could not be deleted", oldPostgresServiceName))
+			}
+
 			// Remove owner reference from old pvc so user can delete when ready
 			var oldPostgresPVCName string
 			if jobName == clairPostgresUpgradeJobName {

@@ -3,20 +3,20 @@ kind: Deployment
 metadata:
   name: clair-postgres-old
   labels:
-    quay-component: clair-postgres
+    quay-component: clair-postgres-old
   annotations:
-    quay-component: clair-postgres
+    quay-component: clair-postgres-old
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      quay-component: clair-postgres
+      quay-component: clair-postgres-old
   template:
     metadata:
       labels:
-        quay-component: clair-postgres
+        quay-component: clair-postgres-old
     spec:
       terminationGracePeriodSeconds: 180
       serviceAccountName: clair-postgres
