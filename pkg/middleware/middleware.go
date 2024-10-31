@@ -34,7 +34,27 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		return nil, err
 	}
 
-	quayComponentLabel := labels.Set(objectMeta.GetLabels()).Get("quay-component")
+	quayComponentLabel := ""
+
+	if hpa, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
+		// HPA may have its own specific labels that are not necessarily present in the standard object metadata.
+		// Therefore, we need to check both labels and annotations specifically for HPA to ensure we capture the correct quay-component label.
+		if labels := hpa.GetLabels(); labels != nil {
+			if labelValue, exists := labels["quay-component"]; exists {
+				quayComponentLabel = labelValue
+			}
+		}
+
+		if quayComponentLabel == "" {
+			if annotations := hpa.GetAnnotations(); annotations != nil {
+				if annotationValue, exists := annotations["quay-component"]; exists {
+					quayComponentLabel = annotationValue
+				}
+			}
+		}
+	} else {
+		quayComponentLabel = labels.Set(objectMeta.GetLabels()).Get("quay-component")
+	}
 
 	// Flatten config bundle `Secret`
 	if strings.Contains(objectMeta.GetName(), configSecretPrefix+"-") {
