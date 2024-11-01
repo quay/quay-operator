@@ -2,7 +2,7 @@ name: Check Reviews
 
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize]
+    types: [opened, edited, reopened]
 
 jobs:
   review-check:
