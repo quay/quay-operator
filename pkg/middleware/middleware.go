@@ -7,7 +7,7 @@ import (
 	route "github.com/openshift/api/route/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,7 +34,27 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		return nil, err
 	}
 
-	quayComponentLabel := labels.Set(objectMeta.GetLabels()).Get("quay-component")
+	quayComponentLabel := ""
+
+	if hpa, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
+		// HPA may have its own specific labels that are not necessarily present in the standard object metadata.
+		// Therefore, we need to check both labels and annotations specifically for HPA to ensure we capture the correct quay-component label.
+		if labels := hpa.GetLabels(); labels != nil {
+			if labelValue, exists := labels["quay-component"]; exists {
+				quayComponentLabel = labelValue
+			}
+		}
+
+		if quayComponentLabel == "" {
+			if annotations := hpa.GetAnnotations(); annotations != nil {
+				if annotationValue, exists := annotations["quay-component"]; exists {
+					quayComponentLabel = annotationValue
+				}
+			}
+		}
+	} else {
+		quayComponentLabel = labels.Set(objectMeta.GetLabels()).Get("quay-component")
+	}
 
 	// Flatten config bundle `Secret`
 	if strings.Contains(objectMeta.GetName(), configSecretPrefix+"-") {
@@ -226,7 +246,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		return pvc, nil
 	}
 
-	if _, ok := obj.(*autoscalingv1.HorizontalPodAutoscaler); ok {
+	if _, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
 		componentMap := map[string]v1.ComponentKind{
 			"mirror": v1.ComponentMirror,
 			"clair":  v1.ComponentClair,
