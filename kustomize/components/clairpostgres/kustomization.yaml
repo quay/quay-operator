@@ -7,3 +7,4 @@ resources:
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
   - ./clair-postgres-conf-sample.configmap.yaml
+  - ./clair-postgres-hba-config.configmap.yaml

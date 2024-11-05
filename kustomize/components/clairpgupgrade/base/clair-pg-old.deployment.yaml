@@ -24,6 +24,9 @@ spec:
         - name: clair-postgres-conf-sample
           configMap:
             name: clair-postgres-conf-sample
+        - name: clair-postgres-hba-config
+          configMap:
+            name: clair-postgres-hba-config
         - name: postgres-data
           persistentVolumeClaim:
             claimName: clair-postgres-13
@@ -51,6 +54,9 @@ spec:
             - name: clair-postgres-conf-sample
               mountPath: /usr/share/pgsql/postgresql.conf.sample
               subPath: postgresql.conf.sample
+            - name: clair-postgres-hba-config
+              mountPath: /var/lib/pgsql/data/pg_hba.conf
+              subPath: pg_hba.conf
             - name: postgres-data
               mountPath: /var/lib/pgsql/data
           resources:

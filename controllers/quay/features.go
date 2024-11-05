@@ -12,11 +12,19 @@ import (
 	"strings"
 	"time"
 
+	"io"
+	"os"
+
 	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
+	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
+	"github.com/quay/quay-operator/pkg/kustomize"
 	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,11 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
-	v1 "github.com/quay/quay-operator/apis/quay/v1"
-	quaycontext "github.com/quay/quay-operator/pkg/context"
-	"github.com/quay/quay-operator/pkg/kustomize"
 )
 
 const (
@@ -456,6 +459,48 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	if currentName != expectedName {
 		r.Log.Info(fmt.Sprintf("%s needs to perform an upgrade, marking in context", component))
 		*info.upgradeField = true
+		configMap, err := LoadConfigMapFromFile("controllers/quay/fips-config-map.yaml")
+		if err != nil {
+			return fmt.Errorf("failed to load ConfigMap from file: %w", err), false
+		}
+
+		// Set the namespace for the ConfigMap
+		configMap.Namespace = quay.GetNamespace()
+
+		// Check if the ConfigMap has a valid name
+		if configMap.Name == "" {
+			return fmt.Errorf("ConfigMap name is empty"), false
+		}
+
+		// Create the ConfigMap
+		if err := r.Client.Create(ctx, configMap); err != nil {
+			return fmt.Errorf("failed to create ConfigMap: %w", err), false
+		}
+
+		r.Log.Info("ConfigMap created")
+
+		// Load the job specification from a YAML file
+		job, err := LoadJobFromFile("controllers/quay/fips-config-job.yaml")
+		if err != nil {
+			return fmt.Errorf("failed to load job from file: %w", err), false
+		}
+
+		// Set the namespace for the job
+		job.Namespace = quay.GetNamespace()
+
+		// Create the job
+		if err := r.Client.Create(ctx, job); err != nil {
+			return fmt.Errorf("failed to create Job: %w", err), false
+		}
+
+		r.Log.Info("FIPS configuration job created")
+
+		// Wait for the job to complete
+		if err := r.waitForJobCompletion(ctx, job.Name, job.Namespace); err != nil {
+			return fmt.Errorf("FIPS configuration job failed: %w", err), false
+		}
+
+		r.Log.Info("FIPS configuration job completed successfully")
 	} else {
 		r.Log.Info(fmt.Sprintf("%s does not need to perform an upgrade", component))
 		return nil, true
@@ -532,4 +577,60 @@ func getCertificatesPEM(address string) ([]byte, error) {
 	}
 
 	return b.Bytes(), nil
+}
+
+func (r *QuayRegistryReconciler) waitForJobCompletion(ctx context.Context, jobName, namespace string) error {
+	for {
+		job := &batchv1.Job{}
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: jobName, Namespace: namespace}, job); err != nil {
+			return err
+		}
+
+		if job.Status.Succeeded > 0 {
+			return nil
+		}
+
+		if job.Status.Failed > 0 {
+			return fmt.Errorf("job failed")
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+}
+
+func LoadJobFromFile(filePath string) (*batchv1.Job, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	var job batchv1.Job
+	if err := yaml.Unmarshal(data, &job); err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func LoadConfigMapFromFile(filePath string) (*corev1.ConfigMap, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	var configMap corev1.ConfigMap
+	if err := yaml.Unmarshal(data, &configMap); err != nil {
+		return nil, err
+	}
+	return &configMap, nil
 }

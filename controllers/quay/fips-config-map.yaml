@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fips-postgres-config
+  namespace: shudeshp
+data:
+  update_postgres.sh: |
+    #!/bin/bash
+    echo "password_encryption = 'scram-sha-256'" >> /var/lib/pgsql/data/userdata/postgresql.conf
+    echo "host    all    all    0.0.0.0/0    scram-sha-256" >> /var/lib/pgsql/data/userdata/pg_hba.conf
+    psql -c "SELECT pg_reload_conf();"
+    psql -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+
+#ToDo: extract password from config

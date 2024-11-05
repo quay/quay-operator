@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clair-postgres-hba-config
+data:
+  pg_hba.conf: |
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             all                                     scram-sha-256
+    host    all             all             0.0.0.0/0               scram-sha-256
+

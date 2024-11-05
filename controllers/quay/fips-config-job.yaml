@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fips-postgres-config-job
+  namespace: shudeshp
+spec:
+  template:
+    spec:
+      containers:
+      - name: fips-config
+        image: quay.io/sclorg/postgresql-13-c9s:latest 
+        command: ["/bin/sh", "/scripts/update_postgres.sh"]
+        volumeMounts:
+        - name: config-script
+          mountPath: /scripts
+        - name: postgres-data
+          mountPath: /var/lib/pgsql/data
+      restartPolicy: OnFailure
+      volumes:
+      - name: config-script
+        configMap:
+          name: fips-postgres-config
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: clair-postgres-13  
