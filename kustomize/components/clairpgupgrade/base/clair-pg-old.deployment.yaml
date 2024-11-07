@@ -70,5 +70,5 @@ spec:
                   pg_ctl reload;
                   psql -c \"ALTER SYSTEM SET password_encryption TO 'scram-sha-256';\";
                   psql -c \"SELECT pg_reload_conf();\";
-                  psql -c \"ALTER USER postgres WITH PASSWORD 'postgres';\"
+                  psql -c \"ALTER USER $POSTGRESQL_USER WITH PASSWORD '$POSTGRESQL_PASSWORD';\"
                 "]
