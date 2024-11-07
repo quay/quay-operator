@@ -65,10 +65,12 @@ spec:
                     echo 'Waiting for PostgreSQL to start...';
                     sleep 2;
                   done;
-                  echo 'password_encryption = scram-sha-256' >> $PGDATA/postgresql.conf;
-                  echo 'host all all 0.0.0.0/0 scram-sha-256' >> $PGDATA/pg_hba.conf;
-                  pg_ctl reload;
-                  psql -c \"ALTER SYSTEM SET password_encryption TO 'scram-sha-256';\";
-                  psql -c \"SELECT pg_reload_conf();\";
-                  psql -c \"ALTER USER $POSTGRESQL_USER WITH PASSWORD '$POSTGRESQL_PASSWORD';\"
+                  if [ \"\$(cat /proc/sys/crypto/fips_enabled)\" -eq 1 ]; then
+                    echo 'password_encryption = scram-sha-256' >> $PGDATA/postgresql.conf;
+                    echo 'host all all 0.0.0.0/0 scram-sha-256' >> $PGDATA/pg_hba.conf;
+                    pg_ctl reload;
+                    psql -c \"ALTER SYSTEM SET password_encryption TO 'scram-sha-256';\";
+                    psql -c \"SELECT pg_reload_conf();\";
+                    psql -c \"ALTER USER $POSTGRESQL_USER WITH PASSWORD '$POSTGRESQL_PASSWORD';\";
+                  fi
                 "]
