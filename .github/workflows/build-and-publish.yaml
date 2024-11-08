@@ -64,11 +64,30 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch || github.ref_name }}
 
+      - name: Check for wget
+        run: |
+          if command -v wget &> /dev/null; then
+            echo "wget is installed."
+          else
+            echo "wget is not installed. Installing wget..."
+            sudo apt-get update
+            sudo apt-get install -y wget
+          fi
+
       - name: Install opm from OpenShift Mirror
-        uses: redhat-actions/openshift-tools-installer@v1
-        with:
-          opm: "latest"
-      
+        run: |
+          LATEST_VERSION=$(curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/ | grep -oP 'opm-linux-\K[0-9.]+(?=\.tar\.gz)' | head -1)
+          echo "Latest version of opm: $LATEST_VERSION"
+          
+          wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${LATEST_VERSION}/opm-linux-${LATEST_VERSION}.tar.gz
+          tar -xzf opm-linux-${LATEST_VERSION}.tar.gz
+          # Check if the executable is named opm-rhel8 and rename it if necessary
+          if [ -f opm-rhel8 ]; then
+            mv opm-rhel8 /usr/local/bin/opm
+          fi
+          mv /usr/local/bin/opm /usr/local/bin/opm || true
+          chmod +x /usr/local/bin/opm
+
       - name: Install skopeo
         run: |
           sudo apt-get -y install skopeo
