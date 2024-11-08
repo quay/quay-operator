@@ -57,7 +57,7 @@ spec:
             requests:
               cpu: 500m
               memory: 2Gi
-                 lifecycle:
+          lifecycle:
             postStart:
               exec:
                 command: ["/bin/sh", "-c", "
