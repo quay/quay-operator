@@ -7,6 +7,7 @@ import (
 	route "github.com/openshift/api/route/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/stretchr/testify/assert"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -247,4 +248,37 @@ func TestProcess(t *testing.T) {
 func parseResourceString(s string) *resource.Quantity {
 	resourceSize := resource.MustParse(s)
 	return &resourceSize
+}
+
+func TestHPAWithUnmanagedMirrorAndClair(t *testing.T) {
+	quayRegistry := &v1.QuayRegistry{
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "mirror", Managed: false},
+				{Kind: "clair", Managed: false},
+				{Kind: "horizontalpodautoscaler", Managed: true},
+			},
+		},
+	}
+
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "registry-quay-app",
+			Labels: map[string]string{
+				"quay-component": "clair",
+			},
+		},
+	}
+
+	// Create a mock context and logger
+	qctx := &quaycontext.QuayRegistryContext{}
+
+	// Call the Process function
+	result, err := Process(quayRegistry, qctx, hpa, false)
+
+	// Assert that there is no error
+	assert.NoError(t, err)
+
+	// Assert that the result is nil
+	assert.Nil(t, result)
 }
