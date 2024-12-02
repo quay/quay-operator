@@ -56,14 +56,15 @@ func (r ReplicationStatus) Empty() bool {
 // AdvancedPutOptions for internal use - to be utilized by replication, ILM transition
 // implementation on MinIO server
 type AdvancedPutOptions struct {
-	SourceVersionID    string
-	SourceETag         string
-	ReplicationStatus  ReplicationStatus
-	SourceMTime        time.Time
-	ReplicationRequest bool
-	RetentionTimestamp time.Time
-	TaggingTimestamp   time.Time
-	LegalholdTimestamp time.Time
+	SourceVersionID          string
+	SourceETag               string
+	ReplicationStatus        ReplicationStatus
+	SourceMTime              time.Time
+	ReplicationRequest       bool
+	RetentionTimestamp       time.Time
+	TaggingTimestamp         time.Time
+	LegalholdTimestamp       time.Time
+	ReplicationValidityCheck bool
 }
 
 // PutObjectOptions represents options specified by user for PutObject call
@@ -76,6 +77,7 @@ type PutObjectOptions struct {
 	ContentDisposition      string
 	ContentLanguage         string
 	CacheControl            string
+	Expires                 time.Time
 	Mode                    RetentionMode
 	RetainUntilDate         time.Time
 	ServerSideEncryption    encrypt.ServerSide
@@ -87,7 +89,34 @@ type PutObjectOptions struct {
 	SendContentMd5          bool
 	DisableContentSha256    bool
 	DisableMultipart        bool
-	Internal                AdvancedPutOptions
+
+	// ConcurrentStreamParts will create NumThreads buffers of PartSize bytes,
+	// fill them serially and upload them in parallel.
+	// This can be used for faster uploads on non-seekable or slow-to-seek input.
+	ConcurrentStreamParts bool
+	Internal              AdvancedPutOptions
+
+	customHeaders http.Header
+}
+
+// SetMatchETag if etag matches while PUT MinIO returns an error
+// this is a MinIO specific extension to support optimistic locking
+// semantics.
+func (opts *PutObjectOptions) SetMatchETag(etag string) {
+	if opts.customHeaders == nil {
+		opts.customHeaders = http.Header{}
+	}
+	opts.customHeaders.Set("If-Match", "\""+etag+"\"")
+}
+
+// SetMatchETagExcept if etag does not match while PUT MinIO returns an
+// error this is a MinIO specific extension to support optimistic locking
+// semantics.
+func (opts *PutObjectOptions) SetMatchETagExcept(etag string) {
+	if opts.customHeaders == nil {
+		opts.customHeaders = http.Header{}
+	}
+	opts.customHeaders.Set("If-None-Match", "\""+etag+"\"")
 }
 
 // getNumThreads - gets the number of threads to be used in the multipart
@@ -125,6 +154,10 @@ func (opts PutObjectOptions) Header() (header http.Header) {
 		header.Set("Cache-Control", opts.CacheControl)
 	}
 
+	if !opts.Expires.IsZero() {
+		header.Set("Expires", opts.Expires.UTC().Format(http.TimeFormat))
+	}
+
 	if opts.Mode != "" {
 		header.Set(amzLockMode, opts.Mode.String())
 	}
@@ -159,7 +192,10 @@ func (opts PutObjectOptions) Header() (header http.Header) {
 		header.Set(minIOBucketSourceETag, opts.Internal.SourceETag)
 	}
 	if opts.Internal.ReplicationRequest {
-		header.Set(minIOBucketReplicationRequest, "")
+		header.Set(minIOBucketReplicationRequest, "true")
+	}
+	if opts.Internal.ReplicationValidityCheck {
+		header.Set(minIOBucketReplicationCheck, "true")
 	}
 	if !opts.Internal.LegalholdTimestamp.IsZero() {
 		header.Set(minIOBucketReplicationObjectLegalHoldTimestamp, opts.Internal.LegalholdTimestamp.Format(time.RFC3339Nano))
@@ -182,6 +218,12 @@ func (opts PutObjectOptions) Header() (header http.Header) {
 			header.Set("x-amz-meta-"+k, v)
 		}
 	}
+
+	// set any other additional custom headers.
+	for k, v := range opts.customHeaders {
+		header[k] = v
+	}
+
 	return
 }
 
@@ -269,6 +311,12 @@ func (c *Client) putObjectCommon(ctx context.Context, bucketName, objectName str
 	}
 
 	if size < 0 {
+		if opts.DisableMultipart {
+			return UploadInfo{}, errors.New("no length provided and multipart disabled")
+		}
+		if opts.ConcurrentStreamParts && opts.NumThreads > 1 {
+			return c.putObjectMultipartStreamParallel(ctx, bucketName, objectName, reader, opts)
+		}
 		return c.putObjectMultipartStreamNoLength(ctx, bucketName, objectName, reader, opts)
 	}
 
@@ -366,7 +414,8 @@ func (c *Client) putObjectMultipartStreamNoLength(ctx context.Context, bucketNam
 		rd := newHook(bytes.NewReader(buf[:length]), opts.Progress)
 
 		// Proceed to upload the part.
-		objPart, uerr := c.uploadPart(ctx, bucketName, objectName, uploadID, rd, partNumber, md5Base64, "", int64(length), opts.ServerSideEncryption, !opts.DisableContentSha256, customHeader)
+		p := uploadPartParams{bucketName: bucketName, objectName: objectName, uploadID: uploadID, reader: rd, partNumber: partNumber, md5Base64: md5Base64, size: int64(length), sse: opts.ServerSideEncryption, streamSha256: !opts.DisableContentSha256, customHeader: customHeader}
+		objPart, uerr := c.uploadPart(ctx, p)
 		if uerr != nil {
 			return UploadInfo{}, uerr
 		}
