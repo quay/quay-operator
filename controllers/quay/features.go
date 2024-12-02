@@ -25,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/quay/quay-operator/pkg/kustomize"
+	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 )
 
 const (
