@@ -67,7 +67,7 @@ spec:
           command:
           - sh
           - -c
-          - python -c "import os, requests, sys; host = os.getenv(\"QUAY_APP_SERVICE_HOST\"); sys.exit(0) if requests.get(\"http://\"+host) else sys.exit(1);"
+          - python -c "import os, requests, sys; host = os.getenv(\"QUAY_APP_SERVICE_HOST\"); sys.exit(0) if requests.get(\"http://\"+host, verify=False) else sys.exit(1);"
           env:
             - name: QUAY_APP_SERVICE_HOST
               value: $(QUAY_APP_SERVICE_HOST)
