@@ -676,6 +676,17 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	if err := r.cleanupPreviousSecret(log, ctx, &quay); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("could not remove previous config bundle secret: %s", err),
+		)
+	}
+
 	for _, obj := range kustomize.EnsureCreationOrder(deploymentObjects) {
 		// For metrics and dashboards to work, we need to deploy the Grafana ConfigMap
 		// in the `openshift-config-managed` namespace and add the label
@@ -1040,6 +1051,35 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 	r.EventRecorder.Event(quay, eventType, string(reason), msg)
 
 	return r.Client.Status().Update(ctx, quay)
+}
+
+func (r *QuayRegistryReconciler) cleanupPreviousSecret(log logr.Logger, ctx context.Context, quay *v1.QuayRegistry) error {
+	log.Info("deleting old objects")
+	previousSecret := &corev1.Secret{}
+	if err := r.Client.Get(
+		ctx,
+		types.NamespacedName{
+			Name:      quay.Spec.ConfigBundleSecret,
+			Namespace: quay.GetNamespace(),
+		},
+		previousSecret,
+	); err != nil {
+		r.Log.Info(fmt.Sprintf("%s secret not found, skipping", quay.Spec.ConfigBundleSecret))
+	}
+	if err := r.Client.Delete(ctx, previousSecret); err != nil {
+		if !errors.IsNotFound(err) {
+			return r.updateWithCondition(
+				ctx,
+				quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonComponentCreationFailed,
+				fmt.Sprintf("could not delete old objects: %s", err),
+			)
+		}
+		log.Info("previous secret not found, continuing")
+	}
+	return nil
 }
 
 // reconcileWithCondition sets the given condition on the `QuayRegistry` and returns a reconcile
