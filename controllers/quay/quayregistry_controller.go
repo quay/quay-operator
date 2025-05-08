@@ -448,6 +448,33 @@ func (r *QuayRegistryReconciler) GetConfigBundleSecret(
 	return bundle, nil
 }
 
+// GetOldConfigBundleSecrets returns all of the secrets with the prefix `<quayregistry-name>-config-bundle-`
+// in the same namespace as the QuayRegistry. This is used to clean up old config bundle secrets
+// when a new config bundle secret is created.
+func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
+	ctx context.Context, quay *v1.QuayRegistry,
+
+) ([]corev1.Secret, error) {
+	secretList := &corev1.SecretList{}
+	if err := r.Client.List(
+		ctx,
+		secretList,
+		client.InNamespace(quay.GetNamespace()),
+	); err != nil {
+		return nil, err
+	}
+	if len(secretList.Items) == 0 {
+		return nil, goerrors.New("no unused secrets found")
+	}
+	var oldConfigBundleSecrets []corev1.Secret
+	for _, secret := range secretList.Items {
+		if strings.HasPrefix(secret.Name, quay.GetName()+"-quay-config-secret") && secret.Name != quay.Spec.ConfigBundleSecret {
+			oldConfigBundleSecrets = append(oldConfigBundleSecrets, secret)
+		}
+	}
+	return oldConfigBundleSecrets, nil
+}
+
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
 
@@ -676,7 +703,21 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	if err := r.cleanupPreviousSecret(log, ctx, &quay); err != nil {
+	previousSecrets, err := r.GetOldConfigBundleSecrets(ctx, updatedQuay)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				fmt.Sprintf("could not get previous config bundle secrets: %s", err),
+			)
+		}
+	}
+
+	if err := r.cleanupPreviousSecrets(log, ctx, &quay, previousSecrets); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
 			&quay,
@@ -1053,32 +1094,33 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 	return r.Client.Status().Update(ctx, quay)
 }
 
-func (r *QuayRegistryReconciler) cleanupPreviousSecret(log logr.Logger, ctx context.Context, quay *v1.QuayRegistry) error {
+func (r *QuayRegistryReconciler) cleanupPreviousSecrets(log logr.Logger, ctx context.Context, quay *v1.QuayRegistry, previousSecrets []corev1.Secret) error {
 	log.Info("deleting old objects")
-	previousSecret := &corev1.Secret{}
-	if err := r.Client.Get(
-		ctx,
-		types.NamespacedName{
-			Name:      quay.Spec.ConfigBundleSecret,
-			Namespace: quay.GetNamespace(),
-		},
-		previousSecret,
-	); err != nil {
-		r.Log.Info(fmt.Sprintf("%s secret not found, skipping", quay.Spec.ConfigBundleSecret))
+	if len(previousSecrets) == 0 {
+		log.Info("no previous config bundle secrets to delete")
+		return nil
+	} else {
+		log.Info("found previous config bundle secrets", "count", len(previousSecrets))
 	}
-	if err := r.Client.Delete(ctx, previousSecret); err != nil {
-		if !errors.IsNotFound(err) {
+
+	log.Info("deleting previous config bundle secrets")
+	for _, secret := range previousSecrets {
+		if err := r.Client.Delete(ctx, &secret); err != nil {
+			log.Error(err, "failed to delete previous config bundle secret")
 			return r.updateWithCondition(
 				ctx,
 				quay,
 				v1.ConditionTypeRolloutBlocked,
 				metav1.ConditionTrue,
 				v1.ConditionReasonComponentCreationFailed,
-				fmt.Sprintf("could not delete old objects: %s", err),
+				fmt.Sprintf("could not delete previous config bundle secret: %s", err),
 			)
 		}
-		log.Info("previous secret not found, continuing")
+
+		// print thee secret name that has been cleaned up
+		log.Info("cleaned up unused config bundle secret", "name", secret.Name)
 	}
+
 	return nil
 }
 
