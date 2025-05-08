@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -683,6 +684,77 @@ func Test_hasNecessaryConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reconciler := QuayRegistryReconciler{}
 			err := reconciler.hasNecessaryConfig(tt.quay, tt.cfg)
+			if err != nil {
+				if tt.experr {
+					return
+				}
+				t.Errorf("unexpected err: %s", err)
+				return
+			}
+
+			if tt.experr {
+				t.Errorf("expecting error but nil returned")
+			}
+		})
+	}
+}
+
+func Test_cleanupPreviousSecret(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		experr  bool
+		secrets corev1.SecretList
+		quay    v1.QuayRegistry
+	}{
+		{
+			name:   "no secrets",
+			experr: false,
+			secrets: corev1.SecretList{
+				Items: []corev1.Secret{},
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "no secrets with config bundle",
+			experr: false,
+			secrets: corev1.SecretList{
+				Items: []corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "quay-config-secret",
+							Namespace: "test",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple secrets",
+			secrets: corev1.SecretList{
+				Items: []corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "quay-config-secret-abc123",
+							Namespace: "test",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "quay-config-secret-def456",
+							Namespace: "test",
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			reconciler := QuayRegistryReconciler{
+				Client: fake.NewFakeClient(&tt.secrets),
+			}
+			log := testLogger.WithValues("test", t.Name())
+
+			err := reconciler.cleanupPreviousSecrets(log, context.Background(), &tt.quay, tt.secrets.Items)
 			if err != nil {
 				if tt.experr {
 					return
