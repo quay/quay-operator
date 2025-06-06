@@ -13,7 +13,6 @@ import (
 // Postgres checks a quay registry postgres component status.
 type Postgres struct {
 	Client client.Client
-	deploy deploy
 }
 
 // Name returns the component name this entity checks for health.
@@ -34,7 +33,7 @@ func (p *Postgres) Check(ctx context.Context, quay qv1.QuayRegistry) (qv1.Condit
 		}, nil
 	}
 
-	return CheckPVCStatusForDeployment(
+	return CheckDatabaseDeploymentAndPVCStatus(
 		ctx,
 		p.Client,
 		quay,

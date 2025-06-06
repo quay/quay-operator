@@ -18,7 +18,7 @@ import (
 
 // CheckPVCStatusForDeployment checks the status of a PersistentVolumeClaim associated with a Deployment.
 // It returns a condition indicating the readiness of the component.
-func CheckPVCStatusForDeployment(
+func CheckDatabaseDeploymentAndPVCStatus(
 	ctx context.Context,
 	cli client.Client,
 	quay qv1.QuayRegistry,
