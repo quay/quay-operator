@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -36,6 +37,7 @@ import (
 
 	quay "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontroller "github.com/quay/quay-operator/controllers/quay"
+	corev1 "k8s.io/api/core/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -148,6 +150,21 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistryStatus")
 		os.Exit(1)
 	}
+
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Event{}, "involvedObject.uid", func(rawObj client.Object) []string {
+		event, ok := rawObj.(*corev1.Event)
+		if !ok {
+			return nil
+		}
+		if event.InvolvedObject.UID == "" {
+			return nil
+		}
+		return []string{string(event.InvolvedObject.UID)}
+	}); err != nil {
+		setupLog.Error(err, "unable to set up field indexer for Event involvedObject.uid")
+		os.Exit(1)
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
