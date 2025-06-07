@@ -246,8 +246,12 @@ func TestDatabaseComponentCheck(t *testing.T) {
 				defer cancel()
 
 				scheme := runtime.NewScheme()
-				qv1.AddToScheme(scheme)
-				clientgoscheme.AddToScheme(scheme)
+				if err := qv1.AddToScheme(scheme); err != nil {
+					t.Fatalf("failed to add quay/v1 to scheme: %s", err)
+				}
+				if err := clientgoscheme.AddToScheme(scheme); err != nil {
+					t.Fatalf("failed to add client-go to scheme: %s", err)
+				}
 
 				cliBuilder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tt.objs...)
 				cliBuilder.WithIndex(&corev1.Event{}, "involvedObject.uid", func(rawObj client.Object) []string {
