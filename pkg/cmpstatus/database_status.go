@@ -3,8 +3,10 @@ package cmpstatus
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,7 +30,7 @@ func CheckDatabaseDeploymentAndPVCStatus(
 ) (qv1.Condition, error) {
 	var zero qv1.Condition
 
-	componentName := strings.Title(string(component))
+	componentName := cases.Title(language.English).String(string(component))
 	if component == qv1.ComponentClairPostgres {
 		componentName = "ClairPostgres"
 	}
