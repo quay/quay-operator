@@ -1,6 +1,8 @@
 module github.com/quay/quay-operator
 
-go 1.21
+go 1.23
+
+toolchain go1.23.10
 
 require (
 	github.com/go-logr/logr v1.4.1
@@ -96,7 +98,7 @@ require (
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/rs/xid v1.4.0 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tidwall/gjson v1.10.2 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
