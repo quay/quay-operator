@@ -980,6 +980,10 @@ spec:
                                 quantity) pairs.
                               type: object
                           type: object
+                        storageClassName:
+                          description: StorageClassName is the name of the StorageClass
+                            to use for the PVC.
+                          type: string
                         volumeSize:
                           anyOf:
                           - type: integer

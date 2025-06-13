@@ -70,6 +70,11 @@ func (in *Override) DeepCopyInto(out *Override) {
 		x := (*in).DeepCopy()
 		*out = &x
 	}
+	if in.StorageClassName != nil {
+		in, out := &in.StorageClassName, &out.StorageClassName
+		*out = new(string)
+		**out = **in
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))
