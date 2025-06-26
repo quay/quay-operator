@@ -8,7 +8,11 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "pull_request" && target_branch
-      == "redhat-3.14"
+      == "redhat-3.14" &&
+      (".tekton/single-arch-build-pipeline.yaml".pathChanged() ||
+      ".tekton/quay-operator-bundle-v3-14-pull-request.yaml".pathChanged() ||
+      ".tekton/quay-operator-bundle-v3-14-push.yaml".pathChanged() ||
+      "bundle-hack/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: quay-v3-14

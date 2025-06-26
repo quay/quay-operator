@@ -50,6 +50,40 @@ spec:
       workspaces:
       - name: basic-auth
         workspace: git-auth
+    - name: seed-dockerfile
+      params:
+      - name: ociStorage
+        value: $(params.output-image).git
+      - name: SCRIPT_RUNNER_IMAGE
+        value: registry.access.redhat.com/ubi8/python-312:latest
+      - name: SOURCE_ARTIFACT
+        value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
+      - name: SCRIPT
+        value: |
+          sed -i '1i\
+            FROM registry.access.redhat.com/ubi9/ubi-minimal:latest as builder-runner\
+            RUN microdnf install -y skopeo jq python3 python3-pip\
+            RUN pip3 install --upgrade pip && pip3 install build-hack/requirements.txt\
+            # Use a new stage to enable caching of the package installations for local development\
+            FROM builder-runner as builder\
+            COPY bundle-hack .\
+            COPY bundle/manifests /manifests/\
+            COPY bundle/metadata /metadata/\
+            RUN ./update_bundle.sh
+            s|^ADD manifests /manifests$|COPY --from=builder /manifests /manifests/|g
+            s|^ADD metadata/annotations.yaml /metadata/annotations.yaml$|COPY --from=builder /metadata /metadata/|g
+          ' bundle/Dockerfile
+      runAfter:
+      - clone-repository
+      taskRef:
+        resolver: bundles
+        params:
+        - name: name
+          value: run-script-oci-ta
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-run-script-oci-ta:0.1@sha256:4b4012ad649a0354a7a355a9b26c0b53bea577801bcaf903dc5260321a9e3c3a
+        - name: kind
+          value: task
     - name: prefetch-dependencies
       taskRef:
         resolver: bundles
@@ -85,6 +119,7 @@ spec:
           value: task
       runAfter:
         - clone-repository
+        - seed-dockerfile
       when:
       - input: "$(tasks.init.results.build)"
         operator: in
@@ -106,7 +141,7 @@ spec:
       - name: COMMIT_SHA
         value: "$(tasks.clone-repository.results.commit)"
       - name: SOURCE_ARTIFACT
-        value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+        value: $(tasks.seed-dockerfile.results.SCRIPT_ARTIFACT)
       - name: CACHI2_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
     - name: build-source-image
