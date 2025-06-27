@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-clair-app
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+resourceRefs:
+- apiVersion: apps/v1
+  kind: Deployment
+  name: skynet-clair-app
+  ref: object
+assertAll:
+- celExpr: |
+            object.spec.template.spec.containers.exists(c,
+              c.name == "clair-app" &&
+              c.volumeMounts.exists(vm,
+                vm.name == "clair-tmp" &&
+                vm.mountPath == "/tmp"
+              )
+            ) &&
+            object.spec.template.spec.volumes.exists(v,
+              v.name == "clair-tmp" &&
+              has(v.ephemeral) &&
+              has(v.ephemeral.volumeClaimTemplate) &&
+              has(v.ephemeral.volumeClaimTemplate.spec) &&
+              "ReadWriteOnce" in v.ephemeral.volumeClaimTemplate.spec.accessModes &&
+              v.ephemeral.volumeClaimTemplate.spec.storageClassName == "local-path" &&
+              v.ephemeral.volumeClaimTemplate.spec.resources.requests.storage == "15Gi"
+            )

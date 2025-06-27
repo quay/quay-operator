@@ -453,7 +453,7 @@ var validateOverridesTests = []struct {
 					{Kind: "clair", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "route", Managed: true},
-					{Kind: "tls", Managed: true, Overrides: &Override{Env: []corev1.EnvVar{corev1.EnvVar{Name: "foo", Value: "bar"}}}},
+					{Kind: "tls", Managed: true, Overrides: &Override{Env: []corev1.EnvVar{{Name: "foo", Value: "bar"}}}},
 					{Kind: "horizontalpodautoscaler", Managed: true},
 					{Kind: "mirror", Managed: true},
 					{Kind: "monitoring", Managed: true},
@@ -500,6 +500,46 @@ var validateOverridesTests = []struct {
 			},
 		},
 		errors.New("component redis does not support storageClassName overrides"),
+	},
+	{
+		"InvalidEphemeralVolumeOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "redis", Managed: true, Overrides: &Override{UseEphemeralVolume: ptr.To(true)}},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component redis does not support ephemeralVolume overrides"),
+	},
+	{
+		"InvalidOverridesWithoutEphemeralVolumeOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true, Overrides: &Override{StorageClassName: ptr.To("foo")}},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component clair with storageClassName/volumeSize override requires useEphemeralVolume to be set to true"),
 	},
 }
 

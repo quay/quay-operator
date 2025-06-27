@@ -21,8 +21,11 @@ import (
 )
 
 const (
-	configSecretPrefix    = "quay-config-secret"
-	fieldGroupsAnnotation = "quay-managed-fieldgroups"
+	configSecretPrefix         = "quay-config-secret"
+	fieldGroupsAnnotation      = "quay-managed-fieldgroups"
+	clairAppDeploymentSuffix   = "clair-app"
+	quayAppDeploymentSuffix    = "quay-app"
+	quayMirrorDeploymentSuffix = "quay-mirror"
 )
 
 // Process applies any additional middleware steps to a managed k8s object that cannot be
@@ -121,9 +124,9 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		// controller.
 		if !v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentHPA) {
 			for kind, depsuffix := range map[v1.ComponentKind]string{
-				v1.ComponentClair:  "clair-app",
-				v1.ComponentMirror: "quay-mirror",
-				v1.ComponentQuay:   "quay-app",
+				v1.ComponentClair:  clairAppDeploymentSuffix,
+				v1.ComponentMirror: quayMirrorDeploymentSuffix,
+				v1.ComponentQuay:   quayAppDeploymentSuffix,
 			} {
 				if !strings.HasSuffix(dep.Name, depsuffix) {
 					continue
@@ -211,6 +214,36 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		}
 
 		dep.Spec.Template.Annotations[fieldGroupsAnnotation] = strings.Join(fgns, ",")
+
+		// --- CLAIR EPHEMERAL VOLUME INJECTION ---
+		if isClairAppDeployment(dep.Name, kind) && v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClair) {
+			useEphemeral := false
+			var storageClassName *string
+			var volumeSize resource.Quantity
+			volumeSizeSet := false
+			for _, cmp := range quay.Spec.Components {
+				if cmp.Kind == v1.ComponentClair && cmp.Overrides != nil {
+					if cmp.Overrides.UseEphemeralVolume != nil {
+						useEphemeral = *cmp.Overrides.UseEphemeralVolume
+					}
+					if cmp.Overrides.StorageClassName != nil {
+						storageClassName = cmp.Overrides.StorageClassName
+					}
+					if cmp.Overrides.VolumeSize != nil {
+						volumeSize = *cmp.Overrides.VolumeSize
+						volumeSizeSet = true
+					}
+				}
+			}
+			if useEphemeral {
+				// Default to 10Gi if not set
+				if !volumeSizeSet {
+					volumeSize = resource.MustParse("10Gi")
+				}
+				injectClairEphemeralVolume(dep, storageClassName, volumeSize)
+			}
+		}
+
 		return dep, nil
 	}
 
@@ -362,4 +395,63 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 
 	flattenedSecret.Data["config.yaml"] = flattenedConfigYAML
 	return flattenedSecret, nil
+}
+
+func isClairAppDeployment(depName string, kind v1.ComponentKind) bool {
+	return kind == v1.ComponentClair && strings.HasSuffix(depName, clairAppDeploymentSuffix)
+}
+
+// injectClairEphemeralVolume adds an ephemeral volume for /tmp to the Clair deployment
+func injectClairEphemeralVolume(dep *appsv1.Deployment, storageClassName *string, volumeSize resource.Quantity) {
+	// Check if the volume already exists (idempotency)
+	found := false
+	for _, v := range dep.Spec.Template.Spec.Volumes {
+		if v.Name == "clair-tmp" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		// Inject the ephemeral volume
+		vol := corev1.Volume{
+			Name: "clair-tmp",
+			VolumeSource: corev1.VolumeSource{
+				Ephemeral: &corev1.EphemeralVolumeSource{
+					VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+						Spec: corev1.PersistentVolumeClaimSpec{
+							AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceStorage: volumeSize,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		if storageClassName != nil {
+			vol.VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.StorageClassName = storageClassName
+		}
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, vol)
+	}
+
+	// Inject the volumeMount for /tmp if not already present
+	for i, c := range dep.Spec.Template.Spec.Containers {
+		if c.Name == clairAppDeploymentSuffix {
+			foundMount := false
+			for _, m := range c.VolumeMounts {
+				if m.Name == "clair-tmp" && m.MountPath == "/tmp" {
+					foundMount = true
+					break
+				}
+			}
+			if !foundMount {
+				dep.Spec.Template.Spec.Containers[i].VolumeMounts = append(dep.Spec.Template.Spec.Containers[i].VolumeMounts, corev1.VolumeMount{
+					Name:      "clair-tmp",
+					MountPath: "/tmp",
+				})
+			}
+		}
+	}
 }

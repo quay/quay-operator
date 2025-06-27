@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -95,6 +96,74 @@ func (c *Clair) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition,
 			Message:        "Clair component is being scaled down",
 			LastUpdateTime: metav1.NewTime(time.Now()),
 		}, nil
+	}
+
+	// --- Ephemeral /tmp PVC status check for managed Clair ---
+	useEphemeralOverride := qv1.GetUseEphemeralVolumeOverrideForComponent(&reg, qv1.ComponentClair)
+	useEphemeral := useEphemeralOverride != nil && *useEphemeralOverride
+
+	if useEphemeral {
+		// List ReplicaSets owned by the deployment
+		var rsList appsv1.ReplicaSetList
+		if err := c.Client.List(ctx, &rsList, client.InNamespace(reg.Namespace)); err == nil {
+			for _, rs := range rsList.Items {
+				for _, owner := range rs.OwnerReferences {
+					if owner.Kind == "Deployment" && owner.Name == dep.Name {
+						// List Pods owned by this ReplicaSet
+						var podList v1.PodList
+						if err := c.Client.List(ctx, &podList, client.InNamespace(reg.Namespace)); err == nil {
+							for _, pod := range podList.Items {
+								for _, podOwner := range pod.OwnerReferences {
+									if podOwner.Kind == "ReplicaSet" && podOwner.Name == rs.Name {
+										// List PVCs owned by this Pod
+										var pvcList v1.PersistentVolumeClaimList
+										if err := c.Client.List(ctx, &pvcList, client.InNamespace(reg.Namespace)); err == nil {
+											for _, pvc := range pvcList.Items {
+												for _, pvcOwner := range pvc.OwnerReferences {
+													if pvcOwner.Kind == "Pod" && pvcOwner.Name == pod.Name {
+														// Check if this PVC is for the /tmp ephemeral volume (by convention, only one per pod for this feature)
+														if pvc.Status.Phase == v1.ClaimPending {
+															// Check for provisioning failure events
+															var eventList v1.EventList
+															opts := []client.ListOption{
+																client.InNamespace(reg.Namespace),
+																client.MatchingFields{"involvedObject.uid": string(pvc.UID)},
+															}
+															if err := c.Client.List(ctx, &eventList, opts...); err == nil {
+																for _, event := range eventList.Items {
+																	if event.Reason == "ProvisioningFailed" {
+																		// Surface provisioning failure in status
+																		return qv1.Condition{
+																			Type:           qv1.ComponentClairReady,
+																			Status:         metav1.ConditionFalse,
+																			Reason:         qv1.ConditionReasonPVCProvisioningFailed,
+																			Message:        fmt.Sprintf("Clair /tmp PersistentVolumeClaim provisioning failed: %s", event.Message),
+																			LastUpdateTime: metav1.NewTime(time.Now()),
+																		}, nil
+																	}
+																}
+															}
+															// If pending but no failure event, surface pending status
+															return qv1.Condition{
+																Type:           qv1.ComponentClairReady,
+																Status:         metav1.ConditionFalse,
+																Reason:         qv1.ConditionReasonPVCPending,
+																Message:        fmt.Sprintf("Clair /tmp PersistentVolumeClaim %s is pending", pvc.Name),
+																LastUpdateTime: metav1.NewTime(time.Now()),
+															}, nil
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	cond := c.deploy.check(dep)

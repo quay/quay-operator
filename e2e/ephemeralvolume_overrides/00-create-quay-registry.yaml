@@ -4,11 +4,9 @@ metadata:
   name: skynet
 spec:
   components:
-    - kind: postgres
+    - kind: clair
       managed: true
       overrides:
-        storageClassName: local-path
-    - kind: clairpostgres
-      managed: true
-      overrides:
+        useEphemeralVolume: true
+        volumeSize: 15Gi
         storageClassName: local-path
