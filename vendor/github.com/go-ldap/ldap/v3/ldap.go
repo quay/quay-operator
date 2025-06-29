@@ -3,7 +3,9 @@ package ldap
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"strings"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
@@ -30,6 +32,7 @@ const (
 	ApplicationSearchResultReference = 19
 	ApplicationExtendedRequest       = 23
 	ApplicationExtendedResponse      = 24
+	ApplicationIntermediateResponse  = 25
 )
 
 // ApplicationMap contains human readable descriptions of LDAP Application Codes
@@ -54,6 +57,7 @@ var ApplicationMap = map[uint8]string{
 	ApplicationSearchResultReference: "Search Result Reference",
 	ApplicationExtendedRequest:       "Extended Request",
 	ApplicationExtendedResponse:      "Extended Response",
+	ApplicationIntermediateResponse:  "Intermediate Response",
 }
 
 // Ldap Behera Password Policy Draft 10 (https://tools.ietf.org/html/draft-behera-ldap-password-policy-10)
@@ -80,6 +84,13 @@ var BeheraPasswordPolicyErrorMap = map[int8]string{
 	BeheraPasswordTooShort:            "Password is too short for policy",
 	BeheraPasswordTooYoung:            "Password has been changed too recently",
 	BeheraPasswordInHistory:           "New password is in list of old passwords",
+}
+
+var logger = log.New(os.Stderr, "", log.LstdFlags)
+
+// Logger allows clients to override the default logger
+func Logger(l *log.Logger) {
+	logger = l
 }
 
 // Adds descriptions to an LDAP Response packet for debugging
@@ -221,18 +232,18 @@ func addControlDescriptions(packet *ber.Packet) error {
 			sequence := value.Children[0]
 			for _, child := range sequence.Children {
 				if child.Tag == 0 {
-					//Warning
+					// Warning
 					warningPacket := child.Children[0]
 					val, err := ber.ParseInt64(warningPacket.Data.Bytes())
 					if err != nil {
 						return fmt.Errorf("failed to decode data bytes: %s", err)
 					}
 					if warningPacket.Tag == 0 {
-						//timeBeforeExpiration
+						// timeBeforeExpiration
 						value.Description += " (TimeBeforeExpiration)"
 						warningPacket.Value = val
 					} else if warningPacket.Tag == 1 {
-						//graceAuthNsRemaining
+						// graceAuthNsRemaining
 						value.Description += " (GraceAuthNsRemaining)"
 						warningPacket.Value = val
 					}
@@ -303,8 +314,6 @@ func DebugBinaryFile(fileName string) error {
 	return nil
 }
 
-var hex = "0123456789abcdef"
-
 func mustEscape(c byte) bool {
 	return c > 0x7f || c == '(' || c == ')' || c == '\\' || c == '*' || c == 0
 }
@@ -313,6 +322,7 @@ func mustEscape(c byte) bool {
 // characters in the set `()*\` and those out of the range 0 < c < 0x80,
 // as defined in RFC4515.
 func EscapeFilter(filter string) string {
+	const hexValues = "0123456789abcdef"
 	escape := 0
 	for i := 0; i < len(filter); i++ {
 		if mustEscape(filter[i]) {
@@ -327,8 +337,8 @@ func EscapeFilter(filter string) string {
 		c := filter[i]
 		if mustEscape(c) {
 			buf[j+0] = '\\'
-			buf[j+1] = hex[c>>4]
-			buf[j+2] = hex[c&0xf]
+			buf[j+1] = hexValues[c>>4]
+			buf[j+2] = hexValues[c&0xf]
 			j += 3
 		} else {
 			buf[j] = c
@@ -336,4 +346,44 @@ func EscapeFilter(filter string) string {
 		}
 	}
 	return string(buf)
+}
+
+// EscapeDN escapes distinguished names as described in RFC4514. Characters in the
+// set `"+,;<>\` are escaped by prepending a backslash, which is also done for trailing
+// spaces or a leading `#`. Null bytes are replaced with `\00`.
+func EscapeDN(dn string) string {
+	if dn == "" {
+		return ""
+	}
+
+	builder := strings.Builder{}
+
+	for i, r := range dn {
+		// Escape leading and trailing spaces
+		if (i == 0 || i == len(dn)-1) && r == ' ' {
+			builder.WriteRune('\\')
+			builder.WriteRune(r)
+			continue
+		}
+
+		// Escape leading '#'
+		if i == 0 && r == '#' {
+			builder.WriteRune('\\')
+			builder.WriteRune(r)
+			continue
+		}
+
+		// Escape characters as defined in RFC4514
+		switch r {
+		case '"', '+', ',', ';', '<', '>', '\\':
+			builder.WriteRune('\\')
+			builder.WriteRune(r)
+		case '\x00': // Null byte may not be escaped by a leading backslash
+			builder.WriteString("\\00")
+		default:
+			builder.WriteRune(r)
+		}
+	}
+
+	return builder.String()
 }
