@@ -6,7 +6,7 @@ toolchain go1.23.10
 
 require (
 	github.com/go-logr/logr v1.4.1
-	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20210311161930-4bea5edaff58
+	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20221122204822-d1a8c34382f1
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.0
 	github.com/openshift/api v3.9.0+incompatible
