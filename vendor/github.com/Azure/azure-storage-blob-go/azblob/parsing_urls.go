@@ -1,7 +1,6 @@
 package azblob
 
 import (
-	"errors"
 	"net"
 	"net/url"
 	"strings"
@@ -70,6 +69,7 @@ func NewBlobURLParts(u url.URL) BlobURLParts {
 		if isIPEndpointStyle(up.Host) {
 			if accountEndIndex := strings.Index(path, "/"); accountEndIndex == -1 { // Slash not found; path has account name & no container name or blob
 				up.IPEndpointStyleInfo.AccountName = path
+				path = "" // No ContainerName present in the URL so path should be empty
 			} else {
 				up.IPEndpointStyleInfo.AccountName = path[:accountEndIndex] // The account name is the part between the slashes
 				path = path[accountEndIndex+1:]                             // path refers to portion after the account name now (container & blob names)
@@ -134,11 +134,6 @@ func (up BlobURLParts) URL() url.URL {
 	}
 
 	rawQuery := up.UnparsedParams
-
-	// Check: Both snapshot and version id cannot be present in the request URL.
-	if up.Snapshot != "" && up.VersionID != "" {
-		errors.New("Snapshot and versioning cannot be enabled simultaneously")
-	}
 
 	//If no snapshot is initially provided, fill it in from the SAS query properties to help the user
 	if up.Snapshot == "" && !up.SAS.snapshotTime.IsZero() {
