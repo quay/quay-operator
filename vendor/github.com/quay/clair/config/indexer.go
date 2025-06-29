@@ -23,7 +23,7 @@ type Indexer struct {
 	// Indexers will index a Manifest's layers concurrently.
 	// This value tunes the number of layers an Indexer will scan in parallel.
 	LayerScanConcurrency int `yaml:"layer_scan_concurrency,omitempty" json:"layer_scan_concurrency,omitempty"`
-	// Rate limits the number if index report creation requests.
+	// Rate limits the number of index report creation requests.
 	//
 	// Setting this to 0 will attempt to auto-size this value. Setting a
 	// negative value means "unlimited." The auto-sizing is a multiple of the
@@ -35,8 +35,16 @@ type Indexer struct {
 	//
 	// Whether Indexer nodes handle migrations to their database.
 	Migrations bool `yaml:"migrations,omitempty" json:"migrations,omitempty"`
-	// Airgap disables scanners that have signaled they expect to talk to the
-	// Internet.
+	// Airgap disables HTTP access to the Internet. This affects both indexers and
+	// the layer fetcher. Database connections are unaffected.
+	//
+	// "Airgap" is a bit of a misnomer, as [RFC 4193] and [RFC 1918] addresses
+	// are always allowed. This means that setting this flag and also
+	// configuring a proxy on a private network does not prevent contact with
+	// the Internet.
+	//
+	// [RFC 1918]: https://datatracker.ietf.org/doc/html/rfc1918
+	// [RFC 4193]: https://datatracker.ietf.org/doc/html/rfc4193
 	Airgap bool `yaml:"airgap,omitempty" json:"airgap,omitempty"`
 }
 
