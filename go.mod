@@ -22,7 +22,7 @@ require (
 	k8s.io/api v0.28.3
 	k8s.io/apimachinery v0.28.3
 	k8s.io/client-go v0.28.3
-	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	sigs.k8s.io/controller-runtime v0.16.3
 	sigs.k8s.io/kustomize/api v0.10.1
 	sigs.k8s.io/kustomize/kyaml v0.13.0
