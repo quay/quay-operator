@@ -261,7 +261,7 @@ github.com/monochromegane/go-gitignore
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/ncw/swift v1.0.52
+# github.com/ncw/swift v1.0.53
 ## explicit
 github.com/ncw/swift
 # github.com/onsi/ginkgo/v2 v2.17.2
