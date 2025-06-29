@@ -26,7 +26,7 @@ import (
 	"net/url"
 	"time"
 
-	jsoniter "github.com/json-iterator/go"
+	"github.com/minio/minio-go/v7/internal/json"
 	"github.com/minio/minio-go/v7/pkg/notification"
 	"github.com/minio/minio-go/v7/pkg/s3utils"
 )
@@ -157,21 +157,15 @@ func (c *Client) ListenBucketNotification(ctx context.Context, bucketName, prefi
 			return
 		}
 
-		// Continuously run and listen on bucket notification.
-		// Create a done channel to control 'ListObjects' go routine.
-		retryDoneCh := make(chan struct{}, 1)
-
-		// Indicate to our routine to exit cleanly upon return.
-		defer close(retryDoneCh)
-
 		// Prepare urlValues to pass into the request on every loop
 		urlValues := make(url.Values)
+		urlValues.Set("ping", "10")
 		urlValues.Set("prefix", prefix)
 		urlValues.Set("suffix", suffix)
 		urlValues["events"] = events
 
 		// Wait on the jitter retry loop.
-		for range c.newRetryTimerContinous(time.Second, time.Second*30, MaxJitter, retryDoneCh) {
+		for range c.newRetryTimerContinous(time.Second, time.Second*30, MaxJitter) {
 			// Execute GET on bucket to list objects.
 			resp, err := c.executeMethod(ctx, http.MethodGet, requestMetadata{
 				bucketName:       bucketName,
@@ -206,7 +200,6 @@ func (c *Client) ListenBucketNotification(ctx context.Context, bucketName, prefi
 			// Use a higher buffer to support unexpected
 			// caching done by proxies
 			bio.Buffer(notificationEventBuffer, notificationCapacity)
-			json := jsoniter.ConfigCompatibleWithStandardLibrary
 
 			// Unmarshal each line, returns marshaled values.
 			for bio.Scan() {
@@ -224,6 +217,12 @@ func (c *Client) ListenBucketNotification(ctx context.Context, bucketName, prefi
 					closeResponse(resp)
 					continue
 				}
+
+				// Empty events pinged from the server
+				if len(notificationInfo.Records) == 0 && notificationInfo.Err == nil {
+					continue
+				}
+
 				// Send notificationInfo
 				select {
 				case notificationInfoCh <- notificationInfo:
@@ -245,7 +244,6 @@ func (c *Client) ListenBucketNotification(ctx context.Context, bucketName, prefi
 
 			// Close current connection before looping further.
 			closeResponse(resp)
-
 		}
 	}(notificationInfoCh)
 

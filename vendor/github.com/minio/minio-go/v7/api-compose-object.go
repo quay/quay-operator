@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -31,6 +30,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7/pkg/encrypt"
 	"github.com/minio/minio-go/v7/pkg/s3utils"
+	"github.com/minio/minio-go/v7/pkg/tags"
 )
 
 // CopyDestOptions represents options specified by user for CopyObject/ComposeObject APIs
@@ -68,8 +68,14 @@ type CopyDestOptions struct {
 	LegalHold LegalHoldStatus
 
 	// Object Retention related fields
-	Mode            RetentionMode
-	RetainUntilDate time.Time
+	Mode               RetentionMode
+	RetainUntilDate    time.Time
+	Expires            time.Time
+	ContentType        string
+	ContentEncoding    string
+	ContentDisposition string
+	ContentLanguage    string
+	CacheControl       string
 
 	Size int64 // Needs to be specified if progress bar is specified.
 	// Progress of the entire copy operation will be sent here.
@@ -99,8 +105,8 @@ func (opts CopyDestOptions) Marshal(header http.Header) {
 	const replaceDirective = "REPLACE"
 	if opts.ReplaceTags {
 		header.Set(amzTaggingHeaderDirective, replaceDirective)
-		if tags := s3utils.TagEncode(opts.UserTags); tags != "" {
-			header.Set(amzTaggingHeader, tags)
+		if tags, _ := tags.NewTags(opts.UserTags, true); tags != nil {
+			header.Set(amzTaggingHeader, tags.String())
 		}
 	}
 
@@ -116,11 +122,29 @@ func (opts CopyDestOptions) Marshal(header http.Header) {
 	if opts.Encryption != nil {
 		opts.Encryption.Marshal(header)
 	}
+	if opts.ContentType != "" {
+		header.Set("Content-Type", opts.ContentType)
+	}
+	if opts.ContentEncoding != "" {
+		header.Set("Content-Encoding", opts.ContentEncoding)
+	}
+	if opts.ContentDisposition != "" {
+		header.Set("Content-Disposition", opts.ContentDisposition)
+	}
+	if opts.ContentLanguage != "" {
+		header.Set("Content-Language", opts.ContentLanguage)
+	}
+	if opts.CacheControl != "" {
+		header.Set("Cache-Control", opts.CacheControl)
+	}
+	if !opts.Expires.IsZero() {
+		header.Set("Expires", opts.Expires.UTC().Format(http.TimeFormat))
+	}
 
 	if opts.ReplaceMetadata {
 		header.Set("x-amz-metadata-directive", replaceDirective)
 		for k, v := range filterCustomMeta(opts.UserMetadata) {
-			if isAmzHeader(k) || isStandardHeader(k) || isStorageClassHeader(k) {
+			if isAmzHeader(k) || isStandardHeader(k) || isStorageClassHeader(k) || isMinioHeader(k) {
 				header.Set(k, v)
 			} else {
 				header.Set("x-amz-meta-"+k, v)
@@ -221,7 +245,10 @@ func (c *Client) copyObjectDo(ctx context.Context, srcBucket, srcObject, destBuc
 		headers.Set(minIOBucketSourceETag, dstOpts.Internal.SourceETag)
 	}
 	if dstOpts.Internal.ReplicationRequest {
-		headers.Set(minIOBucketReplicationRequest, "")
+		headers.Set(minIOBucketReplicationRequest, "true")
+	}
+	if dstOpts.Internal.ReplicationValidityCheck {
+		headers.Set(minIOBucketReplicationCheck, "true")
 	}
 	if !dstOpts.Internal.LegalholdTimestamp.IsZero() {
 		headers.Set(minIOBucketReplicationObjectLegalHoldTimestamp, dstOpts.Internal.LegalholdTimestamp.Format(time.RFC3339Nano))
@@ -234,7 +261,9 @@ func (c *Client) copyObjectDo(ctx context.Context, srcBucket, srcObject, destBuc
 	}
 
 	if len(dstOpts.UserTags) != 0 {
-		headers.Set(amzTaggingHeader, s3utils.TagEncode(dstOpts.UserTags))
+		if tags, _ := tags.NewTags(dstOpts.UserTags, true); tags != nil {
+			headers.Set(amzTaggingHeader, tags.String())
+		}
 	}
 
 	reqMetadata := requestMetadata{
@@ -284,8 +313,8 @@ func (c *Client) copyObjectDo(ctx context.Context, srcBucket, srcObject, destBuc
 	return objInfo, nil
 }
 
-func (c *Client) copyObjectPartDo(ctx context.Context, srcBucket, srcObject, destBucket, destObject string, uploadID string,
-	partID int, startOffset int64, length int64, metadata map[string]string,
+func (c *Client) copyObjectPartDo(ctx context.Context, srcBucket, srcObject, destBucket, destObject, uploadID string,
+	partID int, startOffset, length int64, metadata map[string]string,
 ) (p CompletePart, err error) {
 	headers := make(http.Header)
 
@@ -516,7 +545,7 @@ func (c *Client) ComposeObject(ctx context.Context, dst CopyDestOptions, srcs ..
 				return UploadInfo{}, err
 			}
 			if dst.Progress != nil {
-				io.CopyN(ioutil.Discard, dst.Progress, end-start+1)
+				io.CopyN(io.Discard, dst.Progress, end-start+1)
 			}
 			objParts = append(objParts, complPart)
 			partIndex++
@@ -525,7 +554,7 @@ func (c *Client) ComposeObject(ctx context.Context, dst CopyDestOptions, srcs ..
 
 	// 4. Make final complete-multipart request.
 	uploadInfo, err := c.completeMultipartUpload(ctx, dst.Bucket, dst.Object, uploadID,
-		completeMultipartUpload{Parts: objParts}, PutObjectOptions{})
+		completeMultipartUpload{Parts: objParts}, PutObjectOptions{ServerSideEncryption: dst.Encryption})
 	if err != nil {
 		return UploadInfo{}, err
 	}

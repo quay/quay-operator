@@ -18,7 +18,7 @@ package minio
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -104,7 +104,7 @@ func (c *Client) GetBucketPolicy(ctx context.Context, bucketName string) (string
 	bucketPolicy, err := c.getBucketPolicy(ctx, bucketName)
 	if err != nil {
 		errResponse := ToErrorResponse(err)
-		if errResponse.Code == "NoSuchBucketPolicy" {
+		if errResponse.Code == NoSuchBucketPolicy {
 			return "", nil
 		}
 		return "", err
@@ -137,7 +137,7 @@ func (c *Client) getBucketPolicy(ctx context.Context, bucketName string) (string
 		}
 	}
 
-	bucketPolicyBuf, err := ioutil.ReadAll(resp.Body)
+	bucketPolicyBuf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
