@@ -15,7 +15,7 @@ require (
 	github.com/quay/config-tool v0.1.15
 	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/sjson v1.2.3
-	go.uber.org/zap v1.25.0
+	go.uber.org/zap v1.27.0
 	golang.org/x/net v0.24.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
