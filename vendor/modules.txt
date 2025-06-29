@@ -1,7 +1,7 @@
 # github.com/Azure/azure-pipeline-go v0.2.3
 ## explicit; go 1.14
 github.com/Azure/azure-pipeline-go/pipeline
-# github.com/Azure/azure-storage-blob-go v0.11.0
+# github.com/Azure/azure-storage-blob-go v0.15.0
 ## explicit; go 1.15
 github.com/Azure/azure-storage-blob-go/azblob
 # github.com/Azure/go-autorest/autorest/adal v0.9.20
