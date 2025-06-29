@@ -374,8 +374,8 @@ github.com/tidwall/sjson
 # github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca
 ## explicit
 github.com/xlab/treeprint
-# go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5
-## explicit; go 1.13
+# go.starlark.net v0.0.0-20250623223156-8bf495bf4e9a
+## explicit; go 1.19
 go.starlark.net/internal/compile
 go.starlark.net/internal/spell
 go.starlark.net/resolve
