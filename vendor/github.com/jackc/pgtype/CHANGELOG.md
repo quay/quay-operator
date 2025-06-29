@@ -1,3 +1,21 @@
+# 1.14.4 (October 18, 2024)
+
+* Update pgx to v4.18.3
+
+# 1.14.3 (March 12, 2024)
+
+* Update pgx to v4.18.2
+
+# 1.14.2 (February 5, 2024)
+
+* Fix numeric to float64 conversion (Joe Schafer)
+
+# 1.14.1 (January 12, 2024)
+
+* Backport fix numeric to string conversion for small negative values
+* Fix EncodeValueText (horpto)
+* Fix JSON.UnmarshalJSON to make copy of byte slice (horpto)
+
 # 1.14.0 (February 11, 2023)
 
 * Fix: BC timestamp text format support (jozeflami)
