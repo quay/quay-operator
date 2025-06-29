@@ -85,7 +85,7 @@ github.com/evanphx/json-patch/v5
 # github.com/fsnotify/fsnotify v1.7.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
-# github.com/go-asn1-ber/asn1-ber v1.5.1
+# github.com/go-asn1-ber/asn1-ber v1.5.7
 ## explicit; go 1.13
 github.com/go-asn1-ber/asn1-ber
 # github.com/go-errors/errors v1.0.1
