@@ -346,8 +346,8 @@ github.com/quay/config-tool/pkg/lib/fieldgroups/redis
 github.com/quay/config-tool/pkg/lib/fieldgroups/repomirror
 github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner
 github.com/quay/config-tool/pkg/lib/shared
-# github.com/rs/xid v1.4.0
-## explicit; go 1.12
+# github.com/rs/xid v1.6.0
+## explicit; go 1.16
 github.com/rs/xid
 # github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
