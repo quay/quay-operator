@@ -110,6 +110,8 @@ spec:
             limits:
               cpu: 2000m
               memory: 8Gi
+          securityContext:
+            readOnlyRootFilesystem: true
           startupProbe:
             httpGet:
               path: /health/instance

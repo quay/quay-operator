@@ -90,6 +90,8 @@ spec:
             limits:
               cpu: 4000m
               memory: 16Gi
+          securityContext:
+            readOnlyRootFilesystem: true
       restartPolicy: Always
       volumes:
         - name: cluster-trusted-ca

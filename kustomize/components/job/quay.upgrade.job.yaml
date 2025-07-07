@@ -85,3 +85,5 @@ spec:
               mountPath: /run/secrets/postgresql
             - name: postgres-certs-store
               mountPath: /.postgresql
+          securityContext:
+            readOnlyRootFilesystem: true
