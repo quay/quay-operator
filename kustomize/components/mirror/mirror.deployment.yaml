@@ -46,7 +46,7 @@ spec:
               - configMap:
                   name: cluster-trusted-ca
               - secret:
-                  name: extra-ca-certs      
+                  name: extra-ca-certs
               - secret:
                   name: quay-config-tls
         - name: postgres-certs
@@ -67,7 +67,7 @@ spec:
           command:
           - sh
           - -c
-          - python -c "import os, requests, sys; host = os.getenv(\"QUAY_APP_SERVICE_HOST\"); sys.exit(0) if requests.get(\"http://\"+host, verify=False, allow_redirects=False) else sys.exit(1);"
+          - python3 mirror-worker-init/mirror-worker-init.py
           env:
             - name: QUAY_APP_SERVICE_HOST
               value: $(QUAY_APP_SERVICE_HOST)
