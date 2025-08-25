@@ -974,7 +974,7 @@ data:
                 "value": "quay-namespace"
               }
             ],
-            "query": "namespace,",
+            "query": "namespace",
             "refresh": 0,
             "regex": "",
             "skipUrlSync": false,
@@ -1000,7 +1000,7 @@ data:
                 "value": "quay-metrics"
               }
             ],
-            "query": "service,",
+            "query": "service",
             "refresh": 0,
             "regex": "",
             "skipUrlSync": false,
