@@ -1,0 +1,140 @@
+---
+# NetworkPolicy for Quay Operator - Controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-operator-netpol
+  labels:
+    app.kubernetes.io/name: quay-operator
+    app.kubernetes.io/component: operator
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: quay-operator
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from Kubernetes API server
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 8080  # metrics port
+  # Allow ingress from webhook admission controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 9443  # webhook port
+  egress:
+  # Allow egress to Kubernetes API server
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow egress to all Quay components for management
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-app
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 55443
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: clair-app
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 8089
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: clair-postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-mirror
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: monitoring
+    ports:
+    - protocol: TCP
+      port: 9091
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy for Quay Operator Webhook
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-operator-webhook-netpol
+  labels:
+    app.kubernetes.io/name: quay-operator
+    app.kubernetes.io/component: webhook
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: quay-operator
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from Kubernetes API server for webhook calls
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 9443
+  egress:
+  # Allow egress to Kubernetes API server
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
