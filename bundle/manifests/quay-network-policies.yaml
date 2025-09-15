@@ -1,0 +1,360 @@
+---
+# NetworkPolicy for Quay App - Main Application
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-app-netpol
+  labels:
+    quay-component: quay
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: quay-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from OpenShift routes
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: openshift-ingress
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow ingress from mirror component
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-mirror
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow ingress from monitoring
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: monitoring
+    ports:
+    - protocol: TCP
+      port: 9091
+  egress:
+  # Allow egress to PostgreSQL
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow egress to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow egress to Clair
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: clair-app
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 8089
+  # Allow egress to object storage (external)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy for PostgreSQL - Main Database
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-postgres-netpol
+  labels:
+    quay-component: postgres
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: postgres
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from Quay app
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-app
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow ingress from mirror component
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-mirror
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy for Clair - Security Scanner
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-clair-netpol
+  labels:
+    quay-component: clair
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: clair-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from Quay app
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-app
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 8089
+  egress:
+  # Allow egress to Clair PostgreSQL
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: clair-postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow egress to external vulnerability databases
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy for Clair PostgreSQL - Clair's Database
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-clair-postgres-netpol
+  labels:
+    quay-component: clair-postgres
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: clair-postgres
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from Clair
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: clair-app
+    ports:
+    - protocol: TCP
+      port: 5432
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy for Redis - Caching Layer
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-redis-netpol
+  labels:
+    quay-component: redis
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: redis
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from Quay app
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-app
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow ingress from mirror component
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-mirror
+    ports:
+    - protocol: TCP
+      port: 6379
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy for Mirror - Repository Mirroring
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-mirror-netpol
+  labels:
+    quay-component: mirror
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: quay-mirror
+  policyTypes:
+  - Ingress
+  - Egress
+  egress:
+  # Allow egress to Quay app
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-app
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  # Allow egress to PostgreSQL
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow egress to Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Allow egress to external registries for mirroring
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy for Monitoring - Metrics Collection
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-monitoring-netpol
+  labels:
+    quay-component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: monitoring
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress from Prometheus/OpenShift monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: openshift-monitoring
+    ports:
+    - protocol: TCP
+      port: 9091
+  egress:
+  # Allow egress to Quay app for metrics collection
+  - to:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-app
+    ports:
+    - protocol: TCP
+      port: 9091
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# Default deny all NetworkPolicy for the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-default-deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
