@@ -9,7 +9,6 @@ package syntax
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
@@ -35,6 +34,7 @@ const (
 	INT    // 123
 	FLOAT  // 1.23e45
 	STRING // "foo" or 'foo' or '''foo''' or r'foo' or r"foo"
+	BYTES  // b"foo", etc
 
 	// Punctuation
 	PLUS          // +
@@ -97,6 +97,26 @@ const (
 	PASS
 	RETURN
 	WHILE
+
+	// Reserved words (following Python); unused in Starlark
+
+	AS
+	// ASSERT    // heavily used in our tests
+	ASYNC
+	AWAIT
+	CLASS
+	DEL
+	EXCEPT
+	FINALLY
+	FROM
+	GLOBAL
+	IMPORT
+	IS
+	NONLOCAL
+	RAISE
+	TRY
+	WITH
+	YIELD
 
 	maxToken
 )
@@ -180,6 +200,35 @@ var tokenNames = [...]string{
 	PASS:          "pass",
 	RETURN:        "return",
 	WHILE:         "while",
+
+	// Reserved words (following Python); unused in Starlark
+
+	AS: "as",
+	// ASSERT:   "assert", // heavily used in our tests
+	ASYNC:    "async",
+	AWAIT:    "await",
+	CLASS:    "class",
+	DEL:      "del",
+	EXCEPT:   "except",
+	FINALLY:  "finally",
+	FROM:     "from",
+	GLOBAL:   "global",
+	IMPORT:   "import",
+	IS:       "is",
+	NONLOCAL: "nonlocal",
+	RAISE:    "raise",
+	TRY:      "try",
+	WITH:     "with",
+	YIELD:    "yield",
+}
+
+// A FilePortion describes the content of a portion of a file.
+// Callers may provide a FilePortion for the src argument of Parse
+// when the desired initial line and column numbers are not (1, 1),
+// such as when an expression is parsed from within larger file.
+type FilePortion struct {
+	Content             []byte
+	FirstLine, FirstCol int32
 }
 
 // A Position describes the location of a rune of input.
@@ -249,13 +298,17 @@ type scanner struct {
 }
 
 func newScanner(filename string, src interface{}, keepComments bool) (*scanner, error) {
+	var firstLine, firstCol int32 = 1, 1
+	if portion, ok := src.(FilePortion); ok {
+		firstLine, firstCol = portion.FirstLine, portion.FirstCol
+	}
 	sc := &scanner{
-		pos:          Position{file: &filename, Line: 1, Col: 1},
+		pos:          MakePosition(&filename, firstLine, firstCol),
 		indentstk:    make([]int, 1, 10), // []int{0} + spare capacity
 		lineStart:    true,
 		keepComments: keepComments,
 	}
-	sc.readline, _ = src.(func() ([]byte, error)) // REPL only
+	sc.readline, _ = src.(func() ([]byte, error)) // ParseCompoundStmt (REPL) only
 	if sc.readline == nil {
 		data, err := readSource(filename, src)
 		if err != nil {
@@ -273,14 +326,16 @@ func readSource(filename string, src interface{}) ([]byte, error) {
 	case []byte:
 		return src, nil
 	case io.Reader:
-		data, err := ioutil.ReadAll(src)
+		data, err := io.ReadAll(src)
 		if err != nil {
 			err = &os.PathError{Op: "read", Path: filename, Err: err}
 			return nil, err
 		}
 		return data, nil
+	case FilePortion:
+		return src.Content, nil
 	case nil:
-		return ioutil.ReadFile(filename)
+		return os.ReadFile(filename)
 	default:
 		return nil, fmt.Errorf("invalid source: %T", src)
 	}
@@ -407,7 +462,7 @@ type tokenValue struct {
 	int    int64    // decoded int
 	bigInt *big.Int // decoded integers > int64
 	float  float64  // decoded float
-	string string   // decoded string
+	string string   // decoded string or bytes
 	pos    Position // start position of token
 }
 
@@ -627,8 +682,15 @@ start:
 
 	// identifier or keyword
 	if isIdentStart(c) {
-		// raw string literal
-		if c == 'r' && len(sc.rest) > 1 && (sc.rest[1] == '"' || sc.rest[1] == '\'') {
+		if (c == 'r' || c == 'b') && len(sc.rest) > 1 && (sc.rest[1] == '"' || sc.rest[1] == '\'') {
+			//  r"..."
+			//  b"..."
+			sc.readRune()
+			c = sc.peekRune()
+			return sc.scanString(val, c)
+		} else if c == 'r' && len(sc.rest) > 2 && sc.rest[1] == 'b' && (sc.rest[2] == '"' || sc.rest[2] == '\'') {
+			// rb"..."
+			sc.readRune()
 			sc.readRune()
 			c = sc.peekRune()
 			return sc.scanString(val, c)
@@ -805,13 +867,26 @@ func (sc *scanner) scanString(val *tokenValue, quote rune) Token {
 	start := sc.pos
 	triple := len(sc.rest) >= 3 && sc.rest[0] == byte(quote) && sc.rest[1] == byte(quote) && sc.rest[2] == byte(quote)
 	sc.readRune()
+
+	// String literals may contain escaped or unescaped newlines,
+	// causing them to span multiple lines (gulps) of REPL input;
+	// they are the only such token. Thus we cannot call endToken,
+	// as it assumes sc.rest is unchanged since startToken.
+	// Instead, buffer the token here.
+	// TODO(adonovan): opt: buffer only if we encounter a newline.
+	raw := new(strings.Builder)
+
+	// Copy the prefix, e.g. r' or " (see startToken).
+	raw.Write(sc.token[:len(sc.token)-len(sc.rest)])
+
 	if !triple {
-		// Precondition: startToken was already called.
+		// single-quoted string literal
 		for {
 			if sc.eof() {
 				sc.error(val.pos, "unexpected EOF in string")
 			}
 			c := sc.readRune()
+			raw.WriteRune(c)
 			if c == quote {
 				break
 			}
@@ -822,22 +897,16 @@ func (sc *scanner) scanString(val *tokenValue, quote rune) Token {
 				if sc.eof() {
 					sc.error(val.pos, "unexpected EOF in string")
 				}
-				sc.readRune()
+				c = sc.readRune()
+				raw.WriteRune(c)
 			}
 		}
-		sc.endToken(val)
 	} else {
 		// triple-quoted string literal
 		sc.readRune()
+		raw.WriteRune(quote)
 		sc.readRune()
-
-		// A triple-quoted string literal may span multiple
-		// gulps of REPL input; it is the only such token.
-		// Thus we must avoid {start,end}Token.
-		raw := new(strings.Builder)
-
-		// Copy the prefix, e.g. r''' or """ (see startToken).
-		raw.Write(sc.token[:len(sc.token)-len(sc.rest)])
+		raw.WriteRune(quote)
 
 		quoteCount := 0
 		for {
@@ -862,15 +931,19 @@ func (sc *scanner) scanString(val *tokenValue, quote rune) Token {
 				raw.WriteRune(c)
 			}
 		}
-		val.raw = raw.String()
 	}
+	val.raw = raw.String()
 
-	s, _, err := unquote(val.raw)
+	s, _, isByte, err := unquote(val.raw)
 	if err != nil {
 		sc.error(start, err.Error())
 	}
 	val.string = s
-	return STRING
+	if isByte {
+		return BYTES
+	} else {
+		return STRING
+	}
 }
 
 func (sc *scanner) scanNumber(val *tokenValue, c rune) Token {
@@ -1071,19 +1144,21 @@ var keywordToken = map[string]Token{
 	"while":    WHILE,
 
 	// reserved words:
-	"as": ILLEGAL,
-	// "assert":   ILLEGAL, // heavily used by our tests
-	"class":    ILLEGAL,
-	"del":      ILLEGAL,
-	"except":   ILLEGAL,
-	"finally":  ILLEGAL,
-	"from":     ILLEGAL,
-	"global":   ILLEGAL,
-	"import":   ILLEGAL,
-	"is":       ILLEGAL,
-	"nonlocal": ILLEGAL,
-	"raise":    ILLEGAL,
-	"try":      ILLEGAL,
-	"with":     ILLEGAL,
-	"yield":    ILLEGAL,
+	"as": AS,
+	// "assert":   ASSERT, // heavily used by our tests
+	"async":    ASYNC,
+	"await":    AWAIT,
+	"class":    CLASS,
+	"del":      DEL,
+	"except":   EXCEPT,
+	"finally":  FINALLY,
+	"from":     FROM,
+	"global":   GLOBAL,
+	"import":   IMPORT,
+	"is":       IS,
+	"nonlocal": NONLOCAL,
+	"raise":    RAISE,
+	"try":      TRY,
+	"with":     WITH,
+	"yield":    YIELD,
 }
