@@ -20,6 +20,8 @@ spec:
     spec:
       terminationGraceperiodSeconds: 600
       serviceAccountName: clair-postgres
+      securityContext:
+        fsGroup: 2000
       volumes:
         - name: clair-postgres-conf-sample
           configMap:
