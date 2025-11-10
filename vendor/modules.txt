@@ -6,7 +6,7 @@ github.com/Azure/azure-pipeline-go/pipeline
 github.com/Azure/azure-storage-blob-go/azblob
 # github.com/Azure/go-autorest/autorest/adal v0.9.20
 ## explicit; go 1.15
-# github.com/Azure/go-ntlmssp v0.0.0-20200615164410-66371956d46c
+# github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
 ## explicit
 github.com/Azure/go-ntlmssp
 # github.com/aws/aws-sdk-go v1.44.282
