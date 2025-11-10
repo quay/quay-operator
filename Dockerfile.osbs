@@ -8,7 +8,7 @@ RUN cp -Rp $REMOTE_SOURCE_DIR/app/* /workspace
 RUN go build -o manager
 
 
-FROM registry.redhat.io/ubi8:8.4
+FROM registry.redhat.io/ubi8:8.10-1304.1749680715
 
 LABEL com.redhat.component="quay-operator-container"
 LABEL name="quay/quay-operator-rhel8"
