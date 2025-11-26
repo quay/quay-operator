@@ -128,13 +128,13 @@ func (q *Quay) upgradeJob(ctx context.Context, reg qv1.QuayRegistry) error {
 	var job batchv1.Job
 	if err := q.Client.Get(ctx, nsn, &job); err != nil {
 		if errors.IsNotFound(err) {
-			return fmt.Errorf("job %s not found", jname)
+			return fmt.Errorf("Job %s not found", jname)
 		}
 		return fmt.Errorf("unexpected error reading upgrade job: %w", err)
 	}
 
 	if job.Status.Succeeded == 0 {
-		return fmt.Errorf("job %s not finished", jname)
+		return fmt.Errorf("Job %s not finished", jname)
 	}
 	return nil
 }
