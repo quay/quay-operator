@@ -86,11 +86,6 @@ var supportsVolumeOverride = []ComponentKind{
 	ComponentClairPostgres,
 }
 
-var supportsStorageClassOverride = []ComponentKind{
-	ComponentPostgres,
-	ComponentClairPostgres,
-}
-
 var supportsEnvOverride = []ComponentKind{
 	ComponentQuay,
 	ComponentClair,
@@ -518,7 +513,6 @@ func ValidateOverrides(quay *QuayRegistry) error {
 
 		hasaffinity := hasAffinity(component)
 		hasvolume := component.Overrides.VolumeSize != nil
-		hasstorageclass := component.Overrides.StorageClassName != nil
 		hasreplicas := component.Overrides.Replicas != nil
 		hasresources := component.Overrides.Resources != nil
 		hasenvvar := len(component.Overrides.Env) > 0
@@ -547,13 +541,6 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		if hasvolume && !ComponentSupportsOverride(component.Kind, "volumeSize") {
 			return fmt.Errorf(
 				"component %s does not support volumeSize overrides",
-				component.Kind,
-			)
-		}
-
-		if hasstorageclass && !ComponentSupportsOverride(component.Kind, "storageClassName") {
-			return fmt.Errorf(
-				"component %s does not support storageClassName overrides",
 				component.Kind,
 			)
 		}
@@ -751,8 +738,6 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 	switch override {
 	case "volumeSize":
 		components = supportsVolumeOverride
-	case "storageClassName":
-		components = supportsStorageClassOverride
 	case "env":
 		components = supportsEnvOverride
 	case "replicas":
