@@ -481,26 +481,6 @@ var validateOverridesTests = []struct {
 		},
 		errors.New("component postgres does not support affinity overrides"),
 	},
-	{
-		"InvalidStorageClassNameOverride",
-		QuayRegistry{
-			Spec: QuayRegistrySpec{
-				Components: []Component{
-					{Kind: "postgres", Managed: true},
-					{Kind: "clairpostgres", Managed: true},
-					{Kind: "redis", Managed: true, Overrides: &Override{StorageClassName: ptr.To("foo")}},
-					{Kind: "clair", Managed: true},
-					{Kind: "objectstorage", Managed: true},
-					{Kind: "route", Managed: true},
-					{Kind: "tls", Managed: true},
-					{Kind: "horizontalpodautoscaler", Managed: true},
-					{Kind: "mirror", Managed: true},
-					{Kind: "monitoring", Managed: true},
-				},
-			},
-		},
-		errors.New("component redis does not support storageClassName overrides"),
-	},
 }
 
 func TestValidOverrides(t *testing.T) {

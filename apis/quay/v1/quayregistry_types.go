@@ -86,11 +86,6 @@ var supportsVolumeOverride = []ComponentKind{
 	ComponentClairPostgres,
 }
 
-var supportsStorageClassOverride = []ComponentKind{
-	ComponentPostgres,
-	ComponentClairPostgres,
-}
-
 var supportsEnvOverride = []ComponentKind{
 	ComponentQuay,
 	ComponentClair,
@@ -153,9 +148,7 @@ type Component struct {
 // Override describes configuration overrides for the given managed component
 type Override struct {
 	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
-	// StorageClassName is the name of the StorageClass to use for the PVC.
-	StorageClassName *string         `json:"storageClassName,omitempty"`
-	Env              []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	Env        []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// +nullable
 	Replicas    *int32            `json:"replicas,omitempty"`
 	Affinity    *corev1.Affinity  `json:"affinity,omitempty"`
@@ -216,8 +209,6 @@ const (
 	ConditionReasonMonitoringComponentDependencyError    ConditionReason = "MonitoringComponentDependencyError"
 	ConditionReasonConfigInvalid                         ConditionReason = "ConfigInvalid"
 	ConditionReasonComponentOverrideInvalid              ConditionReason = "ComponentOverrideInvalid"
-	ConditionReasonPVCPending                            ConditionReason = "PVCPending"
-	ConditionReasonPVCProvisioningFailed                 ConditionReason = "PVCProvisioningFailed"
 )
 
 // Condition is a single condition of a QuayRegistry.
@@ -518,7 +509,6 @@ func ValidateOverrides(quay *QuayRegistry) error {
 
 		hasaffinity := hasAffinity(component)
 		hasvolume := component.Overrides.VolumeSize != nil
-		hasstorageclass := component.Overrides.StorageClassName != nil
 		hasreplicas := component.Overrides.Replicas != nil
 		hasresources := component.Overrides.Resources != nil
 		hasenvvar := len(component.Overrides.Env) > 0
@@ -547,13 +537,6 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		if hasvolume && !ComponentSupportsOverride(component.Kind, "volumeSize") {
 			return fmt.Errorf(
 				"component %s does not support volumeSize overrides",
-				component.Kind,
-			)
-		}
-
-		if hasstorageclass && !ComponentSupportsOverride(component.Kind, "storageClassName") {
-			return fmt.Errorf(
-				"component %s does not support storageClassName overrides",
 				component.Kind,
 			)
 		}
@@ -751,8 +734,6 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 	switch override {
 	case "volumeSize":
 		components = supportsVolumeOverride
-	case "storageClassName":
-		components = supportsStorageClassOverride
 	case "env":
 		components = supportsEnvOverride
 	case "replicas":
@@ -796,29 +777,26 @@ func GetReplicasOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *in
 	return nil
 }
 
-// GetVolumeSizeOverrideForComponent returns the volume size override for a given component kind.
+// GetVolumeSizeOverrideForComponent returns the volume size overrides set by the user for the
+// provided component. Returns nil if not set.
 func GetVolumeSizeOverrideForComponent(
 	quay *QuayRegistry, kind ComponentKind,
 ) (qt *resource.Quantity) {
 	for _, component := range quay.Spec.Components {
-		if component.Kind == kind && component.Overrides != nil && component.Overrides.VolumeSize != nil {
-			return component.Overrides.VolumeSize
+		if component.Kind != kind {
+			continue
 		}
+
+		if component.Overrides != nil && component.Overrides.VolumeSize != nil {
+			qt = component.Overrides.VolumeSize
+		}
+		return
 	}
-	return nil
+	return
 }
 
-// GetStorageClassNameOverrideForComponent returns the StorageClass override for a given component kind.
-func GetStorageClassNameOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *string {
-	for _, component := range quay.Spec.Components {
-		if component.Kind == kind && component.Overrides != nil && component.Overrides.StorageClassName != nil {
-			return component.Overrides.StorageClassName
-		}
-	}
-	return nil
-}
-
-// GetResourceOverridesForComponent returns the resource overrides for a given component kind.
+// GetResourceOverridesForComponent returns the resource overrides set by the user for the
+// provided component. Returns nil if not set.
 func GetResourceOverridesForComponent(
 	quay *QuayRegistry, kind ComponentKind,
 ) (resources *Resources) {
