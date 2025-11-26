@@ -16,7 +16,7 @@ import (
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
-// CheckDatabaseDeploymentAndPVCStatus checks the status of a database Deployment and its PersistentVolumeClaim.
+// CheckPVCStatusForDeployment checks the status of a PersistentVolumeClaim associated with a Deployment.
 // It returns a condition indicating the readiness of the component.
 func CheckDatabaseDeploymentAndPVCStatus(
 	ctx context.Context,
