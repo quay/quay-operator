@@ -148,9 +148,7 @@ type Component struct {
 // Override describes configuration overrides for the given managed component
 type Override struct {
 	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
-	// StorageClassName is the name of the StorageClass to use for the PVC.
-	StorageClassName *string         `json:"storageClassName,omitempty"`
-	Env              []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	Env        []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// +nullable
 	Replicas    *int32            `json:"replicas,omitempty"`
 	Affinity    *corev1.Affinity  `json:"affinity,omitempty"`
@@ -779,29 +777,26 @@ func GetReplicasOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *in
 	return nil
 }
 
-// GetVolumeSizeOverrideForComponent returns the volume size override for a given component kind.
+// GetVolumeSizeOverrideForComponent returns the volume size overrides set by the user for the
+// provided component. Returns nil if not set.
 func GetVolumeSizeOverrideForComponent(
 	quay *QuayRegistry, kind ComponentKind,
 ) (qt *resource.Quantity) {
 	for _, component := range quay.Spec.Components {
-		if component.Kind == kind && component.Overrides != nil && component.Overrides.VolumeSize != nil {
-			return component.Overrides.VolumeSize
+		if component.Kind != kind {
+			continue
 		}
+
+		if component.Overrides != nil && component.Overrides.VolumeSize != nil {
+			qt = component.Overrides.VolumeSize
+		}
+		return
 	}
-	return nil
+	return
 }
 
-// GetStorageClassNameOverrideForComponent returns the StorageClass override for a given component kind.
-func GetStorageClassNameOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *string {
-	for _, component := range quay.Spec.Components {
-		if component.Kind == kind && component.Overrides != nil && component.Overrides.StorageClassName != nil {
-			return component.Overrides.StorageClassName
-		}
-	}
-	return nil
-}
-
-// GetResourceOverridesForComponent returns the resource overrides for a given component kind.
+// GetResourceOverridesForComponent returns the resource overrides set by the user for the
+// provided component. Returns nil if not set.
 func GetResourceOverridesForComponent(
 	quay *QuayRegistry, kind ComponentKind,
 ) (resources *Resources) {
