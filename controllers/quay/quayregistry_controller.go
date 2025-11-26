@@ -753,7 +753,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				v1.ConditionTypeRolloutBlocked,
 				metav1.ConditionTrue,
 				v1.ConditionReasonComponentCreationFailed,
-				fmt.Sprintf("error creating/updating object %s %s: %s", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName(), err.Error()),
+				fmt.Sprintf("error creating object: %s", err),
 			)
 		}
 	}
