@@ -211,8 +211,6 @@ const (
 	ConditionReasonMonitoringComponentDependencyError    ConditionReason = "MonitoringComponentDependencyError"
 	ConditionReasonConfigInvalid                         ConditionReason = "ConfigInvalid"
 	ConditionReasonComponentOverrideInvalid              ConditionReason = "ComponentOverrideInvalid"
-	ConditionReasonPVCPending                            ConditionReason = "PVCPending"
-	ConditionReasonPVCProvisioningFailed                 ConditionReason = "PVCProvisioningFailed"
 )
 
 // Condition is a single condition of a QuayRegistry.

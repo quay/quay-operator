@@ -6,7 +6,6 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,7 +26,7 @@ func (p *Postgres) Name() string {
 }
 
 // Check verifies if the postgres deployment associated with provided quay registry was created
-// and rolled out as expected, also checking its PVC status dynamically.
+// and rolled out as expected.
 func (p *Postgres) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, error) {
 	var zero qv1.Condition
 
@@ -41,21 +40,23 @@ func (p *Postgres) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Conditi
 		}, nil
 	}
 
-	deploymentName := fmt.Sprintf("%s-quay-database", reg.Name)
-	nsnDeployment := types.NamespacedName{Namespace: reg.Namespace, Name: deploymentName}
+	nsn := types.NamespacedName{
+		Namespace: reg.Namespace,
+		Name:      fmt.Sprintf("%s-quay-database", reg.Name),
+	}
 
 	var dep appsv1.Deployment
-	if err := p.Client.Get(ctx, nsnDeployment, &dep); err != nil {
+	if err := p.Client.Get(ctx, nsn, &dep); err != nil {
 		if errors.IsNotFound(err) {
 			return qv1.Condition{
 				Type:           qv1.ComponentPostgresReady,
 				Status:         metav1.ConditionFalse,
 				Reason:         qv1.ConditionReasonComponentNotReady,
-				Message:        fmt.Sprintf("Postgres deployment %s not found", deploymentName),
+				Message:        "Postgres deployment not found",
 				LastUpdateTime: metav1.NewTime(time.Now()),
 			}, nil
 		}
-		return zero, fmt.Errorf("failed to get Postgres deployment %s: %w", deploymentName, err)
+		return zero, err
 	}
 
 	if !qv1.Owns(reg, &dep) {
@@ -63,82 +64,11 @@ func (p *Postgres) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Conditi
 			Type:           qv1.ComponentPostgresReady,
 			Status:         metav1.ConditionFalse,
 			Reason:         qv1.ConditionReasonComponentNotReady,
-			Message:        fmt.Sprintf("Postgres deployment %s not owned by QuayRegistry", deploymentName),
+			Message:        "Postgres deployment not owned by QuayRegistry",
 			LastUpdateTime: metav1.NewTime(time.Now()),
 		}, nil
 	}
 
-	// Dynamically find the PVC name from the deployment's volumes
-	var pvcName string
-	for _, vol := range dep.Spec.Template.Spec.Volumes {
-		if vol.PersistentVolumeClaim != nil {
-			pvcName = vol.PersistentVolumeClaim.ClaimName
-			break
-		}
-	}
-
-	if pvcName == "" {
-		// This case should ideally not happen for Postgres if it's configured to use a PVC.
-		// If it does, the deployment readiness check will likely fail, or we can return a specific error.
-		return qv1.Condition{
-			Type:           qv1.ComponentPostgresReady,
-			Status:         metav1.ConditionFalse,
-			Reason:         qv1.ConditionReasonComponentNotReady,
-			Message:        fmt.Sprintf("Postgres deployment %s does not reference a PersistentVolumeClaim", deploymentName),
-			LastUpdateTime: metav1.NewTime(time.Now()),
-		}, nil
-	}
-
-	nsnPVC := types.NamespacedName{Namespace: reg.Namespace, Name: pvcName}
-	var pvc corev1.PersistentVolumeClaim
-	if err := p.Client.Get(ctx, nsnPVC, &pvc); err != nil {
-		if errors.IsNotFound(err) {
-			return qv1.Condition{
-				Type:           qv1.ComponentPostgresReady,
-				Status:         metav1.ConditionFalse,
-				Reason:         qv1.ConditionReasonComponentNotReady,
-				Message:        fmt.Sprintf("Postgres PersistentVolumeClaim %s (referenced by deployment %s) not found", pvcName, deploymentName),
-				LastUpdateTime: metav1.NewTime(time.Now()),
-			}, nil
-		}
-		return zero, fmt.Errorf("failed to get Postgres PVC %s: %w", pvcName, err)
-	}
-
-	if pvc.Status.Phase == corev1.ClaimPending {
-		var eventList corev1.EventList
-		if err := p.Client.List(ctx, &eventList, client.InNamespace(reg.Namespace), &client.MatchingFields{"involvedObject.uid": string(pvc.UID)}); err == nil {
-			for _, event := range eventList.Items {
-				if event.Type == corev1.EventTypeWarning && (event.Reason == "ProvisioningFailed" || event.Reason == "FailedBinding") {
-					return qv1.Condition{
-						Type:           qv1.ComponentPostgresReady,
-						Status:         metav1.ConditionFalse,
-						Reason:         qv1.ConditionReasonPVCProvisioningFailed,
-						Message:        fmt.Sprintf("Postgres PVC %s provisioning failed: %s", pvc.Name, event.Message),
-						LastUpdateTime: metav1.NewTime(time.Now()),
-					}, nil
-				}
-			}
-		}
-		return qv1.Condition{
-			Type:           qv1.ComponentPostgresReady,
-			Status:         metav1.ConditionFalse,
-			Reason:         qv1.ConditionReasonPVCPending,
-			Message:        fmt.Sprintf("Postgres PersistentVolumeClaim %s is pending", pvc.Name),
-			LastUpdateTime: metav1.NewTime(time.Now()),
-		}, nil
-	}
-
-	if pvc.Status.Phase != corev1.ClaimBound {
-		return qv1.Condition{
-			Type:           qv1.ComponentPostgresReady,
-			Status:         metav1.ConditionFalse,
-			Reason:         qv1.ConditionReasonPVCPending,
-			Message:        fmt.Sprintf("Postgres PersistentVolumeClaim %s is not bound (current phase: %s)", pvc.Name, pvc.Status.Phase),
-			LastUpdateTime: metav1.NewTime(time.Now()),
-		}, nil
-	}
-
-	// If PVC is bound, then check deployment readiness
 	cond := p.deploy.check(dep)
 	cond.Type = qv1.ComponentPostgresReady
 	return cond, nil
