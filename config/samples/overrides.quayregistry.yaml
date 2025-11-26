@@ -17,8 +17,8 @@ spec:
     - kind: postgres
       managed: true
       overrides:
-        storageClassName: "local-path"
+        storageClassName: "local-path2"
     - kind: clairpostgres
       managed: true
       overrides:
-        storageClassName: "local-path"
+        storageClassName: "local-path2"
