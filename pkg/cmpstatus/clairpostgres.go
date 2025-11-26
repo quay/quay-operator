@@ -13,6 +13,7 @@ import (
 // ClairPostgres checks a quay registry clairpostgres component status.
 type ClairPostgres struct {
 	Client client.Client
+	deploy deploy
 }
 
 // Name returns the component name this entity checks for health.
@@ -33,7 +34,7 @@ func (c *ClairPostgres) Check(ctx context.Context, quay qv1.QuayRegistry) (qv1.C
 		}, nil
 	}
 
-	return CheckDatabaseDeploymentAndPVCStatus(
+	return CheckPVCStatusForDeployment(
 		ctx,
 		c.Client,
 		quay,
