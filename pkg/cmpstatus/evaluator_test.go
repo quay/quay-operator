@@ -103,7 +103,7 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentPostgresReady,
 					Status:  metav1.ConditionFalse,
 					Reason:  qv1.ConditionReasonComponentNotReady,
-					Message: "Postgres deployment not found",
+					Message: "Postgres deployment registry-quay-database not found",
 				},
 				{
 					Type:    qv1.ComponentObjectStorageReady,
@@ -121,7 +121,7 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentClairPostgresReady,
 					Status:  metav1.ConditionFalse,
 					Reason:  qv1.ConditionReasonComponentNotReady,
-					Message: "Deployment registry-clair-postgres not found",
+					Message: "ClairPostgres deployment registry-clair-postgres not found",
 				},
 				{
 					Type:    qv1.ComponentTLSReady,
@@ -456,7 +456,7 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentClairPostgresReady,
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
-					Message: "ClairPostgres component healthy",
+					Message: "Deployment registry-clair-postgres healthy",
 				},
 				{
 					Type:    qv1.ComponentTLSReady,
@@ -812,7 +812,7 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentClairPostgresReady,
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
-					Message: "ClairPostgres component healthy",
+					Message: "Deployment registry-clair-postgres healthy",
 				},
 				{
 					Type:    qv1.ComponentTLSReady,
@@ -1191,7 +1191,7 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentClairPostgresReady,
 					Status:  metav1.ConditionTrue,
 					Reason:  qv1.ConditionReasonComponentReady,
-					Message: "ClairPostgres component healthy",
+					Message: "Deployment registry-clair-postgres healthy",
 				},
 				{
 					Type:    qv1.ComponentTLSReady,

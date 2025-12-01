@@ -1,0 +1,24 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: registry
+  namespace: quay
+spec:
+  configBundleSecret: config-bundle-secret
+  components:
+    - kind: objectstorage
+      managed: false
+    - kind: route
+      managed: false
+    - kind: tls
+      managed: false
+    - kind: clair
+      managed: false
+    - kind: postgres
+      managed: true
+      overrides:
+        storageClassName: "local-path"
+    - kind: clairpostgres
+      managed: true
+      overrides:
+        storageClassName: "local-path"
