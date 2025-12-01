@@ -216,31 +216,38 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 
 	// If the current object is a PVC, check for volume override
 	if pvc, ok := obj.(*corev1.PersistentVolumeClaim); ok {
-		var override *resource.Quantity
+		var volumeSizeOverride *resource.Quantity
+		var storageClassNameOverride *string
+
 		switch quayComponentLabel {
 		case "postgres":
-			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
+			volumeSizeOverride = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
+			storageClassNameOverride = v1.GetStorageClassNameOverrideForComponent(quay, v1.ComponentPostgres)
 		case "clair-postgres":
-			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClairPostgres)
+			volumeSizeOverride = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClairPostgres)
+			storageClassNameOverride = v1.GetStorageClassNameOverrideForComponent(quay, v1.ComponentClairPostgres)
 		}
 
-		// If override was not provided
-		if override == nil {
-			return pvc, nil
+		// If volume override was provided
+		if volumeSizeOverride != nil {
+			// Ensure that volume size is not being reduced
+			pvcstorage := pvc.Spec.Resources.Requests.Storage()
+			if pvcstorage != nil && volumeSizeOverride.Cmp(*pvcstorage) == -1 {
+				return nil, fmt.Errorf(
+					"cannot shrink volume override size from %s to %s",
+					pvcstorage.String(),
+					volumeSizeOverride.String(),
+				)
+			}
+
+			pvc.Spec.Resources.Requests = corev1.ResourceList{
+				corev1.ResourceStorage: *volumeSizeOverride,
+			}
 		}
 
-		// Ensure that volume size is not being reduced
-		pvcstorage := pvc.Spec.Resources.Requests.Storage()
-		if pvcstorage != nil && override.Cmp(*pvcstorage) == -1 {
-			return nil, fmt.Errorf(
-				"cannot shrink volume override size from %s to %s",
-				pvcstorage.String(),
-				override.String(),
-			)
-		}
-
-		pvc.Spec.Resources.Requests = corev1.ResourceList{
-			corev1.ResourceStorage: *override,
+		// If storage class override was provided
+		if storageClassNameOverride != nil {
+			pvc.Spec.StorageClassName = storageClassNameOverride
 		}
 
 		return pvc, nil
