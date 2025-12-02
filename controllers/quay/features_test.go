@@ -48,10 +48,10 @@ func Test_extractImageName(t *testing.T) {
 
 func Test_repositoryNameComparison(t *testing.T) {
 	for _, tt := range []struct {
-		name        string
-		currentName string
+		name         string
+		currentName  string
 		expectedName string
-		shouldMatch bool
+		shouldMatch  bool
 	}{
 		{
 			name:         "exact match - same registry and repo",
