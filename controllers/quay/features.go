@@ -453,7 +453,12 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 
 	currentName := extractImageName(deployedImageName)
 
-	if currentName != expectedName {
+	// Extract repository names by finding the last component after splitting by '/'
+	// This handles cases where repository names contain slashes (e.g., "quay.io/org/repo")
+	currentRepoName := currentName[strings.LastIndex(currentName, "/")+1:]
+	expectedRepoName := expectedName[strings.LastIndex(expectedName, "/")+1:]
+
+	if currentRepoName != expectedRepoName {
 		r.Log.Info(fmt.Sprintf("%s needs to perform an upgrade, marking in context", component))
 		*info.upgradeField = true
 	} else {
