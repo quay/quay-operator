@@ -76,6 +76,7 @@ spec:
           - kind: HorizontalPodAutoscaler
           - kind: ServiceMonitor
           - kind: PrometheusRule
+          - kind: NetworkPolicy
         specDescriptors:
           - path: configBundleSecret
             displayName: Config Bundle Secret
@@ -193,6 +194,12 @@ spec:
                 - serviceaccounts
                 - persistentvolumeclaims
                 - events
+              verbs:
+                - '*'
+            - apiGroups:
+                - networking.k8s.io
+              resources:
+                - networkpolicies
               verbs:
                 - '*'
             - apiGroups:
