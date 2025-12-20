@@ -1,0 +1,31 @@
+name: Check Reviews
+
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+
+jobs:
+  review-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for required reviews
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              console.log('GitHub context:', context);
+              const { pull_request } = context.payload;
+              const reviews = await github.pulls.listReviews({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pull_request.number,
+              });
+              const approvedReviews = reviews.data.filter(review => review.state === 'APPROVED');
+              if (approvedReviews.length === 0) {
+                throw new Error('This pull request requires at least one approved review before merging.');
+              }
+            } catch (error) {
+              console.error('Error fetching reviews:', error);
+              throw new Error('Failed to check reviews: ' + error.message);
+            }
+           
