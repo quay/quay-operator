@@ -37,6 +37,8 @@ type QuayRegistryContext struct {
 	DbRootPw            string
 	NeedsPgUpgrade      bool
 	NeedsClairPgUpgrade bool
+	ClairPostgresPassword     string
+	ClairPostgresRootPassword  string
 
 	// Clair integration
 	SecurityScannerV4PSK string
