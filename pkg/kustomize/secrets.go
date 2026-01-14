@@ -370,7 +370,13 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
 		}
 
-		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey)
+		// Get clair postgres password from context
+		dbPassword := qctx.ClairPostgresPassword
+		if dbPassword == "" {
+			// Fallback to default if not set (for backward compatibility during migration)
+			dbPassword = "postgres"
+		}
+		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey, dbPassword)
 		if err != nil {
 			return nil, err
 		}
@@ -380,13 +386,30 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 		cfgFiles["clair-db-old-host"] = []byte(strings.TrimSpace(strings.Join([]string{quay.GetName(), "clair-postgres-old"}, "-")))
 
 		return cfgFiles, nil
+	case v1.ComponentClairPostgres:
+		// Use passwords from context (generated in kustomize.go)
+		databasePassword := qctx.ClairPostgresPassword
+		if databasePassword == "" {
+			return nil, fmt.Errorf("ClairPostgresPassword not set in context")
+		}
+		databaseRootPassword := qctx.ClairPostgresRootPassword
+		if databaseRootPassword == "" {
+			return nil, fmt.Errorf("ClairPostgresRootPassword not set in context")
+		}
+
+		return map[string][]byte{
+			"database-username":      []byte("postgres"),
+			"database-password":      []byte(databasePassword),
+			"database-name":          []byte("postgres"),
+			"database-root-password": []byte(databaseRootPassword),
+		}, nil
 	default:
 		return nil, nil
 	}
 }
 
 // clairConfigFor returns a Clair v4 config with the correct values.
-func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
+func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey, dbPassword string) ([]byte, error) {
 	// the default number for the clair's database connections pool is arbitralily defined to
 	// 10 when the HPA component is unmanaged. If HPA is managed we have more control over the
 	// max number running clair pods so we increase it to the magic number of 33. This number
@@ -401,7 +424,7 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
 	dbname := "postgres"
 	user := "postgres"
-	password := "postgres"
+	password := dbPassword
 	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable pool_max_conns=%d", host, dbname, user, password, poolsize)
 
 	psk, err := base64.StdEncoding.DecodeString(preSharedKey)
