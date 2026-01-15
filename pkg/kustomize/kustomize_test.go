@@ -366,6 +366,9 @@ var quayComponents = map[string][]client.Object{
 	"job": {
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
 	},
+	"clairpostgres": {
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clairpostgres-config-secret"}},
+	},
 }
 
 func withComponents(components []string) []client.Object {
