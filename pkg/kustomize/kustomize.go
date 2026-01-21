@@ -422,6 +422,8 @@ func KustomizationFor(
 						"DB_URI=" + ctx.DbUri,
 						"DB_ROOT_PW=" + ctx.DbRootPw,
 						"SECURITY_SCANNER_V4_PSK=" + ctx.SecurityScannerV4PSK,
+						"CLAIR_POSTGRES_PASSWORD=" + ctx.ClairPostgresPassword,
+						"CLAIR_POSTGRES_ROOT_PASSWORD=" + ctx.ClairPostgresRootPassword,
 					},
 				},
 			},
