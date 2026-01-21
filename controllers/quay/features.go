@@ -37,11 +37,13 @@ const (
 	datastoreAccessKey     = "AWS_ACCESS_KEY_ID"
 	datastoreSecretKey     = "AWS_SECRET_ACCESS_KEY"
 
-	databaseSecretKey    = "DATABASE_SECRET_KEY"
-	secretKey            = "SECRET_KEY"
-	dbURI                = "DB_URI"
-	dbRootPw             = "DB_ROOT_PW"
-	securityScannerV4PSK = "SECURITY_SCANNER_V4_PSK"
+	databaseSecretKey         = "DATABASE_SECRET_KEY"
+	secretKey                 = "SECRET_KEY"
+	dbURI                     = "DB_URI"
+	dbRootPw                  = "DB_ROOT_PW"
+	securityScannerV4PSK      = "SECURITY_SCANNER_V4_PSK"
+	clairPostgresPassword     = "CLAIR_POSTGRES_PASSWORD"
+	clairPostgresRootPassword = "CLAIR_POSTGRES_ROOT_PASSWORD"
 )
 
 // checkDeprecatedManagedKeys populates the provided quay context with information we
@@ -74,6 +76,8 @@ func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 		qctx.DbUri = string(secret.Data[dbURI])
 		qctx.DbRootPw = string(secret.Data[dbRootPw])
 		qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
+		qctx.ClairPostgresPassword = string(secret.Data[clairPostgresPassword])
+		qctx.ClairPostgresRootPassword = string(secret.Data[clairPostgresRootPassword])
 		break
 	}
 
@@ -105,6 +109,8 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	qctx.DbUri = string(secret.Data[dbURI])
 	qctx.DbRootPw = string(secret.Data[dbRootPw])
 	qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
+	qctx.ClairPostgresPassword = string(secret.Data[clairPostgresPassword])
+	qctx.ClairPostgresRootPassword = string(secret.Data[clairPostgresRootPassword])
 	return nil
 }
 
