@@ -373,8 +373,7 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 		// Get clair postgres password from context
 		dbPassword := qctx.ClairPostgresPassword
 		if dbPassword == "" {
-			// Fallback to default if not set (for backward compatibility during migration)
-			dbPassword = "postgres"
+			return nil, fmt.Errorf("clair postgres password is empty")
 		}
 		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey, dbPassword)
 		if err != nil {
