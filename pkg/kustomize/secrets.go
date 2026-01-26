@@ -373,7 +373,8 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 		// Get clair postgres password from context
 		dbPassword := qctx.ClairPostgresPassword
 		if dbPassword == "" {
-			return nil, fmt.Errorf("clair postgres password is empty")
+			log.Info("ClairPostgresPassword not set in context, using default")
+			dbPassword = "postgres"
 		}
 		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey, dbPassword)
 		if err != nil {
@@ -389,11 +390,13 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 		// Use passwords from context (generated in kustomize.go)
 		databasePassword := qctx.ClairPostgresPassword
 		if databasePassword == "" {
-			return nil, fmt.Errorf("ClairPostgresPassword not set in context")
+			log.Info("ClairPostgresPassword not set in context, using default")
+			databasePassword = "postgres"
 		}
 		databaseRootPassword := qctx.ClairPostgresRootPassword
 		if databaseRootPassword == "" {
-			return nil, fmt.Errorf("ClairPostgresRootPassword not set in context")
+			log.Info("ClairPostgresRootPassword not set in context, using default")
+			databaseRootPassword = "postgres"
 		}
 
 		return map[string][]byte{
