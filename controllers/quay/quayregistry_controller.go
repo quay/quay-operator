@@ -57,15 +57,19 @@ const (
 	creationPollInterval = time.Second * 2
 	creationPollTimeout  = time.Second * 600
 
-	grafanaDashboardConfigMapNameSuffix = "grafana-dashboard-quay"
-	grafanaTitleJSONPath                = "title"
-	grafanaNamespaceFilterJSONPath      = "templating.list.1.options.0.value"
-	grafanaServiceFilterJSONPath        = "templating.list.2.options.0.value"
-	clusterMonitoringLabelKey           = "openshift.io/cluster-monitoring"
-	quayDashboardJSONKey                = "quay.json"
-	quayOperatorManagedLabelKey         = "quay-operator/managed-label"
-	quayOperatorFinalizer               = "quay-operator/finalizer"
-	grafanaDashboardConfigNamespace     = "openshift-config-managed"
+	grafanaDashboardConfigMapNameSuffix   = "grafana-dashboard-quay"
+	grafanaTitleJSONPath                  = "title"
+	grafanaNamespaceFilterJSONPath        = "templating.list.1.options.0.value"
+	grafanaNamespaceCurrentFilterJSONPath = "templating.list.1.current.value"
+	grafanaNamespaceQueryJSONPath         = "templating.list.1.query"
+	grafanaServiceFilterJSONPath          = "templating.list.2.options.0.value"
+	grafanaServiceCurrentFilterJSONPath   = "templating.list.2.current.value"
+	grafanaServiceQueryJSONPath           = "templating.list.2.query"
+	clusterMonitoringLabelKey             = "openshift.io/cluster-monitoring"
+	quayDashboardJSONKey                  = "quay.json"
+	quayOperatorManagedLabelKey           = "quay-operator/managed-label"
+	quayOperatorFinalizer                 = "quay-operator/finalizer"
+	grafanaDashboardConfigNamespace       = "openshift-config-managed"
 )
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
@@ -939,11 +943,42 @@ func updateGrafanaDashboardData(obj client.Object, quay *v1.QuayRegistry) error 
 		return err
 	}
 
+	// Also set the current value for namespace variable (required for Grafana to apply the variable)
+	if config, err = sjson.Set(
+		config, grafanaNamespaceCurrentFilterJSONPath, quay.GetNamespace(),
+	); err != nil {
+		return err
+	}
+
+	// Set the query field for namespace variable (Grafana uses this for type: custom)
+	if config, err = sjson.Set(
+		config, grafanaNamespaceQueryJSONPath, quay.GetNamespace(),
+	); err != nil {
+		return err
+	}
+
 	metricsServiceName := fmt.Sprintf("%s-quay-metrics", quay.GetName())
 	config, err = sjson.Set(config, grafanaServiceFilterJSONPath, metricsServiceName)
 	if err != nil {
 		return err
 	}
+
+	// Also set the current value for service variable (required for Grafana to apply the variable)
+	config, err = sjson.Set(config, grafanaServiceCurrentFilterJSONPath, metricsServiceName)
+	if err != nil {
+		return err
+	}
+
+	// Set the query field for service variable (Grafana uses this for type: custom)
+	config, err = sjson.Set(config, grafanaServiceQueryJSONPath, metricsServiceName)
+	if err != nil {
+		return err
+	}
+
+	// Replace $namespace and $service placeholders directly in all panel expressions
+	// This is required because OpenShift Console doesn't substitute custom type variables
+	config = strings.ReplaceAll(config, "$namespace", quay.GetNamespace())
+	config = strings.ReplaceAll(config, "$service", metricsServiceName)
 
 	cm.Data[quayDashboardJSONKey] = config
 	return nil
