@@ -336,6 +336,22 @@ func KustomizationFor(
 		ctx.DbRootPw = rootpw
 	}
 
+	if ctx.ClairPostgresPassword == "" {
+		clairPostgresPw, err := generateRandomString(secretKeyLength)
+		if err != nil {
+			return nil, err
+		}
+		ctx.ClairPostgresPassword = clairPostgresPw
+	}
+
+	if ctx.ClairPostgresRootPassword == "" {
+		clairPostgresRootPw, err := generateRandomString(32)
+		if err != nil {
+			return nil, err
+		}
+		ctx.ClairPostgresRootPassword = clairPostgresRootPw
+	}
+
 	userProvidedCaCerts := []string{}
 	for key, val := range quayConfigFiles {
 		if !strings.HasPrefix(key, "extra_ca_cert_") {
@@ -406,6 +422,8 @@ func KustomizationFor(
 						"DB_URI=" + ctx.DbUri,
 						"DB_ROOT_PW=" + ctx.DbRootPw,
 						"SECURITY_SCANNER_V4_PSK=" + ctx.SecurityScannerV4PSK,
+						"CLAIR_POSTGRES_PASSWORD=" + ctx.ClairPostgresPassword,
+						"CLAIR_POSTGRES_ROOT_PASSWORD=" + ctx.ClairPostgresRootPassword,
 					},
 				},
 			},

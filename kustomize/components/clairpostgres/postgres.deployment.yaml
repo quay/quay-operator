@@ -36,13 +36,25 @@ spec:
               protocol: TCP
           env:
             - name: POSTGRESQL_USER
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-username
             - name: POSTGRESQL_DATABASE
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-name
             - name: POSTGRESQL_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-password
             - name: POSTGRESQL_ADMIN_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-root-password
             - name: POSTGRESQL_SHARED_BUFFERS
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS

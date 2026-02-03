@@ -7,3 +7,6 @@ resources:
   - ./postgres.deployment.yaml
   - ./postgres.service.yaml
   - ./clair-postgres-conf-sample.configmap.yaml
+secretGenerator:
+  # NOTE: `clairpostgres-config-secret` fields generated in `kustomize.go`.
+  - name: clairpostgres-config-secret
