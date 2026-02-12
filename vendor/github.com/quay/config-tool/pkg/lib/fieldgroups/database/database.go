@@ -20,8 +20,14 @@ type DbConnectionArgsStruct struct {
 	Autorollback bool       `default:""  json:"autorollback,omitempty" yaml:"autorollback,omitempty"`
 
 	// Postgres arguments
-	SslRootCert string `default:""  json:"sslrootcert,omitempty" yaml:"sslrootcert,omitempty"`
-	SslMode     string `default:""  json:"sslmode,omitempty" yaml:"sslmode,omitempty"`
+	SslRootCert        string `default:""  json:"sslrootcert,omitempty" yaml:"sslrootcert,omitempty"`
+	SslMode            string `default:""  json:"sslmode,omitempty" yaml:"sslmode,omitempty"`
+	MaxConnections     int    `default:"10" json:"max_connections,omitempty" yaml:"max_connections,omitempty"`
+	StaleTimeout       int    `default:"180" json:"stale_timeout,omitempty" yaml:"stale_timeout,omitempty"`
+	KeepAlives         int    `default:"1" json:"keepalives,omitempty" yaml:"keepalives,omitempty"`
+	KeepalivesIdle     int    `default:"10" json:"keepalives_idle,omitempty" yaml:"keepalives_idle,omitempty"`
+	KeepalivesInterval int    `default:"2" json:"keepalives_interval,omitempty" yaml:"keepalives_interval,omitempty"`
+	KeepalivesCount    int    `default:"5" json:"keepalives_count,omitempty" yaml:"keepalives_count,omitempty"`
 }
 
 // SslStruct represents the SslStruct config fields
@@ -87,6 +93,48 @@ func NewDbConnectionArgsStruct(fullConfig map[string]interface{}) (*DbConnection
 		newDbConnectionArgsStruct.SslRootCert, ok = value.(string)
 		if !ok {
 			return newDbConnectionArgsStruct, errors.New("sslrootcert must be of type string")
+		}
+	}
+
+	if value, ok := fullConfig["max_connections"]; ok {
+		newDbConnectionArgsStruct.MaxConnections, ok = value.(int)
+		if !ok {
+			return newDbConnectionArgsStruct, errors.New("max_connections must be a positive integer")
+		}
+	}
+
+	if value, ok := fullConfig["stale_timeout"]; ok {
+		newDbConnectionArgsStruct.StaleTimeout, ok = value.(int)
+		if !ok {
+			return newDbConnectionArgsStruct, errors.New("stale_timeout must be a positive integer")
+		}
+	}
+
+	if value, ok := fullConfig["keepalives"]; ok {
+		newDbConnectionArgsStruct.KeepAlives, ok = value.(int)
+		if !ok {
+			return newDbConnectionArgsStruct, errors.New("keepalives must be a positive integer")
+		}
+	}
+
+	if value, ok := fullConfig["keepalives_idle"]; ok {
+		newDbConnectionArgsStruct.KeepalivesIdle, ok = value.(int)
+		if !ok {
+			return newDbConnectionArgsStruct, errors.New("keepalives_idle must be a positive integer")
+		}
+	}
+
+	if value, ok := fullConfig["keepalives_interval"]; ok {
+		newDbConnectionArgsStruct.KeepalivesInterval, ok = value.(int)
+		if !ok {
+			return newDbConnectionArgsStruct, errors.New("keepalives_interval must be a positive integer")
+		}
+	}
+
+	if value, ok := fullConfig["keepalives_count"]; ok {
+		newDbConnectionArgsStruct.KeepalivesCount, ok = value.(int)
+		if !ok {
+			return newDbConnectionArgsStruct, errors.New("keepalives_count must be a positive integer")
 		}
 	}
 

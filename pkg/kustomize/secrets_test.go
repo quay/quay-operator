@@ -549,3 +549,65 @@ func TestClairMarshal(t *testing.T) {
 		})
 	}
 }
+
+func TestPostgreSQLParsingLogic_Comprehensive(t *testing.T) {
+	assert := assert.New(t)
+	tests := []struct {
+		name     string
+		input    map[string]interface{}
+		expected *database.DbConnectionArgsStruct
+	}{
+		{
+			name:  "default_values",
+			input: map[string]any{},
+			expected: &database.DbConnectionArgsStruct{
+				MaxConnections:     10,
+				StaleTimeout:       180,
+				KeepAlives:         1,
+				KeepalivesIdle:     10,
+				KeepalivesInterval: 2,
+				KeepalivesCount:    5,
+			},
+		},
+		{
+			name: "partial_override",
+			input: map[string]any{
+				"max_connections": 20,
+				"stale_timeout":   600,
+			},
+			expected: &database.DbConnectionArgsStruct{
+				MaxConnections:     20,
+				StaleTimeout:       600,
+				KeepAlives:         1,
+				KeepalivesIdle:     10,
+				KeepalivesInterval: 2,
+				KeepalivesCount:    5,
+			},
+		},
+		{
+			name: "complete_override",
+			input: map[string]any{
+				"max_connections":     50,
+				"stale_timeout":       600,
+				"keepalives":          0,
+				"keepalives_interval": 5,
+				"keepalives_idle":     30,
+				"keepalives_count":    10,
+			},
+			expected: &database.DbConnectionArgsStruct{
+				MaxConnections:     50,
+				StaleTimeout:       600,
+				KeepAlives:         0,
+				KeepalivesIdle:     30,
+				KeepalivesInterval: 5,
+				KeepalivesCount:    10,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		result, err := database.NewDbConnectionArgsStruct(tt.input)
+		assert.Nil(err, tt.name)
+		assert.Equal(tt.expected, result, tt.name)
+	}
+}
