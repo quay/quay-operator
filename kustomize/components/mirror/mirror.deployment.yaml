@@ -63,6 +63,14 @@ spec:
             sizeLimit: 5Mi
       initContainers:
         - name: quay-mirror-init
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
           image: quay.io/projectquay/quay:latest
           command:
           - sh
@@ -73,6 +81,14 @@ spec:
               value: $(QUAY_APP_SERVICE_HOST)
       containers:
         - name: quay-mirror
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
           image: quay.io/projectquay/quay:latest
           command: ["/quay-registry/quay-entrypoint.sh"]
           args: ["repomirror-nomigrate"]
