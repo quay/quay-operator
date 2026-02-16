@@ -120,6 +120,11 @@ var supportsAffinityOverride = []ComponentKind{
 	ComponentQuay,
 }
 
+var supportsSecurityContextOverride = []ComponentKind{
+	ComponentQuay,
+	ComponentMirror,
+}
+
 const (
 	ManagedKeysName             = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName     = "quay-config-tls"
@@ -157,11 +162,12 @@ type Override struct {
 	StorageClassName *string         `json:"storageClassName,omitempty"`
 	Env              []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// +nullable
-	Replicas    *int32            `json:"replicas,omitempty"`
-	Affinity    *corev1.Affinity  `json:"affinity,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Resources   *Resources        `json:"resources,omitempty"`
+	Replicas        *int32                  `json:"replicas,omitempty"`
+	Affinity        *corev1.Affinity        `json:"affinity,omitempty"`
+	Labels          map[string]string       `json:"labels,omitempty"`
+	Annotations     map[string]string       `json:"annotations,omitempty"`
+	Resources       *Resources              `json:"resources,omitempty"`
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 }
 
 // Resources describes the resource limits and requests for a component.
@@ -521,8 +527,9 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		hasstorageclass := component.Overrides.StorageClassName != nil
 		hasreplicas := component.Overrides.Replicas != nil
 		hasresources := component.Overrides.Resources != nil
+		hassecuritycontext := component.Overrides.SecurityContext != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas
+		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas || hassecuritycontext
 
 		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
@@ -575,6 +582,13 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		if hasresources && !ComponentSupportsOverride(component.Kind, "resources") {
 			return fmt.Errorf(
 				"component %s does not support resources overrides",
+				component.Kind,
+			)
+		}
+
+		if hassecuritycontext && !ComponentSupportsOverride(component.Kind, "securityContext") {
+			return fmt.Errorf(
+				"component %s does not support securityContext overrides",
 				component.Kind,
 			)
 		}
@@ -761,6 +775,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 		components = supportsAffinityOverride
 	case "resources":
 		components = supportsResourceOverrides
+	case "securityContext":
+		components = supportsSecurityContextOverride
 	}
 
 	for _, cmp := range components {
@@ -833,6 +849,20 @@ func GetResourceOverridesForComponent(
 		return
 	}
 	return
+}
+
+// GetSecurityContextOverrideForComponent returns the securityContext override for a given component kind.
+func GetSecurityContextOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *corev1.SecurityContext {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+		if cmp.Overrides == nil {
+			return nil
+		}
+		return cmp.Overrides.SecurityContext
+	}
+	return nil
 }
 
 // GetAffinityForComponent returns affinity overrides for the provided component

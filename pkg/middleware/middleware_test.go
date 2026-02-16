@@ -7,7 +7,9 @@ import (
 	route "github.com/openshift/api/route/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	batchv1k8s "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -246,6 +248,8 @@ func TestProcess(t *testing.T) {
 	}
 }
 
+func boolPtr(b bool) *bool { return &b }
+
 func parseResourceString(s string) *resource.Quantity {
 	resourceSize := resource.MustParse(s)
 	return &resourceSize
@@ -421,6 +425,199 @@ func TestProcessPVCStorageClassNameOverride(t *testing.T) {
 				} else if *processedPVC.Spec.StorageClassName != *tt.expectedStorageClass {
 					t.Errorf("Expected StorageClassName %v, got %v", *tt.expectedStorageClass, *processedPVC.Spec.StorageClassName)
 				}
+			}
+		})
+	}
+}
+
+func TestProcessDeploymentSecurityContextOverride(t *testing.T) {
+	overrideSC := &corev1.SecurityContext{
+		RunAsNonRoot:             boolPtr(false),
+		AllowPrivilegeEscalation: boolPtr(true),
+	}
+
+	defaultSC := &corev1.SecurityContext{
+		RunAsNonRoot:             boolPtr(true),
+		AllowPrivilegeEscalation: boolPtr(false),
+	}
+
+	tests := []struct {
+		name                string
+		quay                *v1.QuayRegistry
+		dep                 *appsv1.Deployment
+		expectedContainerSC *corev1.SecurityContext
+		expectedInitSC      *corev1.SecurityContext
+	}{
+		{
+			name: "SecurityContextOverrideReplacesContainers",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentQuay, Managed: true, Overrides: &v1.Override{SecurityContext: overrideSC}},
+					},
+				},
+			},
+			dep: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-quay-app",
+					Labels:      map[string]string{"quay-component": "quay-app"},
+					Annotations: map[string]string{"quay-component": "quay"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "quay-app", SecurityContext: defaultSC},
+							},
+							InitContainers: []corev1.Container{
+								{Name: "init", SecurityContext: defaultSC},
+							},
+						},
+					},
+				},
+			},
+			expectedContainerSC: overrideSC,
+			expectedInitSC:      overrideSC,
+		},
+		{
+			name: "NoOverrideRetainsDefaults",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentQuay, Managed: true},
+					},
+				},
+			},
+			dep: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-quay-app",
+					Labels:      map[string]string{"quay-component": "quay-app"},
+					Annotations: map[string]string{"quay-component": "quay"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "quay-app", SecurityContext: defaultSC},
+							},
+						},
+					},
+				},
+			},
+			expectedContainerSC: defaultSC,
+			expectedInitSC:      nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qctx := quaycontext.NewQuayRegistryContext()
+			result, err := Process(tt.quay, qctx, tt.dep, false)
+			assert.NoError(t, err)
+
+			dep, ok := result.(*appsv1.Deployment)
+			assert.True(t, ok)
+
+			for _, c := range dep.Spec.Template.Spec.Containers {
+				assert.Equal(t, tt.expectedContainerSC, c.SecurityContext)
+			}
+			if tt.expectedInitSC != nil {
+				for _, c := range dep.Spec.Template.Spec.InitContainers {
+					assert.Equal(t, tt.expectedInitSC, c.SecurityContext)
+				}
+			}
+		})
+	}
+}
+
+func TestProcessJobSecurityContextOverride(t *testing.T) {
+	overrideSC := &corev1.SecurityContext{
+		RunAsNonRoot:             boolPtr(false),
+		AllowPrivilegeEscalation: boolPtr(true),
+	}
+
+	defaultSC := &corev1.SecurityContext{
+		RunAsNonRoot:             boolPtr(true),
+		AllowPrivilegeEscalation: boolPtr(false),
+	}
+
+	tests := []struct {
+		name       string
+		quay       *v1.QuayRegistry
+		job        *batchv1k8s.Job
+		expectedSC *corev1.SecurityContext
+	}{
+		{
+			name: "JobSecurityContextOverrideFromQuayComponent",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentQuay, Managed: true, Overrides: &v1.Override{SecurityContext: overrideSC}},
+					},
+				},
+			},
+			job: &batchv1k8s.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-quay-app-upgrade",
+					Labels: map[string]string{"quay-component": "quay-app-upgrade"},
+				},
+				Spec: batchv1k8s.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "quay-app-upgrade", SecurityContext: defaultSC},
+							},
+						},
+					},
+				},
+			},
+			expectedSC: overrideSC,
+		},
+		{
+			name: "JobWithoutOverrideRetainsDefaults",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentQuay, Managed: true},
+					},
+				},
+			},
+			job: &batchv1k8s.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-quay-app-upgrade",
+					Labels: map[string]string{"quay-component": "quay-app-upgrade"},
+				},
+				Spec: batchv1k8s.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "quay-app-upgrade", SecurityContext: defaultSC},
+							},
+						},
+					},
+				},
+			},
+			expectedSC: defaultSC,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qctx := quaycontext.NewQuayRegistryContext()
+			result, err := Process(tt.quay, qctx, tt.job, false)
+			assert.NoError(t, err)
+
+			job, ok := result.(*batchv1k8s.Job)
+			assert.True(t, ok)
+
+			for _, c := range job.Spec.Template.Spec.Containers {
+				assert.Equal(t, tt.expectedSC, c.SecurityContext)
 			}
 		})
 	}
