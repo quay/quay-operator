@@ -86,9 +86,14 @@ var supportsVolumeOverride = []ComponentKind{
 	ComponentClairPostgres,
 }
 
+var supportsEphemeralVolumeOverride = []ComponentKind{
+	ComponentClair,
+}
+
 var supportsStorageClassOverride = []ComponentKind{
 	ComponentPostgres,
 	ComponentClairPostgres,
+	ComponentClair,
 }
 
 var supportsEnvOverride = []ComponentKind{
@@ -157,11 +162,12 @@ type Override struct {
 	StorageClassName *string         `json:"storageClassName,omitempty"`
 	Env              []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// +nullable
-	Replicas    *int32            `json:"replicas,omitempty"`
-	Affinity    *corev1.Affinity  `json:"affinity,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Resources   *Resources        `json:"resources,omitempty"`
+	Replicas           *int32            `json:"replicas,omitempty"`
+	Affinity           *corev1.Affinity  `json:"affinity,omitempty"`
+	Labels             map[string]string `json:"labels,omitempty"`
+	Annotations        map[string]string `json:"annotations,omitempty"`
+	Resources          *Resources        `json:"resources,omitempty"`
+	UseEphemeralVolume *bool             `json:"useEphemeralVolume,omitempty"`
 }
 
 // Resources describes the resource limits and requests for a component.
@@ -519,10 +525,11 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		hasaffinity := hasAffinity(component)
 		hasvolume := component.Overrides.VolumeSize != nil
 		hasstorageclass := component.Overrides.StorageClassName != nil
+		hasephemeralvolume := component.Overrides.UseEphemeralVolume != nil
 		hasreplicas := component.Overrides.Replicas != nil
 		hasresources := component.Overrides.Resources != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas
+		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas || hasephemeralvolume
 
 		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
@@ -556,6 +563,34 @@ func ValidateOverrides(quay *QuayRegistry) error {
 				"component %s does not support storageClassName overrides",
 				component.Kind,
 			)
+		}
+
+		if hasephemeralvolume {
+			if !ComponentSupportsOverride(component.Kind, "ephemeralVolume") {
+				return fmt.Errorf(
+					"component %s does not support ephemeralVolume overrides",
+					component.Kind,
+				)
+			}
+		}
+
+		if (hasstorageclass || hasvolume) && ComponentSupportsOverride(component.Kind, "ephemeralVolume") {
+			useEphemeral := false
+			if hasephemeralvolume {
+				useEphemeral = *component.Overrides.UseEphemeralVolume
+			}
+
+			if !useEphemeral && (component.Overrides.StorageClassName != nil || component.Overrides.VolumeSize != nil) {
+				return fmt.Errorf("component %s with storageClassName/volumeSize override requires useEphemeralVolume to be set to true",
+					component.Kind)
+			}
+
+			if useEphemeral && component.Overrides.VolumeSize != nil {
+				minGi, _ := resource.ParseQuantity("1Gi")
+				if component.Overrides.VolumeSize.Cmp(minGi) < 0 {
+					return fmt.Errorf("component %s requires volumeSize to be at least 1Gi when useEphemeralVolume is true", component.Kind)
+				}
+			}
 		}
 
 		if hasenvvar && !ComponentSupportsOverride(component.Kind, "env") {
@@ -753,6 +788,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 		components = supportsVolumeOverride
 	case "storageClassName":
 		components = supportsStorageClassOverride
+	case "ephemeralVolume":
+		components = supportsEphemeralVolumeOverride
 	case "env":
 		components = supportsEnvOverride
 	case "replicas":
@@ -914,6 +951,16 @@ func GetAnnotationsOverrideForComponent(quay *QuayRegistry, kind ComponentKind) 
 		return cmp.Overrides.Annotations
 	}
 
+	return nil
+}
+
+// GetUseEphemeralVolumeOverrideForComponent returns the UseEphemeralVolume override for a given component kind.
+func GetUseEphemeralVolumeOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *bool {
+	for _, component := range quay.Spec.Components {
+		if component.Kind == kind && component.Overrides != nil && component.Overrides.UseEphemeralVolume != nil {
+			return component.Overrides.UseEphemeralVolume
+		}
+	}
 	return nil
 }
 

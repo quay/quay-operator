@@ -984,6 +984,8 @@ spec:
                           description: StorageClassName is the name of the StorageClass
                             to use for the PVC.
                           type: string
+                        useEphemeralVolume:
+                          type: boolean
                         volumeSize:
                           anyOf:
                           - type: integer
