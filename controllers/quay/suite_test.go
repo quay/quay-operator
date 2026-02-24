@@ -51,7 +51,7 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "QuayRegistry Controller Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	testLogger = zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true))
 	logf.SetLogger(testLogger)
 	testEventRecorder = record.NewFakeRecorder(100)
@@ -85,7 +85,6 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
 
-	close(done)
 })
 
 var _ = AfterSuite(func() {

@@ -5,6 +5,6 @@ resources:
   - ./quay-pg-upgrade.job.yaml
   - ./quay-pg-old.persistentvolumeclaim.yaml
   - ./quay-pg-old.deployment.yaml
-patchesStrategicMerge:
-  - ./quay.deployment.patch.yaml
-  - ./quay-pg.deployment.patch.yaml
+patches:
+  - path: ./quay.deployment.patch.yaml
+  - path: ./quay-pg.deployment.patch.yaml

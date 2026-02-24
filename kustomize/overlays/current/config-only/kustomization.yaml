@@ -1,8 +1,8 @@
 # Overlay variant for only deploying config editor.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-bases:
+resources:
   - ../../../tmp
-patchesStrategicMerge:
+patches:
   # Scale the app deployment to 0 pods in order to prevent pod errors on startup from invalid configuration.
-  - ./quay.deployment.patch.yaml
+  - path: ./quay.deployment.patch.yaml

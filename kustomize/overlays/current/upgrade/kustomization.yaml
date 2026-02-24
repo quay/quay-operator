@@ -1,8 +1,8 @@
 # Overlay variant for upgrading to current Project Quay release.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-bases:
+resources:
   - ../../../tmp
-patchesStrategicMerge:
+patches:
   # Scale the app deployment to 0 pods in order to run all migrations present in the new container image using the "upgrade" `Job`.
-  - ./quay.deployment.patch.yaml
+  - path: ./quay.deployment.patch.yaml

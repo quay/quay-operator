@@ -5,5 +5,5 @@ resources:
   - ./clair-pg-old.persistentvolumeclaim.yaml
   - ./clair-pg-old.deployment.yaml
   - ./clair-pg-old.service.yaml
-patchesStrategicMerge:
-  - ./clair-pg.deployment.patch.yaml
+patches:
+  - path: ./clair-pg.deployment.patch.yaml
