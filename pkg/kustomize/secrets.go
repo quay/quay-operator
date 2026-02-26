@@ -370,10 +370,12 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
 		}
 
-		// Get clair postgres password from context
-		dbPassword := qctx.ClairPostgresPassword
+		// Get clair postgres root password from context. We use the root password
+		// here because POSTGRESQL_USER=postgres (the superuser), and the SCLORG
+		// container sets the superuser password via POSTGRESQL_ADMIN_PASSWORD.
+		dbPassword := qctx.ClairPostgresRootPassword
 		if dbPassword == "" {
-			return nil, fmt.Errorf("clair postgres password is empty")
+			return nil, fmt.Errorf("clair postgres root password is empty")
 		}
 		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey, dbPassword)
 		if err != nil {
