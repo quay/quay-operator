@@ -516,6 +516,14 @@ func hasAffinity(component Component) bool {
 
 // ValidateOverrides validates that the overrides set for each component are valid.
 func ValidateOverrides(quay *QuayRegistry) error {
+	seen := make(map[ComponentKind]bool)
+	for _, component := range quay.Spec.Components {
+		if seen[component.Kind] {
+			return fmt.Errorf("duplicate component %q in spec.components", component.Kind)
+		}
+		seen[component.Kind] = true
+	}
+
 	for _, component := range quay.Spec.Components {
 
 		// No overrides provided
