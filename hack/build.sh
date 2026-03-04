@@ -64,7 +64,7 @@ docker buildx build --push --platform "linux/amd64,linux/ppc64le,linux/s390x"  -
 digest "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" OPERATOR_DIGEST
 
 digest "${REGISTRY}/${NAMESPACE}/quay:${TAG}" QUAY_DIGEST
-digest "${REGISTRY}/${NAMESPACE}/clair:nightly" CLAIR_DIGEST
+digest "${REGISTRY}/${NAMESPACE}/clair:4.8.0" CLAIR_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
 digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_DIGEST
