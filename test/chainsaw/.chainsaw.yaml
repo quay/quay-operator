@@ -26,6 +26,9 @@ spec:
       apiVersion: apps/v1
       kind: Deployment
   - podLogs:
+      selector: quay-component=quay-app-upgrade
+      tail: 50
+  - podLogs:
       selector: quay-component=quay-app
       tail: 30
   - podLogs:
@@ -44,7 +47,7 @@ spec:
       shell: /bin/bash
       content: |
         echo "=== Previous container logs (crash-looping pods) ==="
-        for component in clair-app clair-postgres quay-app quay-database; do
+        for component in quay-app-upgrade clair-app clair-postgres quay-app quay-database; do
           for pod in $(kubectl get pods -n $NAMESPACE -l quay-component=$component -o name 2>/dev/null); do
             echo "--- $pod (previous) ---"
             kubectl logs -n $NAMESPACE "$pod" --previous --tail=50 2>/dev/null || echo "(no previous logs)"

@@ -16,6 +16,7 @@ type QuayRegistryContext struct {
 	ClusterWildcardCert []byte
 	TLSCert             []byte
 	TLSKey              []byte
+	TLSSecretHash       string
 
 	// TLS Security Profile (from OpenShift APIServer)
 	SSLProtocols string // e.g. "TLSv1.2 TLSv1.3" (nginx format)

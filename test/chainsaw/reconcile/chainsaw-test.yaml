@@ -505,3 +505,140 @@ spec:
           echo "PASS: old config secret cleaned up, ${COUNT} config secret(s) remain"
     - assert:
         file: 08-assert.yaml
+  - name: switch-external-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Determine the SAN for the certificate based on platform.
+          # On OpenShift the operator derives SERVER_HOSTNAME from the route:
+          #   {name}-quay-{namespace}.{apps_domain}
+          # The cert must be valid for that hostname or kustomize rejects it.
+          # On KinD, SERVER_HOSTNAME is 127.0.0.1:30443 from the config bundle.
+          if kubectl get ingresses.config.openshift.io cluster &>/dev/null; then
+            APPS_DOMAIN=$(kubectl get ingresses.config.openshift.io cluster \
+              -o jsonpath='{.spec.domain}')
+            ROUTE_HOST="reconcile-quay-${NAMESPACE}.${APPS_DOMAIN}"
+            SAN="DNS:${ROUTE_HOST}"
+            echo "OpenShift detected: SAN=${SAN}"
+          else
+            SAN="IP:127.0.0.1,DNS:localhost"
+            echo "KinD detected: SAN=${SAN}"
+          fi
+
+          # Generate self-signed TLS certificate for external TLS secret
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/external-tls.key -out /tmp/external-tls.crt -days 1 \
+            -subj "/O=Quay E2E/CN=external-tls" \
+            -addext "subjectAltName=${SAN}" 2>/dev/null
+          echo "Generated external TLS certificate"
+
+          # Create kubernetes.io/tls secret
+          kubectl create secret tls reconcile-external-tls -n $NAMESPACE \
+            --cert=/tmp/external-tls.crt --key=/tmp/external-tls.key
+          echo "Created external TLS secret"
+
+          # Remove ssl.cert and ssl.key from config bundle (mutually exclusive with secretRef)
+          if kubectl get secret reconcile-config -n $NAMESPACE -o jsonpath='{.data}' | grep -q ssl; then
+            kubectl get secret reconcile-config -n $NAMESPACE -o json \
+              | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          d['data'].pop('ssl.cert', None)
+          d['data'].pop('ssl.key', None)
+          json.dump(d, sys.stdout)
+          " | kubectl replace -f -
+            echo "Removed ssl.cert/ssl.key from config bundle"
+          else
+            echo "Config bundle has no ssl.cert/ssl.key, no patch needed"
+          fi
+    - apply:
+        file: 09-switch-external-tls.yaml
+    - assert:
+        file: 09-assert-tls-label.yaml
+    - assert:
+        file: 00-assert-status.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Wait for TLS hash annotation to appear on quay-app deployment pod template
+          echo "Waiting for tls-secret-hash annotation..."
+          for i in $(seq 1 60); do
+            HASH=$(kubectl get deployment reconcile-quay-app -n $NAMESPACE \
+              -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}' 2>/dev/null || true)
+            if [ -n "${HASH}" ]; then
+              echo "PASS: initial tls-secret-hash = ${HASH}"
+              echo "${HASH}" > /tmp/initial-tls-hash
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: tls-secret-hash annotation not found after 5m"; exit 1; }
+            sleep 5
+          done
+  - name: rotate-external-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          OLD_HASH=$(cat /tmp/initial-tls-hash)
+          echo "Old TLS hash: ${OLD_HASH}"
+
+          # Determine SAN (same logic as switch-external-tls step)
+          if kubectl get ingresses.config.openshift.io cluster &>/dev/null; then
+            APPS_DOMAIN=$(kubectl get ingresses.config.openshift.io cluster \
+              -o jsonpath='{.spec.domain}')
+            SAN="DNS:reconcile-quay-${NAMESPACE}.${APPS_DOMAIN}"
+          else
+            SAN="IP:127.0.0.1,DNS:localhost"
+          fi
+
+          # Generate a new cert (different key material produces different hash)
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/external-tls-rotated.key -out /tmp/external-tls-rotated.crt -days 1 \
+            -subj "/O=Quay E2E/CN=rotated" \
+            -addext "subjectAltName=${SAN}" 2>/dev/null
+
+          # Update the external TLS secret
+          kubectl create secret tls reconcile-external-tls -n $NAMESPACE \
+            --cert=/tmp/external-tls-rotated.crt --key=/tmp/external-tls-rotated.key \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "External TLS secret updated with rotated certificate"
+
+          # Wait for hash annotation to change on quay-app deployment
+          echo "Waiting for TLS hash rotation..."
+          for i in $(seq 1 60); do
+            NEW_HASH=$(kubectl get deployment reconcile-quay-app -n $NAMESPACE \
+              -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}' 2>/dev/null || true)
+            if [ -n "${NEW_HASH}" ] && [ "${NEW_HASH}" != "${OLD_HASH}" ]; then
+              echo "PASS: hash rotated: ${OLD_HASH} -> ${NEW_HASH}"
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: TLS hash rotation timeout after 5m"; exit 1; }
+            sleep 5
+          done
+
+          # Verify clair-app also has the same new hash
+          if ! kubectl get deployment reconcile-clair-app -n $NAMESPACE &>/dev/null; then
+            echo "SKIP: clair-app deployment not found, skipping hash consistency check"
+          else
+            CLAIR_HASH=$(kubectl get deployment reconcile-clair-app -n $NAMESPACE \
+              -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}' 2>/dev/null || true)
+            if [ "${CLAIR_HASH}" != "${NEW_HASH}" ]; then
+              echo "ERROR: clair-app hash (${CLAIR_HASH}) != quay-app hash (${NEW_HASH})"
+              exit 1
+            fi
+            echo "PASS: all deployments have consistent rotated hash"
+          fi
+
+          # Wait for rollouts to complete before asserting status.
+          # The hash annotation change triggers new rollouts and on
+          # resource-constrained CI runners these can take a while.
+          echo "Waiting for deployment rollouts to complete..."
+          kubectl rollout status deployment/reconcile-quay-app -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/reconcile-clair-app -n $NAMESPACE --timeout=300s || true
+    - assert:
+        file: 00-assert-status.yaml
