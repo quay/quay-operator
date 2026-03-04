@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"go.uber.org/zap/zapcore"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -85,7 +86,15 @@ func main() {
 		c.NextProtos = []string{"http/1.1"}
 	}
 
-	cacheOptions := cache.Options{}
+	cacheOptions := cache.Options{
+		ByObject: map[client.Object]cache.ByObject{
+			&corev1.Secret{}: {
+				Label: labels.SelectorFromSet(labels.Set{
+					quay.TLSSecretLabel: "true",
+				}),
+			},
+		},
+	}
 	if namespace != "" {
 		cacheOptions.DefaultNamespaces = map[string]cache.Config{
 			namespace: {},
@@ -96,6 +105,7 @@ func main() {
 		Cache: &client.CacheOptions{
 			DisableFor: []client.Object{
 				&quay.QuayRegistry{},
+				&corev1.Secret{},
 			},
 		},
 	}

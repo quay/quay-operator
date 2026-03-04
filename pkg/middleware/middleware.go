@@ -115,6 +115,14 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		dep.Spec.Template.Annotations[v1.ClusterServiceCAName] = qctx.ClusterServiceCAHash
 		dep.Spec.Template.Annotations[v1.ClusterTrustedCAName] = qctx.ClusterTrustedCAHash
 
+		if qctx.TLSSecretHash != "" {
+			dep.Annotations[v1.TLSSecretHashAnnotation] = qctx.TLSSecretHash
+			dep.Spec.Template.Annotations[v1.TLSSecretHashAnnotation] = qctx.TLSSecretHash
+		} else {
+			delete(dep.Annotations, v1.TLSSecretHashAnnotation)
+			delete(dep.Spec.Template.Annotations, v1.TLSSecretHashAnnotation)
+		}
+
 		// here we do an attempt to setting the default or overwriten number of replicas
 		// for clair, quay and mirror. we can't do that if horizontal pod autoscaler is
 		// in managed state as we would be stomping in the values defined by the hpa
