@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	err "errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -28,6 +29,7 @@ import (
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/quay/quay-operator/pkg/kustomize"
+	quaytls "github.com/quay/quay-operator/pkg/tls"
 )
 
 const (
@@ -191,6 +193,62 @@ func (r *QuayRegistryReconciler) checkManagedTLS(
 }
 
 var errRouteProbeInProgress = fmt.Errorf("route probe in progress, awaiting ingress status")
+
+// checkExternalTLSSecret validates and reads TLS cert/key from an external Secret referenced
+// by spec.tls.secretRef. Populates TLSCert, TLSKey, and TLSSecretHash on the context.
+func (r *QuayRegistryReconciler) checkExternalTLSSecret(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry, bundle *corev1.Secret,
+) error {
+	if quay.Spec.TLS == nil || quay.Spec.TLS.SecretRef == nil {
+		return nil
+	}
+
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentTLS) {
+		return fmt.Errorf(
+			"spec.tls.secretRef cannot be used when the TLS component is managed; set tls component to unmanaged",
+		)
+	}
+
+	if _, hasCert := bundle.Data["ssl.cert"]; hasCert {
+		return fmt.Errorf(
+			"spec.tls.secretRef and ssl.cert in configBundleSecret are mutually exclusive",
+		)
+	}
+	if _, hasKey := bundle.Data["ssl.key"]; hasKey {
+		return fmt.Errorf(
+			"spec.tls.secretRef and ssl.key in configBundleSecret are mutually exclusive",
+		)
+	}
+
+	secretName := quay.Spec.TLS.SecretRef.Name
+	namespace := quay.GetNamespace()
+
+	tlsCert, tlsKey, secret, err := quaytls.FetchAndValidate(ctx, r.Client, namespace, secretName)
+	if err != nil {
+		return err
+	}
+
+	// Auto-label the secret so the cache informer picks it up for reactive watches.
+	if secret.Labels[v1.TLSSecretLabel] != "true" {
+		patch := client.MergeFrom(secret.DeepCopy())
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[v1.TLSSecretLabel] = "true"
+		if err := r.Patch(ctx, secret, patch); err != nil {
+			return fmt.Errorf("unable to label external TLS secret %q: %w", secretName, err)
+		}
+	}
+
+	qctx.TLSCert = tlsCert
+	qctx.TLSKey = tlsKey
+
+	hash := sha256.Sum256(slices.Concat(tlsCert, tlsKey))
+	hashStr := hex.EncodeToString(hash[:])
+	qctx.TLSSecretHash = hashStr[len(hashStr)-8:]
+	return nil
+}
 
 // parseServerHostname extracts the SERVER_HOSTNAME field from the config bundle
 // and sets it on the QuayRegistryContext if present.
