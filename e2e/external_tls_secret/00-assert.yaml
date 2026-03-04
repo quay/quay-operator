@@ -1,0 +1,15 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: external-tls
+status:
+  conditions:
+  - type: ComponentTLSReady
+    reason: ComponentReady
+    status: "True"
+  - type: Available
+    reason: HealthChecksPassing
+    status: "True"
+  - type: ComponentsCreated
+    reason: ComponentsCreationSuccess
+    status: "True"

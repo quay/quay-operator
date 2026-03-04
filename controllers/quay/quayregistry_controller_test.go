@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -648,6 +649,18 @@ func Test_hasNecessaryConfig(t *testing.T) {
 			quay:   quayWithUnmanagedComponents(v1.ComponentTLS),
 		},
 		{
+			name:   "unmanaged tls with secretRef skips config check",
+			experr: false,
+			cfg:    map[string][]byte{},
+			quay: func() v1.QuayRegistry {
+				q := quayWithUnmanagedComponents(v1.ComponentTLS)
+				q.Spec.TLS = &v1.TLSConfig{
+					SecretRef: &corev1.LocalObjectReference{Name: "my-tls"},
+				}
+				return q
+			}(),
+		},
+		{
 			name:   "managed clairpostgres with config",
 			experr: true,
 			cfg: map[string][]byte{
@@ -765,4 +778,101 @@ func Test_cleanupPreviousSecret(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_findQuayRegistriesForSecret(t *testing.T) {
+	s := scheme.Scheme
+	if err := v1.AddToScheme(s); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tt := range []struct {
+		name     string
+		secret   *corev1.Secret
+		objs     []client.Object
+		expected int
+	}{
+		{
+			name: "matching secret triggers reconcile",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-tls", Namespace: "ns"},
+			},
+			objs: []client.Object{
+				&v1.QuayRegistry{
+					ObjectMeta: metav1.ObjectMeta{Name: "reg1", Namespace: "ns"},
+					Spec: v1.QuayRegistrySpec{
+						TLS: &v1.TLSConfig{
+							SecretRef: &corev1.LocalObjectReference{Name: "my-tls"},
+						},
+					},
+				},
+			},
+			expected: 1,
+		},
+		{
+			name: "non-matching secret name",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "other-secret", Namespace: "ns"},
+			},
+			objs: []client.Object{
+				&v1.QuayRegistry{
+					ObjectMeta: metav1.ObjectMeta{Name: "reg1", Namespace: "ns"},
+					Spec: v1.QuayRegistrySpec{
+						TLS: &v1.TLSConfig{
+							SecretRef: &corev1.LocalObjectReference{Name: "my-tls"},
+						},
+					},
+				},
+			},
+			expected: 0,
+		},
+		{
+			name: "registry without secretRef",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-tls", Namespace: "ns"},
+			},
+			objs: []client.Object{
+				&v1.QuayRegistry{
+					ObjectMeta: metav1.ObjectMeta{Name: "reg1", Namespace: "ns"},
+					Spec:       v1.QuayRegistrySpec{},
+				},
+			},
+			expected: 0,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cli := fake.NewClientBuilder().WithScheme(s).WithObjects(tt.objs...).Build()
+			r := newReconcilerWithClient(cli)
+
+			requests := r.findQuayRegistriesForSecret(context.Background(), tt.secret)
+			if len(requests) != tt.expected {
+				t.Errorf("expected %d requests, got %d", tt.expected, len(requests))
+			}
+		})
+	}
+}
+
+func Test_externalTLSSecretPredicate(t *testing.T) {
+	r := &QuayRegistryReconciler{}
+	pred := r.externalTLSSecretPredicate()
+
+	t.Run("update with changed data returns true", func(t *testing.T) {
+		result := pred.Update(event.UpdateEvent{
+			ObjectOld: &corev1.Secret{Data: map[string][]byte{"tls.crt": []byte("old")}},
+			ObjectNew: &corev1.Secret{Data: map[string][]byte{"tls.crt": []byte("new")}},
+		})
+		if !result {
+			t.Error("expected true for changed data")
+		}
+	})
+
+	t.Run("update with same data returns false", func(t *testing.T) {
+		result := pred.Update(event.UpdateEvent{
+			ObjectOld: &corev1.Secret{Data: map[string][]byte{"tls.crt": []byte("same")}},
+			ObjectNew: &corev1.Secret{Data: map[string][]byte{"tls.crt": []byte("same")}},
+		})
+		if result {
+			t.Error("expected false for unchanged data")
+		}
+	})
 }

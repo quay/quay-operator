@@ -16,6 +16,7 @@ type QuayRegistryContext struct {
 	ClusterWildcardCert []byte
 	TLSCert             []byte
 	TLSKey              []byte
+	TLSSecretHash       string
 
 	// Object Storage
 	SupportsObjectStorage    bool
