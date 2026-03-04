@@ -48,3 +48,20 @@ spec:
             requests:
               cpu: 300m
               memory: 300Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skynet-quay-redis
+spec:
+  template:
+    spec:
+      containers:
+        - name: redis-master
+          resources:
+            limits:
+              cpu: 400m
+              memory: 400Mi
+            requests:
+              cpu: 400m
+              memory: 400Mi

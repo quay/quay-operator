@@ -34,3 +34,13 @@ spec:
           requests:
             cpu: 300m
             memory: 300Mi
+    - kind: redis
+      managed: true
+      overrides:
+        resources:
+          limits:
+            cpu: 400m
+            memory: 400Mi
+          requests:
+            cpu: 400m
+            memory: 400Mi
