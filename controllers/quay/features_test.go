@@ -1,8 +1,18 @@
 package controllers
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	v1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaycontext "github.com/quay/quay-operator/pkg/context"
 )
 
 func Test_extractImageName(t *testing.T) {
@@ -119,5 +129,116 @@ func Test_repositoryNameComparison(t *testing.T) {
 					matches, tt.shouldMatch)
 			}
 		})
+	}
+}
+
+func TestCheckManagedKeys_UpgradeFallback(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = v1.AddToScheme(scheme)
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+	}
+	secretName := fmt.Sprintf("%s-%s", quay.Name, v1.ManagedKeysName)
+
+	for _, tt := range []struct {
+		name                      string
+		secretData                map[string][]byte
+		expectedClairPassword     string
+		expectedClairRootPassword string
+	}{
+		{
+			name: "upgrade - secret exists without clair postgres keys",
+			secretData: map[string][]byte{
+				"DATABASE_SECRET_KEY": []byte("some-key"),
+				"SECRET_KEY":          []byte("another-key"),
+			},
+			expectedClairPassword:     "postgres",
+			expectedClairRootPassword: "postgres",
+		},
+		{
+			name: "normal reconcile - secret has clair postgres keys",
+			secretData: map[string][]byte{
+				"DATABASE_SECRET_KEY":          []byte("some-key"),
+				"CLAIR_POSTGRES_PASSWORD":      []byte("random-pw"),
+				"CLAIR_POSTGRES_ROOT_PASSWORD": []byte("random-root-pw"),
+			},
+			expectedClairPassword:     "random-pw",
+			expectedClairRootPassword: "random-root-pw",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: quay.Namespace,
+				},
+				Data: tt.secretData,
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(secret).
+				Build()
+
+			reconciler := QuayRegistryReconciler{
+				Client: fakeClient,
+				Log:    testLogger,
+			}
+
+			qctx := &quaycontext.QuayRegistryContext{}
+			if err := reconciler.checkManagedKeys(context.Background(), qctx, quay); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if qctx.ClairPostgresPassword != tt.expectedClairPassword {
+				t.Errorf("ClairPostgresPassword = %q, want %q",
+					qctx.ClairPostgresPassword, tt.expectedClairPassword)
+			}
+			if qctx.ClairPostgresRootPassword != tt.expectedClairRootPassword {
+				t.Errorf("ClairPostgresRootPassword = %q, want %q",
+					qctx.ClairPostgresRootPassword, tt.expectedClairRootPassword)
+			}
+		})
+	}
+}
+
+func TestCheckManagedKeys_FreshInstall(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = v1.AddToScheme(scheme)
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		Build()
+
+	reconciler := QuayRegistryReconciler{
+		Client: fakeClient,
+		Log:    testLogger,
+	}
+
+	qctx := &quaycontext.QuayRegistryContext{}
+	if err := reconciler.checkManagedKeys(context.Background(), qctx, quay); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Fresh install: no secret exists, fields should remain empty
+	// so KustomizationFor() generates random passwords
+	if qctx.ClairPostgresPassword != "" {
+		t.Errorf("ClairPostgresPassword = %q, want empty", qctx.ClairPostgresPassword)
+	}
+	if qctx.ClairPostgresRootPassword != "" {
+		t.Errorf("ClairPostgresRootPassword = %q, want empty", qctx.ClairPostgresRootPassword)
 	}
 }

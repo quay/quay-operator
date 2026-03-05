@@ -78,6 +78,16 @@ func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 		qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
 		qctx.ClairPostgresPassword = string(secret.Data[clairPostgresPassword])
 		qctx.ClairPostgresRootPassword = string(secret.Data[clairPostgresRootPassword])
+
+		// If the managed-keys secret exists but doesn't have clair postgres keys,
+		// this is an upgrade from a version that used hardcoded "postgres" credentials.
+		// Preserve the old password so existing databases remain accessible.
+		if qctx.ClairPostgresPassword == "" {
+			qctx.ClairPostgresPassword = "postgres"
+		}
+		if qctx.ClairPostgresRootPassword == "" {
+			qctx.ClairPostgresRootPassword = "postgres"
+		}
 		break
 	}
 
@@ -111,6 +121,16 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
 	qctx.ClairPostgresPassword = string(secret.Data[clairPostgresPassword])
 	qctx.ClairPostgresRootPassword = string(secret.Data[clairPostgresRootPassword])
+
+	// If the managed-keys secret exists but doesn't have clair postgres keys,
+	// this is an upgrade from a version that used hardcoded "postgres" credentials.
+	// Preserve the old password so existing databases remain accessible.
+	if qctx.ClairPostgresPassword == "" {
+		qctx.ClairPostgresPassword = "postgres"
+	}
+	if qctx.ClairPostgresRootPassword == "" {
+		qctx.ClairPostgresRootPassword = "postgres"
+	}
 	return nil
 }
 
