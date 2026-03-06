@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -79,7 +78,6 @@ type QuayRegistryReconciler struct {
 	Scheme               *runtime.Scheme
 	EventRecorder        record.EventRecorder
 	WatchNamespace       string
-	Mtx                  *sync.Mutex
 	Requeue              ctrl.Result
 	SkipResourceRequests bool
 }
@@ -485,9 +483,6 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
 func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
-
 	regid := fmt.Sprintf("%s/%s", req.NamespacedName.Namespace, req.NamespacedName.Name)
 	log := r.Log.WithValues("quayregistry", regid)
 	log.Info("begin reconcile")
