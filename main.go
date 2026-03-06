@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
-	"sync"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -125,14 +124,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	var mtx sync.Mutex
 	if err = (&quaycontroller.QuayRegistryReconciler{
 		Client:               mgr.GetClient(),
 		Log:                  ctrl.Log.WithName("controllers").WithName("QuayRegistry"),
 		Scheme:               mgr.GetScheme(),
 		EventRecorder:        mgr.GetEventRecorderFor("quayregistry-controller"),
 		WatchNamespace:       namespace,
-		Mtx:                  &mtx,
 		Requeue:              ctrl.Result{RequeueAfter: 10 * time.Second},
 		SkipResourceRequests: skipres,
 	}).SetupWithManager(mgr); err != nil {
@@ -143,7 +140,6 @@ func main() {
 	if err = (&quaycontroller.QuayRegistryStatusReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("QuayRegistryStatus"),
-		Mtx:    &mtx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistryStatus")
 		os.Exit(1)
