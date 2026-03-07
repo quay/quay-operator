@@ -1221,6 +1221,11 @@ spec:
                 description: LastUpdate is the timestamp when the Operator last processed
                   this instance.
                 type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
               registryEndpoint:
                 description: RegistryEndpoint is the external access point for the
                   Quay registry.

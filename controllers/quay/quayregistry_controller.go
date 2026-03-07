@@ -499,6 +499,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	updatedQuay := quay.DeepCopy()
+	updatedQuay.Status.ObservedGeneration = quay.Generation
+
 	if v1.FlaggedForDeletion(updatedQuay) {
 		return r.manageQuayDeletion(ctx, updatedQuay, log)
 	}
