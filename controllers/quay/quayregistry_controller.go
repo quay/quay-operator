@@ -473,6 +473,15 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=pods;services;secrets;configmaps;serviceaccounts;persistentvolumeclaims;events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=route.openshift.io,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
