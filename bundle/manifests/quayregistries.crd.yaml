@@ -13,7 +13,20 @@ spec:
     singular: quayregistry
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .status.currentVersion
+      name: Version
+      type: string
+    - jsonPath: .status.registryEndpoint
+      name: Endpoint
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Available")].status
+      name: Available
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: QuayRegistry is the Schema for the quayregistries API.

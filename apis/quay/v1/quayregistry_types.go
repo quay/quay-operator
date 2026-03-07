@@ -298,6 +298,10 @@ func RemoveCondition(conditions []Condition, conditionType ConditionType) []Cond
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.status.currentVersion`
+// +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=`.status.registryEndpoint`
+// +kubebuilder:printcolumn:name="Available",type=string,JSONPath=`.status.conditions[?(@.type=="Available")].status`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // QuayRegistry is the Schema for the quayregistries API.
 type QuayRegistry struct {
