@@ -1193,8 +1193,13 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.QuayRegistry{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&batchv1.Job{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		// TODO: Add `.Owns()` for every resource type we manage...
 		Complete(r)
 }
 
