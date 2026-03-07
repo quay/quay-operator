@@ -250,6 +250,8 @@ type QuayRegistryStatus struct {
 	LastUpdate string `json:"lastUpdated,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
+	// ObservedGeneration is the most recent generation observed by the controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
