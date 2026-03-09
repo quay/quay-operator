@@ -175,13 +175,14 @@ func decode(bytes []byte) interface{} {
 }
 
 // EnsureCreationOrder sorts the given slice of Kubernetes objects so that when created in order,
-// `Deployments` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
+// `Deployments` and `Jobs` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
 func EnsureCreationOrder(objects []client.Object) []client.Object {
 	sort.Slice(
 		objects,
 		func(i, j int) bool {
 			obji := objects[i]
-			return obji.GetObjectKind().GroupVersionKind().Kind != "Deployment"
+			kind := obji.GetObjectKind().GroupVersionKind().Kind
+			return kind != "Deployment" && kind != "Job"
 		},
 	)
 	return objects
