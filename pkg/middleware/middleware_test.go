@@ -480,7 +480,41 @@ func TestProcessDeploymentSecurityContextOverride(t *testing.T) {
 				},
 			},
 			expectedContainerSC: overrideSC,
-			expectedInitSC:      overrideSC,
+			expectedInitSC:      defaultSC,
+		},
+		{
+			name: "SecurityContextOverrideDoesNotAffectInitContainers",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentMirror, Managed: true, Overrides: &v1.Override{SecurityContext: overrideSC}},
+					},
+				},
+			},
+			dep: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-quay-mirror",
+					Labels:      map[string]string{"quay-component": "quay-mirror"},
+					Annotations: map[string]string{"quay-component": "mirror"},
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Name: "quay-mirror", SecurityContext: defaultSC},
+							},
+							InitContainers: []corev1.Container{
+								{Name: "quay-mirror-init", SecurityContext: defaultSC},
+							},
+						},
+					},
+				},
+			},
+			expectedContainerSC: overrideSC,
+			expectedInitSC:      defaultSC,
 		},
 		{
 			name: "NoOverrideRetainsDefaults",
@@ -527,8 +561,8 @@ func TestProcessDeploymentSecurityContextOverride(t *testing.T) {
 			for _, c := range dep.Spec.Template.Spec.Containers {
 				assert.Equal(t, tt.expectedContainerSC, c.SecurityContext)
 			}
-			if tt.expectedInitSC != nil {
-				for _, c := range dep.Spec.Template.Spec.InitContainers {
+			for _, c := range dep.Spec.Template.Spec.InitContainers {
+				if tt.expectedInitSC != nil {
 					assert.Equal(t, tt.expectedInitSC, c.SecurityContext)
 				}
 			}
