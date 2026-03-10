@@ -329,6 +329,29 @@ func KustomizationFor(
 		configFiles = append(configFiles, filepath.Join("bundle", key))
 	}
 
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClairPostgres) && ctx.ClairDbPassword == "" {
+		// DbRootPw is populated from managed keys for existing deployments
+		// but empty for new ones (before the generation block below).
+		if ctx.DbRootPw == "" {
+			// New deployment: generate random credentials.
+			pw, err := generateRandomString(32)
+			if err != nil {
+				return nil, err
+			}
+			ctx.ClairDbPassword = pw
+		} else {
+			// Upgrade path: default to legacy hardcoded values
+			ctx.ClairDbPassword = "postgres"
+		}
+		// The sclorg PG image sets POSTGRESQL_ADMIN_PASSWORD on the
+		// "postgres" superuser after POSTGRESQL_PASSWORD. When
+		// POSTGRESQL_USER is also "postgres" both must match or the
+		// user password is silently overwritten by the admin password.
+		ctx.ClairDbRootPw = ctx.ClairDbPassword
+		ctx.ClairDbUser = "postgres"
+		ctx.ClairDbName = "postgres"
+	}
+
 	if ctx.DbRootPw == "" {
 		rootpw, err := generateRandomString(32)
 		if err != nil {
@@ -407,6 +430,10 @@ func KustomizationFor(
 						"DB_URI=" + ctx.DbUri,
 						"DB_ROOT_PW=" + ctx.DbRootPw,
 						"SECURITY_SCANNER_V4_PSK=" + ctx.SecurityScannerV4PSK,
+						"CLAIR_DB_USER=" + ctx.ClairDbUser,
+						"CLAIR_DB_PASSWORD=" + ctx.ClairDbPassword,
+						"CLAIR_DB_ROOT_PW=" + ctx.ClairDbRootPw,
+						"CLAIR_DB_NAME=" + ctx.ClairDbName,
 					},
 				},
 			},
