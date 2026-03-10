@@ -42,6 +42,11 @@ const (
 	dbURI                = "DB_URI"
 	dbRootPw             = "DB_ROOT_PW"
 	securityScannerV4PSK = "SECURITY_SCANNER_V4_PSK"
+
+	clairDbUser   = "CLAIR_DB_USER"
+	clairDbPw     = "CLAIR_DB_PASSWORD"
+	clairDbRootPw = "CLAIR_DB_ROOT_PW"
+	clairDbName   = "CLAIR_DB_NAME"
 )
 
 // checkDeprecatedManagedKeys populates the provided quay context with information we
@@ -74,6 +79,10 @@ func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 		qctx.DbUri = string(secret.Data[dbURI])
 		qctx.DbRootPw = string(secret.Data[dbRootPw])
 		qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
+		qctx.ClairDbUser = string(secret.Data[clairDbUser])
+		qctx.ClairDbPassword = string(secret.Data[clairDbPw])
+		qctx.ClairDbRootPw = string(secret.Data[clairDbRootPw])
+		qctx.ClairDbName = string(secret.Data[clairDbName])
 		break
 	}
 
@@ -105,6 +114,10 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	qctx.DbUri = string(secret.Data[dbURI])
 	qctx.DbRootPw = string(secret.Data[dbRootPw])
 	qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
+	qctx.ClairDbUser = string(secret.Data[clairDbUser])
+	qctx.ClairDbPassword = string(secret.Data[clairDbPw])
+	qctx.ClairDbRootPw = string(secret.Data[clairDbRootPw])
+	qctx.ClairDbName = string(secret.Data[clairDbName])
 	return nil
 }
 
