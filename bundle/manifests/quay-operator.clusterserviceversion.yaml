@@ -2,14 +2,14 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    olm.skipRange: ">=3.5.x <3.6.1"
+    olm.skipRange: ">=3.5.x <3.99.0-dev"
     capabilities: Full Lifecycle
     categories: Integration & Delivery
-    containerImage: quay.io/projectquay/quay-operator:v3.6.1
+    containerImage: quay.io/projectquay/quay-operator:v3.99.0-dev
     createdAt: 2021-04-23T10:04:00Z
     support: Project Quay
     description: Opinionated deployment of Quay on Kubernetes.
-    quay-version: v3.6.1
+    quay-version: v3.99.0-dev
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
     alm-examples: |-
@@ -45,12 +45,13 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
-  name: quay-operator.v3.6.1
+  name: quay-operator.v3.99.0-dev
   namespace: placeholder
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.s390x: supported
     operatorframework.io/arch.ppc64le: supported
+    operatorframework.io/arch.arm64: supported
     operatorframework.io/os.linux: supported
 spec:
   customresourcedefinitions:
@@ -126,7 +127,7 @@ spec:
               spec:
                 containers:
                   - name: quay-operator
-                    image: quay.io/projectquay/quay-operator:v3.6.1
+                    image: quay.io/projectquay/quay-operator:v3.99.0-dev
                     command:
                       - /workspace/manager
                       - '--namespace=$(WATCH_NAMESPACE)'
@@ -278,5 +279,5 @@ spec:
     matchLabels:
       alm-owner-quay-operator: quay-operator
       operated-by: quay-operator
-  version: 3.6.1
-  replaces: quay-operator.v3.6.0 ## Except for ".0", always put the previous z-stream here
+  version: 3.99.0-dev
+  ## replaces is set by prepare-upstream.sh during release. Except for ".0", always put the previous z-stream here

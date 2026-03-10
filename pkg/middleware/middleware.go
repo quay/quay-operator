@@ -180,6 +180,12 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			ref.Resources.Limits = oresources.Limits
 		}
 
+		if osecctx := v1.GetSecurityContextOverrideForComponent(quay, kind); osecctx != nil {
+			for i := range dep.Spec.Template.Spec.Containers {
+				dep.Spec.Template.Spec.Containers[i].SecurityContext = osecctx
+			}
+		}
+
 		if oannot := v1.GetAnnotationsOverrideForComponent(quay, kind); oannot != nil {
 			if dep.Annotations == nil {
 				dep.Annotations = map[string]string{}
@@ -274,6 +280,13 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 				UpsertContainerEnv(ref, oenv)
 			}
 		}
+
+		if osecctx := v1.GetSecurityContextOverrideForComponent(quay, v1.ComponentQuay); osecctx != nil {
+			for i := range job.Spec.Template.Spec.Containers {
+				job.Spec.Template.Spec.Containers[i].SecurityContext = osecctx
+			}
+		}
+
 		// if we are deploying without resource requests we have to remove them
 		if skipres {
 			var noresources corev1.ResourceRequirements

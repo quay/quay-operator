@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
-	"sync"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -31,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -114,27 +114,26 @@ func main() {
 	webhookServer := webhook.NewServer(webhookServerOptions)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:           scheme,
-		Cache:            cacheOptions,
-		Client:           clientOptions,
-		LeaderElection:   enableLeaderElection,
-		LeaderElectionID: "7daa4ab6.quay.redhat.com",
-		Metrics:          metricsOptions,
-		WebhookServer:    webhookServer,
+		Scheme:                 scheme,
+		Cache:                  cacheOptions,
+		Client:                 clientOptions,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "7daa4ab6.quay.redhat.com",
+		Metrics:                metricsOptions,
+		WebhookServer:          webhookServer,
+		HealthProbeBindAddress: ":8081",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	var mtx sync.Mutex
 	if err = (&quaycontroller.QuayRegistryReconciler{
 		Client:               mgr.GetClient(),
 		Log:                  ctrl.Log.WithName("controllers").WithName("QuayRegistry"),
 		Scheme:               mgr.GetScheme(),
 		EventRecorder:        mgr.GetEventRecorderFor("quayregistry-controller"),
 		WatchNamespace:       namespace,
-		Mtx:                  &mtx,
 		Requeue:              ctrl.Result{RequeueAfter: 10 * time.Second},
 		SkipResourceRequests: skipres,
 	}).SetupWithManager(mgr); err != nil {
@@ -145,7 +144,6 @@ func main() {
 	if err = (&quaycontroller.QuayRegistryStatusReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("QuayRegistryStatus"),
-		Mtx:    &mtx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistryStatus")
 		os.Exit(1)
@@ -166,6 +164,15 @@ func main() {
 	}
 
 	// +kubebuilder:scaffold:builder
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -57,15 +56,19 @@ const (
 	creationPollInterval = time.Second * 2
 	creationPollTimeout  = time.Second * 600
 
-	grafanaDashboardConfigMapNameSuffix = "grafana-dashboard-quay"
-	grafanaTitleJSONPath                = "title"
-	grafanaNamespaceFilterJSONPath      = "templating.list.1.options.0.value"
-	grafanaServiceFilterJSONPath        = "templating.list.2.options.0.value"
-	clusterMonitoringLabelKey           = "openshift.io/cluster-monitoring"
-	quayDashboardJSONKey                = "quay.json"
-	quayOperatorManagedLabelKey         = "quay-operator/managed-label"
-	quayOperatorFinalizer               = "quay-operator/finalizer"
-	grafanaDashboardConfigNamespace     = "openshift-config-managed"
+	grafanaDashboardConfigMapNameSuffix   = "grafana-dashboard-quay"
+	grafanaTitleJSONPath                  = "title"
+	grafanaNamespaceFilterJSONPath        = "templating.list.1.options.0.value"
+	grafanaNamespaceCurrentFilterJSONPath = "templating.list.1.current.value"
+	grafanaNamespaceQueryJSONPath         = "templating.list.1.query"
+	grafanaServiceFilterJSONPath          = "templating.list.2.options.0.value"
+	grafanaServiceCurrentFilterJSONPath   = "templating.list.2.current.value"
+	grafanaServiceQueryJSONPath           = "templating.list.2.query"
+	clusterMonitoringLabelKey             = "openshift.io/cluster-monitoring"
+	quayDashboardJSONKey                  = "quay.json"
+	quayOperatorManagedLabelKey           = "quay-operator/managed-label"
+	quayOperatorFinalizer                 = "quay-operator/finalizer"
+	grafanaDashboardConfigNamespace       = "openshift-config-managed"
 )
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
@@ -75,7 +78,6 @@ type QuayRegistryReconciler struct {
 	Scheme               *runtime.Scheme
 	EventRecorder        record.EventRecorder
 	WatchNamespace       string
-	Mtx                  *sync.Mutex
 	Requeue              ctrl.Result
 	SkipResourceRequests bool
 }
@@ -477,13 +479,19 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=pods;services;secrets;configmaps;serviceaccounts;persistentvolumeclaims;events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=route.openshift.io,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
 func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
-
 	regid := fmt.Sprintf("%s/%s", req.NamespacedName.Namespace, req.NamespacedName.Name)
 	log := r.Log.WithValues("quayregistry", regid)
 	log.Info("begin reconcile")
@@ -500,6 +508,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	updatedQuay := quay.DeepCopy()
+	updatedQuay.Status.ObservedGeneration = quay.Generation
+
 	if v1.FlaggedForDeletion(updatedQuay) {
 		return r.manageQuayDeletion(ctx, updatedQuay, log)
 	}
@@ -801,7 +811,6 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.Requeue, nil
 	}
 
-	osmanaged = v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage")
 	if osmanaged && !quayContext.ObjectStorageInitialized {
 		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
 		return r.Requeue, nil
@@ -939,11 +948,42 @@ func updateGrafanaDashboardData(obj client.Object, quay *v1.QuayRegistry) error 
 		return err
 	}
 
+	// Also set the current value for namespace variable (required for Grafana to apply the variable)
+	if config, err = sjson.Set(
+		config, grafanaNamespaceCurrentFilterJSONPath, quay.GetNamespace(),
+	); err != nil {
+		return err
+	}
+
+	// Set the query field for namespace variable (Grafana uses this for type: custom)
+	if config, err = sjson.Set(
+		config, grafanaNamespaceQueryJSONPath, quay.GetNamespace(),
+	); err != nil {
+		return err
+	}
+
 	metricsServiceName := fmt.Sprintf("%s-quay-metrics", quay.GetName())
 	config, err = sjson.Set(config, grafanaServiceFilterJSONPath, metricsServiceName)
 	if err != nil {
 		return err
 	}
+
+	// Also set the current value for service variable (required for Grafana to apply the variable)
+	config, err = sjson.Set(config, grafanaServiceCurrentFilterJSONPath, metricsServiceName)
+	if err != nil {
+		return err
+	}
+
+	// Set the query field for service variable (Grafana uses this for type: custom)
+	config, err = sjson.Set(config, grafanaServiceQueryJSONPath, metricsServiceName)
+	if err != nil {
+		return err
+	}
+
+	// Replace $namespace and $service placeholders directly in all panel expressions
+	// This is required because OpenShift Console doesn't substitute custom type variables
+	config = strings.ReplaceAll(config, "$namespace", quay.GetNamespace())
+	config = strings.ReplaceAll(config, "$service", metricsServiceName)
 
 	cm.Data[quayDashboardJSONKey] = config
 	return nil
@@ -1161,8 +1201,13 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.QuayRegistry{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&batchv1.Job{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		// TODO: Add `.Owns()` for every resource type we manage...
 		Complete(r)
 }
 

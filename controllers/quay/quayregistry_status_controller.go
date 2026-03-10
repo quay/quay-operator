@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,7 +20,6 @@ import (
 type QuayRegistryStatusReconciler struct {
 	Client client.Client
 	Log    logr.Logger
-	Mtx    *sync.Mutex
 }
 
 // NewQuayRegistryStatusReconciler returns a new QuayRegistryStatusController configured to use
@@ -43,9 +41,6 @@ func (q *QuayRegistryStatusReconciler) SetupWithManager(mgr ctrl.Manager) error 
 func (q *QuayRegistryStatusReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request,
 ) (ctrl.Result, error) {
-	q.Mtx.Lock()
-	defer q.Mtx.Unlock()
-
 	log := q.Log.WithValues("quayregistrystatus", req.NamespacedName)
 	reschedule := ctrl.Result{RequeueAfter: time.Minute}
 

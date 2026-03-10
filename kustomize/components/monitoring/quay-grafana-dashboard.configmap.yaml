@@ -961,6 +961,11 @@ data:
           },
           {
             "allValue": null,
+            "current": {
+              "selected": true,
+              "text": "namespace",
+              "value": "quay-namespace"
+            },
             "datasource": null,
             "hide": 1,
             "includeAll": false,
@@ -974,19 +979,20 @@ data:
                 "value": "quay-namespace"
               }
             ],
-            "query": "namespace",
+            "query": "quay-namespace",
             "refresh": 0,
             "regex": "",
             "skipUrlSync": false,
             "sort": 0,
-            "tagValuesQuery": "",
-            "tags": [],
-            "tagsQuery": "",
-            "type": "query",
-            "useTags": false
+            "type": "custom"
           },
           {
             "allValue": null,
+            "current": {
+              "selected": true,
+              "text": "service",
+              "value": "quay-metrics"
+            },
             "datasource": null,
             "hide": 1,
             "includeAll": false,
@@ -1000,16 +1006,12 @@ data:
                 "value": "quay-metrics"
               }
             ],
-            "query": "service",
+            "query": "quay-metrics",
             "refresh": 0,
             "regex": "",
             "skipUrlSync": false,
             "sort": 0,
-            "tagValuesQuery": "",
-            "tags": [],
-            "tagsQuery": "",
-            "type": "query",
-            "useTags": false
+            "type": "custom"
           }
         ]
       },

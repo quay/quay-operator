@@ -175,13 +175,14 @@ func decode(bytes []byte) interface{} {
 }
 
 // EnsureCreationOrder sorts the given slice of Kubernetes objects so that when created in order,
-// `Deployments` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
+// `Deployments` and `Jobs` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
 func EnsureCreationOrder(objects []client.Object) []client.Object {
 	sort.Slice(
 		objects,
 		func(i, j int) bool {
 			obji := objects[i]
-			return obji.GetObjectKind().GroupVersionKind().Kind != "Deployment"
+			kind := obji.GetObjectKind().GroupVersionKind().Kind
+			return kind != "Deployment" && kind != "Job"
 		},
 	)
 	return objects
@@ -422,7 +423,15 @@ func KustomizationFor(
 
 	componentPaths := []string{}
 	if overlay == upgradeOverlayDir() {
-		componentPaths = []string{"../components/job"}
+		// only include the upgrade job when object storage is either unmanaged
+		// or already initialized. when managed object storage is pending (OBC
+		// not yet bound), we skip the job to avoid creating it with incomplete
+		// storage configuration. the job will be created on the next reconcile
+		// after the OBC credentials become available.
+		osmanaged := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentObjectStorage)
+		if !osmanaged || ctx.ObjectStorageInitialized {
+			componentPaths = []string{"../components/job"}
+		}
 	}
 	for _, component := range quay.Spec.Components {
 		if !component.Managed || component.Kind == v1.ComponentQuay {

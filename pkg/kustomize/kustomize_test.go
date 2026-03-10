@@ -241,6 +241,55 @@ var kustomizationForTests = []struct {
 	},
 }
 
+func TestEnsureCreationOrder(t *testing.T) {
+	objects := []client.Object{
+		&appsv1.Deployment{
+			TypeMeta:   metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "quay-app"},
+		},
+		&corev1.Secret{
+			TypeMeta:   metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "quay-config-secret"},
+		},
+		&batchv1.Job{
+			TypeMeta:   metav1.TypeMeta{Kind: "Job", APIVersion: "batch/v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"},
+		},
+		&corev1.Service{
+			TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "quay-app"},
+		},
+	}
+
+	sorted := EnsureCreationOrder(objects)
+
+	// Deployments and Jobs should come after Secrets and Services
+	for i, obj := range sorted {
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		if kind == "Deployment" || kind == "Job" {
+			// Every remaining object should also be a Deployment or Job
+			for _, remaining := range sorted[i:] {
+				rKind := remaining.GetObjectKind().GroupVersionKind().Kind
+				assert.True(t, rKind == "Deployment" || rKind == "Job",
+					"expected Deployment or Job at end, got %s", rKind)
+			}
+			break
+		}
+	}
+
+	// First two should be non-Deployment/Job kinds, last two should be Deployment/Job
+	for _, obj := range sorted[:2] {
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		assert.True(t, kind != "Deployment" && kind != "Job",
+			"expected non-Deployment/Job in first half, got %s", kind)
+	}
+	for _, obj := range sorted[2:] {
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		assert.True(t, kind == "Deployment" || kind == "Job",
+			"expected Deployment or Job in second half, got %s", kind)
+	}
+}
+
 func TestKustomizationFor(t *testing.T) {
 	assert := assert.New(t)
 	log := logr.Discard()
@@ -402,7 +451,8 @@ var inflateTests = []struct {
 			},
 		},
 		ctx: quaycontext.QuayRegistryContext{
-			SupportsObjectStorage: true,
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
 		},
 		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
@@ -658,8 +708,9 @@ var inflateTests = []struct {
 			},
 		},
 		ctx: quaycontext.QuayRegistryContext{
-			SupportsObjectStorage: true,
-			DbUri:                 "postgresql://user:pass@db:5432/db",
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+			DbUri:                    "postgresql://user:pass@db:5432/db",
 		},
 		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
