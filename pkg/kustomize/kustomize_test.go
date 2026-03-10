@@ -451,7 +451,8 @@ var inflateTests = []struct {
 			},
 		},
 		ctx: quaycontext.QuayRegistryContext{
-			SupportsObjectStorage: true,
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
 		},
 		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
@@ -707,8 +708,9 @@ var inflateTests = []struct {
 			},
 		},
 		ctx: quaycontext.QuayRegistryContext{
-			SupportsObjectStorage: true,
-			DbUri:                 "postgresql://user:pass@db:5432/db",
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+			DbUri:                    "postgresql://user:pass@db:5432/db",
 		},
 		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
