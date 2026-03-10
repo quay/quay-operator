@@ -800,7 +800,6 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.Requeue, nil
 	}
 
-	osmanaged = v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage")
 	if osmanaged && !quayContext.ObjectStorageInitialized {
 		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
 		return r.Requeue, nil
