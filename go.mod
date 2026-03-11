@@ -1,8 +1,6 @@
 module github.com/quay/quay-operator
 
-go 1.23
-
-toolchain go1.23.10
+go 1.23.10
 
 require (
 	github.com/go-logr/logr v1.4.1
