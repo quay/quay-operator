@@ -370,7 +370,7 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 			preSharedKey = config.(map[string]interface{})["SECURITY_SCANNER_V4_PSK"].(string)
 		}
 
-		cfg, err := clairConfigFor(log, quay, quayHostname, preSharedKey)
+		cfg, err := clairConfigFor(log, qctx, quay, quayHostname, preSharedKey)
 		if err != nil {
 			return nil, err
 		}
@@ -380,13 +380,20 @@ func componentConfigFilesFor(log logr.Logger, qctx *quaycontext.QuayRegistryCont
 		cfgFiles["clair-db-old-host"] = []byte(strings.TrimSpace(strings.Join([]string{quay.GetName(), "clair-postgres-old"}, "-")))
 
 		return cfgFiles, nil
+	case v1.ComponentClairPostgres:
+		return map[string][]byte{
+			"database-username":      []byte(qctx.ClairDbUser),
+			"database-password":      []byte(qctx.ClairDbPassword),
+			"database-name":          []byte(qctx.ClairDbName),
+			"database-root-password": []byte(qctx.ClairDbRootPw),
+		}, nil
 	default:
 		return nil, nil
 	}
 }
 
 // clairConfigFor returns a Clair v4 config with the correct values.
-func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
+func clairConfigFor(log logr.Logger, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, quayHostname, preSharedKey string) ([]byte, error) {
 	// the default number for the clair's database connections pool is arbitralily defined to
 	// 10 when the HPA component is unmanaged. If HPA is managed we have more control over the
 	// max number running clair pods so we increase it to the magic number of 33. This number
@@ -399,9 +406,9 @@ func clairConfigFor(log logr.Logger, quay *v1.QuayRegistry, quayHostname, preSha
 	}
 
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
-	dbname := "postgres"
-	user := "postgres"
-	password := "postgres"
+	dbname := qctx.ClairDbName
+	user := qctx.ClairDbUser
+	password := qctx.ClairDbPassword
 	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable pool_max_conns=%d", host, dbname, user, password, poolsize)
 
 	psk, err := base64.StdEncoding.DecodeString(preSharedKey)
