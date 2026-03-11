@@ -33,7 +33,10 @@ spec:
                   name: clair-config-secret
                   key: clair-db-old-host
             - name: POSTGRESQL_MIGRATION_ADMIN_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-root-password
             - name: POSTGRESQL_SHARED_BUFFERS
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS
