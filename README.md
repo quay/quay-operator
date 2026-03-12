@@ -84,7 +84,6 @@ $ kubectl create -n <your-namespace> -f ./config/samples/managed.quayregistry.ya
 ## Community
 
 - Mailing list: [quay-sig@googlegroups.com](https://groups.google.com/forum/#!forum/quay-sig)
-- IRC: #quay on [freenode.net](https://webchat.freenode.net/)
 - Bug tracking: https://issues.redhat.com/projects/PROJQUAY/summary
 - Security issues: [security@redhat.com](security@redhat.com)
 
