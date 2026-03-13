@@ -10,7 +10,6 @@ import (
 	err "errors"
 	"fmt"
 	"strings"
-	"time"
 
 	routev1 "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -23,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
@@ -96,7 +94,6 @@ func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 func (r *QuayRegistryReconciler) checkManagedKeys(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
 ) error {
-
 	nsn := types.NamespacedName{
 		Name:      fmt.Sprintf("%s-%s", quay.Name, v1.ManagedKeysName),
 		Namespace: quay.Namespace,
@@ -127,7 +124,6 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 func (r *QuayRegistryReconciler) checkClusterCAHash(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
 ) error {
-
 	hashConfigMapContents := func(data map[string]string, key string) string {
 		certData, exists := data[key]
 		if !exists {
@@ -194,21 +190,14 @@ func (r *QuayRegistryReconciler) checkManagedTLS(
 	qctx.TLSKey = providedTLSKey
 }
 
-// checkRoutesAvailable checks if the cluster supports Route objects. // XXX here
-// be dragons. This functions attempts to create a fake route and then read the
-// certificate used on it, this should be refactored. This is as wrong as it can
-// get.
-func (r *QuayRegistryReconciler) checkRoutesAvailable(
-	ctx context.Context,
+var errRouteProbeInProgress = fmt.Errorf("route probe in progress, awaiting ingress status")
+
+// parseServerHostname extracts the SERVER_HOSTNAME field from the config bundle
+// and sets it on the QuayRegistryContext if present.
+func parseServerHostname(
 	qctx *quaycontext.QuayRegistryContext,
-	quay *v1.QuayRegistry,
 	bundle *corev1.Secret,
 ) error {
-	// NOTE: The `route` component is unique because we allow users to set the
-	// `SERVER_HOSTNAME` field instead of controlling the entire fieldgroup. This
-	// value is then passed to the created `Route` using a Kustomize variable.
-
-	// REFACTOR: The below `qctx` obj setting the hostname should be put in a separate function.
 	var config map[string]interface{}
 	if err := yaml.Unmarshal(bundle.Data["config.yaml"], &config); err != nil {
 		return fmt.Errorf("unable to parse config.yaml: %w", err)
@@ -222,19 +211,39 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 	if fieldGroup.ServerHostname != "" {
 		qctx.ServerHostname = fieldGroup.ServerHostname
 	}
+	return nil
+}
 
-	// If route is unmanaged and not explicilty defined then skip routes check
-	routeExplicitlyDefined := v1.ComponentIsExplicitlyDefined(quay.Spec.Components, v1.ComponentRoute)
-	routeManaged := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentRoute)
-	if routeExplicitlyDefined && !routeManaged {
+// ensureRouteDiscovery discovers the cluster hostname and wildcard cert via a
+// probe Route. Results are cached for the operator's lifetime. Returns
+// errRouteProbeInProgress if the probe route exists but status.ingress is not
+// yet populated (caller should requeue).
+func (r *QuayRegistryReconciler) ensureRouteDiscovery(
+	ctx context.Context,
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+) error {
+	// Fast path: hostname already cached from a previous reconcile.
+	if cached := r.clusterHostname.Load(); cached != nil {
+		qctx.SupportsRoutes = true
+		qctx.ClusterHostname = *cached
+		if cachedCert := r.clusterWildcardCert.Load(); cachedCert != nil {
+			qctx.ClusterWildcardCert = *cachedCert
+		}
 		return nil
+	}
+
+	routeName := fmt.Sprintf("%s-test-route", quay.GetName())
+	routeNSN := types.NamespacedName{
+		Name:      routeName,
+		Namespace: quay.GetNamespace(),
 	}
 
 	fakeRoute := v1.EnsureOwnerReference(
 		quay,
 		&routev1.Route{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("%s-test-route", quay.GetName()),
+				Name:      routeName,
 				Namespace: quay.GetNamespace(),
 			},
 			Spec: routev1.RouteSpec{
@@ -246,65 +255,65 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 		},
 	)
 
-	// if we fail to create the fake route and the failure is not IsAlreadyExists then
-	// we consider as if the cluster does not support Route objects. XXX This must be
-	// redesigned. I am keeping the logic as is but we shouldn't blindly trust that any
-	// error means "does not support routes".
 	if err := r.Create(ctx, fakeRoute); err != nil && !errors.IsAlreadyExists(err) {
-		r.Log.Info("cluster does not support `Route` API", "error", err)
+		r.Log.Info("failed to create probe route", "error", err)
 		return nil
 	}
 
-	// Wait until `status.ingress` is populated (should be immediately).
-	r.Log.Info("cluster supports `Routes` API")
 	var rt routev1.Route
-	if err := wait.PollUntilContextTimeout(
-		ctx,
-		time.Second,
-		5*time.Minute,
-		false,
-		func(ctx context.Context) (done bool, err error) {
-			routensn := types.NamespacedName{
-				Name:      fmt.Sprintf("%s-test-route", quay.GetName()),
-				Namespace: quay.GetNamespace(),
-			}
-
-			if err := r.Get(ctx, routensn, &rt); err != nil {
-				return true, err
-			}
-
-			if len(rt.Status.Ingress) == 0 {
-				r.Log.Info("waiting to detect `routerCanonicalHostname`")
-				return false, nil
-			}
-
-			qctx.SupportsRoutes = true
-			prefix := fmt.Sprintf("router-%s.", rt.Status.Ingress[0].RouterName)
-			cnname := rt.Status.Ingress[0].RouterCanonicalHostname
-			qctx.ClusterHostname = strings.TrimPrefix(cnname, prefix)
-			r.Log.Info("Detected cluster hostname " + qctx.ClusterHostname)
-			return true, nil
-		},
-	); err != nil {
-		return err
+	if err := r.Get(ctx, routeNSN, &rt); err != nil {
+		return fmt.Errorf("failed to get probe route: %w", err)
 	}
 
-	if qctx.ServerHostname == "" {
-		qctx.ServerHostname = fmt.Sprintf(
-			"%s-quay-%s.%s",
-			quay.GetName(),
-			quay.GetNamespace(),
-			qctx.ClusterHostname,
-		)
+	if len(rt.Status.Ingress) == 0 {
+		r.Log.Info("waiting to detect routerCanonicalHostname")
+		return errRouteProbeInProgress
 	}
 
+	// Extract and cache cluster hostname.
+	prefix := fmt.Sprintf("router-%s.", rt.Status.Ingress[0].RouterName)
+	cnname := rt.Status.Ingress[0].RouterCanonicalHostname
+	hostname := strings.TrimPrefix(cnname, prefix)
+	r.Log.Info("detected cluster hostname", "hostname", hostname)
+
+	qctx.SupportsRoutes = true
+	qctx.ClusterHostname = hostname
+	r.clusterHostname.Store(&hostname)
+
+	// Best-effort wildcard cert extraction.
 	wildcard, err := getCertificatesPEM(rt.Spec.Host + ":443")
 	if err != nil {
-		return err
+		r.Log.Info("failed to extract wildcard cert, continuing without it", "error", err)
+	} else {
+		qctx.ClusterWildcardCert = wildcard
+		r.clusterWildcardCert.Store(&wildcard)
 	}
-	qctx.ClusterWildcardCert = wildcard
 
-	return r.Delete(ctx, &rt)
+	if err := r.Delete(ctx, &rt); err != nil && !errors.IsNotFound(err) {
+		r.Log.Error(err, "failed to delete probe route")
+	}
+
+	return nil
+}
+
+// fillServerHostname derives ServerHostname from ClusterHostname if not
+// explicitly set in the config bundle.
+func fillServerHostname(
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+) {
+	if qctx.ServerHostname != "" {
+		return
+	}
+	if qctx.ClusterHostname == "" {
+		return
+	}
+	qctx.ServerHostname = fmt.Sprintf(
+		"%s-quay-%s.%s",
+		quay.GetName(),
+		quay.GetNamespace(),
+		qctx.ClusterHostname,
+	)
 }
 
 func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
