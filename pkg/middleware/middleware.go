@@ -184,9 +184,6 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			for i := range dep.Spec.Template.Spec.Containers {
 				dep.Spec.Template.Spec.Containers[i].SecurityContext = osecctx
 			}
-			for i := range dep.Spec.Template.Spec.InitContainers {
-				dep.Spec.Template.Spec.InitContainers[i].SecurityContext = osecctx
-			}
 		}
 
 		if oannot := v1.GetAnnotationsOverrideForComponent(quay, kind); oannot != nil {
