@@ -3,22 +3,22 @@ kind: Deployment
 metadata:
   name: clair-postgres-old
   labels:
-    quay-component: clair-postgres
+    quay-component: clair-postgres-old
   annotations:
-    quay-component: clair-postgres
+    quay-component: clair-postgres-old
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      quay-component: clair-postgres
+      quay-component: clair-postgres-old
   template:
     metadata:
       labels:
-        quay-component: clair-postgres
+        quay-component: clair-postgres-old
     spec:
-      terminationGracePeriodSeconds: 180
+      terminationGraceperiodSeconds: 600
       serviceAccountName: clair-postgres
       volumes:
         - name: clair-postgres-conf-sample
@@ -26,23 +26,35 @@ spec:
             name: clair-postgres-conf-sample
         - name: postgres-data
           persistentVolumeClaim:
-            claimName: clair-postgres
+            claimName: clair-postgres-13
       containers:
         - name: postgres
-          image: centos/postgresql-10-centos7:latest
+          image: quay.io/sclorg/postgresql-13-c9s:latest
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 5432
               protocol: TCP
           env:
             - name: POSTGRESQL_USER
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-username
             - name: POSTGRESQL_DATABASE
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-name
             - name: POSTGRESQL_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-password
             - name: POSTGRESQL_ADMIN_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-root-password
             - name: POSTGRESQL_SHARED_BUFFERS
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS
@@ -57,3 +69,19 @@ spec:
             requests:
               cpu: 500m
               memory: 2Gi
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "
+                  until pg_isready; do
+                    echo 'Waiting for PostgreSQL to start...';
+                    sleep 2;
+                  done;
+                  if [[ -f /proc/sys/crypto/fips_enabled && $(< /proc/sys/crypto/fips_enabled) -eq 1 ]]; then
+                    echo 'password_encryption = scram-sha-256' >> $PGDATA/postgresql.conf;
+                    echo 'host all all 0.0.0.0/0 scram-sha-256' >> $PGDATA/pg_hba.conf;
+                    pg_ctl reload;
+                    psql -c \"ALTER SYSTEM SET password_encryption TO 'scram-sha-256';\";
+                    psql -c \"SELECT pg_reload_conf();\";
+                    psql -c \"ALTER USER $POSTGRESQL_USER WITH PASSWORD '$POSTGRESQL_PASSWORD';\";
+                  fi"]

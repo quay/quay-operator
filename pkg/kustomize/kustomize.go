@@ -3,7 +3,6 @@ package kustomize
 import (
 	"errors"
 	"fmt"
-
 	"os"
 	"path/filepath"
 	"runtime"
@@ -52,16 +51,18 @@ const (
 // to use. If set, returns a Kustomize image override for the given component.
 func ComponentImageFor(component v1.ComponentKind) (types.Image, error) {
 	envVarFor := map[v1.ComponentKind]string{
-		v1.ComponentQuay:     componentImagePrefix + "QUAY",
-		v1.ComponentClair:    componentImagePrefix + "CLAIR",
-		v1.ComponentRedis:    componentImagePrefix + "REDIS",
-		v1.ComponentPostgres: componentImagePrefix + "POSTGRES",
+		v1.ComponentQuay:          componentImagePrefix + "QUAY",
+		v1.ComponentClair:         componentImagePrefix + "CLAIR",
+		v1.ComponentRedis:         componentImagePrefix + "REDIS",
+		v1.ComponentPostgres:      componentImagePrefix + "POSTGRES",
+		v1.ComponentClairPostgres: componentImagePrefix + "CLAIRPOSTGRES",
 	}
 	defaultImagesFor := map[v1.ComponentKind]string{
-		v1.ComponentQuay:     "quay.io/projectquay/quay",
-		v1.ComponentClair:    "quay.io/projectquay/clair",
-		v1.ComponentRedis:    "docker.io/library/redis",
-		v1.ComponentPostgres: "quay.io/sclorg/postgresql-13-c9s",
+		v1.ComponentQuay:          "quay.io/projectquay/quay",
+		v1.ComponentClair:         "quay.io/projectquay/clair",
+		v1.ComponentRedis:         "docker.io/library/redis",
+		v1.ComponentPostgres:      "quay.io/sclorg/postgresql-13-c9s",
+		v1.ComponentClairPostgres: "quay.io/sclorg/postgresql-15-c9s",
 	}
 
 	imageOverride := types.Image{
@@ -96,6 +97,31 @@ func postgresUpgradeImage() (types.Image, error) {
 	}
 
 	image := os.Getenv("RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS")
+	if image == "" {
+		return imageOverride, nil
+	}
+
+	if len(strings.Split(image, "@")) == 2 {
+		imageOverride.NewName = strings.Split(image, "@")[0]
+		imageOverride.Digest = strings.Split(image, "@")[1]
+	} else if len(strings.Split(image, ":")) == 2 {
+		imageOverride.NewName = strings.Split(image, ":")[0]
+		imageOverride.NewTag = strings.Split(image, ":")[1]
+	} else {
+		return types.Image{}, fmt.Errorf(
+			"image override must be reference by tag or digest: %s", image,
+		)
+	}
+	return imageOverride, nil
+}
+
+func clairpostgresUpgradeImage() (types.Image, error) {
+	imageOverride := types.Image{
+		Name: "quay.io/sclorg/postgresql-13-c9s",
+	}
+
+	image := os.Getenv("RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES_PREVIOUS")
+
 	if image == "" {
 		return imageOverride, nil
 	}
@@ -149,13 +175,14 @@ func decode(bytes []byte) interface{} {
 }
 
 // EnsureCreationOrder sorts the given slice of Kubernetes objects so that when created in order,
-// `Deployments` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
+// `Deployments` and `Jobs` will be created after their dependencies (`Secrets`/`ConfigMaps`/etc).
 func EnsureCreationOrder(objects []client.Object) []client.Object {
 	sort.Slice(
 		objects,
 		func(i, j int) bool {
 			obji := objects[i]
-			return obji.GetObjectKind().GroupVersionKind().Kind != "Deployment"
+			kind := obji.GetObjectKind().GroupVersionKind().Kind
+			return kind != "Deployment" && kind != "Job"
 		},
 	)
 	return objects
@@ -302,6 +329,29 @@ func KustomizationFor(
 		configFiles = append(configFiles, filepath.Join("bundle", key))
 	}
 
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClairPostgres) && ctx.ClairDbPassword == "" {
+		// DbRootPw is populated from managed keys for existing deployments
+		// but empty for new ones (before the generation block below).
+		if ctx.DbRootPw == "" {
+			// New deployment: generate random credentials.
+			pw, err := generateRandomString(32)
+			if err != nil {
+				return nil, err
+			}
+			ctx.ClairDbPassword = pw
+		} else {
+			// Upgrade path: default to legacy hardcoded values
+			ctx.ClairDbPassword = "postgres"
+		}
+		// The sclorg PG image sets POSTGRESQL_ADMIN_PASSWORD on the
+		// "postgres" superuser after POSTGRESQL_PASSWORD. When
+		// POSTGRESQL_USER is also "postgres" both must match or the
+		// user password is silently overwritten by the admin password.
+		ctx.ClairDbRootPw = ctx.ClairDbPassword
+		ctx.ClairDbUser = "postgres"
+		ctx.ClairDbName = "postgres"
+	}
+
 	if ctx.DbRootPw == "" {
 		rootpw, err := generateRandomString(32)
 		if err != nil {
@@ -380,6 +430,10 @@ func KustomizationFor(
 						"DB_URI=" + ctx.DbUri,
 						"DB_ROOT_PW=" + ctx.DbRootPw,
 						"SECURITY_SCANNER_V4_PSK=" + ctx.SecurityScannerV4PSK,
+						"CLAIR_DB_USER=" + ctx.ClairDbUser,
+						"CLAIR_DB_PASSWORD=" + ctx.ClairDbPassword,
+						"CLAIR_DB_ROOT_PW=" + ctx.ClairDbRootPw,
+						"CLAIR_DB_NAME=" + ctx.ClairDbName,
 					},
 				},
 			},
@@ -396,7 +450,15 @@ func KustomizationFor(
 
 	componentPaths := []string{}
 	if overlay == upgradeOverlayDir() {
-		componentPaths = []string{"../components/job"}
+		// only include the upgrade job when object storage is either unmanaged
+		// or already initialized. when managed object storage is pending (OBC
+		// not yet bound), we skip the job to avoid creating it with incomplete
+		// storage configuration. the job will be created on the next reconcile
+		// after the OBC credentials become available.
+		osmanaged := v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentObjectStorage)
+		if !osmanaged || ctx.ObjectStorageInitialized {
+			componentPaths = []string{"../components/job"}
+		}
 	}
 	for _, component := range quay.Spec.Components {
 		if !component.Managed || component.Kind == v1.ComponentQuay {
@@ -439,8 +501,10 @@ func KustomizationFor(
 	if ctx.NeedsClairPgUpgrade {
 		if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClair) {
 			componentPaths = append(componentPaths, "../components/clairpgupgrade/scale-down-clair")
+		} else {
+			componentPaths = append(componentPaths, "../components/clairpgupgrade/base")
 		}
-		componentPaths = append(componentPaths, "../components/clairpgupgrade/base")
+
 	}
 
 	images := []types.Image{}
@@ -456,12 +520,20 @@ func KustomizationFor(
 		}
 	}
 
-	if ctx.NeedsPgUpgrade || ctx.NeedsClairPgUpgrade {
+	if ctx.NeedsPgUpgrade {
 		pgImage, err := postgresUpgradeImage()
 		if err != nil {
 			return nil, err
 		}
 		images = append(images, pgImage)
+	}
+
+	if ctx.NeedsClairPgUpgrade {
+		clairPgImage, err := clairpostgresUpgradeImage()
+		if err != nil {
+			return nil, err
+		}
+		images = append(images, clairPgImage)
 	}
 
 	return &types.Kustomization{

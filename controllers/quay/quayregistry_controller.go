@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -40,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -54,18 +52,19 @@ import (
 )
 
 const (
-	creationPollInterval = time.Second * 2
-	creationPollTimeout  = time.Second * 600
-
-	grafanaDashboardConfigMapNameSuffix = "grafana-dashboard-quay"
-	grafanaTitleJSONPath                = "title"
-	grafanaNamespaceFilterJSONPath      = "templating.list.1.options.0.value"
-	grafanaServiceFilterJSONPath        = "templating.list.2.options.0.value"
-	clusterMonitoringLabelKey           = "openshift.io/cluster-monitoring"
-	quayDashboardJSONKey                = "quay.json"
-	quayOperatorManagedLabelKey         = "quay-operator/managed-label"
-	quayOperatorFinalizer               = "quay-operator/finalizer"
-	grafanaDashboardConfigNamespace     = "openshift-config-managed"
+	grafanaDashboardConfigMapNameSuffix   = "grafana-dashboard-quay"
+	grafanaTitleJSONPath                  = "title"
+	grafanaNamespaceFilterJSONPath        = "templating.list.1.options.0.value"
+	grafanaNamespaceCurrentFilterJSONPath = "templating.list.1.current.value"
+	grafanaNamespaceQueryJSONPath         = "templating.list.1.query"
+	grafanaServiceFilterJSONPath          = "templating.list.2.options.0.value"
+	grafanaServiceCurrentFilterJSONPath   = "templating.list.2.current.value"
+	grafanaServiceQueryJSONPath           = "templating.list.2.query"
+	clusterMonitoringLabelKey             = "openshift.io/cluster-monitoring"
+	quayDashboardJSONKey                  = "quay.json"
+	quayOperatorManagedLabelKey           = "quay-operator/managed-label"
+	quayOperatorFinalizer                 = "quay-operator/finalizer"
+	grafanaDashboardConfigNamespace       = "openshift-config-managed"
 )
 
 // QuayRegistryReconciler reconciles a QuayRegistry object
@@ -75,7 +74,6 @@ type QuayRegistryReconciler struct {
 	Scheme               *runtime.Scheme
 	EventRecorder        record.EventRecorder
 	WatchNamespace       string
-	Mtx                  *sync.Mutex
 	Requeue              ctrl.Result
 	SkipResourceRequests bool
 }
@@ -278,6 +276,34 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 				r.Log.Error(err, fmt.Sprintf("%s deployment could not be deleted", oldPostgresDeploymentName))
 			}
 
+			oldPostgresServiceName := fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres-old")
+			oldPostgresService := &corev1.Service{}
+			if err := r.Client.Get(
+				ctx,
+				types.NamespacedName{
+					Name:      oldPostgresServiceName,
+					Namespace: quay.GetNamespace(),
+				},
+				oldPostgresService,
+			); err != nil {
+				r.Log.Info(fmt.Sprintf("%s service not found, skipping", oldPostgresServiceName))
+				continue
+			}
+
+			// Remove owner reference from old service
+			obj, err = v1.RemoveOwnerReference(quay, oldPostgresService)
+			if err != nil {
+				log.Error(err, "could not remove owner reference from old postgres service")
+			}
+
+			// Delete old postgres deployment
+			if err := r.Client.Delete(
+				ctx,
+				obj,
+			); err != nil {
+				r.Log.Error(err, fmt.Sprintf("%s service could not be deleted", oldPostgresServiceName))
+			}
+
 			// Remove owner reference from old pvc so user can delete when ready
 			var oldPostgresPVCName string
 			if jobName == clairPostgresUpgradeJobName {
@@ -357,7 +383,6 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 
 	log.Info("successfully updated `status` after Quay upgrade")
 	return r.Requeue, nil
-
 }
 
 // createInitialBundleSecret creates a new config bundle secret for provided QuayRegistry
@@ -420,15 +445,47 @@ func (r *QuayRegistryReconciler) GetConfigBundleSecret(
 	return bundle, nil
 }
 
+// GetOldConfigBundleSecrets returns all of the secrets with the prefix `<quayregistry-name>-config-bundle-`
+// in the same namespace as the QuayRegistry. This is used to clean up old config bundle secrets
+// when a new config bundle secret is created.
+func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
+	ctx context.Context, quay *v1.QuayRegistry,
+) ([]corev1.Secret, error) {
+	secretList := &corev1.SecretList{}
+	if err := r.Client.List(
+		ctx,
+		secretList,
+		client.InNamespace(quay.GetNamespace()),
+	); err != nil {
+		return nil, err
+	}
+	if len(secretList.Items) == 0 {
+		return nil, goerrors.New("no unused secrets found")
+	}
+	var oldConfigBundleSecrets []corev1.Secret
+	for _, secret := range secretList.Items {
+		if strings.HasPrefix(secret.Name, quay.GetName()+"-quay-config-secret") && secret.Name != quay.Spec.ConfigBundleSecret {
+			oldConfigBundleSecrets = append(oldConfigBundleSecrets, secret)
+		}
+	}
+	return oldConfigBundleSecrets, nil
+}
+
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=pods;services;secrets;configmaps;serviceaccounts;persistentvolumeclaims;events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=route.openshift.io,resources=routes;routes/custom-host,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
 func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
-
 	regid := fmt.Sprintf("%s/%s", req.NamespacedName.Namespace, req.NamespacedName.Name)
 	log := r.Log.WithValues("quayregistry", regid)
 	log.Info("begin reconcile")
@@ -445,6 +502,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	updatedQuay := quay.DeepCopy()
+	updatedQuay.Status.ObservedGeneration = quay.Generation
+
 	if v1.FlaggedForDeletion(updatedQuay) {
 		return r.manageQuayDeletion(ctx, updatedQuay, log)
 	}
@@ -525,7 +584,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
 	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentPostgres) {
-		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
+		err, scaledDown := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
 		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
@@ -536,11 +595,14 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				fmt.Sprintf("error checking for pg upgrade: %s", err),
 			)
 		}
+		if !scaledDown {
+			return r.Requeue, nil
+		}
 	}
 
 	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
 	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentClairPostgres) {
-		err := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
+		err, scaledDown := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
 		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
@@ -550,6 +612,9 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				v1.ConditionReasonPostgresUpgradeFailed,
 				fmt.Sprintf("error checking for pg upgrade: %s", err),
 			)
+		}
+		if !scaledDown {
+			return r.Requeue, nil
 		}
 	}
 
@@ -642,6 +707,31 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	previousSecrets, err := r.GetOldConfigBundleSecrets(ctx, updatedQuay)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				fmt.Sprintf("could not get previous config bundle secrets: %s", err),
+			)
+		}
+	}
+
+	if err := r.cleanupPreviousSecrets(log, ctx, &quay, previousSecrets); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("could not remove previous config bundle secret: %s", err),
+		)
+	}
+
 	for _, obj := range kustomize.EnsureCreationOrder(deploymentObjects) {
 		// For metrics and dashboards to work, we need to deploy the Grafana ConfigMap
 		// in the `openshift-config-managed` namespace and add the label
@@ -660,15 +750,19 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 
-		if err := r.createOrUpdateObject(ctx, obj, quay, log); err != nil {
+		requeue, err := r.createOrUpdateObject(ctx, obj, quay, log)
+		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
 				&quay,
 				v1.ConditionTypeRolloutBlocked,
 				metav1.ConditionTrue,
 				v1.ConditionReasonComponentCreationFailed,
-				fmt.Sprintf("error creating object: %s", err),
+				fmt.Sprintf("error creating/updating object %s %s: %s", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName(), err.Error()),
 			)
+		}
+		if requeue {
+			return r.Requeue, nil
 		}
 	}
 
@@ -715,7 +809,6 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.Requeue, nil
 	}
 
-	osmanaged = v1.ComponentIsManaged(updatedQuay.Spec.Components, "objectstorage")
 	if osmanaged && !quayContext.ObjectStorageInitialized {
 		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
 		return r.Requeue, nil
@@ -853,11 +946,42 @@ func updateGrafanaDashboardData(obj client.Object, quay *v1.QuayRegistry) error 
 		return err
 	}
 
+	// Also set the current value for namespace variable (required for Grafana to apply the variable)
+	if config, err = sjson.Set(
+		config, grafanaNamespaceCurrentFilterJSONPath, quay.GetNamespace(),
+	); err != nil {
+		return err
+	}
+
+	// Set the query field for namespace variable (Grafana uses this for type: custom)
+	if config, err = sjson.Set(
+		config, grafanaNamespaceQueryJSONPath, quay.GetNamespace(),
+	); err != nil {
+		return err
+	}
+
 	metricsServiceName := fmt.Sprintf("%s-quay-metrics", quay.GetName())
 	config, err = sjson.Set(config, grafanaServiceFilterJSONPath, metricsServiceName)
 	if err != nil {
 		return err
 	}
+
+	// Also set the current value for service variable (required for Grafana to apply the variable)
+	config, err = sjson.Set(config, grafanaServiceCurrentFilterJSONPath, metricsServiceName)
+	if err != nil {
+		return err
+	}
+
+	// Set the query field for service variable (Grafana uses this for type: custom)
+	config, err = sjson.Set(config, grafanaServiceQueryJSONPath, metricsServiceName)
+	if err != nil {
+		return err
+	}
+
+	// Replace $namespace and $service placeholders directly in all panel expressions
+	// This is required because OpenShift Console doesn't substitute custom type variables
+	config = strings.ReplaceAll(config, "$namespace", quay.GetNamespace())
+	config = strings.ReplaceAll(config, "$service", metricsServiceName)
 
 	cm.Data[quayDashboardJSONKey] = config
 	return nil
@@ -899,7 +1023,7 @@ func convertHpaToV2beta2(hpa *autoscalingv2.HorizontalPodAutoscaler) (*autoscali
 
 func (r *QuayRegistryReconciler) createOrUpdateObject(
 	ctx context.Context, obj client.Object, quay v1.QuayRegistry, log logr.Logger,
-) error {
+) (bool, error) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	log = log.WithValues("kind", gvk.Kind, "name", obj.GetName())
 	log.Info("creating/updating object")
@@ -911,7 +1035,7 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		var err error
 		if obj, err = v1.RemoveOwnerReference(&quay, obj); err != nil {
 			log.Error(err, "could not remove `ownerReferences` from grafana config")
-			return err
+			return false, err
 		}
 	}
 
@@ -927,31 +1051,20 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 
 		if err := r.Client.Delete(ctx, obj, opts); err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "failed to delete immutable resource")
-			return err
+			return false, err
 		}
 
-		if err := wait.PollUntilContextTimeout(
-			ctx,
-			creationPollInterval,
-			creationPollTimeout,
-			false,
-			func(ctx context.Context) (bool, error) {
-				if err := r.Client.Create(ctx, obj); err != nil {
-					if errors.IsAlreadyExists(err) {
-						log.Info("immutable resource being deleted, retry")
-						return false, nil
-					}
-					return true, err
-				}
+		if err := r.Client.Create(ctx, obj); err != nil {
+			if errors.IsAlreadyExists(err) {
+				log.Info("immutable resource still being deleted, will requeue")
 				return true, nil
-			},
-		); err != nil {
+			}
 			log.Error(err, "failed to create immutable resource")
-			return err
+			return false, err
 		}
 
-		log.Info("succefully (re)created immutable resource")
-		return nil
+		log.Info("successfully (re)created immutable resource")
+		return false, nil
 	}
 
 	hpaGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}
@@ -966,17 +1079,17 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		var hpa *autoscalingv2beta2.HorizontalPodAutoscaler
 		hpa, err = convertHpaToV2beta2(obj.(*autoscalingv2.HorizontalPodAutoscaler))
 		if err != nil {
-			return err
+			return false, err
 		}
 		err = r.Client.Patch(ctx, hpa, client.Apply, opts...)
 	}
 	if err != nil {
 		log.Error(err, "failed to create/update object")
-		return err
+		return false, err
 	}
 
 	log.Info("finished creating/updating object")
-	return nil
+	return false, nil
 }
 
 func (r *QuayRegistryReconciler) updateWithCondition(
@@ -1006,6 +1119,36 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 	r.EventRecorder.Event(quay, eventType, string(reason), msg)
 
 	return r.Client.Status().Update(ctx, quay)
+}
+
+func (r *QuayRegistryReconciler) cleanupPreviousSecrets(log logr.Logger, ctx context.Context, quay *v1.QuayRegistry, previousSecrets []corev1.Secret) error {
+	log.Info("deleting old objects")
+	if len(previousSecrets) == 0 {
+		log.Info("no previous config bundle secrets to delete")
+		return nil
+	} else {
+		log.Info("found previous config bundle secrets", "count", len(previousSecrets))
+	}
+
+	log.Info("deleting previous config bundle secrets")
+	for _, secret := range previousSecrets {
+		if err := r.Client.Delete(ctx, &secret); err != nil {
+			log.Error(err, "failed to delete previous config bundle secret")
+			return r.updateWithCondition(
+				ctx,
+				quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonComponentCreationFailed,
+				fmt.Sprintf("could not delete previous config bundle secret: %s", err),
+			)
+		}
+
+		// print thee secret name that has been cleaned up
+		log.Info("cleaned up unused config bundle secret", "name", secret.Name)
+	}
+
+	return nil
 }
 
 // reconcileWithCondition sets the given condition on the `QuayRegistry` and returns a reconcile
@@ -1045,8 +1188,13 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.QuayRegistry{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&batchv1.Job{}).
+		Owns(&corev1.Service{}).
+		Owns(&corev1.Secret{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.PersistentVolumeClaim{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
-		// TODO: Add `.Owns()` for every resource type we manage...
 		Complete(r)
 }
 
@@ -1085,7 +1233,6 @@ func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(
 func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, quay *v1.QuayRegistry) error {
 	var ns corev1.Namespace
 	err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
-
 	if err != nil {
 		return err
 	}
@@ -1121,7 +1268,8 @@ func (r *QuayRegistryReconciler) cleanupGrafanaConfigMap(ctx context.Context, qu
 	var grafanaConfigMap corev1.ConfigMap
 	grafanaConfigMapName := types.NamespacedName{
 		Name:      quay.GetName() + "-" + grafanaDashboardConfigMapNameSuffix,
-		Namespace: grafanaDashboardConfigNamespace}
+		Namespace: grafanaDashboardConfigNamespace,
+	}
 
 	if err := r.Client.Get(ctx, grafanaConfigMapName, &grafanaConfigMap); err == nil || !errors.IsNotFound(err) {
 		return r.Client.Delete(ctx, &grafanaConfigMap)

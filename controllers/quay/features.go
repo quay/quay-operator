@@ -42,6 +42,11 @@ const (
 	dbURI                = "DB_URI"
 	dbRootPw             = "DB_ROOT_PW"
 	securityScannerV4PSK = "SECURITY_SCANNER_V4_PSK"
+
+	clairDbUser   = "CLAIR_DB_USER"
+	clairDbPw     = "CLAIR_DB_PASSWORD"
+	clairDbRootPw = "CLAIR_DB_ROOT_PW"
+	clairDbName   = "CLAIR_DB_NAME"
 )
 
 // checkDeprecatedManagedKeys populates the provided quay context with information we
@@ -74,6 +79,10 @@ func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 		qctx.DbUri = string(secret.Data[dbURI])
 		qctx.DbRootPw = string(secret.Data[dbRootPw])
 		qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
+		qctx.ClairDbUser = string(secret.Data[clairDbUser])
+		qctx.ClairDbPassword = string(secret.Data[clairDbPw])
+		qctx.ClairDbRootPw = string(secret.Data[clairDbRootPw])
+		qctx.ClairDbName = string(secret.Data[clairDbName])
 		break
 	}
 
@@ -105,6 +114,10 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	qctx.DbUri = string(secret.Data[dbURI])
 	qctx.DbRootPw = string(secret.Data[dbRootPw])
 	qctx.SecurityScannerV4PSK = string(secret.Data[securityScannerV4PSK])
+	qctx.ClairDbUser = string(secret.Data[clairDbUser])
+	qctx.ClairDbPassword = string(secret.Data[clairDbPw])
+	qctx.ClairDbRootPw = string(secret.Data[clairDbRootPw])
+	qctx.ClairDbName = string(secret.Data[clairDbName])
 	return nil
 }
 
@@ -408,15 +421,21 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 // checkPostgresVersion returns the image name used by the currently deployed postgres version
 func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry, component v1.ComponentKind,
-) error {
-	var deploymentName string
-	if component == v1.ComponentClairPostgres {
-		deploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres")
-	} else if component == v1.ComponentPostgres {
-		deploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database")
-	} else {
-		return fmt.Errorf("invalid component kind: %s", component)
+) (err error, scaledDown bool) {
+	componentInfo := map[v1.ComponentKind]struct {
+		deploymentSuffix string
+		upgradeField     *bool
+	}{
+		v1.ComponentClairPostgres: {"clair-postgres", &qctx.NeedsClairPgUpgrade},
+		v1.ComponentPostgres:      {"quay-database", &qctx.NeedsPgUpgrade},
 	}
+
+	info, ok := componentInfo[component]
+	if !ok {
+		return fmt.Errorf("invalid component kind: %s", component), false
+	}
+
+	deploymentName := fmt.Sprintf("%s-%s", quay.GetName(), info.deploymentSuffix)
 	r.Log.Info(fmt.Sprintf("getting %s version", component))
 
 	postgresDeployment := &appsv1.Deployment{}
@@ -429,42 +448,85 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 		postgresDeployment,
 	); err != nil {
 		r.Log.Info(fmt.Sprintf("%s deployment not found, skipping", component))
-		return nil
+		return nil, true
 	}
 
-	r.Log.Info(fmt.Sprintf("%s deployment found", component), "image", postgresDeployment.Spec.Template.Spec.Containers[0].Image)
 	deployedImageName := postgresDeployment.Spec.Template.Spec.Containers[0].Image
-	expectedImage, err := kustomize.ComponentImageFor(v1.ComponentPostgres)
+	r.Log.Info(fmt.Sprintf("%s deployment found", component), "image", deployedImageName)
+
+	expectedImage, err := kustomize.ComponentImageFor(component)
 	if err != nil {
 		r.Log.Error(err, "failed to get postgres image")
 	}
 
-	var expectedName string
-	if expectedImage.NewName != "" {
-		expectedName = expectedImage.NewName
-	} else {
+	expectedName := expectedImage.NewName
+	if expectedName == "" {
 		expectedName = expectedImage.Name
 	}
-	currentName := deployedImageName
-	if len(strings.Split(currentName, "@")) == 2 {
-		currentName = strings.Split(currentName, "@")[0]
-	} else if len(strings.Split(currentName, ":")) == 2 {
-		currentName = strings.Split(currentName, ":")[0]
-	}
-	if currentName != expectedName {
-		if component == v1.ComponentClairPostgres {
-			r.Log.Info("clair-postgres needs to perform an upgrade, marking in context")
-			qctx.NeedsClairPgUpgrade = true
-		} else if component == v1.ComponentPostgres {
-			r.Log.Info("postgres needs to perform an upgrade, marking in context")
-			qctx.NeedsPgUpgrade = true
-		}
+
+	currentName := extractImageName(deployedImageName)
+
+	// Extract repository names by finding the last component after splitting by '/'
+	// This handles cases where repository names contain slashes (e.g., "quay.io/org/repo")
+	currentRepoName := currentName[strings.LastIndex(currentName, "/")+1:]
+	expectedRepoName := expectedName[strings.LastIndex(expectedName, "/")+1:]
+
+	if currentRepoName != expectedRepoName {
+		r.Log.Info(fmt.Sprintf("%s needs to perform an upgrade, marking in context", component))
+		*info.upgradeField = true
 	} else {
 		r.Log.Info(fmt.Sprintf("%s does not need to perform an upgrade", component))
+		return nil, true
 	}
 
-	return nil
+	// at this point we have determined that these postgres deployments need to be upgraded and can set them to 0 replicas
+	// so that the upgrade job can run with no interference
+	r.Log.Info(fmt.Sprintf("scaling down %s deployment", component))
+	postgresDeployment.Spec.Replicas = &[]int32{0}[0]
+	postgresDeployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &[]int64{600}[0]
+	if err := r.Client.Update(ctx, postgresDeployment); err != nil {
+		r.Log.Error(err, "unable to update postgres deployment replicas")
+	}
+	// now we wait to ensure that the deployment has scaled down before we proceed
 
+	terminatingPods := []corev1.Pod{}
+	podList := &corev1.PodList{}
+	labelSelector, err := metav1.LabelSelectorAsSelector(postgresDeployment.Spec.Selector)
+	if err != nil {
+		r.Log.Error(err, "unable to get label selector for postgres deployment")
+	}
+	err = r.Client.List(ctx, podList, &client.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		r.Log.Error(err, "unable to list pods for postgres deployment")
+		return err, false
+	}
+
+	for _, pod := range podList.Items {
+		if pod.Status.Phase == corev1.PodRunning {
+			terminatingPods = append(terminatingPods, pod)
+		}
+	}
+
+	if len(terminatingPods) > 0 {
+		r.Log.Info(fmt.Sprintf("Found %d pods in terminating status", len(terminatingPods)))
+		return nil, false
+	}
+
+	return nil, true
+}
+
+func extractImageName(imageName string) string {
+	parts := strings.Split(imageName, "@")
+	if len(parts) > 1 {
+		return parts[0]
+	}
+	parts = strings.Split(imageName, ":")
+	if len(parts) > 1 {
+		return parts[0]
+	}
+	return imageName
 }
 
 // Taken from https://stackoverflow.com/questions/46735347/how-can-i-fetch-a-certificate-from-a-url

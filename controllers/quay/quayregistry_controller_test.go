@@ -4,26 +4,124 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"sync"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/quay/quay-operator/pkg/kustomize"
 )
+
+func TestCreateOrUpdateObject_Job(t *testing.T) {
+	jobObj := &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "batch/v1",
+			Kind:       "Job",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: "default",
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{Name: "test", Image: "busybox"},
+					},
+				},
+			},
+		},
+	}
+
+	quay := v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-registry",
+			Namespace: "default",
+		},
+	}
+
+	for _, tt := range []struct {
+		name              string
+		existing          bool
+		createInterceptor func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error
+		wantRequeue       bool
+		wantErr           bool
+	}{
+		{
+			name:        "job does not exist, create succeeds",
+			existing:    false,
+			wantRequeue: false,
+			wantErr:     false,
+		},
+		{
+			name:     "job still terminating, returns requeue",
+			existing: true,
+			createInterceptor: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+				return k8serrors.NewAlreadyExists(
+					schema.GroupResource{Group: "batch", Resource: "jobs"},
+					obj.GetName(),
+				)
+			},
+			wantRequeue: true,
+			wantErr:     false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(scheme.Scheme)
+			if tt.existing {
+				existingJob := jobObj.DeepCopy()
+				existingJob.SetResourceVersion("1")
+				builder = builder.WithObjects(existingJob)
+			}
+			if tt.createInterceptor != nil {
+				builder = builder.WithInterceptorFuncs(interceptor.Funcs{
+					Create: tt.createInterceptor,
+				})
+			}
+			fakeClient := builder.Build()
+
+			reconciler := &QuayRegistryReconciler{
+				Client:        fakeClient,
+				Log:           testLogger,
+				Scheme:        scheme.Scheme,
+				EventRecorder: testEventRecorder,
+			}
+
+			obj := jobObj.DeepCopy()
+			requeue, err := reconciler.createOrUpdateObject(
+				context.Background(), obj, quay, testLogger,
+			)
+
+			if tt.wantErr && err == nil {
+				t.Error("expected error but got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if requeue != tt.wantRequeue {
+				t.Errorf("requeue = %v, want %v", requeue, tt.wantRequeue)
+			}
+		})
+	}
+}
 
 func newQuayRegistry(name, namespace string) *v1.QuayRegistry {
 	quay := &v1.QuayRegistry{
@@ -66,7 +164,6 @@ func newConfigBundle(name, namespace string, withCerts bool) corev1.Secret {
 			config["SERVER_HOSTNAME"].(string),
 			nil,
 			[]string{config["SERVER_HOSTNAME"].(string)})
-
 		if err != nil {
 			panic(err)
 		}
@@ -110,13 +207,11 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 	BeforeEach(func() {
 		namespace = randIdentifier(16)
 
-		var mtx sync.Mutex
 		controller = &QuayRegistryReconciler{
 			Client:        k8sClient,
 			Log:           testLogger,
 			Scheme:        scheme.Scheme,
 			EventRecorder: testEventRecorder,
-			Mtx:           &mtx,
 		}
 
 		Expect(k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})).Should(Succeed())
@@ -150,7 +245,8 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 				context.Background(),
 				types.NamespacedName{
 					Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
-					Namespace: quayRegistry.GetNamespace()},
+					Namespace: quayRegistry.GetNamespace(),
+				},
 				&configBundleSecret)).
 				To(Succeed())
 		})
@@ -174,7 +270,8 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 				context.Background(),
 				types.NamespacedName{
 					Name:      updatedQuayRegistry.Spec.ConfigBundleSecret,
-					Namespace: quayRegistry.GetNamespace()},
+					Namespace: quayRegistry.GetNamespace(),
+				},
 				&configBundleSecret)).
 				To(Succeed())
 		})
@@ -310,7 +407,8 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 				Namespace: namespace,
 				LabelSelector: labels.SelectorFromSet(map[string]string{
 					kustomize.QuayRegistryNameLabel: quayRegistryName.Name,
-				})}
+				}),
+			}
 
 			Expect(k8sClient.List(context.Background(), &secrets, &listOptions)).To(Succeed())
 
@@ -683,6 +781,77 @@ func Test_hasNecessaryConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reconciler := QuayRegistryReconciler{}
 			err := reconciler.hasNecessaryConfig(tt.quay, tt.cfg)
+			if err != nil {
+				if tt.experr {
+					return
+				}
+				t.Errorf("unexpected err: %s", err)
+				return
+			}
+
+			if tt.experr {
+				t.Errorf("expecting error but nil returned")
+			}
+		})
+	}
+}
+
+func Test_cleanupPreviousSecret(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		experr  bool
+		secrets corev1.SecretList
+		quay    v1.QuayRegistry
+	}{
+		{
+			name:   "no secrets",
+			experr: false,
+			secrets: corev1.SecretList{
+				Items: []corev1.Secret{},
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			name:   "no secrets with config bundle",
+			experr: false,
+			secrets: corev1.SecretList{
+				Items: []corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "quay-config-secret",
+							Namespace: "test",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple secrets",
+			secrets: corev1.SecretList{
+				Items: []corev1.Secret{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "quay-config-secret-abc123",
+							Namespace: "test",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "quay-config-secret-def456",
+							Namespace: "test",
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			reconciler := QuayRegistryReconciler{
+				Client: fake.NewFakeClient(&tt.secrets),
+			}
+			log := testLogger.WithValues("test", t.Name())
+
+			err := reconciler.cleanupPreviousSecrets(log, context.Background(), &tt.quay, tt.secrets.Items)
 			if err != nil {
 				if tt.experr {
 					return

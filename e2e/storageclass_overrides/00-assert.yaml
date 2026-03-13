@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: skynet-clair-postgres-15
+spec:
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: skynet-quay-postgres-13
+spec:
+  storageClassName: local-path

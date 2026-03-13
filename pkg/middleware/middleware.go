@@ -7,7 +7,7 @@ import (
 	route "github.com/openshift/api/route/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,7 +34,27 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		return nil, err
 	}
 
-	quayComponentLabel := labels.Set(objectMeta.GetLabels()).Get("quay-component")
+	quayComponentLabel := ""
+
+	if hpa, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
+		// HPA may have its own specific labels that are not necessarily present in the standard object metadata.
+		// Therefore, we need to check both labels and annotations specifically for HPA to ensure we capture the correct quay-component label.
+		if labels := hpa.GetLabels(); labels != nil {
+			if labelValue, exists := labels["quay-component"]; exists {
+				quayComponentLabel = labelValue
+			}
+		}
+
+		if quayComponentLabel == "" {
+			if annotations := hpa.GetAnnotations(); annotations != nil {
+				if annotationValue, exists := annotations["quay-component"]; exists {
+					quayComponentLabel = annotationValue
+				}
+			}
+		}
+	} else {
+		quayComponentLabel = labels.Set(objectMeta.GetLabels()).Get("quay-component")
+	}
 
 	// Flatten config bundle `Secret`
 	if strings.Contains(objectMeta.GetName(), configSecretPrefix+"-") {
@@ -160,6 +180,12 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			ref.Resources.Limits = oresources.Limits
 		}
 
+		if osecctx := v1.GetSecurityContextOverrideForComponent(quay, kind); osecctx != nil {
+			for i := range dep.Spec.Template.Spec.Containers {
+				dep.Spec.Template.Spec.Containers[i].SecurityContext = osecctx
+			}
+		}
+
 		if oannot := v1.GetAnnotationsOverrideForComponent(quay, kind); oannot != nil {
 			if dep.Annotations == nil {
 				dep.Annotations = map[string]string{}
@@ -196,37 +222,44 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 
 	// If the current object is a PVC, check for volume override
 	if pvc, ok := obj.(*corev1.PersistentVolumeClaim); ok {
-		var override *resource.Quantity
+		var volumeSizeOverride *resource.Quantity
+		var storageClassNameOverride *string
+
 		switch quayComponentLabel {
 		case "postgres":
-			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
+			volumeSizeOverride = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentPostgres)
+			storageClassNameOverride = v1.GetStorageClassNameOverrideForComponent(quay, v1.ComponentPostgres)
 		case "clair-postgres":
-			override = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
+			volumeSizeOverride = v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClairPostgres)
+			storageClassNameOverride = v1.GetStorageClassNameOverrideForComponent(quay, v1.ComponentClairPostgres)
 		}
 
-		// If override was not provided
-		if override == nil {
-			return pvc, nil
+		// If volume override was provided
+		if volumeSizeOverride != nil {
+			// Ensure that volume size is not being reduced
+			pvcstorage := pvc.Spec.Resources.Requests.Storage()
+			if pvcstorage != nil && volumeSizeOverride.Cmp(*pvcstorage) == -1 {
+				return nil, fmt.Errorf(
+					"cannot shrink volume override size from %s to %s",
+					pvcstorage.String(),
+					volumeSizeOverride.String(),
+				)
+			}
+
+			pvc.Spec.Resources.Requests = corev1.ResourceList{
+				corev1.ResourceStorage: *volumeSizeOverride,
+			}
 		}
 
-		// Ensure that volume size is not being reduced
-		pvcstorage := pvc.Spec.Resources.Requests.Storage()
-		if pvcstorage != nil && override.Cmp(*pvcstorage) == -1 {
-			return nil, fmt.Errorf(
-				"cannot shrink volume override size from %s to %s",
-				pvcstorage.String(),
-				override.String(),
-			)
-		}
-
-		pvc.Spec.Resources.Requests = corev1.ResourceList{
-			corev1.ResourceStorage: *override,
+		// If storage class override was provided
+		if storageClassNameOverride != nil {
+			pvc.Spec.StorageClassName = storageClassNameOverride
 		}
 
 		return pvc, nil
 	}
 
-	if _, ok := obj.(*autoscalingv1.HorizontalPodAutoscaler); ok {
+	if _, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
 		componentMap := map[string]v1.ComponentKind{
 			"mirror": v1.ComponentMirror,
 			"clair":  v1.ComponentClair,
@@ -247,6 +280,13 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 				UpsertContainerEnv(ref, oenv)
 			}
 		}
+
+		if osecctx := v1.GetSecurityContextOverrideForComponent(quay, v1.ComponentQuay); osecctx != nil {
+			for i := range job.Spec.Template.Spec.Containers {
+				job.Spec.Template.Spec.Containers[i].SecurityContext = osecctx
+			}
+		}
+
 		// if we are deploying without resource requests we have to remove them
 		if skipres {
 			var noresources corev1.ResourceRequirements

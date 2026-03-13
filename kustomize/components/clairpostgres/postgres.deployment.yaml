@@ -18,7 +18,7 @@ spec:
       labels:
         quay-component: clair-postgres
     spec:
-      terminationGracePeriodSeconds: 180
+      terminationGraceperiodSeconds: 600
       serviceAccountName: clair-postgres
       volumes:
         - name: clair-postgres-conf-sample
@@ -26,23 +26,35 @@ spec:
             name: clair-postgres-conf-sample
         - name: postgres-data
           persistentVolumeClaim:
-            claimName: clair-postgres-13
+            claimName: clair-postgres-15
       containers:
         - name: clair-postgres
-          image: quay.io/sclorg/postgresql-13-c9s:latest
+          image: quay.io/sclorg/postgresql-15-c9s:latest
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 5432
               protocol: TCP
           env:
             - name: POSTGRESQL_USER
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-username
             - name: POSTGRESQL_DATABASE
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-name
             - name: POSTGRESQL_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-password
             - name: POSTGRESQL_ADMIN_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-root-password
             - name: POSTGRESQL_SHARED_BUFFERS
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS

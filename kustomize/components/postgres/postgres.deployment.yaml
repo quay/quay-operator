@@ -18,7 +18,7 @@ spec:
       labels:
         quay-component: postgres
     spec:
-      terminationGracePeriodSeconds: 180
+      terminationGraceperiodSeconds: 600
       serviceAccountName: quay-database
       volumes:
         - name: postgres-conf-sample

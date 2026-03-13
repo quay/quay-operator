@@ -10,18 +10,18 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
-      terminationGracePeriodSeconds: 180
+      terminationGraceperiodSeconds: 600
       serviceAccountName: clair-postgres
       volumes:
         - name: clair-postgres-conf-sample
           configMap:
             name: clair-postgres-conf-sample
-        - name: clair-postgres-13
+        - name: clair-postgres-15
           persistentVolumeClaim:
-            claimName: clair-postgres-13
+            claimName: clair-postgres-15
       containers:
-        - name: clair-postgres-13
-          image: quay.io/sclorg/postgresql-13-c9s:latest
+        - name: clair-postgres-15
+          image: quay.io/sclorg/postgresql-15-c9s:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
@@ -31,9 +31,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: clair-config-secret
-                  key: clair-db-host
+                  key: clair-db-old-host
             - name: POSTGRESQL_MIGRATION_ADMIN_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: clairpostgres-config-secret
+                  key: database-root-password
             - name: POSTGRESQL_SHARED_BUFFERS
               value: 256MB
             - name: POSTGRESQL_MAX_CONNECTIONS
@@ -42,16 +45,16 @@ spec:
             - name: clair-postgres-conf-sample
               mountPath: /usr/share/pgsql/postgresql.conf.sample
               subPath: postgresql.conf.sample
-            - name: clair-postgres-13
+            - name: clair-postgres-15
               mountPath: /var/lib/pgsql/data
           resources:
             requests:
               cpu: 500m
               memory: 2Gi
           command:
-          - "/bin/sh"
-          - "-c"
+            - "/bin/sh"
+            - "-c"
           args:
-          - >
-            run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
+            - >
+              run-postgresql --version || (echo "postgres migration command failed, cleaning up..." && rm -rf /var/lib/pgsql/data/* && exit 1)
   backoffLimit: 50

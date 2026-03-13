@@ -481,6 +481,84 @@ var validateOverridesTests = []struct {
 		},
 		errors.New("component postgres does not support affinity overrides"),
 	},
+	{
+		"InvalidStorageClassNameOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "redis", Managed: true, Overrides: &Override{StorageClassName: ptr.To("foo")}},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component redis does not support storageClassName overrides"),
+	},
+	{
+		"ValidSecurityContextOverrideOnQuay",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "quay", Managed: true, Overrides: &Override{SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(true)}}},
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"ValidSecurityContextOverrideOnMirror",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true, Overrides: &Override{SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(true)}}},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"InvalidSecurityContextOverrideOnRedis",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true, Overrides: &Override{SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(true)}}},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component redis does not support securityContext overrides"),
+	},
 }
 
 func TestValidOverrides(t *testing.T) {
@@ -608,5 +686,87 @@ func TestEnsureRegistryEndpoint(t *testing.T) {
 
 		assert.Equal(test.expectedOk, ok, test.name)
 		assert.Equal(test.expected, test.quay.Status.RegistryEndpoint, test.name)
+	}
+}
+
+func TestGetSecurityContextOverrideForComponent(t *testing.T) {
+	sc := &corev1.SecurityContext{
+		RunAsNonRoot:             ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+	}
+
+	tests := []struct {
+		name     string
+		quay     *QuayRegistry
+		kind     ComponentKind
+		expected *corev1.SecurityContext
+	}{
+		{
+			name: "ReturnsSecurityContextForQuay",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentQuay, Managed: true, Overrides: &Override{SecurityContext: sc}},
+					},
+				},
+			},
+			kind:     ComponentQuay,
+			expected: sc,
+		},
+		{
+			name: "ReturnsSecurityContextForMirror",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentMirror, Managed: true, Overrides: &Override{SecurityContext: sc}},
+					},
+				},
+			},
+			kind:     ComponentMirror,
+			expected: sc,
+		},
+		{
+			name: "ReturnsNilWhenNoOverrides",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentQuay, Managed: true},
+					},
+				},
+			},
+			kind:     ComponentQuay,
+			expected: nil,
+		},
+		{
+			name: "ReturnsNilWhenComponentNotFound",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentQuay, Managed: true},
+					},
+				},
+			},
+			kind:     ComponentMirror,
+			expected: nil,
+		},
+		{
+			name: "ReturnsNilWhenSecurityContextNotSet",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentQuay, Managed: true, Overrides: &Override{Replicas: ptr.To[int32](3)}},
+					},
+				},
+			},
+			kind:     ComponentQuay,
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetSecurityContextOverrideForComponent(tt.quay, tt.kind)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }

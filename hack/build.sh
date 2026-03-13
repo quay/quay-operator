@@ -10,12 +10,11 @@
 #   $ REGISTRY=quay.io NAMESPACE=yourusername ./hack/build.sh
 #
 # REQUIREMENTS:
-#  * a valid login session to a container registry.
-#  * `docker`
-#  * `yq`
+#  * a valid login session to a container registry (unless DRY_RUN=true).
+#  * `docker` with buildx
 #  * `jq`
-#  * `opm`
-#  * `skopeo`
+#  * `curl`
+#  * `opm` and `yq` are auto-installed if missing.
 #
 # NOTE: this script will modify the following files:
 #  - bundle/manifests/quay-operator.clusterserviceversion.yaml
@@ -23,14 +22,37 @@
 # if `git` is available it will be used to checkout changes to the above files.
 # this means that if you made any changes to them and want them to be persisted,
 # make sure to commit them before running this script.
-set -e
+set -ex
 
-export OPERATOR_NAME='quay-operator-test'
+export OPERATOR_NAME=${OPERATOR_NAME:-'quay-operator'}
 export REGISTRY=${REGISTRY:-'quay.io'}
 export NAMESPACE=${NAMESPACE:-'projectquay'}
 export TAG=${TAG:-'3.9-unstable'}
+export CLAIR_TAG=${CLAIR_TAG:-'4.8.0'}
+export BUILDER_QEMU_TAG=${BUILDER_QEMU_TAG:-'main'}
+export CHANNEL=${CHANNEL:-'alpha'}
 export CSV_PATH=${CSV_PATH:-'bundle/manifests/quay-operator.clusterserviceversion.yaml'}
 export ANNOTATIONS_PATH=${ANNOTATIONS_PATH:-'bundle/metadata/annotations.yaml'}
+export DRY_RUN=${DRY_RUN:-''}
+
+# derive a semver-compliant version from TAG for use in the CSV.
+# opm requires Major.Minor.Patch; TAG may only be Major.Minor (e.g. 3.9-unstable).
+BASE=${TAG%%-*}           # strip prerelease: "3.9-unstable" -> "3.9"
+PRE=${TAG#"$BASE"}        # extract prerelease: "-unstable" (or empty)
+if [[ "$BASE" =~ ^[0-9]+\.[0-9]+$ ]]; then
+	VERSION="${BASE}.0${PRE}"
+else
+	VERSION="${TAG}"
+fi
+export VERSION
+
+if [ -n "${DRY_RUN}" ]; then
+	BUILDX_PUSH="--load"
+	BUILDX_PLATFORM="linux/amd64"
+else
+	BUILDX_PUSH="--push"
+	BUILDX_PLATFORM="linux/amd64,linux/arm64,linux/ppc64le,linux/s390x"
+fi
 
 function cleanup {
 	# shellcheck disable=SC2046
@@ -52,23 +74,49 @@ function error {
 	>&2 echo "ERROR $(date '+%Y-%m-%dT%H:%M:%S') $*"
 }
 
+# install opm and yq if not already on PATH.
+function ensure_opm {
+	if command -v opm &>/dev/null; then return; fi
+	info "installing opm..."
+	local version
+	version=$(curl -sL https://api.github.com/repos/operator-framework/operator-registry/releases/latest | jq -r .tag_name)
+	curl -sLo /usr/local/bin/opm "https://github.com/operator-framework/operator-registry/releases/download/${version}/linux-amd64-opm"
+	chmod +x /usr/local/bin/opm
+}
+
+function ensure_yq {
+	if command -v yq &>/dev/null; then return; fi
+	info "installing yq..."
+	curl -sLo /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.14.2/yq_linux_amd64"
+	chmod +x /usr/local/bin/yq
+}
+
+ensure_opm
+ensure_yq
+
 function digest() {
 	declare -n ret=$2
 	IMAGE=$1
-	docker pull "${IMAGE}"
 	# shellcheck disable=SC2034
-	ret=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE}")
+	DIGEST=$(docker buildx imagetools inspect "${IMAGE}" --format '{{json .Manifest}}' 2>/dev/null | jq -r .digest)
+	if [ -n "${DIGEST}" ] && [ "${DIGEST}" != "null" ]; then
+		ret="${IMAGE%%:*}@${DIGEST}"
+	else
+		ret="${IMAGE}"
+	fi
 }
 
-docker buildx build --push --platform "linux/amd64,linux/ppc64le,linux/s390x"  -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
+docker buildx build ${BUILDX_PUSH} --platform "${BUILDX_PLATFORM}" -t "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" .
 digest "${REGISTRY}/${NAMESPACE}/quay-operator:${TAG}" OPERATOR_DIGEST
 
 digest "${REGISTRY}/${NAMESPACE}/quay:${TAG}" QUAY_DIGEST
-digest "${REGISTRY}/${NAMESPACE}/clair:nightly" CLAIR_DIGEST
+digest "${REGISTRY}/${NAMESPACE}/clair:${CLAIR_TAG}" CLAIR_DIGEST
 digest "${REGISTRY}/${NAMESPACE}/quay-builder:${TAG}" BUILDER_DIGEST
-digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:3.9.0" BUILDER_QEMU_DIGEST
+digest "${REGISTRY}/${NAMESPACE}/quay-builder-qemu:${BUILDER_QEMU_TAG}" BUILDER_QEMU_DIGEST
 digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_DIGEST
-digest centos/postgresql-10-centos7:latest POSTGRES_OLD_DIGEST
+digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_OLD_DIGEST
+digest quay.io/sclorg/postgresql-15-c9s:latest POSTGRES_CLAIR_DIGEST
+digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_CLAIR_OLD_DIGEST
 digest docker.io/library/redis:7.0 REDIS_DIGEST
 
 # need exporting so that yq can see them
@@ -79,6 +127,8 @@ export BUILDER_DIGEST
 export BUILDER_QEMU_DIGEST
 export POSTGRES_DIGEST
 export POSTGRES_OLD_DIGEST
+export POSTGRES_CLAIR_DIGEST
+export POSTGRES_CLAIR_OLD_DIGEST
 export REDIS_DIGEST
 
 
@@ -86,10 +136,12 @@ export REDIS_DIGEST
 # index images.
 
 yq eval -i '
-	.metadata.name = strenv(OPERATOR_NAME) |
+	.metadata.name = ("quay-operator.v" + strenv(VERSION)) |
 	.metadata.annotations.quay-version = strenv(TAG) |
 	.metadata.annotations.containerImage = strenv(OPERATOR_DIGEST) |
+	.metadata.annotations["olm.skipRange"] = (">=3.6.x <" + strenv(VERSION)) |
 	del(.spec.replaces) |
+	.spec.version = strenv(VERSION) |
 	.spec.install.spec.deployments[0].name = strenv(OPERATOR_NAME) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].image = strenv(OPERATOR_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_QUAY") .value = strenv(QUAY_DIGEST) |
@@ -98,33 +150,52 @@ yq eval -i '
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_BUILDER_QEMU") .value = strenv(BUILDER_QEMU_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES") .value = strenv(POSTGRES_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_POSTGRES_PREVIOUS") .value = strenv(POSTGRES_OLD_DIGEST) |
+	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES") .value = strenv(POSTGRES_CLAIR_DIGEST) |
+	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_CLAIRPOSTGRES_PREVIOUS") .value = strenv(POSTGRES_CLAIR_OLD_DIGEST) |
 	.spec.install.spec.deployments[0].spec.template.spec.containers[0].env[] |= select(.name == "RELATED_IMAGE_COMPONENT_REDIS") .value = strenv(REDIS_DIGEST)
 	' "${CSV_PATH}"
 
 yq eval -i '
-	.annotations."operators.operatorframework.io.bundle.channel.default.v1" = "test" |
-	.annotations."operators.operatorframework.io.bundle.channels.v1" = "test"
+	.annotations."operators.operatorframework.io.bundle.channel.default.v1" = strenv(CHANNEL) |
+	.annotations."operators.operatorframework.io.bundle.channels.v1" = strenv(CHANNEL) |
+	.annotations."operators.operatorframework.io.bundle.package.v1" = "project-quay"
 	' "${ANNOTATIONS_PATH}"
 
-docker buildx build --push -f ./bundle/Dockerfile --platform "linux/amd64,linux/ppc64le,linux/s390x"  -t "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" ./bundle
-digest "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" BUNDLE_DIGEST
+docker buildx build ${BUILDX_PUSH} -f ./bundle/Dockerfile --platform "${BUILDX_PLATFORM}" -t "${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}" ./bundle
 
-AMD64_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
-               jq -r '.manifests[] | select(.platform.architecture == "amd64" and .platform.os == "linux").digest')
-POWER_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
-               jq -r '.manifests[] | select(.platform.architecture == "ppc64le" and .platform.os == "linux").digest')
-Z_DIGEST=$(skopeo inspect --raw  docker://${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG} | \
-           jq -r '.manifests[] | select(.platform.architecture == "s390x" and .platform.os == "linux").digest')
-        
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${AMD64_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64" --binary-image "quay.io/operator-framework/opm:v1.28.0-amd64"
-docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64"
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${POWER_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le" --binary-image "quay.io/operator-framework/opm:v1.28.0-ppc64le"
-docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le"
-opm index add --build-tool docker --bundles "${REGISTRY}/${NAMESPACE}/quay-operator-bundle@${Z_DIGEST}" --tag "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x" --binary-image "quay.io/operator-framework/opm:v1.28.0-s390x"
-docker push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
+# build file-based catalog (FBC) index image.
+# in dry-run mode, render from local bundle directory; otherwise from the pushed bundle image.
+if [ -n "${DRY_RUN}" ]; then
+	BUNDLE_REF="bundle/"
+else
+	BUNDLE_REF="${REGISTRY}/${NAMESPACE}/quay-operator-bundle:${TAG}"
+fi
 
-docker manifest create --amend "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}" \
-	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-amd64" \
-	"${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-ppc64le" \
-        "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}-s390x"
-docker manifest push "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}"
+mkdir -p catalog/project-quay
+opm render "${BUNDLE_REF}" --output=yaml > catalog/project-quay/catalog.yaml
+
+# opm render from a local directory does not produce an olm.package entry;
+# add one if missing so opm validate succeeds in both dry-run and production.
+if ! grep -q 'schema: olm.package' catalog/project-quay/catalog.yaml; then
+cat >> catalog/project-quay/catalog.yaml <<PKGEOF
+---
+schema: olm.package
+name: project-quay
+defaultChannel: ${CHANNEL}
+PKGEOF
+fi
+
+cat >> catalog/project-quay/catalog.yaml <<CHEOF
+---
+schema: olm.channel
+package: project-quay
+name: ${CHANNEL}
+entries:
+  - name: quay-operator.v${VERSION}
+CHEOF
+
+opm validate catalog
+opm generate dockerfile catalog
+
+docker buildx build ${BUILDX_PUSH} --platform "${BUILDX_PLATFORM}" \
+	-f catalog.Dockerfile -t "${REGISTRY}/${NAMESPACE}/quay-operator-index:${TAG}" .

@@ -45,6 +45,7 @@ var kustomizationForTests = []struct {
 					{Kind: "postgres", Managed: true},
 					{Kind: "clair", Managed: true},
 					{Kind: "redis", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "mirror", Managed: true},
 				},
@@ -61,6 +62,7 @@ var kustomizationForTests = []struct {
 				"../components/postgres",
 				"../components/clair",
 				"../components/redis",
+				"../components/clairpostgres",
 				"../components/objectstorage",
 				"../components/mirror",
 			},
@@ -207,14 +209,14 @@ var kustomizationForTests = []struct {
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{
 				Components: []v1.Component{
-					{Kind: "postgres", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
 					{Kind: "clair", Managed: false},
 					{Kind: "redis", Managed: true},
 				},
 			},
 		},
 		quaycontext.QuayRegistryContext{
-			NeedsPgUpgrade: true,
+			NeedsClairPgUpgrade: true,
 		},
 		&types.Kustomization{
 			TypeMeta: types.TypeMeta{
@@ -223,20 +225,69 @@ var kustomizationForTests = []struct {
 			},
 			Components: []string{
 				"../components/redis",
-				"../components/postgres",
-				"../components/pgupgrade",
+				"../components/clairpostgres",
+				"../components/clairpgupgrade/base",
 			},
 			Images: []types.Image{
 				{Name: "quay.io/projectquay/quay", NewName: "quay", NewTag: "latest"},
 				{Name: "quay.io/projectquay/clair", NewName: "clair", NewTag: "alpine"},
 				{Name: "docker.io/library/redis", NewName: "redis", NewTag: "buster"},
-				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "postgres", NewTag: "latest"},
-				{Name: "centos/postgresql-10-centos7", NewName: "postgres_previous", NewTag: "latest"},
+				{Name: "quay.io/sclorg/postgresql-15-c9s", NewName: "clairpostgres", NewTag: "latest"},
+				{Name: "quay.io/sclorg/postgresql-13-c9s", NewName: "clairpostgres_previous", NewTag: "latest"},
 			},
 			SecretGenerator: []types.SecretArgs{},
 		},
 		"",
 	},
+}
+
+func TestEnsureCreationOrder(t *testing.T) {
+	objects := []client.Object{
+		&appsv1.Deployment{
+			TypeMeta:   metav1.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "quay-app"},
+		},
+		&corev1.Secret{
+			TypeMeta:   metav1.TypeMeta{Kind: "Secret", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "quay-config-secret"},
+		},
+		&batchv1.Job{
+			TypeMeta:   metav1.TypeMeta{Kind: "Job", APIVersion: "batch/v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"},
+		},
+		&corev1.Service{
+			TypeMeta:   metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
+			ObjectMeta: metav1.ObjectMeta{Name: "quay-app"},
+		},
+	}
+
+	sorted := EnsureCreationOrder(objects)
+
+	// Deployments and Jobs should come after Secrets and Services
+	for i, obj := range sorted {
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		if kind == "Deployment" || kind == "Job" {
+			// Every remaining object should also be a Deployment or Job
+			for _, remaining := range sorted[i:] {
+				rKind := remaining.GetObjectKind().GroupVersionKind().Kind
+				assert.True(t, rKind == "Deployment" || rKind == "Job",
+					"expected Deployment or Job at end, got %s", rKind)
+			}
+			break
+		}
+	}
+
+	// First two should be non-Deployment/Job kinds, last two should be Deployment/Job
+	for _, obj := range sorted[:2] {
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		assert.True(t, kind != "Deployment" && kind != "Job",
+			"expected non-Deployment/Job in first half, got %s", kind)
+	}
+	for _, obj := range sorted[2:] {
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		assert.True(t, kind == "Deployment" || kind == "Job",
+			"expected Deployment or Job in second half, got %s", kind)
+	}
 }
 
 func TestKustomizationFor(t *testing.T) {
@@ -361,6 +412,9 @@ var quayComponents = map[string][]client.Object{
 		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror"}},
 		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
 	},
+	"clairpostgres": {
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clairpostgres-config-secret"}},
+	},
 	"job": {
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
 	},
@@ -400,7 +454,8 @@ var inflateTests = []struct {
 			},
 		},
 		ctx: quaycontext.QuayRegistryContext{
-			SupportsObjectStorage: true,
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
 		},
 		configBundle: &corev1.Secret{
 			Data: map[string][]byte{
@@ -656,8 +711,9 @@ var inflateTests = []struct {
 			},
 		},
 		ctx: quaycontext.QuayRegistryContext{
-			SupportsObjectStorage: true,
-			DbUri:                 "postgresql://user:pass@db:5432/db",
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+			DbUri:                    "postgresql://user:pass@db:5432/db",
 		},
 		configBundle: &corev1.Secret{
 			Data: map[string][]byte{

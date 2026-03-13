@@ -40,6 +40,7 @@ type QuayVersion string
 var QuayVersionCurrent QuayVersion = QuayVersion(os.Getenv("QUAY_VERSION"))
 
 // ComponentKind holds a component type, e.g. "clair", "postgres", etc.
+// +kubebuilder:validation:Enum=quay;postgres;clair;clairpostgres;redis;horizontalpodautoscaler;objectstorage;route;mirror;monitoring;tls
 type ComponentKind string
 
 // Follow a list of constants representing all supported components.
@@ -83,6 +84,12 @@ var requiredComponents = []ComponentKind{
 var supportsVolumeOverride = []ComponentKind{
 	ComponentPostgres,
 	ComponentClair,
+	ComponentClairPostgres,
+}
+
+var supportsStorageClassOverride = []ComponentKind{
+	ComponentPostgres,
+	ComponentClairPostgres,
 }
 
 var supportsEnvOverride = []ComponentKind{
@@ -91,6 +98,7 @@ var supportsEnvOverride = []ComponentKind{
 	ComponentMirror,
 	ComponentPostgres,
 	ComponentRedis,
+	ComponentClairPostgres,
 }
 
 var supportsResourceOverrides = []ComponentKind{
@@ -99,6 +107,7 @@ var supportsResourceOverrides = []ComponentKind{
 	ComponentMirror,
 	ComponentPostgres,
 	ComponentClairPostgres,
+	ComponentRedis,
 }
 
 var supportsReplicasOverride = []ComponentKind{
@@ -111,6 +120,11 @@ var supportsAffinityOverride = []ComponentKind{
 	ComponentClair,
 	ComponentMirror,
 	ComponentQuay,
+}
+
+var supportsSecurityContextOverride = []ComponentKind{
+	ComponentQuay,
+	ComponentMirror,
 }
 
 const (
@@ -133,6 +147,7 @@ type QuayRegistrySpec struct {
 }
 
 // Component describes how the Operator should handle a backing Quay service.
+// +kubebuilder:validation:XValidation:rule="self.managed || !has(self.overrides)",message="cannot set overrides on unmanaged component"
 type Component struct {
 	// Kind is the unique name of this type of component.
 	Kind ComponentKind `json:"kind"`
@@ -146,13 +161,17 @@ type Component struct {
 // Override describes configuration overrides for the given managed component
 type Override struct {
 	VolumeSize *resource.Quantity `json:"volumeSize,omitempty"`
-	Env        []corev1.EnvVar    `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
+	// StorageClassName is the name of the StorageClass to use for the PVC.
+	StorageClassName *string         `json:"storageClassName,omitempty"`
+	Env              []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// +nullable
-	Replicas    *int32            `json:"replicas,omitempty"`
-	Affinity    *corev1.Affinity  `json:"affinity,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	Resources   *Resources        `json:"resources,omitempty"`
+	// +kubebuilder:validation:Minimum=0
+	Replicas        *int32                  `json:"replicas,omitempty"`
+	Affinity        *corev1.Affinity        `json:"affinity,omitempty"`
+	Labels          map[string]string       `json:"labels,omitempty"`
+	Annotations     map[string]string       `json:"annotations,omitempty"`
+	Resources       *Resources              `json:"resources,omitempty"`
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
 }
 
 // Resources describes the resource limits and requests for a component.
@@ -207,6 +226,8 @@ const (
 	ConditionReasonMonitoringComponentDependencyError    ConditionReason = "MonitoringComponentDependencyError"
 	ConditionReasonConfigInvalid                         ConditionReason = "ConfigInvalid"
 	ConditionReasonComponentOverrideInvalid              ConditionReason = "ComponentOverrideInvalid"
+	ConditionReasonPVCPending                            ConditionReason = "PVCPending"
+	ConditionReasonPVCProvisioningFailed                 ConditionReason = "PVCProvisioningFailed"
 )
 
 // Condition is a single condition of a QuayRegistry.
@@ -232,6 +253,8 @@ type QuayRegistryStatus struct {
 	LastUpdate string `json:"lastUpdated,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
+	// ObservedGeneration is the most recent generation observed by the controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
@@ -280,6 +303,10 @@ func RemoveCondition(conditions []Condition, conditionType ConditionType) []Cond
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.status.currentVersion`
+// +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=`.status.registryEndpoint`
+// +kubebuilder:printcolumn:name="Available",type=string,JSONPath=`.status.conditions[?(@.type=="Available")].status`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // QuayRegistry is the Schema for the quayregistries API.
 type QuayRegistry struct {
@@ -507,10 +534,12 @@ func ValidateOverrides(quay *QuayRegistry) error {
 
 		hasaffinity := hasAffinity(component)
 		hasvolume := component.Overrides.VolumeSize != nil
+		hasstorageclass := component.Overrides.StorageClassName != nil
 		hasreplicas := component.Overrides.Replicas != nil
 		hasresources := component.Overrides.Resources != nil
+		hassecuritycontext := component.Overrides.SecurityContext != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas
+		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas || hassecuritycontext
 
 		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
@@ -539,6 +568,13 @@ func ValidateOverrides(quay *QuayRegistry) error {
 			)
 		}
 
+		if hasstorageclass && !ComponentSupportsOverride(component.Kind, "storageClassName") {
+			return fmt.Errorf(
+				"component %s does not support storageClassName overrides",
+				component.Kind,
+			)
+		}
+
 		if hasenvvar && !ComponentSupportsOverride(component.Kind, "env") {
 			return fmt.Errorf(
 				"component %s does not support env overrides",
@@ -556,6 +592,13 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		if hasresources && !ComponentSupportsOverride(component.Kind, "resources") {
 			return fmt.Errorf(
 				"component %s does not support resources overrides",
+				component.Kind,
+			)
+		}
+
+		if hassecuritycontext && !ComponentSupportsOverride(component.Kind, "securityContext") {
+			return fmt.Errorf(
+				"component %s does not support securityContext overrides",
 				component.Kind,
 			)
 		}
@@ -732,6 +775,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 	switch override {
 	case "volumeSize":
 		components = supportsVolumeOverride
+	case "storageClassName":
+		components = supportsStorageClassOverride
 	case "env":
 		components = supportsEnvOverride
 	case "replicas":
@@ -740,6 +785,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 		components = supportsAffinityOverride
 	case "resources":
 		components = supportsResourceOverrides
+	case "securityContext":
+		components = supportsSecurityContextOverride
 	}
 
 	for _, cmp := range components {
@@ -775,26 +822,29 @@ func GetReplicasOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *in
 	return nil
 }
 
-// GetVolumeSizeOverrideForComponent returns the volume size overrides set by the user for the
-// provided component. Returns nil if not set.
+// GetVolumeSizeOverrideForComponent returns the volume size override for a given component kind.
 func GetVolumeSizeOverrideForComponent(
 	quay *QuayRegistry, kind ComponentKind,
 ) (qt *resource.Quantity) {
 	for _, component := range quay.Spec.Components {
-		if component.Kind != kind {
-			continue
+		if component.Kind == kind && component.Overrides != nil && component.Overrides.VolumeSize != nil {
+			return component.Overrides.VolumeSize
 		}
-
-		if component.Overrides != nil && component.Overrides.VolumeSize != nil {
-			qt = component.Overrides.VolumeSize
-		}
-		return
 	}
-	return
+	return nil
 }
 
-// GetResourceOverridesForComponent returns the resource overrides set by the user for the
-// provided component. Returns nil if not set.
+// GetStorageClassNameOverrideForComponent returns the StorageClass override for a given component kind.
+func GetStorageClassNameOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *string {
+	for _, component := range quay.Spec.Components {
+		if component.Kind == kind && component.Overrides != nil && component.Overrides.StorageClassName != nil {
+			return component.Overrides.StorageClassName
+		}
+	}
+	return nil
+}
+
+// GetResourceOverridesForComponent returns the resource overrides for a given component kind.
 func GetResourceOverridesForComponent(
 	quay *QuayRegistry, kind ComponentKind,
 ) (resources *Resources) {
@@ -809,6 +859,20 @@ func GetResourceOverridesForComponent(
 		return
 	}
 	return
+}
+
+// GetSecurityContextOverrideForComponent returns the securityContext override for a given component kind.
+func GetSecurityContextOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *corev1.SecurityContext {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+		if cmp.Overrides == nil {
+			return nil
+		}
+		return cmp.Overrides.SecurityContext
+	}
+	return nil
 }
 
 // GetAffinityForComponent returns affinity overrides for the provided component
