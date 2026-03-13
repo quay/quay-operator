@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -76,6 +77,11 @@ type QuayRegistryReconciler struct {
 	WatchNamespace       string
 	Requeue              ctrl.Result
 	SkipResourceRequests bool
+
+	// Cached route discovery results (write-once, read-many)
+	supportsRoutes      bool
+	clusterHostname     atomic.Pointer[string]
+	clusterWildcardCert atomic.Pointer[[]byte]
 }
 
 // manageQuayDeletion makes sure that we process a QuayRegistry once it is flagged for
@@ -557,16 +563,42 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	if err := r.checkRoutesAvailable(ctx, quayContext, updatedQuay, cbundle); err != nil {
+	if err := parseServerHostname(quayContext, cbundle); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
 			&quay,
 			v1.ConditionTypeRolloutBlocked,
 			metav1.ConditionTrue,
-			v1.ConditionReasonRouteComponentDependencyError,
-			fmt.Sprintf("could not check for `Routes` API: %s", err),
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("unable to parse SERVER_HOSTNAME from config: %s", err),
 		)
 	}
+
+	if r.supportsRoutes {
+		routeIsUnmanaged := v1.ComponentIsExplicitlyDefined(updatedQuay.Spec.Components, v1.ComponentRoute) &&
+			!v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentRoute)
+		userProvidedAll := quayContext.ServerHostname != "" && quayContext.TLSCert != nil
+
+		needsProbe := !routeIsUnmanaged && !userProvidedAll
+		if needsProbe {
+			if err := r.ensureRouteDiscovery(ctx, quayContext, updatedQuay); err != nil {
+				if goerrors.Is(err, errRouteProbeInProgress) {
+					log.Info("route probe in progress, will retry")
+					return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+				}
+				return r.reconcileWithCondition(
+					ctx,
+					&quay,
+					v1.ConditionTypeRolloutBlocked,
+					metav1.ConditionTrue,
+					v1.ConditionReasonRouteComponentDependencyError,
+					fmt.Sprintf("could not check for `Routes` API: %s", err),
+				)
+			}
+		}
+	}
+
+	fillServerHostname(quayContext, updatedQuay)
 
 	osmanaged := v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentObjectStorage)
 	if err := r.checkObjectBucketClaimsAvailable(
@@ -1184,6 +1216,17 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.Log.Error(err, "Failed to add `PrometheusRule` API to scheme")
 
 		return err
+	}
+
+	// Detect Route API availability once at startup via RESTMapper (zero side effects).
+	_, err := mgr.GetRESTMapper().RESTMapping(
+		schema.GroupKind{Group: "route.openshift.io", Kind: "Route"},
+	)
+	r.supportsRoutes = (err == nil)
+	if r.supportsRoutes {
+		r.Log.Info("Route API detected at startup")
+	} else {
+		r.Log.Info("Route API not available, running in non-OpenShift mode")
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
