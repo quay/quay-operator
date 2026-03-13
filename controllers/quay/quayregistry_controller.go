@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,9 +52,6 @@ import (
 )
 
 const (
-	creationPollInterval = time.Second * 2
-	creationPollTimeout  = time.Second * 600
-
 	grafanaDashboardConfigMapNameSuffix   = "grafana-dashboard-quay"
 	grafanaTitleJSONPath                  = "title"
 	grafanaNamespaceFilterJSONPath        = "templating.list.1.options.0.value"
@@ -387,7 +383,6 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 
 	log.Info("successfully updated `status` after Quay upgrade")
 	return r.Requeue, nil
-
 }
 
 // createInitialBundleSecret creates a new config bundle secret for provided QuayRegistry
@@ -455,7 +450,6 @@ func (r *QuayRegistryReconciler) GetConfigBundleSecret(
 // when a new config bundle secret is created.
 func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 	ctx context.Context, quay *v1.QuayRegistry,
-
 ) ([]corev1.Secret, error) {
 	secretList := &corev1.SecretList{}
 	if err := r.Client.List(
@@ -745,7 +739,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 
-		if err := r.createOrUpdateObject(ctx, obj, quay, log); err != nil {
+		requeue, err := r.createOrUpdateObject(ctx, obj, quay, log)
+		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
 				&quay,
@@ -754,6 +749,9 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				v1.ConditionReasonComponentCreationFailed,
 				fmt.Sprintf("error creating/updating object %s %s: %s", obj.GetObjectKind().GroupVersionKind().Kind, obj.GetName(), err.Error()),
 			)
+		}
+		if requeue {
+			return r.Requeue, nil
 		}
 	}
 
@@ -1014,7 +1012,7 @@ func convertHpaToV2beta2(hpa *autoscalingv2.HorizontalPodAutoscaler) (*autoscali
 
 func (r *QuayRegistryReconciler) createOrUpdateObject(
 	ctx context.Context, obj client.Object, quay v1.QuayRegistry, log logr.Logger,
-) error {
+) (bool, error) {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	log = log.WithValues("kind", gvk.Kind, "name", obj.GetName())
 	log.Info("creating/updating object")
@@ -1026,7 +1024,7 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		var err error
 		if obj, err = v1.RemoveOwnerReference(&quay, obj); err != nil {
 			log.Error(err, "could not remove `ownerReferences` from grafana config")
-			return err
+			return false, err
 		}
 	}
 
@@ -1042,31 +1040,20 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 
 		if err := r.Client.Delete(ctx, obj, opts); err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "failed to delete immutable resource")
-			return err
+			return false, err
 		}
 
-		if err := wait.PollUntilContextTimeout(
-			ctx,
-			creationPollInterval,
-			creationPollTimeout,
-			false,
-			func(ctx context.Context) (bool, error) {
-				if err := r.Client.Create(ctx, obj); err != nil {
-					if errors.IsAlreadyExists(err) {
-						log.Info("immutable resource being deleted, retry")
-						return false, nil
-					}
-					return true, err
-				}
+		if err := r.Client.Create(ctx, obj); err != nil {
+			if errors.IsAlreadyExists(err) {
+				log.Info("immutable resource still being deleted, will requeue")
 				return true, nil
-			},
-		); err != nil {
+			}
 			log.Error(err, "failed to create immutable resource")
-			return err
+			return false, err
 		}
 
-		log.Info("succefully (re)created immutable resource")
-		return nil
+		log.Info("successfully (re)created immutable resource")
+		return false, nil
 	}
 
 	hpaGVK := schema.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}
@@ -1081,17 +1068,17 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		var hpa *autoscalingv2beta2.HorizontalPodAutoscaler
 		hpa, err = convertHpaToV2beta2(obj.(*autoscalingv2.HorizontalPodAutoscaler))
 		if err != nil {
-			return err
+			return false, err
 		}
 		err = r.Client.Patch(ctx, hpa, client.Apply, opts...)
 	}
 	if err != nil {
 		log.Error(err, "failed to create/update object")
-		return err
+		return false, err
 	}
 
 	log.Info("finished creating/updating object")
-	return nil
+	return false, nil
 }
 
 func (r *QuayRegistryReconciler) updateWithCondition(
@@ -1230,7 +1217,6 @@ func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(
 func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, quay *v1.QuayRegistry) error {
 	var ns corev1.Namespace
 	err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
-
 	if err != nil {
 		return err
 	}
@@ -1266,7 +1252,8 @@ func (r *QuayRegistryReconciler) cleanupGrafanaConfigMap(ctx context.Context, qu
 	var grafanaConfigMap corev1.ConfigMap
 	grafanaConfigMapName := types.NamespacedName{
 		Name:      quay.GetName() + "-" + grafanaDashboardConfigMapNameSuffix,
-		Namespace: grafanaDashboardConfigNamespace}
+		Namespace: grafanaDashboardConfigNamespace,
+	}
 
 	if err := r.Client.Get(ctx, grafanaConfigMapName, &grafanaConfigMap); err == nil || !errors.IsNotFound(err) {
 		return r.Client.Delete(ctx, &grafanaConfigMap)
