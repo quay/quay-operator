@@ -94,18 +94,29 @@ import (
 const debug = false
 const doesnt = "this Starlark dialect does not "
 
-// global options
-// These features are either not standard Starlark (yet), or deprecated
-// features of the BUILD language, so we put them behind flags.
+// Global options: these features are either not standard Starlark
+// (yet), or deprecated features of the BUILD language, so we put them
+// behind flags.
+//
+// Deprecated: use an explicit [syntax.FileOptions] argument instead,
+// as it avoids all the usual problems of global variables,
+// and permits finer control.
+//
+// For example The legacy AllowGlobalReassign flag controls three
+// FileOptions: the availability of 'while' loops at all; the use of
+// if/for/while constructs at top level; and the ability to reassign
+// a global variable.
 var (
-	AllowNestedDef      = false // allow def statements within function bodies
-	AllowLambda         = false // allow lambda expressions
-	AllowFloat          = false // allow floating point literals, the 'float' built-in, and x / y
-	AllowSet            = false // allow the 'set' built-in
-	AllowGlobalReassign = false // allow reassignment to top-level names; also, allow if/for/while at top-level
-	AllowRecursion      = false // allow while statements and recursive functions
-	AllowBitwise        = true  // obsolete; bitwise operations (&, |, ^, ~, <<, and >>) are always enabled
+	AllowGlobalReassign = false // allow reassignment to top-level names; while loops; and if/for/while at top-level
+	AllowRecursion      = false // allow recursive functions
 	LoadBindsGlobally   = false // load creates global not file-local bindings (deprecated)
+
+	// obsolete flags for features that are now standard. No effect.
+	AllowBitwise   = true
+	AllowFloat     = true
+	AllowLambda    = true
+	AllowNestedDef = true
+	AllowSet       = true
 )
 
 // File resolves the specified file and records information about the
@@ -128,7 +139,7 @@ func File(file *syntax.File, isPredeclared, isUniversal func(name string) bool) 
 // REPLChunk is a generalization of the File function that supports a
 // non-empty initial global block, as occurs in a REPL.
 func REPLChunk(file *syntax.File, isGlobal, isPredeclared, isUniversal func(name string) bool) error {
-	r := newResolver(isGlobal, isPredeclared, isUniversal)
+	r := newResolver(file.Options, isGlobal, isPredeclared, isUniversal)
 	r.stmts(file.Stmts)
 
 	r.env.resolveLocalUses()
@@ -149,12 +160,20 @@ func REPLChunk(file *syntax.File, isGlobal, isPredeclared, isUniversal func(name
 	return nil
 }
 
-// Expr resolves the specified expression.
+// Expr calls [ExprOptions] using [syntax.LegacyFileOptions].
+//
+// Deprecated: use [ExprOptions] with [syntax.FileOptions] instead,
+// because this function relies on legacy global variables.
+func Expr(expr syntax.Expr, isPredeclared, isUniversal func(name string) bool) ([]*Binding, error) {
+	return ExprOptions(syntax.LegacyFileOptions(), expr, isPredeclared, isUniversal)
+}
+
+// ExprOptions resolves the specified expression.
 // It returns the local variables bound within the expression.
 //
-// The isPredeclared and isUniversal predicates behave as for the File function.
-func Expr(expr syntax.Expr, isPredeclared, isUniversal func(name string) bool) ([]*Binding, error) {
-	r := newResolver(nil, isPredeclared, isUniversal)
+// The isPredeclared and isUniversal predicates behave as for the File function
+func ExprOptions(opts *syntax.FileOptions, expr syntax.Expr, isPredeclared, isUniversal func(name string) bool) ([]*Binding, error) {
+	r := newResolver(opts, nil, isPredeclared, isUniversal)
 	r.expr(expr)
 	r.env.resolveLocalUses()
 	r.resolveNonLocalUses(r.env) // globals & universals
@@ -177,9 +196,10 @@ type Error struct {
 
 func (e Error) Error() string { return e.Pos.String() + ": " + e.Msg }
 
-func newResolver(isGlobal, isPredeclared, isUniversal func(name string) bool) *resolver {
+func newResolver(options *syntax.FileOptions, isGlobal, isPredeclared, isUniversal func(name string) bool) *resolver {
 	file := new(block)
 	return &resolver{
+		options:       options,
 		file:          file,
 		env:           file,
 		isGlobal:      isGlobal,
@@ -191,6 +211,8 @@ func newResolver(isGlobal, isPredeclared, isUniversal func(name string) bool) *r
 }
 
 type resolver struct {
+	options *syntax.FileOptions
+
 	// env is the current local environment:
 	// a linked list of blocks, innermost first.
 	// The tail of the list is the file block.
@@ -214,7 +236,8 @@ type resolver struct {
 	// isGlobal may be nil.
 	isGlobal, isPredeclared, isUniversal func(name string) bool
 
-	loops int // number of enclosing for loops
+	loops   int // number of enclosing for/while loops in current function (or file, if top-level)
+	ifstmts int // number of enclosing if statements loops
 
 	errors ErrorList
 }
@@ -278,7 +301,7 @@ func (b *block) String() string {
 	return "file block"
 }
 
-func (r *resolver) errorf(posn syntax.Position, format string, args ...interface{}) {
+func (r *resolver) errorf(posn syntax.Position, format string, args ...any) {
 	r.errors = append(r.errors, Error{posn, fmt.Sprintf(format, args...)})
 }
 
@@ -311,7 +334,7 @@ func (r *resolver) bind(id *syntax.Ident) bool {
 				r.moduleGlobals = append(r.moduleGlobals, bind)
 			}
 		}
-		if ok && !AllowGlobalReassign {
+		if ok && !r.options.GlobalReassign {
 			r.errorf(id.NamePos, "cannot reassign %s %s declared at %s",
 				bind.Scope, id.Name, bind.First.NamePos)
 		}
@@ -379,7 +402,7 @@ func (r *resolver) use(id *syntax.Ident) {
 	// We will piggyback support for the legacy semantics on the
 	// AllowGlobalReassign flag, which is loosely related and also
 	// required for Bazel.
-	if AllowGlobalReassign && r.env == r.file {
+	if r.options.GlobalReassign && r.env == r.file {
 		r.useToplevel(use)
 		return
 	}
@@ -417,10 +440,7 @@ func (r *resolver) useToplevel(use use) (bind *Binding) {
 		r.predeclared[id.Name] = bind // save it
 	} else if r.isUniversal(id.Name) {
 		// use of universal name
-		if !AllowFloat && id.Name == "float" {
-			r.errorf(id.NamePos, doesnt+"support floating point")
-		}
-		if !AllowSet && id.Name == "set" {
+		if !r.options.Set && id.Name == "set" {
 			r.errorf(id.NamePos, doesnt+"support sets")
 		}
 		bind = &Binding{Scope: Universal}
@@ -493,12 +513,14 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		}
 
 	case *syntax.IfStmt:
-		if !AllowGlobalReassign && r.container().function == nil {
+		if !r.options.TopLevelControl && r.container().function == nil {
 			r.errorf(stmt.If, "if statement not within a function")
 		}
 		r.expr(stmt.Cond)
+		r.ifstmts++
 		r.stmts(stmt.True)
 		r.stmts(stmt.False)
+		r.ifstmts--
 
 	case *syntax.AssignStmt:
 		r.expr(stmt.RHS)
@@ -506,9 +528,6 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		r.assign(stmt.LHS, isAugmented)
 
 	case *syntax.DefStmt:
-		if !AllowNestedDef && r.container().function != nil {
-			r.errorf(stmt.Def, doesnt+"support nested def")
-		}
 		r.bind(stmt.Name)
 		fn := &Function{
 			Name:   stmt.Name.Name,
@@ -520,7 +539,7 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		r.function(fn, stmt.Def)
 
 	case *syntax.ForStmt:
-		if !AllowGlobalReassign && r.container().function == nil {
+		if !r.options.TopLevelControl && r.container().function == nil {
 			r.errorf(stmt.For, "for loop not within a function")
 		}
 		r.expr(stmt.X)
@@ -531,10 +550,10 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		r.loops--
 
 	case *syntax.WhileStmt:
-		if !AllowRecursion {
+		if !r.options.While {
 			r.errorf(stmt.While, doesnt+"support while loops")
 		}
-		if !AllowGlobalReassign && r.container().function == nil {
+		if !r.options.TopLevelControl && r.container().function == nil {
 			r.errorf(stmt.While, "while loop not within a function")
 		}
 		r.expr(stmt.Cond)
@@ -551,8 +570,13 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 		}
 
 	case *syntax.LoadStmt:
+		// A load statement may not be nested in any other statement.
 		if r.container().function != nil {
 			r.errorf(stmt.Load, "load statement within a function")
+		} else if r.loops > 0 {
+			r.errorf(stmt.Load, "load statement within a loop")
+		} else if r.ifstmts > 0 {
+			r.errorf(stmt.Load, "load statement within a conditional")
 		}
 
 		for i, from := range stmt.From {
@@ -565,9 +589,9 @@ func (r *resolver) stmt(stmt syntax.Stmt) {
 			}
 
 			id := stmt.To[i]
-			if LoadBindsGlobally {
+			if r.options.LoadBindsGlobally {
 				r.bind(id)
-			} else if r.bindLocal(id) && !AllowGlobalReassign {
+			} else if r.bindLocal(id) && !r.options.GlobalReassign {
 				// "Global" in AllowGlobalReassign is a misnomer for "toplevel".
 				// Sadly we can't report the previous declaration
 				// as id.Binding may not be set yet.
@@ -597,9 +621,6 @@ func (r *resolver) assign(lhs syntax.Expr, isAugmented bool) {
 
 	case *syntax.TupleExpr:
 		// (x, y) = ...
-		if len(lhs.List) == 0 {
-			r.errorf(syntax.Start(lhs), "can't assign to ()")
-		}
 		if isAugmented {
 			r.errorf(syntax.Start(lhs), "can't use tuple expression in augmented assignment")
 		}
@@ -609,9 +630,6 @@ func (r *resolver) assign(lhs syntax.Expr, isAugmented bool) {
 
 	case *syntax.ListExpr:
 		// [x, y, z] = ...
-		if len(lhs.List) == 0 {
-			r.errorf(syntax.Start(lhs), "can't assign to []")
-		}
 		if isAugmented {
 			r.errorf(syntax.Start(lhs), "can't use list expression in augmented assignment")
 		}
@@ -634,9 +652,6 @@ func (r *resolver) expr(e syntax.Expr) {
 		r.use(e)
 
 	case *syntax.Literal:
-		if !AllowFloat && e.Token == syntax.FLOAT {
-			r.errorf(e.TokenPos, doesnt+"support floating point")
-		}
 
 	case *syntax.ListExpr:
 		for _, x := range e.List {
@@ -711,9 +726,6 @@ func (r *resolver) expr(e syntax.Expr) {
 		r.expr(e.X)
 
 	case *syntax.BinaryExpr:
-		if !AllowFloat && e.Op == syntax.SLASH {
-			r.errorf(e.OpPos, doesnt+"support floating point (use //)")
-		}
 		r.expr(e.X)
 		r.expr(e.Y)
 
@@ -748,11 +760,13 @@ func (r *resolver) expr(e syntax.Expr) {
 				// k=v
 				n++
 				if seenKwargs {
-					r.errorf(pos, "argument may not follow **kwargs")
+					r.errorf(pos, "keyword argument may not follow **kwargs")
+				} else if seenVarargs {
+					r.errorf(pos, "keyword argument may not follow *args")
 				}
 				x := binop.X.(*syntax.Ident)
 				if seenName[x.Name] {
-					r.errorf(x.NamePos, "keyword argument %s repeated", x.Name)
+					r.errorf(x.NamePos, "keyword argument %q is repeated", x.Name)
 				} else {
 					if seenName == nil {
 						seenName = make(map[string]bool)
@@ -764,9 +778,9 @@ func (r *resolver) expr(e syntax.Expr) {
 				// positional argument
 				p++
 				if seenVarargs {
-					r.errorf(pos, "argument may not follow *args")
+					r.errorf(pos, "positional argument may not follow *args")
 				} else if seenKwargs {
-					r.errorf(pos, "argument may not follow **kwargs")
+					r.errorf(pos, "positional argument may not follow **kwargs")
 				} else if len(seenName) > 0 {
 					r.errorf(pos, "positional argument may not follow named")
 				}
@@ -785,9 +799,6 @@ func (r *resolver) expr(e syntax.Expr) {
 		}
 
 	case *syntax.LambdaExpr:
-		if !AllowLambda {
-			r.errorf(e.Lambda, doesnt+"support lambda")
-		}
 		fn := &Function{
 			Name:   "lambda",
 			Pos:    e.Lambda,
@@ -816,6 +827,10 @@ func (r *resolver) function(function *Function, pos syntax.Position) {
 	// Enter function block.
 	b := &block{function: function}
 	r.push(b)
+
+	// Save the current loop count and reset it for the new function
+	outerLoops := r.loops
+	r.loops = 0
 
 	var seenOptional bool
 	var star *syntax.UnaryExpr // * or *args param
@@ -899,6 +914,9 @@ func (r *resolver) function(function *Function, pos syntax.Position) {
 
 	// Leave function block.
 	r.pop()
+
+	// Restore the outer loop count
+	r.loops = outerLoops
 
 	// References within the function body to globals are not
 	// resolved until the end of the module.

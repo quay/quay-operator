@@ -49,6 +49,10 @@ func Walk(n Node, f func(Node) bool) {
 		Walk(n.X, f)
 		walkStmts(n.Body, f)
 
+	case *WhileStmt:
+		Walk(n.Cond, f)
+		walkStmts(n.Body, f)
+
 	case *ReturnStmt:
 		if n.Result != nil {
 			Walk(n.Result, f)
@@ -119,9 +123,7 @@ func Walk(n Node, f func(Node) bool) {
 
 	case *DictExpr:
 		for _, entry := range n.List {
-			entry := entry.(*DictEntry)
-			Walk(entry.Key, f)
-			Walk(entry.Value, f)
+			Walk(entry, f)
 		}
 
 	case *UnaryExpr:
