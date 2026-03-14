@@ -1033,6 +1033,26 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 
 	jobGVK := schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}
 	if gvk == jobGVK {
+		// Check if an existing Job with this name is still running or already
+		// completed. Jobs are immutable so we normally delete+recreate, but we
+		// must not recreate a Job that is active or has already succeeded —
+		// the migrations are not idempotent and a second run will fail.
+		var existingJob batchv1.Job
+		jobKey := types.NamespacedName{
+			Name:      obj.GetName(),
+			Namespace: obj.GetNamespace(),
+		}
+		if err := r.Get(ctx, jobKey, &existingJob); err == nil {
+			if existingJob.Status.Succeeded >= 1 {
+				log.Info("immutable resource already completed successfully, skipping recreation")
+				return false, nil
+			}
+			if existingJob.Status.Active >= 1 {
+				log.Info("immutable resource is still running, skipping recreation")
+				return false, nil
+			}
+		}
+
 		propagationPolicy := metav1.DeletePropagationForeground
 		opts := &client.DeleteOptions{
 			PropagationPolicy: &propagationPolicy,
