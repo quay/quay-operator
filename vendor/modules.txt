@@ -371,8 +371,8 @@ github.com/tidwall/pretty
 # github.com/tidwall/sjson v1.2.3
 ## explicit; go 1.14
 github.com/tidwall/sjson
-# github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca
-## explicit
+# github.com/xlab/treeprint v1.2.0
+## explicit; go 1.13
 github.com/xlab/treeprint
 # go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5
 ## explicit; go 1.13
