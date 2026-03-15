@@ -1,7 +1,8 @@
 package ldap
 
 import (
-	"log"
+	"errors"
+	"fmt"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
@@ -63,11 +64,14 @@ func NewAddRequest(dn string, controls []Control) *AddRequest {
 		DN:       dn,
 		Controls: controls,
 	}
-
 }
 
 // Add performs the given AddRequest
 func (l *Conn) Add(addRequest *AddRequest) error {
+	if addRequest == nil {
+		return NewError(ErrorNetwork, errors.New("AddRequest cannot be nil"))
+	}
+
 	msgCtx, err := l.doRequest(addRequest)
 	if err != nil {
 		return err
@@ -85,7 +89,7 @@ func (l *Conn) Add(addRequest *AddRequest) error {
 			return err
 		}
 	} else {
-		log.Printf("Unexpected Response: %d", packet.Children[1].Tag)
+		return fmt.Errorf("ldap: unexpected response: %d", packet.Children[1].Tag)
 	}
 	return nil
 }
