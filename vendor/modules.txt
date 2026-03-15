@@ -88,8 +88,8 @@ github.com/fsnotify/fsnotify
 # github.com/go-asn1-ber/asn1-ber v1.5.1
 ## explicit; go 1.13
 github.com/go-asn1-ber/asn1-ber
-# github.com/go-errors/errors v1.0.1
-## explicit
+# github.com/go-errors/errors v1.5.1
+## explicit; go 1.14
 github.com/go-errors/errors
 # github.com/go-ldap/ldap/v3 v3.2.4
 ## explicit; go 1.13
