@@ -5,7 +5,7 @@ all: checks
 
 .PHONY: examples docs
 
-checks: lint vet test examples functional-test
+checks: lint test examples functional-test
 
 lint:
 	@mkdir -p ${GOPATH}/bin
@@ -14,11 +14,10 @@ lint:
 	@GO111MODULE=on ${GOPATH}/bin/golangci-lint cache clean
 	@GO111MODULE=on ${GOPATH}/bin/golangci-lint run --timeout=5m --config ./.golangci.yml
 
-vet:
-	@GO111MODULE=on go vet ./...
+vet: lint
 
 test:
-	@GO111MODULE=on SERVER_ENDPOINT=localhost:9000 ACCESS_KEY=minio SECRET_KEY=minio123 ENABLE_HTTPS=1 MINT_MODE=full go test -race -v ./...
+	@GO111MODULE=on SERVER_ENDPOINT=localhost:9000 ACCESS_KEY=minioadmin SECRET_KEY=minioadmin ENABLE_HTTPS=1 MINT_MODE=full go test -race -v ./...
 
 examples:
 	@echo "Building s3 examples"
@@ -28,7 +27,11 @@ examples:
 
 functional-test:
 	@GO111MODULE=on go build -race functional_tests.go
-	@SERVER_ENDPOINT=localhost:9000 ACCESS_KEY=minio SECRET_KEY=minio123 ENABLE_HTTPS=1 MINT_MODE=full ./functional_tests
+	@SERVER_ENDPOINT=localhost:9000 ACCESS_KEY=minioadmin SECRET_KEY=minioadmin ENABLE_HTTPS=1 MINT_MODE=full ./functional_tests
+
+functional-test-notls:
+	@GO111MODULE=on go build -race functional_tests.go
+	@SERVER_ENDPOINT=localhost:9000 ACCESS_KEY=minioadmin SECRET_KEY=minioadmin ENABLE_HTTPS=0 MINT_MODE=full ./functional_tests
 
 clean:
 	@echo "Cleaning up all the generated files"
