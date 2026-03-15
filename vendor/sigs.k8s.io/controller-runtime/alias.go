@@ -18,10 +18,10 @@ package controllerruntime
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	cfg "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -78,12 +78,18 @@ var (
 	// If --kubeconfig is set, will use the kubeconfig file at that location.  Otherwise will assume running
 	// in cluster and use the cluster provided kubeconfig.
 	//
+	// The returned `*rest.Config` has client-side ratelimting disabled as we can rely on API priority and
+	// fairness. Set its QPS to a value equal or bigger than 0 to re-enable it.
+	//
 	// Will log an error and exit if there is an error creating the rest.Config.
 	GetConfigOrDie = config.GetConfigOrDie
 
 	// GetConfig creates a *rest.Config for talking to a Kubernetes apiserver.
 	// If --kubeconfig is set, will use the kubeconfig file at that location.  Otherwise will assume running
 	// in cluster and use the cluster provided kubeconfig.
+	//
+	// The returned `*rest.Config` has client-side ratelimting disabled as we can rely on API priority and
+	// fairness. Set its QPS to a value equal or bigger than 0 to re-enable it.
 	//
 	// Config precedence
 	//
@@ -96,24 +102,22 @@ var (
 	// * $HOME/.kube/config if exists.
 	GetConfig = config.GetConfig
 
-	// ConfigFile returns the cfg.File function for deferred config file loading,
-	// this is passed into Options{}.From() to populate the Options fields for
-	// the manager.
-	//
-	// Deprecated: This is deprecated in favor of using Options directly.
-	ConfigFile = cfg.File
-
 	// NewControllerManagedBy returns a new controller builder that will be started by the provided Manager.
 	NewControllerManagedBy = builder.ControllerManagedBy
-
-	// NewWebhookManagedBy returns a new webhook builder that will be started by the provided Manager.
-	NewWebhookManagedBy = builder.WebhookManagedBy
 
 	// NewManager returns a new Manager for creating Controllers.
 	// Note that if ContentType in the given config is not set, "application/vnd.kubernetes.protobuf"
 	// will be used for all built-in resources of Kubernetes, and "application/json" is for other types
 	// including all CRD resources.
 	NewManager = manager.New
+
+	// CreateOrPatch creates or patches the given object obj in the Kubernetes
+	// cluster. The object's desired state should be reconciled with the existing
+	// state using the passed in ReconcileFn. obj must be a struct pointer so that
+	// obj can be patched with the content returned by the Server.
+	//
+	// It returns the executed operation and an error.
+	CreateOrPatch = controllerutil.CreateOrPatch
 
 	// CreateOrUpdate creates or updates the given object obj in the Kubernetes
 	// cluster. The object's desired state should be reconciled with the existing
@@ -130,8 +134,8 @@ var (
 	// there is another OwnerReference with Controller flag set.
 	SetControllerReference = controllerutil.SetControllerReference
 
-	// SetupSignalHandler registered for SIGTERM and SIGINT. A stop channel is returned
-	// which is closed on one of these signals. If a second signal is caught, the program
+	// SetupSignalHandler registers for SIGTERM and SIGINT. A context is returned
+	// which is canceled on one of these signals. If a second signal is caught, the program
 	// is terminated with exit code 1.
 	SetupSignalHandler = signals.SetupSignalHandler
 
@@ -157,3 +161,8 @@ var (
 	// SetLogger sets a concrete logging implementation for all deferred Loggers.
 	SetLogger = log.SetLogger
 )
+
+// NewWebhookManagedBy returns a new webhook builder for the provided type T.
+func NewWebhookManagedBy[T runtime.Object](mgr manager.Manager, obj T) *builder.WebhookBuilder[T] {
+	return builder.WebhookManagedBy(mgr, obj)
+}

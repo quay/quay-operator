@@ -36,6 +36,9 @@ type JunitReportConfig struct {
 	// Enable OmitSpecLabels to prevent labels from appearing in the spec name
 	OmitSpecLabels bool
 
+	// Enable OmitSpecSemVerConstraints to prevent semantic version constraints from appearing in the spec name
+	OmitSpecSemVerConstraints bool
+
 	// Enable OmitLeafNodeType to prevent the spec leaf node type from appearing in the spec name
 	OmitLeafNodeType bool
 
@@ -169,14 +172,17 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 				{"SuiteHasProgrammaticFocus", fmt.Sprintf("%t", report.SuiteHasProgrammaticFocus)},
 				{"SpecialSuiteFailureReason", strings.Join(report.SpecialSuiteFailureReasons, ",")},
 				{"SuiteLabels", fmt.Sprintf("[%s]", strings.Join(report.SuiteLabels, ","))},
+				{"SuiteSemVerConstraints", fmt.Sprintf("[%s]", strings.Join(report.SuiteSemVerConstraints, ","))},
 				{"RandomSeed", fmt.Sprintf("%d", report.SuiteConfig.RandomSeed)},
 				{"RandomizeAllSpecs", fmt.Sprintf("%t", report.SuiteConfig.RandomizeAllSpecs)},
 				{"LabelFilter", report.SuiteConfig.LabelFilter},
+				{"SemVerFilter", report.SuiteConfig.SemVerFilter},
 				{"FocusStrings", strings.Join(report.SuiteConfig.FocusStrings, ",")},
 				{"SkipStrings", strings.Join(report.SuiteConfig.SkipStrings, ",")},
 				{"FocusFiles", strings.Join(report.SuiteConfig.FocusFiles, ";")},
 				{"SkipFiles", strings.Join(report.SuiteConfig.SkipFiles, ";")},
 				{"FailOnPending", fmt.Sprintf("%t", report.SuiteConfig.FailOnPending)},
+				{"FailOnEmpty", fmt.Sprintf("%t", report.SuiteConfig.FailOnEmpty)},
 				{"FailFast", fmt.Sprintf("%t", report.SuiteConfig.FailFast)},
 				{"FlakeAttempts", fmt.Sprintf("%d", report.SuiteConfig.FlakeAttempts)},
 				{"DryRun", fmt.Sprintf("%t", report.SuiteConfig.DryRun)},
@@ -205,6 +211,10 @@ func GenerateJUnitReportWithConfig(report types.Report, dst string, config Junit
 			if matches := ownerRE.FindStringSubmatch(label); len(matches) == 2 {
 				owner = matches[1]
 			}
+		}
+		semVerConstraints := spec.SemVerConstraints()
+		if len(semVerConstraints) > 0 && !config.OmitSpecSemVerConstraints {
+			name = name + " [" + strings.Join(semVerConstraints, ", ") + "]"
 		}
 		name = strings.TrimSpace(name)
 
