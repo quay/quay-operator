@@ -3,20 +3,11 @@
 // license that can be found in the LICENSE file.
 
 // Package md4 implements the MD4 hash algorithm as defined in RFC 1320.
-//
-// Deprecated: MD4 is cryptographically broken and should only be used
-// where compatibility with legacy systems, not security, is the goal. Instead,
-// use a secure hash like SHA-256 (from crypto/sha256).
 package md4
 
 import (
-	"crypto"
 	"hash"
 )
-
-func init() {
-	crypto.RegisterHash(crypto.MD4, New)
-}
 
 // The size of an MD4 checksum in bytes.
 const Size = 16
