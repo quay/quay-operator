@@ -8,7 +8,7 @@
 // Generally using the signer outside of the SDK should not require any additional
 // logic when using Go v1.5 or higher. The signer does this by taking advantage
 // of the URL.EscapedPath method. If your request URI requires additional escaping
-// you many need to use the URL.Opaque to define what the raw URI should be sent
+// you may need to use the URL.Opaque to define what the raw URI should be sent
 // to the service as.
 //
 // The signer will first check the URL.Opaque field, and use its value if set.
@@ -52,6 +52,9 @@
 //
 // Test `TestStandaloneSign` provides a complete example of using the signer
 // outside of the SDK and pre-escaping the URI path.
+//
+// Deprecated: aws-sdk-go is deprecated. Use aws-sdk-go-v2.
+// See https://aws.amazon.com/blogs/developer/announcing-end-of-support-for-aws-sdk-for-go-v1-on-july-31-2025/.
 package v4
 
 import (
@@ -125,6 +128,7 @@ var requiredSignedHeaders = rules{
 			"X-Amz-Copy-Source-Server-Side-Encryption-Customer-Algorithm": struct{}{},
 			"X-Amz-Copy-Source-Server-Side-Encryption-Customer-Key":       struct{}{},
 			"X-Amz-Copy-Source-Server-Side-Encryption-Customer-Key-Md5":   struct{}{},
+			"X-Amz-Expected-Bucket-Owner":                                 struct{}{},
 			"X-Amz-Grant-Full-control":                                    struct{}{},
 			"X-Amz-Grant-Read":                                            struct{}{},
 			"X-Amz-Grant-Read-Acp":                                        struct{}{},
@@ -135,6 +139,7 @@ var requiredSignedHeaders = rules{
 			"X-Amz-Request-Payer":                                         struct{}{},
 			"X-Amz-Server-Side-Encryption":                                struct{}{},
 			"X-Amz-Server-Side-Encryption-Aws-Kms-Key-Id":                 struct{}{},
+			"X-Amz-Server-Side-Encryption-Context":                        struct{}{},
 			"X-Amz-Server-Side-Encryption-Customer-Algorithm":             struct{}{},
 			"X-Amz-Server-Side-Encryption-Customer-Key":                   struct{}{},
 			"X-Amz-Server-Side-Encryption-Customer-Key-Md5":               struct{}{},
