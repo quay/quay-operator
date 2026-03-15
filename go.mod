@@ -11,7 +11,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.53.1
 	github.com/quay/clair/config v1.1.3
 	github.com/quay/config-tool v0.1.15
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/sjson v1.2.3
 	go.uber.org/zap v1.25.0
 	golang.org/x/net v0.34.0
@@ -118,7 +118,7 @@ require (
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.66.6 // indirect
+	gopkg.in/ini.v1 v1.67.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	k8s.io/apiextensions-apiserver v0.28.3 // indirect
 	k8s.io/component-base v0.28.3 // indirect
