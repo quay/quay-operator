@@ -224,8 +224,8 @@ github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
-# github.com/mattn/go-ieproxy v0.0.1
-## explicit; go 1.14
+# github.com/mattn/go-ieproxy v0.0.12
+## explicit; go 1.17
 github.com/mattn/go-ieproxy
 # github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0
 ## explicit; go 1.19
