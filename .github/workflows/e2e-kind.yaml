@@ -1,0 +1,88 @@
+---
+name: E2E KinD
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-kind-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-kind:
+    name: E2E Tests on KinD
+    runs-on: quay-002-small-ubuntu-24-x64
+    env:
+      SKIP_RESOURCE_REQUESTS: "true"
+      QUAY_VERSION: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install crane
+        run: go install github.com/google/go-containerregistry/cmd/crane@latest
+
+      - name: Build operator
+        run: go build -o bin/manager main.go
+
+      - name: Create KinD cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: quay-e2e
+          config: hack/kind-config.yaml
+
+      - name: Install CRDs
+        run: make install
+
+      - name: Setup Garage S3
+        run: bash hack/setup-kind-e2e.sh
+
+      - name: Run operator in background
+        run: |
+          ./bin/manager > /tmp/operator.log 2>&1 &
+          echo $! > /tmp/operator.pid
+          curl -sf --retry 10 --retry-delay 1 --retry-connrefused http://localhost:8081/readyz
+
+      - name: Run E2E tests
+        run: make test-e2e-kind CHAINSAW_EXTRA_ARGS="--skip-delete"
+        timeout-minutes: 30
+
+      - name: Stop operator
+        if: always()
+        run: |
+          if [ -f /tmp/operator.pid ]; then
+            kill $(cat /tmp/operator.pid) 2>/dev/null || true
+          fi
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== Pod status (all namespaces) ==="
+          kubectl get pods -A -o wide
+          echo ""
+          echo "=== QuayRegistry status ==="
+          kubectl get quayregistries -A -o yaml 2>/dev/null || true
+          echo ""
+          echo "=== Events ==="
+          kubectl get events -A --sort-by='.lastTimestamp' | tail -50
+          echo ""
+          echo "=== Operator logs (last 100 lines) ==="
+          tail -100 /tmp/operator.log 2>/dev/null || true
+          echo ""
+          echo "=== Chainsaw namespace resources ==="
+          for ns in $(kubectl get ns -o name | grep chainsaw | sed 's|namespace/||'); do
+            echo "--- $ns: pod describe ---"
+            kubectl describe pods -n "$ns" 2>/dev/null || true
+            echo "--- $ns: pod logs ---"
+            for pod in $(kubectl get pods -n "$ns" -o name 2>/dev/null); do
+              echo "--- $ns/$pod ---"
+              kubectl logs -n "$ns" "$pod" --all-containers --tail=50 2>/dev/null || true
+            done
+          done

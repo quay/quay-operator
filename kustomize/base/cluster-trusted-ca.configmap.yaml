@@ -4,3 +4,5 @@ metadata:
   name: cluster-trusted-ca
   labels:
     config.openshift.io/inject-trusted-cabundle: "true"
+data:
+  ca-bundle.crt: ""
