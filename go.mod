@@ -7,7 +7,7 @@ require (
 	github.com/kube-object-storage/lib-bucket-provisioner v0.0.0-20210311161930-4bea5edaff58
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.0
-	github.com/openshift/api v0.0.0-20240729140855-0a58f8c30a8c
+	github.com/openshift/api 8182f057c06b
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.53.1
 	github.com/quay/clair/config v1.1.3
 	github.com/quay/config-tool v0.1.15
