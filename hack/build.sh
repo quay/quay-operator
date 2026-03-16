@@ -117,7 +117,7 @@ digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_DIGEST
 digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_OLD_DIGEST
 digest quay.io/sclorg/postgresql-15-c9s:latest POSTGRES_CLAIR_DIGEST
 digest quay.io/sclorg/postgresql-13-c9s:latest POSTGRES_CLAIR_OLD_DIGEST
-digest docker.io/library/redis:7.0 REDIS_DIGEST
+digest quay.io/sclorg/redis-7-c9s:latest REDIS_DIGEST
 
 # need exporting so that yq can see them
 export OPERATOR_DIGEST
