@@ -10,20 +10,16 @@ const (
 	// during the indexing process. Its name is a historical accident.
 	DefaultScanLockRetry = 1
 	// DefaultMatcherPeriod is the default interval for running updaters.
-	DefaultMatcherPeriod = 30 * time.Minute
+	DefaultMatcherPeriod = 6 * time.Hour
 	// DefaultUpdateRetention is the number of updates per vulnerability
 	// database to retain.
 	DefaultUpdateRetention = 10
 	// DefaultNotifierPollInterval is the default (and minimum) interval for the
 	// notifier's change poll interval. The notifier will poll the database for
 	// updated vulnerability databases at this rate.
-	DefaultNotifierPollInterval = 5 * time.Second
+	DefaultNotifierPollInterval = 6 * time.Hour
 	// DefaultNotifierDeliveryInterval is the default (and minimum) interval for
 	// the notifier's delivery interval. The notifier will attempt to deliver
 	// outstanding notifications at this rate.
-	DefaultNotifierDeliveryInterval = 5 * time.Second
+	DefaultNotifierDeliveryInterval = 1 * time.Hour
 )
-
-// BUG(hank) The DefaultNotifierPollInterval is absurdly low.
-
-// BUG(hank) The DefaultNotifierDeliveryInterval is absurdly low.
