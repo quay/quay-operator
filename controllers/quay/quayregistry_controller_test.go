@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -862,6 +863,59 @@ func Test_cleanupPreviousSecret(t *testing.T) {
 
 			if tt.experr {
 				t.Errorf("expecting error but nil returned")
+			}
+		})
+	}
+}
+
+func testObj(kind string) client.Object {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(schema.GroupVersionKind{Kind: kind})
+	return u
+}
+
+func TestFilterDeferredWorkloads(t *testing.T) {
+	for _, tt := range []struct {
+		name           string
+		deferWorkloads bool
+		inputKinds     []string
+		wantKinds      []string
+	}{
+		{
+			name:           "deferWorkloads false passes all objects through",
+			deferWorkloads: false,
+			inputKinds:     []string{"Secret", "Deployment", "Job", "Service"},
+			wantKinds:      []string{"Secret", "Deployment", "Job", "Service"},
+		},
+		{
+			name:           "deferWorkloads true filters Deployments and Jobs",
+			deferWorkloads: true,
+			inputKinds:     []string{"Secret", "Deployment", "Job", "Service", "ConfigMap"},
+			wantKinds:      []string{"Secret", "Service", "ConfigMap"},
+		},
+		{
+			name:           "deferWorkloads true with no workloads is a no-op",
+			deferWorkloads: true,
+			inputKinds:     []string{"Secret", "Service"},
+			wantKinds:      []string{"Secret", "Service"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			objects := make([]client.Object, len(tt.inputKinds))
+			for i, kind := range tt.inputKinds {
+				objects[i] = testObj(kind)
+			}
+
+			result := filterDeferredWorkloads(objects, tt.deferWorkloads)
+
+			if len(result) != len(tt.wantKinds) {
+				t.Fatalf("got %d objects, want %d", len(result), len(tt.wantKinds))
+			}
+			for i, obj := range result {
+				got := obj.GetObjectKind().GroupVersionKind().Kind
+				if got != tt.wantKinds[i] {
+					t.Errorf("object[%d] kind = %q, want %q", i, got, tt.wantKinds[i])
+				}
 			}
 		})
 	}
