@@ -117,7 +117,7 @@ func (r *QuayRegistryReconciler) checkMigrationStatus(
 	}
 
 	var job batchv1.Job
-	if err := r.Client.Get(ctx, nsn, &job); err != nil {
+	if err := r.Get(ctx, nsn, &job); err != nil {
 		// similarly to when a v1.ConditionReasonMigrationsFailed occurs,
 		// when the upgrade job is expected to exist but doesn't
 		// (i.e. someone manually removed it) we want the reconcile loop
@@ -160,7 +160,7 @@ func (r *QuayRegistryReconciler) checkMigrationStatus(
 		quay.Status.CurrentVersion = v1.QuayVersionCurrent
 		quay.Status.Conditions = v1.SetCondition(quay.Status.Conditions, condition)
 
-		if err := r.Client.Status().Update(ctx, quay); err != nil {
+		if err := r.Status().Update(ctx, quay); err != nil {
 			log.Error(err, "could not update status with current version")
 			return r.Requeue, nil
 		}
@@ -227,7 +227,7 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 		}
 
 		var job batchv1.Job
-		if err := r.Client.Get(ctx, nsn, &job); err != nil {
+		if err := r.Get(ctx, nsn, &job); err != nil {
 			if errors.IsNotFound(err) {
 				continue
 			}
@@ -250,7 +250,7 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 				oldPostgresDeploymentName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database-old")
 			}
 			oldPostgresDeployment := &appsv1.Deployment{}
-			if err := r.Client.Get(
+			if err := r.Get(
 				ctx,
 				types.NamespacedName{
 					Name:      oldPostgresDeploymentName,
@@ -269,7 +269,7 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 			}
 
 			// Delete old postgres deployment
-			if err := r.Client.Delete(
+			if err := r.Delete(
 				ctx,
 				obj,
 			); err != nil {
@@ -278,7 +278,7 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 
 			oldPostgresServiceName := fmt.Sprintf("%s-%s", quay.GetName(), "clair-postgres-old")
 			oldPostgresService := &corev1.Service{}
-			if err := r.Client.Get(
+			if err := r.Get(
 				ctx,
 				types.NamespacedName{
 					Name:      oldPostgresServiceName,
@@ -297,7 +297,7 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 			}
 
 			// Delete old postgres deployment
-			if err := r.Client.Delete(
+			if err := r.Delete(
 				ctx,
 				obj,
 			); err != nil {
@@ -312,7 +312,7 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 				oldPostgresPVCName = fmt.Sprintf("%s-%s", quay.GetName(), "quay-database")
 			}
 			oldPostgresPVC := &corev1.PersistentVolumeClaim{}
-			if err := r.Client.Get(
+			if err := r.Get(
 				ctx,
 				types.NamespacedName{
 					Name:      oldPostgresPVCName,
@@ -334,7 +334,7 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 			}
 
 			// Delete old PVC
-			if err := r.Client.Delete(ctx, oldPostgresPVC); err != nil {
+			if err := r.Delete(ctx, oldPostgresPVC); err != nil {
 				r.Log.Error(err, fmt.Sprintf("Failed to delete PVC %s", oldPostgresPVC.Name))
 			} else {
 				r.Log.Info(fmt.Sprintf("Successfully deleted PVC %s", oldPostgresPVC.Name))
@@ -376,7 +376,7 @@ func (r *QuayRegistryReconciler) checkPostgresUpgradeStatus(
 	}
 	quay.Status.Conditions = v1.SetCondition(quay.Status.Conditions, condition)
 
-	if err := r.Client.Status().Update(ctx, quay); err != nil {
+	if err := r.Status().Update(ctx, quay); err != nil {
 		log.Error(err, "could not update status with current version")
 		return r.Requeue, nil
 	}
@@ -406,7 +406,7 @@ func (r *QuayRegistryReconciler) createInitialBundleSecret(
 		},
 	)
 
-	if err := r.Client.Create(ctx, baseConfigBundle); err != nil {
+	if err := r.Create(ctx, baseConfigBundle); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
 			quay,
@@ -418,7 +418,7 @@ func (r *QuayRegistryReconciler) createInitialBundleSecret(
 	}
 
 	quay.Spec.ConfigBundleSecret = baseConfigBundle.GetName()
-	if err := r.Client.Update(ctx, quay); err != nil {
+	if err := r.Update(ctx, quay); err != nil {
 		log.Error(err, "unable to update `spec.configBundleSecret`")
 		return r.Requeue, err
 	}
@@ -452,7 +452,7 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 	ctx context.Context, quay *v1.QuayRegistry,
 ) ([]corev1.Secret, error) {
 	secretList := &corev1.SecretList{}
-	if err := r.Client.List(
+	if err := r.List(
 		ctx,
 		secretList,
 		client.InNamespace(quay.GetNamespace()),
@@ -477,12 +477,12 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
 func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	regid := fmt.Sprintf("%s/%s", req.NamespacedName.Namespace, req.NamespacedName.Name)
+	regid := fmt.Sprintf("%s/%s", req.Namespace, req.Name)
 	log := r.Log.WithValues("quayregistry", regid)
 	log.Info("begin reconcile")
 
 	var quay v1.QuayRegistry
-	if err := r.Client.Get(ctx, req.NamespacedName, &quay); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, &quay); err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("`QuayRegistry` deleted")
 			return ctrl.Result{}, nil
@@ -648,7 +648,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
 		log.Info("updating QuayRegistry `spec.components` to include defaults")
-		if err = r.Client.Update(ctx, updatedQuay); err != nil {
+		if err = r.Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `spec.components` to include defaults")
 		}
 		return r.Requeue, nil
@@ -805,7 +805,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	upToDate := v1.EnsureRegistryEndpoint(quayContext, updatedQuay, usercfg)
 	if !upToDate {
-		if err = r.Client.Status().Update(ctx, updatedQuay); err != nil {
+		if err = r.Status().Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `registryEndpoint` of `QuayRegistry`")
 			return r.Requeue, nil
 		}
@@ -1038,12 +1038,12 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 			PropagationPolicy: &propagationPolicy,
 		}
 
-		if err := r.Client.Delete(ctx, obj, opts); err != nil && !errors.IsNotFound(err) {
+		if err := r.Delete(ctx, obj, opts); err != nil && !errors.IsNotFound(err) {
 			log.Error(err, "failed to delete immutable resource")
 			return false, err
 		}
 
-		if err := r.Client.Create(ctx, obj); err != nil {
+		if err := r.Create(ctx, obj); err != nil {
 			if errors.IsAlreadyExists(err) {
 				log.Info("immutable resource still being deleted, will requeue")
 				return true, nil
@@ -1062,7 +1062,7 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		client.ForceOwnership,
 		client.FieldOwner("quay-operator"),
 	}
-	err := r.Client.Patch(ctx, obj, client.Apply, opts...)
+	err := r.Patch(ctx, obj, client.Apply, opts...)
 	rdferr := &apiutil.ErrResourceDiscoveryFailed{}
 	if goerrors.As(err, &rdferr) && gvk == hpaGVK {
 		var hpa *autoscalingv2beta2.HorizontalPodAutoscaler
@@ -1070,7 +1070,7 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		if err != nil {
 			return false, err
 		}
-		err = r.Client.Patch(ctx, hpa, client.Apply, opts...)
+		err = r.Patch(ctx, hpa, client.Apply, opts...)
 	}
 	if err != nil {
 		log.Error(err, "failed to create/update object")
@@ -1107,7 +1107,7 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 	}
 	r.EventRecorder.Event(quay, eventType, string(reason), msg)
 
-	return r.Client.Status().Update(ctx, quay)
+	return r.Status().Update(ctx, quay)
 }
 
 func (r *QuayRegistryReconciler) cleanupPreviousSecrets(log logr.Logger, ctx context.Context, quay *v1.QuayRegistry, previousSecrets []corev1.Secret) error {
@@ -1121,7 +1121,7 @@ func (r *QuayRegistryReconciler) cleanupPreviousSecrets(log logr.Logger, ctx con
 
 	log.Info("deleting previous config bundle secrets")
 	for _, secret := range previousSecrets {
-		if err := r.Client.Delete(ctx, &secret); err != nil {
+		if err := r.Delete(ctx, &secret); err != nil {
 			log.Error(err, "failed to delete previous config bundle secret")
 			return r.updateWithCondition(
 				ctx,
@@ -1192,7 +1192,7 @@ func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(
 	}
 
 	var ns corev1.Namespace
-	if err := r.Client.Get(ctx, nsn, &ns); err != nil {
+	if err := r.Get(ctx, nsn, &ns); err != nil {
 		return err
 	}
 
@@ -1211,12 +1211,12 @@ func (r *QuayRegistryReconciler) patchNamespaceForMonitoring(
 	updatedNs.Labels = labels
 
 	patch := client.MergeFrom(&ns)
-	return r.Client.Patch(ctx, updatedNs, patch)
+	return r.Patch(ctx, updatedNs, patch)
 }
 
 func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, quay *v1.QuayRegistry) error {
 	var ns corev1.Namespace
-	err := r.Client.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
+	err := r.Get(ctx, types.NamespacedName{Name: quay.GetNamespace()}, &ns)
 	if err != nil {
 		return err
 	}
@@ -1226,7 +1226,7 @@ func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, qua
 		Namespace: quay.GetNamespace(),
 	}
 
-	if err := r.Client.List(ctx, &quayRegistryList, &listOps); err != nil {
+	if err := r.List(ctx, &quayRegistryList, &listOps); err != nil {
 		return err
 	}
 
@@ -1241,7 +1241,7 @@ func (r *QuayRegistryReconciler) cleanupNamespaceLabels(ctx context.Context, qua
 		updatedNs.Labels = labels
 
 		patch := client.MergeFrom(&ns)
-		err = r.Client.Patch(context.Background(), updatedNs, patch)
+		err = r.Patch(context.Background(), updatedNs, patch)
 		return err
 	}
 
@@ -1255,8 +1255,8 @@ func (r *QuayRegistryReconciler) cleanupGrafanaConfigMap(ctx context.Context, qu
 		Namespace: grafanaDashboardConfigNamespace,
 	}
 
-	if err := r.Client.Get(ctx, grafanaConfigMapName, &grafanaConfigMap); err == nil || !errors.IsNotFound(err) {
-		return r.Client.Delete(ctx, &grafanaConfigMap)
+	if err := r.Get(ctx, grafanaConfigMapName, &grafanaConfigMap); err == nil || !errors.IsNotFound(err) {
+		return r.Delete(ctx, &grafanaConfigMap)
 	}
 
 	return nil
