@@ -1,0 +1,99 @@
+# Assert overrides are applied to generated Deployments and PVCs.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconcile-quay-app
+spec:
+  template:
+    metadata:
+      labels:
+        l1: TESTING
+        l2: TESTING
+      annotations:
+        a1: TESTING
+        a2: TESTING
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: quay-component
+                  operator: In
+                  values:
+                  - quay-app
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconcile-clair-app
+spec:
+  template:
+    metadata:
+      labels:
+        l1: TESTING
+      annotations:
+        a1: TESTING
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: quay-component
+                  operator: In
+                  values:
+                  - clair-app
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconcile-quay-database
+spec:
+  template:
+    metadata:
+      labels:
+        l1: TESTING
+      annotations:
+        a1: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconcile-quay-redis
+spec:
+  template:
+    metadata:
+      labels:
+        l1: TESTING
+      annotations:
+        a1: TESTING
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconcile-quay-mirror
+spec:
+  template:
+    metadata:
+      labels:
+        l1: TESTING
+      annotations:
+        a1: TESTING
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: quay-component
+                  operator: In
+                  values:
+                  - quay-mirror
