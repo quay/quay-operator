@@ -36,7 +36,7 @@ func TestQuayCheck(t *testing.T) {
 				Type:    qv1.ComponentQuayReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
-				Message: "Job registry-quay-app-upgrade not found",
+				Message: "job registry-quay-app-upgrade not found",
 			},
 		},
 		{
@@ -61,7 +61,7 @@ func TestQuayCheck(t *testing.T) {
 				Type:    qv1.ComponentQuayReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
-				Message: "Job registry-quay-app-upgrade not finished",
+				Message: "job registry-quay-app-upgrade not finished",
 			},
 		},
 		{
