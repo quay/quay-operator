@@ -1,14 +1,4 @@
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.25
-tests:
-  - as: unit
-    commands: make test
-    container:
-      from: src
-  - as: lint
-    commands: make vet && make fmt && git diff --exit-code
-    container:
-      from: src
+build_root_image:
+  name: builder
+  namespace: ocp
+  tag: rhel-9-golang-1.25-openshift-4.23
