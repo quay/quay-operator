@@ -97,6 +97,6 @@ Override component images via environment variables:
 export RELATED_IMAGE_COMPONENT_QUAY=quay.io/projectquay/quay:v3.10.0
 export RELATED_IMAGE_COMPONENT_CLAIR=quay.io/projectquay/clair:v4.7.0
 export RELATED_IMAGE_COMPONENT_POSTGRES=quay.io/sclorg/postgresql-13-c9s:latest
-export RELATED_IMAGE_COMPONENT_REDIS=docker.io/library/redis:7
+export RELATED_IMAGE_COMPONENT_REDIS=quay.io/sclorg/redis-7-c9s:latest
 make run
 ```
