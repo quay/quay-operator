@@ -19,7 +19,7 @@ spec:
       serviceAccountName: quay-redis
       containers:
         - name: redis-master
-          image: docker.io/library/redis:7.0
+          image: quay.io/sclorg/redis-7-c9s:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 6379
