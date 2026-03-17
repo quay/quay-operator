@@ -732,7 +732,14 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	for _, obj := range kustomize.EnsureCreationOrder(deploymentObjects) {
+	// When managed object storage is pending initialization (OBC not yet
+	// bound), defer creating Deployments and Jobs. This prevents the config
+	// secret from being created with incomplete storage values only to be
+	// regenerated (with a different hash) once the OBC is bound, which
+	// would trigger an unnecessary deployment rollout.
+	deferWorkloads := osmanaged && !quayContext.ObjectStorageInitialized
+
+	for _, obj := range filterDeferredWorkloads(kustomize.EnsureCreationOrder(deploymentObjects), deferWorkloads) {
 		// For metrics and dashboards to work, we need to deploy the Grafana ConfigMap
 		// in the `openshift-config-managed` namespace and add the label
 		// `openshift.io/cluster-monitoring: true` to the registry namespace
@@ -1323,4 +1330,22 @@ func (r *QuayRegistryReconciler) finalizeQuay(ctx context.Context, quay *v1.Quay
 	}
 
 	return nil
+}
+
+// filterDeferredWorkloads removes Deployments and Jobs from the given
+// slice when deferWorkloads is true. When false, the slice is returned
+// unchanged.
+func filterDeferredWorkloads(objects []client.Object, deferWorkloads bool) []client.Object {
+	if !deferWorkloads {
+		return objects
+	}
+	filtered := make([]client.Object, 0, len(objects))
+	for _, obj := range objects {
+		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		if kind == "Deployment" || kind == "Job" {
+			continue
+		}
+		filtered = append(filtered, obj)
+	}
+	return filtered
 }
