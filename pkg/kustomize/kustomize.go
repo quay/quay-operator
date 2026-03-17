@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	route "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"golang.org/x/net/http/httpproxy"
@@ -19,6 +18,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -213,7 +213,13 @@ func ModelFor(gvk schema.GroupVersionKind) client.Object {
 	case schema.GroupVersionKind{Group: "route.openshift.io", Version: "v1", Kind: "Route"}.String():
 		return &route.Route{}
 	case schema.GroupVersionKind{Group: "objectbucket.io", Version: "v1alpha1", Kind: "ObjectBucketClaim"}.String():
-		return &objectbucket.ObjectBucketClaim{}
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "objectbucket.io",
+			Version: "v1alpha1",
+			Kind:    "ObjectBucketClaim",
+		})
+		return obj
 	case schema.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}.String():
 		return &autoscaling.HorizontalPodAutoscaler{}
 	case schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String():

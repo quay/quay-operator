@@ -6,9 +6,9 @@ import (
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	ocsv1a1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 )
 
 // ObjectStorage is capable of verifying if component ObjectStorage status. Inspects created
@@ -39,17 +39,24 @@ func (o *ObjectStorage) Check(
 		}, nil
 	}
 
-	var list ocsv1a1.ObjectBucketClaimList
+	var list unstructured.UnstructuredList
+	list.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "objectbucket.io",
+		Version: "v1alpha1",
+		Kind:    "ObjectBucketClaimList",
+	})
 	if err := o.Client.List(ctx, &list, client.InNamespace(reg.Namespace)); err != nil {
 		return zero, err
 	}
 
-	for _, obc := range list.Items {
-		if !qv1.Owns(reg, &obc) {
+	for i := range list.Items {
+		obc := &list.Items[i]
+		if !qv1.Owns(reg, obc) {
 			continue
 		}
 
-		if obc.Status.Phase != ocsv1a1.ObjectBucketClaimStatusPhaseBound {
+		phase, _, _ := unstructured.NestedString(obc.Object, "status", "phase")
+		if phase != "Bound" {
 			return qv1.Condition{
 				Type:           qv1.ComponentObjectStorageReady,
 				Status:         metav1.ConditionFalse,
