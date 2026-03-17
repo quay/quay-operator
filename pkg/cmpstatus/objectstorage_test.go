@@ -7,14 +7,32 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
-
-	ocsv1a1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 )
+
+func newUnstructuredOBC(name, namespace, phase string, ownerRefs []metav1.OwnerReference) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "objectbucket.io",
+		Version: "v1alpha1",
+		Kind:    "ObjectBucketClaim",
+	})
+	obj.SetName(name)
+	obj.SetNamespace(namespace)
+	if len(ownerRefs) > 0 {
+		obj.SetOwnerReferences(ownerRefs)
+	}
+	if phase != "" {
+		_ = unstructured.SetNestedField(obj.Object, phase, "status", "phase")
+	}
+	return obj
+}
 
 func TestObjectStorageCheck(t *testing.T) {
 	for _, tt := range []struct {
@@ -78,21 +96,14 @@ func TestObjectStorageCheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&ocsv1a1.ObjectBucketClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredOBC("", "", "Failed", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-					Status: ocsv1a1.ObjectBucketClaimStatus{
-						Phase: ocsv1a1.ObjectBucketClaimStatusPhaseFailed,
-					},
-				},
+				}),
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentObjectStorageReady,
@@ -118,21 +129,14 @@ func TestObjectStorageCheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&ocsv1a1.ObjectBucketClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredOBC("", "", "Bound", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-					Status: ocsv1a1.ObjectBucketClaimStatus{
-						Phase: ocsv1a1.ObjectBucketClaimStatusPhaseBound,
-					},
-				},
+				}),
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentObjectStorageReady,
@@ -158,11 +162,7 @@ func TestObjectStorageCheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&ocsv1a1.ObjectBucketClaim{
-					Status: ocsv1a1.ObjectBucketClaimStatus{
-						Phase: ocsv1a1.ObjectBucketClaimStatusPhaseBound,
-					},
-				},
+				newUnstructuredOBC("", "", "Bound", nil),
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentObjectStorageReady,
@@ -177,10 +177,6 @@ func TestObjectStorageCheck(t *testing.T) {
 			defer cancel()
 
 			scheme := runtime.NewScheme()
-			if err := ocsv1a1.AddToScheme(scheme); err != nil {
-				t.Fatalf("unexpected error adding ocs to scheme: %s", err)
-			}
-
 			builder := fake.NewClientBuilder()
 			cli := builder.WithObjects(tt.objs...).WithScheme(scheme).Build()
 			obs := ObjectStorage{cli}

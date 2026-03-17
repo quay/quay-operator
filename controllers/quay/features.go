@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"gopkg.in/yaml.v2"
@@ -20,7 +19,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -314,7 +315,12 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 		Namespace: quay.GetNamespace(),
 	}
 
-	var claims objectbucket.ObjectBucketClaimList
+	var claims unstructured.UnstructuredList
+	claims.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "objectbucket.io",
+		Version: "v1alpha1",
+		Kind:    "ObjectBucketClaimList",
+	})
 	if err := r.List(ctx, &claims); err != nil {
 		return fmt.Errorf("unable to list object bucket claims: %s", err)
 	}
