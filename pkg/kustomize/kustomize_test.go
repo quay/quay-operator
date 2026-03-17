@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-logr/logr"
 	testlogr "github.com/go-logr/logr/testing"
-	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2"
@@ -14,6 +13,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/api/types"
 
@@ -398,7 +399,16 @@ var quayComponents = map[string][]client.Object{
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
 	},
 	"objectstorage": {
-		&objectbucket.ObjectBucketClaim{ObjectMeta: metav1.ObjectMeta{Name: "quay-datastorage"}},
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "objectbucket.io",
+				Version: "v1alpha1",
+				Kind:    "ObjectBucketClaim",
+			})
+			obj.SetName("quay-datastorage")
+			return obj
+		}(),
 	},
 	"route": {
 		// TODO: Import OpenShift `Route` API struct
