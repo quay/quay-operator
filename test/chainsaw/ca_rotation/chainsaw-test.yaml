@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: ca-rotation
+spec:
+  concurrent: false
+  steps:
+  - name: step-00
+    try:
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert.yaml
+  - name: step-01
+    try:
+    - script:
+        content: |
+          kubectl delete secret/signing-key -n openshift-service-ca;
+          for I in $(oc get ns -o jsonpath='{range .items[*]} {.metadata.name}{"\n"} {end}'); \
+                do oc delete pods --all -n $I; \
+                sleep 1; \
+                done
+        timeout: 50m0s
+    - assert:
+        file: 01-assert.yaml
+    - assert:
+        file: 01-assert.yaml

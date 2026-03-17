@@ -1,0 +1,5 @@
+managedRoute: true
+managedObjectStorage: true
+managedMonitoring: true
+managedTLS: true
+configBundle: ""

@@ -19,11 +19,7 @@ all: manager
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
-test-e2e:
-	mkdir -p ./bin
-	curl -L https://github.com/kudobuilder/kuttl/releases/download/v0.15.0/kubectl-kuttl_0.15.0_linux_$(shell uname -m) -o ./bin/kuttl;
-	chmod +x ./bin/kuttl;
-	./bin/kuttl test;
+include test/chainsaw/Makefile
 
 # Build manager binary
 manager: generate fmt vet
