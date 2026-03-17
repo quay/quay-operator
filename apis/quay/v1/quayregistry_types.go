@@ -40,6 +40,7 @@ type QuayVersion string
 var QuayVersionCurrent QuayVersion = QuayVersion(os.Getenv("QUAY_VERSION"))
 
 // ComponentKind holds a component type, e.g. "clair", "postgres", etc.
+// +kubebuilder:validation:Enum=quay;postgres;clair;clairpostgres;redis;horizontalpodautoscaler;objectstorage;route;mirror;monitoring;tls
 type ComponentKind string
 
 // Follow a list of constants representing all supported components.
@@ -146,6 +147,7 @@ type QuayRegistrySpec struct {
 }
 
 // Component describes how the Operator should handle a backing Quay service.
+// +kubebuilder:validation:XValidation:rule="self.managed || !has(self.overrides)",message="cannot set overrides on unmanaged component"
 type Component struct {
 	// Kind is the unique name of this type of component.
 	Kind ComponentKind `json:"kind"`
@@ -163,6 +165,7 @@ type Override struct {
 	StorageClassName *string         `json:"storageClassName,omitempty"`
 	Env              []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 	// +nullable
+	// +kubebuilder:validation:Minimum=0
 	Replicas        *int32                  `json:"replicas,omitempty"`
 	Affinity        *corev1.Affinity        `json:"affinity,omitempty"`
 	Labels          map[string]string       `json:"labels,omitempty"`
@@ -250,6 +253,8 @@ type QuayRegistryStatus struct {
 	LastUpdate string `json:"lastUpdated,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
 	Conditions []Condition `json:"conditions,omitempty"`
+	// ObservedGeneration is the most recent generation observed by the controller.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // GetCondition retrieves the condition with the matching type from the given list.
@@ -298,6 +303,10 @@ func RemoveCondition(conditions []Condition, conditionType ConditionType) []Cond
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.status.currentVersion`
+// +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=`.status.registryEndpoint`
+// +kubebuilder:printcolumn:name="Available",type=string,JSONPath=`.status.conditions[?(@.type=="Available")].status`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // QuayRegistry is the Schema for the quayregistries API.
 type QuayRegistry struct {
