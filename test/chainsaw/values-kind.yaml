@@ -1,0 +1,5 @@
+managedRoute: false
+managedObjectStorage: false
+managedMonitoring: false
+managedTLS: false
+configBundle: reconcile-config

@@ -1,0 +1,87 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: reconcile
+spec:
+  configBundleSecret: ($values.configBundle)
+  components:
+  - kind: quay
+    managed: true
+    overrides:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: quay-component
+                  operator: In
+                  values:
+                  - quay-app
+              topologyKey: kubernetes.io/hostname
+      labels:
+        l1: TESTING
+        l2: TESTING
+      annotations:
+        a1: TESTING
+        a2: TESTING
+      env:
+      - name: TESTING
+        value: TESTING
+  - kind: clair
+    managed: true
+    overrides:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: quay-component
+                  operator: In
+                  values:
+                  - clair-app
+              topologyKey: kubernetes.io/hostname
+      labels:
+        l1: TESTING
+      annotations:
+        a1: TESTING
+      env:
+      - name: TESTING
+        value: TESTING
+  - kind: postgres
+    managed: true
+    overrides:
+      labels:
+        l1: TESTING
+      annotations:
+        a1: TESTING
+      env:
+      - name: TESTING
+        value: TESTING
+  - kind: redis
+    managed: true
+    overrides:
+      labels:
+        l1: TESTING
+      annotations:
+        a1: TESTING
+      env:
+      - name: TESTING
+        value: TESTING
+  - kind: mirror
+    managed: false
+  - kind: clairpostgres
+    managed: true
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: ($values.managedObjectStorage)
+  - kind: route
+    managed: ($values.managedRoute)
+  - kind: monitoring
+    managed: ($values.managedMonitoring)
+  - kind: tls
+    managed: ($values.managedTLS)
