@@ -8,7 +8,7 @@ metadata:
     quay-component: mirror
 spec:
   strategy:
-    type: Recreate
+    type: RollingUpdate
   selector:
     matchLabels:
       quay-component: quay-mirror
