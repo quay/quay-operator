@@ -13,7 +13,20 @@ spec:
     singular: quayregistry
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .status.currentVersion
+      name: Version
+      type: string
+    - jsonPath: .status.registryEndpoint
+      name: Endpoint
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Available")].status
+      name: Available
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         description: QuayRegistry is the Schema for the quayregistries API.
@@ -47,6 +60,18 @@ spec:
                   properties:
                     kind:
                       description: Kind is the unique name of this type of component.
+                      enum:
+                      - quay
+                      - postgres
+                      - clair
+                      - clairpostgres
+                      - redis
+                      - horizontalpodautoscaler
+                      - objectstorage
+                      - route
+                      - mirror
+                      - monitoring
+                      - tls
                       type: string
                     managed:
                       description: |-
@@ -953,6 +978,7 @@ spec:
                           type: object
                         replicas:
                           format: int32
+                          minimum: 0
                           nullable: true
                           type: integer
                         resources:
@@ -1164,6 +1190,9 @@ spec:
                   - kind
                   - managed
                   type: object
+                  x-kubernetes-validations:
+                  - message: cannot set overrides on unmanaged component
+                    rule: self.managed || !has(self.overrides)
                 type: array
               configBundleSecret:
                 description: |-
@@ -1208,6 +1237,11 @@ spec:
                 description: LastUpdate is the timestamp when the Operator last processed
                   this instance.
                 type: string
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the controller.
+                format: int64
+                type: integer
               registryEndpoint:
                 description: RegistryEndpoint is the external access point for the
                   Quay registry.
