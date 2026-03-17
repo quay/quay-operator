@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	ocsv1a1 "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	monv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -325,21 +324,14 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&ocsv1a1.ObjectBucketClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredOBC("", "", "Bound", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-					Status: ocsv1a1.ObjectBucketClaimStatus{
-						Phase: ocsv1a1.ObjectBucketClaimStatusPhaseBound,
-					},
-				},
+				}),
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-clair-postgres",
@@ -658,21 +650,14 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&ocsv1a1.ObjectBucketClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredOBC("", "", "Bound", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-					Status: ocsv1a1.ObjectBucketClaimStatus{
-						Phase: ocsv1a1.ObjectBucketClaimStatusPhaseBound,
-					},
-				},
+				}),
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-clair-postgres",
@@ -1014,21 +999,14 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&ocsv1a1.ObjectBucketClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredOBC("", "", "Bound", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-					Status: ocsv1a1.ObjectBucketClaimStatus{
-						Phase: ocsv1a1.ObjectBucketClaimStatusPhaseBound,
-					},
-				},
+				}),
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-clair-postgres",
@@ -1227,9 +1205,6 @@ func TestEvaluate(t *testing.T) {
 			scheme := runtime.NewScheme()
 			if err := routev1.AddToScheme(scheme); err != nil {
 				t.Fatalf("unexpected error adding routes to scheme: %s", err)
-			}
-			if err := ocsv1a1.AddToScheme(scheme); err != nil {
-				t.Fatalf("unexpected error adding ocs to scheme: %s", err)
 			}
 			if err := asv2.AddToScheme(scheme); err != nil {
 				t.Fatalf("unexpected error adding hpa to scheme: %s", err)

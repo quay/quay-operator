@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	objectbucket "github.com/kube-object-storage/lib-bucket-provisioner/pkg/apis/objectbucket.io/v1alpha1"
 	routev1 "github.com/openshift/api/route/v1"
 	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/tidwall/sjson"
@@ -1046,9 +1045,6 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		}
 	}
 
-	// managedFields cannot be set on a PATCH.
-	obj.SetManagedFields([]metav1.ManagedFieldsEntry{})
-
 	jobGVK := schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}
 	if gvk == jobGVK {
 		// Check if an existing Job with this name is still running or already
@@ -1200,13 +1196,6 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 		return err
 	}
-	// FIXME: Can we do this in the `init()` function in `main.go`...?
-	if err := objectbucket.AddToScheme(mgr.GetScheme()); err != nil {
-		r.Log.Error(err, "Failed to add `ObjectBucketClaim` API to scheme")
-
-		return err
-	}
-
 	if err := prometheusv1.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add `PrometheusRule` API to scheme")
 
