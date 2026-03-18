@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-logr/logr"
 	route "github.com/openshift/api/route/v1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"golang.org/x/net/http/httpproxy"
 	apps "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2"
@@ -225,9 +224,21 @@ func ModelFor(gvk schema.GroupVersionKind) client.Object {
 	case schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}.String():
 		return &batchv1.Job{}
 	case schema.GroupVersionKind{Group: "monitoring.coreos.com", Version: "v1", Kind: "ServiceMonitor"}.String():
-		return &prometheusv1.ServiceMonitor{}
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "monitoring.coreos.com",
+			Version: "v1",
+			Kind:    "ServiceMonitor",
+		})
+		return obj
 	case schema.GroupVersionKind{Group: "monitoring.coreos.com", Version: "v1", Kind: "PrometheusRule"}.String():
-		return &prometheusv1.PrometheusRule{}
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "monitoring.coreos.com",
+			Version: "v1",
+			Kind:    "PrometheusRule",
+		})
+		return obj
 	default:
 		panic(fmt.Sprintf("Missing model for GVK %s", gvk.String()))
 	}
