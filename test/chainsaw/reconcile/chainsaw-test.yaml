@@ -6,7 +6,7 @@ metadata:
   name: reconcile
 spec:
   steps:
-  - name: step-00
+  - name: create-registry
     try:
     - script:
         content: |
@@ -61,19 +61,19 @@ spec:
         file: 00-assert-overrides.yaml
     - assert:
         file: 00-assert-status.yaml
-  - name: step-01
+  - name: unmanage-mirror
     try:
     - apply:
         file: 01-unmanage-mirror.yaml
     - assert:
         file: 01-assert.yaml
-  - name: step-02
+  - name: scale-mirror
     try:
     - apply:
         file: 02-scale-mirror.yaml
     - assert:
         file: 02-assert.yaml
-  - name: step-03
+  - name: delete-quay-app
     try:
     - script:
         content: |
@@ -81,7 +81,7 @@ spec:
           echo "Deleted deployment reconcile-quay-app"
     - assert:
         file: 03-assert.yaml
-  - name: step-04
+  - name: push-pull-image
     try:
     - script:
         shell: /bin/bash
@@ -156,25 +156,25 @@ spec:
           # Verify tag is queryable via the registry API
           PUSH_DIGEST=$(crane digest ${CRANE_FLAGS} "${REGISTRY}/admin/e2e-test:latest")
           echo "PASS: push verified digest=${PUSH_DIGEST}"
-  - name: step-05
+  - name: remanage-mirror
     try:
     - apply:
         file: 05-remanage-mirror.yaml
     - assert:
         file: 05-assert.yaml
-  - name: step-06
+  - name: scale-to-zero
     try:
     - apply:
         file: 06-scale-to-zero.yaml
     - assert:
         file: 06-assert.yaml
-  - name: step-07
+  - name: restore-mirror
     try:
     - apply:
         file: 07-restore-mirror.yaml
     - assert:
         file: 07-assert.yaml
-  - name: step-08
+  - name: rotate-config
     try:
     - script:
         shell: /bin/bash
