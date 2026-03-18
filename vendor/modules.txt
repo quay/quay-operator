@@ -313,10 +313,6 @@ github.com/pmezard/go-difflib/difflib
 ## explicit; go 1.16
 github.com/pquerna/cachecontrol
 github.com/pquerna/cachecontrol/cacheobject
-# github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.53.1
-## explicit; go 1.17
-github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
-github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1
 # github.com/prometheus/client_golang v1.17.0
 ## explicit; go 1.19
 github.com/prometheus/client_golang/prometheus

@@ -7,14 +7,42 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	monv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
+
+func newUnstructuredPrometheusRule(name string, ownerRefs []metav1.OwnerReference) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "PrometheusRule",
+	})
+	obj.SetName(name)
+	if len(ownerRefs) > 0 {
+		obj.SetOwnerReferences(ownerRefs)
+	}
+	return obj
+}
+
+func newUnstructuredServiceMonitor(name string, ownerRefs []metav1.OwnerReference) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "ServiceMonitor",
+	})
+	obj.SetName(name)
+	if len(ownerRefs) > 0 {
+		obj.SetOwnerReferences(ownerRefs)
+	}
+	return obj
+}
 
 func TestMonitoringCheck(t *testing.T) {
 	for _, tt := range []struct {
@@ -86,11 +114,7 @@ func TestMonitoringCheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&monv1.PrometheusRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-prometheus-rules",
-					},
-				},
+				newUnstructuredPrometheusRule("registry-quay-prometheus-rules", nil),
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentMonitoringReady,
@@ -116,19 +140,14 @@ func TestMonitoringCheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&monv1.PrometheusRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-prometheus-rules",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredPrometheusRule("registry-quay-prometheus-rules", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
+				}),
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentMonitoringReady,
@@ -154,24 +173,15 @@ func TestMonitoringCheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&monv1.PrometheusRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-prometheus-rules",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredPrometheusRule("registry-quay-prometheus-rules", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
-				&monv1.ServiceMonitor{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-metrics-monitor",
-					},
-				},
+				}),
+				newUnstructuredServiceMonitor("registry-quay-metrics-monitor", nil),
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentMonitoringReady,
@@ -197,32 +207,22 @@ func TestMonitoringCheck(t *testing.T) {
 				},
 			},
 			objs: []client.Object{
-				&monv1.PrometheusRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-prometheus-rules",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredPrometheusRule("registry-quay-prometheus-rules", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
-				&monv1.ServiceMonitor{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-metrics-monitor",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				}),
+				newUnstructuredServiceMonitor("registry-quay-metrics-monitor", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
+				}),
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentMonitoringReady,
@@ -237,10 +237,6 @@ func TestMonitoringCheck(t *testing.T) {
 			defer cancel()
 
 			scheme := runtime.NewScheme()
-			if err := monv1.AddToScheme(scheme); err != nil {
-				t.Fatalf("unexpected error adding monitoring to scheme: %s", err)
-			}
-
 			builder := fake.NewClientBuilder()
 			cli := builder.WithObjects(tt.objs...).WithScheme(scheme).Build()
 			mon := Monitoring{cli}

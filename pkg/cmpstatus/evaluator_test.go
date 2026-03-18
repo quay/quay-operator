@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	routev1 "github.com/openshift/api/route/v1"
-	monv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
@@ -275,32 +274,22 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&monv1.PrometheusRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-prometheus-rules",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredPrometheusRule("registry-quay-prometheus-rules", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
-				&monv1.ServiceMonitor{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-metrics-monitor",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				}),
+				newUnstructuredServiceMonitor("registry-quay-metrics-monitor", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
+				}),
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-database",
@@ -601,32 +590,22 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&monv1.PrometheusRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-prometheus-rules",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredPrometheusRule("registry-quay-prometheus-rules", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
-				&monv1.ServiceMonitor{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-metrics-monitor",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				}),
+				newUnstructuredServiceMonitor("registry-quay-metrics-monitor", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
+				}),
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-database",
@@ -950,32 +929,22 @@ func TestEvaluate(t *testing.T) {
 						},
 					},
 				},
-				&monv1.PrometheusRule{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-prometheus-rules",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				newUnstructuredPrometheusRule("registry-quay-prometheus-rules", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
-				&monv1.ServiceMonitor{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-metrics-monitor",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
-						},
+				}),
+				newUnstructuredServiceMonitor("registry-quay-metrics-monitor", []metav1.OwnerReference{
+					{
+						Kind:       "QuayRegistry",
+						Name:       "registry",
+						APIVersion: "quay.redhat.com/v1",
+						UID:        "uid",
 					},
-				},
+				}),
 				&appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "registry-quay-database",
@@ -1214,9 +1183,6 @@ func TestEvaluate(t *testing.T) {
 			}
 			if err := corev1.AddToScheme(scheme); err != nil {
 				t.Fatalf("unexpected error adding core to scheme: %s", err)
-			}
-			if err := monv1.AddToScheme(scheme); err != nil {
-				t.Fatalf("unexpected error adding monitoring to scheme: %s", err)
 			}
 			if err := batchv1.AddToScheme(scheme); err != nil {
 				t.Fatalf("unexpected error adding batch to scheme: %s", err)
