@@ -11,17 +11,15 @@ CHAINSAW_VALUES_KIND := test/chainsaw/values-kind.yaml
 
 chainsaw: $(CHAINSAW) ## Download chainsaw locally if necessary.
 $(CHAINSAW): $(LOCALBIN)
+	@mkdir -p $(LOCALBIN)
 	@test -s $(LOCALBIN)/chainsaw && $(LOCALBIN)/chainsaw version 2>/dev/null | grep -q $(CHAINSAW_VERSION) || \
 	{ curl -sL "https://github.com/kyverno/chainsaw/releases/download/$(CHAINSAW_VERSION)/chainsaw_linux_amd64.tar.gz" | tar -xz -C $(LOCALBIN) chainsaw; }
 
-test-e2e: chainsaw ## Run Chainsaw e2e tests (excludes destructive and resource-intensive tests)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/hpa"
+test-e2e: chainsaw ## Run Chainsaw e2e tests (excludes destructive tests)
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation" $(CHAINSAW_EXTRA_ARGS)
 
 test-e2e-destructive: chainsaw ## Run destructive Chainsaw e2e tests (ca-rotation, OpenShift only)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --include-test-regex "/ca.rotation"
-
-test-e2e-hpa: chainsaw ## Run HPA e2e tests (resource-intensive, OpenShift only)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --include-test-regex "/hpa"
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --include-test-regex "/ca.rotation" $(CHAINSAW_EXTRA_ARGS)
 
 test-e2e-kind: chainsaw ## Run Chainsaw e2e tests (KinD)
 	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_KIND) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/hpa" --assert-timeout 20m $(CHAINSAW_EXTRA_ARGS)

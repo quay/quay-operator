@@ -14,3 +14,26 @@ spec:
     delete: 10m0s
     error: 10m0s
     exec: 10m0s
+  catch:
+  - events: {}
+  - describe:
+      apiVersion: quay.redhat.com/v1
+      kind: QuayRegistry
+  - get:
+      apiVersion: v1
+      kind: Pod
+  - get:
+      apiVersion: apps/v1
+      kind: Deployment
+  - podLogs:
+      selector: quay-component=quay-app
+      tail: 30
+  - podLogs:
+      selector: quay-component=clair-app
+      tail: 30
+  - podLogs:
+      selector: quay-component=quay-app-mirror
+      tail: 20
+  - podLogs:
+      selector: quay-component=quay-database
+      tail: 20

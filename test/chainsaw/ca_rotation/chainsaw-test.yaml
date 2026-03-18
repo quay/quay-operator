@@ -7,13 +7,13 @@ metadata:
 spec:
   concurrent: false
   steps:
-  - name: step-00
+  - name: create-registry
     try:
     - apply:
         file: 00-create-quay-registry.yaml
     - assert:
         file: 00-assert.yaml
-  - name: step-01
+  - name: rotate-ca
     try:
     - script:
         content: |
