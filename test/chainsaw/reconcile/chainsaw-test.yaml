@@ -156,3 +156,87 @@ spec:
           # Verify tag is queryable via the registry API
           PUSH_DIGEST=$(crane digest ${CRANE_FLAGS} "${REGISTRY}/admin/e2e-test:latest")
           echo "PASS: push verified digest=${PUSH_DIGEST}"
+  - name: step-05
+    try:
+    - apply:
+        file: 05-remanage-mirror.yaml
+    - assert:
+        file: 05-assert.yaml
+  - name: step-06
+    try:
+    - apply:
+        file: 06-scale-to-zero.yaml
+    - assert:
+        file: 06-assert.yaml
+  - name: step-07
+    try:
+    - apply:
+        file: 07-restore-mirror.yaml
+    - assert:
+        file: 07-assert.yaml
+  - name: step-08
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          # Record the current config secret name
+          OLD_SECRET=$(kubectl get secret -n $NAMESPACE -o name \
+            | grep "reconcile-quay-config-secret" | head -1 || true)
+          echo "Current config secret: ${OLD_SECRET}"
+
+          if [ -z "${OLD_SECRET}" ]; then
+            echo "ERROR: no config secret found"
+            exit 1
+          fi
+
+          # Ensure config bundle secret exists (on OpenShift it may not)
+          if ! kubectl get secret reconcile-config -n $NAMESPACE &>/dev/null; then
+            echo "Creating config bundle secret for OpenShift..."
+            kubectl create secret generic reconcile-config -n $NAMESPACE \
+              --from-literal=config.yaml="FEATURE_MAILING: false"
+            kubectl patch quayregistry reconcile -n $NAMESPACE --type=merge \
+              -p '{"spec":{"configBundleSecret":"reconcile-config"}}'
+            # Wait for reconcile to settle with the new config bundle
+            echo "Waiting for reconcile to settle..."
+            sleep 30
+            # Re-record after settle since the secret name may have changed
+            OLD_SECRET=$(kubectl get secret -n $NAMESPACE -o name \
+              | grep "reconcile-quay-config-secret" | head -1 || true)
+            echo "Config secret after settle: ${OLD_SECRET}"
+          fi
+
+          # Patch the config bundle to trigger config rotation
+          # Add a new key that doesn't exist in the original config
+          CONFIG=$(kubectl get secret reconcile-config -n $NAMESPACE \
+            -o jsonpath='{.data.config\.yaml}' | base64 -d)
+          UPDATED_CONFIG=$(printf '%s\nTAGGING_DISABLED: true\n' "${CONFIG}")
+          kubectl patch secret reconcile-config -n $NAMESPACE --type=merge \
+            -p "{\"data\":{\"config.yaml\":\"$(echo -n "${UPDATED_CONFIG}" | base64 -w0)\"}}"
+          echo "Config bundle patched"
+
+          # Wait for the operator to create a new config secret
+          echo "Waiting for config secret rotation..."
+          for i in $(seq 1 60); do
+            NEW_SECRET=$(kubectl get secret -n $NAMESPACE -o name \
+              | grep "reconcile-quay-config-secret" | head -1 || true)
+            if [ -n "${NEW_SECRET}" ] && [ "${NEW_SECRET}" != "${OLD_SECRET}" ]; then
+              echo "PASS: config secret rotated: ${OLD_SECRET} -> ${NEW_SECRET}"
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: config secret rotation timeout"; exit 1; }
+            sleep 5
+          done
+
+          # Verify only one config secret exists (old one was cleaned up)
+          COUNT=$(kubectl get secret -n $NAMESPACE -o name \
+            | grep -c "reconcile-quay-config-secret" || true)
+          if [ "${COUNT}" -ne 1 ]; then
+            echo "ERROR: expected 1 config secret, found ${COUNT}"
+            kubectl get secret -n $NAMESPACE -o name | grep "reconcile-quay-config-secret" || true
+            exit 1
+          fi
+          echo "PASS: old config secret cleaned up, ${COUNT} config secret(s) remain"
+    - assert:
+        file: 08-assert.yaml
