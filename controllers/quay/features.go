@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	routev1 "github.com/openshift/api/route/v1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -446,14 +445,24 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 		return err.New(msg)
 	}
 
-	var serviceMonitors prometheusv1.ServiceMonitorList
+	var serviceMonitors unstructured.UnstructuredList
+	serviceMonitors.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "ServiceMonitorList",
+	})
 	if err := r.List(ctx, &serviceMonitors); err != nil {
 		r.Log.Info("Unable to find ServiceMonitor CRD. Monitoring component disabled")
 		return err
 	}
 	r.Log.Info("cluster supports `ServiceMonitor` API")
 
-	var prometheusRules prometheusv1.PrometheusRuleList
+	var prometheusRules unstructured.UnstructuredList
+	prometheusRules.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "PrometheusRuleList",
+	})
 	if err := r.List(ctx, &prometheusRules); err != nil {
 		r.Log.Info("Unable to find PrometheusRule CRD. Monitoring component disabled")
 		return err

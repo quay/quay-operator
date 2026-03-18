@@ -25,7 +25,6 @@ import (
 
 	"github.com/go-logr/logr"
 	routev1 "github.com/openshift/api/route/v1"
-	prometheusv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/tidwall/sjson"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -1243,11 +1242,6 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// FIXME: Can we do this in the `init()` function in `main.go`...?
 	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add OpenShift `Route` API to scheme")
-
-		return err
-	}
-	if err := prometheusv1.AddToScheme(mgr.GetScheme()); err != nil {
-		r.Log.Error(err, "Failed to add `PrometheusRule` API to scheme")
 
 		return err
 	}
