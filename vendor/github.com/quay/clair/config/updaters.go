@@ -7,7 +7,7 @@ type Updaters struct {
 	// TODO(louis): this is only used in clairctl, should we keep this?
 	// it may offer an escape hatch for a particular updater name
 	// from running, vs disabling the updater set completely.
-	Filter string `yaml:"filter" json:"filter"`
+	Filter string `yaml:"filter,omitempty" json:"filter,omitempty"`
 	// Config holds configuration blocks for UpdaterFactories and Updaters,
 	// keyed by name.
 	//
@@ -21,11 +21,13 @@ type Updaters struct {
 	// The following sets are supported by default:
 	// "alpine"
 	// "aws"
+	// "clair.cvss"
 	// "debian"
 	// "oracle"
+	// "osv"
 	// "photon"
-	// "pyupio"
-	// "rhel"
+	// "rhcc"
+	// "rhel-vex"
 	// "suse"
 	// "ubuntu"
 	Sets []string `yaml:"sets,omitempty" json:"sets,omitempty"`
