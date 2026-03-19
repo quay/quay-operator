@@ -25,6 +25,7 @@ import (
 	"math"
 	"time"
 
+	"go.uber.org/zap/internal/stacktrace"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -374,7 +375,7 @@ func StackSkip(key string, skip int) Field {
 	// from expanding the zapcore.Field union struct to include a byte slice. Since
 	// taking a stacktrace is already so expensive (~10us), the extra allocation
 	// is okay.
-	return String(key, takeStacktrace(skip+1)) // skip StackSkip
+	return String(key, stacktrace.Take(skip+1)) // skip StackSkip
 }
 
 // Duration constructs a field with the given key and value. The encoder
@@ -397,6 +398,9 @@ func Durationp(key string, val *time.Duration) Field {
 // struct-like user-defined types to the logging context. The struct's
 // MarshalLogObject method is called lazily.
 func Object(key string, val zapcore.ObjectMarshaler) Field {
+	if val == nil {
+		return nilField(key)
+	}
 	return Field{Key: key, Type: zapcore.ObjectMarshalerType, Interface: val}
 }
 
@@ -408,6 +412,33 @@ func Inline(val zapcore.ObjectMarshaler) Field {
 		Type:      zapcore.InlineMarshalerType,
 		Interface: val,
 	}
+}
+
+// Dict constructs a field containing the provided key-value pairs.
+// It acts similar to [Object], but with the fields specified as arguments.
+func Dict(key string, val ...Field) Field {
+	return dictField(key, val)
+}
+
+// We need a function with the signature (string, T) for zap.Any.
+func dictField(key string, val []Field) Field {
+	return Object(key, dictObject(val))
+}
+
+type dictObject []Field
+
+func (d dictObject) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	for _, f := range d {
+		f.AddTo(enc)
+	}
+	return nil
+}
+
+// DictObject constructs a [zapcore.ObjectMarshaler] with the given list of fields.
+// The resulting object marshaler can be used as input to [Object], [Objects], or
+// any other functions that expect an object marshaler.
+func DictObject(val ...Field) zapcore.ObjectMarshaler {
+	return dictObject(val)
 }
 
 // We discovered an issue where zap.Any can cause a performance degradation
@@ -439,6 +470,8 @@ func Inline(val zapcore.ObjectMarshaler) Field {
 // - https://github.com/uber-go/zap/pull/1304
 // - https://github.com/uber-go/zap/pull/1305
 // - https://github.com/uber-go/zap/pull/1308
+//
+// See https://github.com/golang/go/issues/62077 for upstream issue.
 type anyFieldC[T any] func(string, T) Field
 
 func (f anyFieldC[T]) Any(key string, val any) Field {
@@ -462,6 +495,8 @@ func Any(key string, value interface{}) Field {
 		c = anyFieldC[zapcore.ObjectMarshaler](Object)
 	case zapcore.ArrayMarshaler:
 		c = anyFieldC[zapcore.ArrayMarshaler](Array)
+	case []Field:
+		c = anyFieldC[[]Field](dictField)
 	case bool:
 		c = anyFieldC[bool](Bool)
 	case *bool:
