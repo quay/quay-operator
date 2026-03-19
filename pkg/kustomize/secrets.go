@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/quay/clair/config"
@@ -432,8 +431,8 @@ func clairConfigFor(log logr.Logger, qctx *quaycontext.QuayRegistryContext, quay
 		"notifier": map[string]interface{}{
 			"connstring":        dbConn,
 			"migrations":        true,
-			"delivery_interval": 1 * time.Minute,
-			"poll_interval":     5 * time.Minute,
+			"delivery_interval": "1m",
+			"poll_interval":     "5m",
 			"webhook": map[string]interface{}{
 				"target":   "https://" + quayHostname + "/secscan/notification",
 				"callback": "http://" + quay.GetName() + "-clair-app/notifier/api/v1/notifications",

@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"net/url"
-	"time"
 )
 
 // Matcher is the configuration for the matcher service.
@@ -22,8 +21,8 @@ type Matcher struct {
 	IndexerAddr string `yaml:"indexer_addr" json:"indexer_addr"`
 	// Period controls how often updaters are run.
 	//
-	// The default is 30 minutes.
-	Period time.Duration `yaml:"period,omitempty" json:"period,omitempty"`
+	// The default is 6 hours.
+	Period Duration `yaml:"period,omitempty" json:"period,omitempty"`
 	// UpdateRetention controls the number of updates to retain between
 	// garbage collection periods.
 	//
@@ -40,7 +39,7 @@ type Matcher struct {
 	// Deprecated: Pool size should be set through the ConnString member.
 	// Currently, Clair only uses the "pgxpool" package to connect to the
 	// database, so see
-	// https://pkg.go.dev/github.com/jackc/pgx/v4/pgxpool#ParseConfig for more
+	// https://pkg.go.dev/github.com/jackc/pgx/v5/pgxpool#ParseConfig for more
 	// information.
 	MaxConnPool int `yaml:"max_conn_pool,omitempty" json:"max_conn_pool,omitempty"`
 	// CacheAge controls how long clients should be hinted to cache responses
@@ -48,7 +47,7 @@ type Matcher struct {
 	//
 	// If empty, the duration set in "Period" will be used. This means client
 	// may cache "stale" results for 2(Period) - 1 seconds.
-	CacheAge time.Duration `yaml:"cache_age,omitempty" json:"cache_age,omitempty"`
+	CacheAge Duration `yaml:"cache_age,omitempty" json:"cache_age,omitempty"`
 	// A "true" or "false" value
 	//
 	// Whether Matcher nodes handle migrations to their databases.
@@ -58,6 +57,8 @@ type Matcher struct {
 	// This should be toggled on if vulnerabilities are being provided by
 	// another mechanism.
 	DisableUpdaters bool `yaml:"disable_updaters,omitempty" json:"disable_updaters,omitempty"`
+	// DisableEnrichment disables the enrichment of vulnerability data.
+	DisableEnrichment bool `yaml:"disable_enrichment,omitempty" json:"disable_enrichment,omitempty"`
 }
 
 func (m *Matcher) validate(mode Mode) ([]Warning, error) {
@@ -65,7 +66,7 @@ func (m *Matcher) validate(mode Mode) ([]Warning, error) {
 		return nil, nil
 	}
 	if m.Period == 0 {
-		m.Period = DefaultMatcherPeriod
+		m.Period = Duration(DefaultMatcherPeriod)
 	}
 	switch {
 	case m.UpdateRetention < 0:
@@ -103,7 +104,7 @@ func (m *Matcher) lint() (ws []Warning, err error) {
 		ws[i].path = ".connstring"
 	}
 
-	if m.Period < DefaultMatcherPeriod {
+	if m.Period < Duration(DefaultMatcherPeriod) {
 		ws = append(ws, Warning{
 			path: ".period",
 			msg:  "updater period is very aggressive: most sources are updated daily",
