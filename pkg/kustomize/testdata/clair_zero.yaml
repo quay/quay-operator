@@ -9,10 +9,10 @@ matcher:
   connstring: ""
   indexer_addr: ""
   update_retention: 0
-matchers:
-  names: null
+matchers: {}
 metrics:
   name: ""
+  otlp: {}
   prometheus: {}
 notifier:
   connstring: ""
@@ -25,5 +25,7 @@ trace:
     collector:
       endpoint: ""
   name: ""
-updaters:
-  filter: ""
+  otlp: {}
+  sentry:
+    dsn: ""
+updaters: {}

@@ -40,16 +40,16 @@ type Notifier struct {
 	// A time.ParseDuration parsable string
 	//
 	// The frequency at which the notifier will query at Matcher for Update Operations.
-	// If a value smaller then 1 second is provided it will be replaced with the
-	// default 5 second poll interval.
-	PollInterval time.Duration `yaml:"poll_interval,omitempty" json:"poll_interval,omitempty"`
+	// If a value smaller then 1 minute is provided it will be replaced with the
+	// default 6 hour poll interval as the default updater period is 6 hours.
+	PollInterval Duration `yaml:"poll_interval,omitempty" json:"poll_interval,omitempty"`
 	// A time.ParseDuration parsable string
 	//
 	// The frequency at which the notifier attempt delivery of created or previously failed
 	// notifications
-	// If a value smaller then 1 second is provided it will be replaced with the
-	// default 5 second delivery interval.
-	DeliveryInterval time.Duration `yaml:"delivery_interval,omitempty" json:"delivery_interval,omitempty"`
+	// If a value smaller then 1 minute is provided it will be replaced with the
+	// default 1 hour delivery interval.
+	DeliveryInterval Duration `yaml:"delivery_interval,omitempty" json:"delivery_interval,omitempty"`
 	// DisableSummary disables summarizing vulnerabilities per-manifest.
 	//
 	// The default is to summarize any new vulnerabilities to the most severe
@@ -70,11 +70,11 @@ func (n *Notifier) validate(mode Mode) ([]Warning, error) {
 	if mode != ComboMode && mode != NotifierMode {
 		return nil, nil
 	}
-	if n.PollInterval < 1*time.Second {
-		n.PollInterval = DefaultNotifierPollInterval
+	if n.PollInterval < Duration(1*time.Minute) {
+		n.PollInterval = Duration(DefaultNotifierPollInterval)
 	}
-	if n.DeliveryInterval < 1*time.Second {
-		n.DeliveryInterval = DefaultNotifierDeliveryInterval
+	if n.DeliveryInterval < Duration(1*time.Minute) {
+		n.DeliveryInterval = Duration(DefaultNotifierDeliveryInterval)
 	}
 	switch mode {
 	case ComboMode:
@@ -120,13 +120,13 @@ func (n *Notifier) lint() (ws []Warning, err error) {
 		})
 	}
 
-	if n.PollInterval < DefaultNotifierPollInterval {
+	if n.PollInterval < Duration(DefaultNotifierPollInterval) {
 		ws = append(ws, Warning{
 			path: ".poll_interval",
 			msg:  "interval is very fast: may result in increased workload",
 		})
 	}
-	if n.DeliveryInterval < DefaultNotifierDeliveryInterval {
+	if n.DeliveryInterval < Duration(DefaultNotifierDeliveryInterval) {
 		ws = append(ws, Warning{
 			path: ".delivery_interval",
 			msg:  "interval is very fast: may result in increased workload",
