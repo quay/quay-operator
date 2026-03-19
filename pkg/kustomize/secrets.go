@@ -17,7 +17,7 @@ import (
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/repomirror"
 	"github.com/quay/config-tool/pkg/lib/fieldgroups/securityscanner"
 	"github.com/quay/config-tool/pkg/lib/shared"
-	"gopkg.in/yaml.v3"
+	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
