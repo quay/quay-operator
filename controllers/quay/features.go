@@ -330,7 +330,7 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 		Version: "v1alpha1",
 		Kind:    "ObjectBucketClaimList",
 	})
-	if err := r.List(ctx, &claims); err != nil {
+	if err := r.List(ctx, &claims, client.InNamespace(quay.GetNamespace())); err != nil {
 		return fmt.Errorf("unable to list object bucket claims: %s", err)
 	}
 
