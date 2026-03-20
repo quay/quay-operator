@@ -868,6 +868,106 @@ func Test_cleanupPreviousSecret(t *testing.T) {
 	}
 }
 
+func newTestOBC(name, namespace string) *unstructured.Unstructured {
+	obj := &unstructured.Unstructured{}
+	obj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "objectbucket.io",
+		Version: "v1alpha1",
+		Kind:    "ObjectBucketClaim",
+	})
+	obj.SetName(name)
+	obj.SetNamespace(namespace)
+	_ = unstructured.SetNestedField(obj.Object, "Bound", "status", "phase")
+	return obj
+}
+
+func TestCheckObjectBucketClaimsAvailable_NamespaceScoped(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "quay-ns",
+		},
+	}
+
+	// OBC exists in a different namespace — should NOT be found.
+	wrongNsOBC := newTestOBC("test-quay-datastore", "other-ns")
+
+	// OBC exists in the correct namespace — should be found.
+	correctOBC := newTestOBC("test-quay-datastore", "quay-ns")
+
+	for _, tt := range []struct {
+		name            string
+		objs            []client.Object
+		secrets         []client.Object
+		configmaps      []client.Object
+		wantInitialized bool
+	}{
+		{
+			name:            "OBC in wrong namespace is ignored",
+			objs:            []client.Object{wrongNsOBC},
+			wantInitialized: false,
+		},
+		{
+			name: "OBC in correct namespace is found",
+			objs: []client.Object{correctOBC},
+			secrets: []client.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-quay-datastore",
+						Namespace: "quay-ns",
+					},
+					Data: map[string][]byte{
+						"AWS_ACCESS_KEY_ID":     []byte("key"),
+						"AWS_SECRET_ACCESS_KEY": []byte("secret"),
+					},
+				},
+			},
+			configmaps: []client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-quay-datastore",
+						Namespace: "quay-ns",
+					},
+					Data: map[string]string{
+						"BUCKET_NAME": "mybucket",
+						"BUCKET_HOST": "s3.example.com",
+					},
+				},
+			},
+			wantInitialized: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder()
+			builder.WithObjects(tt.objs...)
+			if tt.secrets != nil {
+				builder.WithObjects(tt.secrets...)
+			}
+			if tt.configmaps != nil {
+				builder.WithObjects(tt.configmaps...)
+			}
+			cli := builder.Build()
+
+			reconciler := &QuayRegistryReconciler{
+				Client: cli,
+				Log:    testLogger,
+			}
+
+			qctx := &quaycontext.QuayRegistryContext{}
+			err := reconciler.checkObjectBucketClaimsAvailable(
+				t.Context(), qctx, quay,
+			)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if qctx.ObjectStorageInitialized != tt.wantInitialized {
+				t.Errorf("ObjectStorageInitialized = %v, want %v",
+					qctx.ObjectStorageInitialized, tt.wantInitialized)
+			}
+		})
+	}
+}
+
 func testObj(kind string) client.Object {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(schema.GroupVersionKind{Kind: kind})
