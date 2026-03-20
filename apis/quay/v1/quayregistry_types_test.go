@@ -559,6 +559,21 @@ var validateOverridesTests = []struct {
 		},
 		errors.New("component redis does not support securityContext overrides"),
 	},
+	{
+		"DuplicateComponentEntries",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "clairpostgres", Managed: true, Overrides: &Override{VolumeSize: &resource.Quantity{}}},
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
+				},
+			},
+		},
+		errors.New(`duplicate component "clairpostgres" in spec.components`),
+	},
 }
 
 func TestValidOverrides(t *testing.T) {
