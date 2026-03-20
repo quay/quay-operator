@@ -7,10 +7,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	monv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
@@ -44,8 +45,13 @@ func (m *Monitoring) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condi
 		Name:      prname,
 	}
 
-	var pr monv1.PrometheusRule
-	if err := m.Client.Get(ctx, nsn, &pr); err != nil {
+	pr := &unstructured.Unstructured{}
+	pr.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "PrometheusRule",
+	})
+	if err := m.Client.Get(ctx, nsn, pr); err != nil {
 		if errors.IsNotFound(err) {
 			msg := fmt.Sprintf("PrometheusRule %s not found", prname)
 			return qv1.Condition{
@@ -59,7 +65,7 @@ func (m *Monitoring) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condi
 		return zero, err
 	}
 
-	if !qv1.Owns(reg, &pr) {
+	if !qv1.Owns(reg, pr) {
 		msg := fmt.Sprintf("PrometheusRule %s not owned by QuayRegistry", prname)
 		return qv1.Condition{
 			Type:           qv1.ComponentMonitoringReady,
@@ -76,8 +82,13 @@ func (m *Monitoring) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condi
 		Name:      smname,
 	}
 
-	var sm monv1.ServiceMonitor
-	if err := m.Client.Get(ctx, nsn, &sm); err != nil {
+	sm := &unstructured.Unstructured{}
+	sm.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "ServiceMonitor",
+	})
+	if err := m.Client.Get(ctx, nsn, sm); err != nil {
 		if errors.IsNotFound(err) {
 			msg := fmt.Sprintf("ServiceMonitor %s not found", smname)
 			return qv1.Condition{
@@ -91,7 +102,7 @@ func (m *Monitoring) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condi
 		return zero, nil
 	}
 
-	if !qv1.Owns(reg, &sm) {
+	if !qv1.Owns(reg, sm) {
 		msg := fmt.Sprintf("ServiceMonitor %s not owned by QuayRegistry", smname)
 		return qv1.Condition{
 			Type:           qv1.ComponentMonitoringReady,
