@@ -664,6 +664,20 @@ func Inflate(
 			parsedUserConfig[field] = value
 		}
 	}
+
+	// Inject TLS security profile settings (if detected from cluster).
+	// User-provided values in configBundleSecret take precedence.
+	if ctx.SSLProtocols != "" {
+		if _, ok := parsedUserConfig["SSL_PROTOCOLS"]; !ok {
+			parsedUserConfig["SSL_PROTOCOLS"] = strings.Split(ctx.SSLProtocols, " ")
+		}
+	}
+	if ctx.SSLCiphers != "" {
+		if _, ok := parsedUserConfig["SSL_CIPHERS"]; !ok {
+			parsedUserConfig["SSL_CIPHERS"] = strings.Split(ctx.SSLCiphers, ":")
+		}
+	}
+
 	componentConfigFiles["config.yaml"] = encode(parsedUserConfig)
 
 	for _, component := range quay.Spec.Components {

@@ -127,6 +127,13 @@ rules:
   - update
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - apiservers
+  verbs:
+  - get
+  - watch
+- apiGroups:
   - route.openshift.io
   resources:
   - routes

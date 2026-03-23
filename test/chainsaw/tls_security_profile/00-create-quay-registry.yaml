@@ -1,0 +1,32 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: tls-profile
+spec:
+  configBundleSecret: tls-profile-config
+  components:
+  - kind: quay
+    managed: true
+  - kind: postgres
+    managed: true
+  - kind: redis
+    managed: true
+  - kind: clair
+    managed: false
+  - kind: clairpostgres
+    managed: false
+  - kind: mirror
+    managed: false
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: ($values.managedObjectStorage)
+  - kind: route
+    managed: false
+  - kind: monitoring
+    managed: false
+  # TLS is unmanaged — Quay terminates TLS itself using the provided cert/key.
+  # The operator should inject the cluster's TLS security profile (SSL_PROTOCOLS,
+  # SSL_CIPHERS) into Quay's config.
+  - kind: tls
+    managed: false

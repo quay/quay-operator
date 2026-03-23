@@ -1,0 +1,87 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: tls-security-profile
+spec:
+  # This test requires the OpenShift config.openshift.io API (APIServer resource).
+  # It must not run on KinD or vanilla Kubernetes clusters.
+  concurrent: false
+  steps:
+  - name: check-openshift
+    try:
+    - script:
+        content: |
+          if ! kubectl api-resources 2>/dev/null | grep -q "apiservers.*config.openshift.io"; then
+            echo "Skipping: OpenShift APIServer resource not available"
+            exit 1
+          fi
+          echo "OpenShift APIServer resource detected"
+  - name: create-registry-with-unmanaged-tls
+    try:
+    - script:
+        content: |
+          # Generate self-signed cert for unmanaged TLS
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl.key -out /tmp/ssl.cert -days 1 \
+            -subj "/O=Quay TLS Profile Test" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+
+          # Read the current cluster TLS security profile
+          PROFILE_TYPE=$(kubectl get apiserver cluster -o jsonpath='{.spec.tlsSecurityProfile.type}' 2>/dev/null || echo "")
+          echo "Cluster TLS profile type: ${PROFILE_TYPE:-Intermediate (default)}"
+
+          CONFIG=$(cat <<'CFGEOF'
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: "localhost"
+          PREFERRED_URL_SCHEME: https
+          FEATURE_USER_INITIALIZE: true
+          CFGEOF
+          )
+          kubectl create secret generic tls-profile-config -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl.cert \
+            --from-file=ssl.key=/tmp/ssl.key
+          echo "Config bundle with TLS cert/key created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert.yaml
+  - name: verify-tls-profile-injected
+    try:
+    - script:
+        content: |
+          # When TLS is unmanaged (Quay terminates TLS), the operator should
+          # inject SSL_PROTOCOLS and SSL_CIPHERS from the cluster profile into
+          # the Quay config secret.
+          SECRET_NAME=$(kubectl get quayregistry tls-profile -n $NAMESPACE \
+            -o jsonpath='{.spec.configBundleSecret}')
+
+          # Find the generated config secret (quay-config-secret)
+          CONFIG_SECRET=$(kubectl get secret -n $NAMESPACE \
+            -o name | grep "tls-profile-quay-config-secret" | head -1)
+
+          if [ -z "$CONFIG_SECRET" ]; then
+            echo "FAIL: quay-config-secret not found"
+            exit 1
+          fi
+
+          CONFIG=$(kubectl get $CONFIG_SECRET -n $NAMESPACE \
+            -o jsonpath='{.data.config\.yaml}' | base64 -d)
+
+          # Check SSL_PROTOCOLS is set in the config
+          if echo "$CONFIG" | grep -q "SSL_PROTOCOLS"; then
+            echo "PASS: SSL_PROTOCOLS found in Quay config"
+            echo "$CONFIG" | grep "SSL_PROTOCOLS"
+          else
+            echo "FAIL: SSL_PROTOCOLS not found in Quay config (TLS is unmanaged, should be injected)"
+            exit 1
+          fi
+
+          # Check SSL_CIPHERS is set in the config
+          if echo "$CONFIG" | grep -q "SSL_CIPHERS"; then
+            echo "PASS: SSL_CIPHERS found in Quay config"
+          else
+            echo "FAIL: SSL_CIPHERS not found in Quay config (TLS is unmanaged, should be injected)"
+            exit 1
+          fi
