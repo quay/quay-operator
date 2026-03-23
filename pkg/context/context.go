@@ -17,6 +17,10 @@ type QuayRegistryContext struct {
 	TLSCert             []byte
 	TLSKey              []byte
 
+	// TLS Security Profile (from OpenShift APIServer)
+	SSLProtocols string // e.g. "TLSv1.2 TLSv1.3" (nginx format)
+	SSLCiphers   string // e.g. "ECDHE-RSA-AES128-GCM-SHA256:..." (OpenSSL format)
+
 	// Object Storage
 	SupportsObjectStorage    bool
 	ObjectStorageInitialized bool
