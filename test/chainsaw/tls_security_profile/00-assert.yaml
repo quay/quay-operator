@@ -1,0 +1,22 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: tls-profile
+status:
+  conditions:
+  - type: ComponentPostgresReady
+    status: "True"
+  - type: ComponentRedisReady
+    status: "True"
+  - type: ComponentQuayReady
+    status: "True"
+  - type: ComponentTLSReady
+    status: "True"
+    reason: ComponentNotManaged
+  - type: ComponentRouteReady
+    status: "True"
+    reason: ComponentNotManaged
+  - type: Available
+    status: "True"
+  - type: RolloutBlocked
+    status: "False"

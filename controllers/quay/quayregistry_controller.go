@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/tidwall/sjson"
 	appsv1 "k8s.io/api/apps/v1"
@@ -486,6 +487,7 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 // +kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;watch
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
@@ -661,6 +663,19 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			v1.ConditionReasonConfigInvalid,
 			fmt.Sprintf("could not check for build manager support: %s", err),
 		)
+	}
+
+	if !v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentTLS) {
+		if err := r.checkTLSSecurityProfile(ctx, quayContext, cbundle); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				fmt.Sprintf("unable to check TLS security profile: %s", err),
+			)
+		}
 	}
 
 	monmanaged := v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentMonitoring)
@@ -1243,6 +1258,15 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add OpenShift `Route` API to scheme")
 
+		return err
+	}
+	if err := prometheusv1.AddToScheme(mgr.GetScheme()); err != nil {
+		r.Log.Error(err, "Failed to add `PrometheusRule` API to scheme")
+
+		return err
+	}
+	if err := configv1.Install(mgr.GetScheme()); err != nil {
+		r.Log.Error(err, "Failed to add OpenShift `config` API to scheme")
 		return err
 	}
 
