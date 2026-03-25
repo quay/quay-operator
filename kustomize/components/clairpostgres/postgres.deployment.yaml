@@ -34,6 +34,13 @@ spec:
           ports:
             - containerPort: 5432
               protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - /usr/libexec/check-container
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
           env:
             - name: POSTGRESQL_USER
               valueFrom:

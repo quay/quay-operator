@@ -968,42 +968,236 @@ func TestCheckObjectBucketClaimsAvailable_NamespaceScoped(t *testing.T) {
 	}
 }
 
+func TestCheckManagedDatabaseReady(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+
+	for _, tt := range []struct {
+		name                string
+		components          []v1.Component
+		existingDeployments []appsv1.Deployment
+		wantDBInit          bool
+		wantClairDBInit     bool
+	}{
+		{
+			name: "both databases unmanaged",
+			components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: false},
+				{Kind: v1.ComponentClairPostgres, Managed: false},
+			},
+			wantDBInit:      true,
+			wantClairDBInit: true,
+		},
+		{
+			name: "managed postgres not found",
+			components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: true},
+				{Kind: v1.ComponentClairPostgres, Managed: false},
+			},
+			wantDBInit:      false,
+			wantClairDBInit: true,
+		},
+		{
+			name: "managed postgres zero available replicas",
+			components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: true},
+				{Kind: v1.ComponentClairPostgres, Managed: false},
+			},
+			existingDeployments: []appsv1.Deployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-quay-database",
+						Namespace: "default",
+					},
+					Status: appsv1.DeploymentStatus{AvailableReplicas: 0},
+				},
+			},
+			wantDBInit:      false,
+			wantClairDBInit: true,
+		},
+		{
+			name: "managed postgres available",
+			components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: true},
+				{Kind: v1.ComponentClairPostgres, Managed: false},
+			},
+			existingDeployments: []appsv1.Deployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-quay-database",
+						Namespace: "default",
+					},
+					Status: appsv1.DeploymentStatus{AvailableReplicas: 1},
+				},
+			},
+			wantDBInit:      true,
+			wantClairDBInit: true,
+		},
+		{
+			name: "managed clair-postgres not found",
+			components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: false},
+				{Kind: v1.ComponentClairPostgres, Managed: true},
+			},
+			wantDBInit:      true,
+			wantClairDBInit: false,
+		},
+		{
+			name: "managed clair-postgres available",
+			components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: false},
+				{Kind: v1.ComponentClairPostgres, Managed: true},
+			},
+			existingDeployments: []appsv1.Deployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-clair-postgres",
+						Namespace: "default",
+					},
+					Status: appsv1.DeploymentStatus{AvailableReplicas: 1},
+				},
+			},
+			wantDBInit:      true,
+			wantClairDBInit: true,
+		},
+		{
+			name: "both managed and available",
+			components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: true},
+				{Kind: v1.ComponentClairPostgres, Managed: true},
+			},
+			existingDeployments: []appsv1.Deployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-quay-database",
+						Namespace: "default",
+					},
+					Status: appsv1.DeploymentStatus{AvailableReplicas: 1},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-clair-postgres",
+						Namespace: "default",
+					},
+					Status: appsv1.DeploymentStatus{AvailableReplicas: 1},
+				},
+			},
+			wantDBInit:      true,
+			wantClairDBInit: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			quayCopy := quay.DeepCopy()
+			quayCopy.Spec.Components = tt.components
+
+			builder := fake.NewClientBuilder().WithScheme(scheme.Scheme)
+			for i := range tt.existingDeployments {
+				builder = builder.WithObjects(&tt.existingDeployments[i])
+			}
+			fakeClient := builder.Build()
+
+			reconciler := &QuayRegistryReconciler{
+				Client: fakeClient,
+				Log:    testLogger,
+			}
+
+			qctx := quaycontext.NewQuayRegistryContext()
+			reconciler.checkManagedDatabaseReady(context.Background(), qctx, quayCopy)
+
+			if qctx.DatabaseInitialized != tt.wantDBInit {
+				t.Errorf("DatabaseInitialized = %v, want %v", qctx.DatabaseInitialized, tt.wantDBInit)
+			}
+			if qctx.ClairDatabaseInitialized != tt.wantClairDBInit {
+				t.Errorf("ClairDatabaseInitialized = %v, want %v", qctx.ClairDatabaseInitialized, tt.wantClairDBInit)
+			}
+		})
+	}
+}
+
 func testObj(kind string) client.Object {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(schema.GroupVersionKind{Kind: kind})
 	return u
 }
 
+func testObjWithLabel(kind, component string) client.Object {
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(schema.GroupVersionKind{Kind: kind})
+	u.SetLabels(map[string]string{"quay-component": component})
+	return u
+}
+
 func TestFilterDeferredWorkloads(t *testing.T) {
+	type obj struct {
+		kind      string
+		component string // quay-component label value
+	}
 	for _, tt := range []struct {
 		name           string
 		deferWorkloads bool
-		inputKinds     []string
+		input          []obj
 		wantKinds      []string
 	}{
 		{
 			name:           "deferWorkloads false passes all objects through",
 			deferWorkloads: false,
-			inputKinds:     []string{"Secret", "Deployment", "Job", "Service"},
-			wantKinds:      []string{"Secret", "Deployment", "Job", "Service"},
+			input: []obj{
+				{"Secret", ""},
+				{"Deployment", "quay-app"},
+				{"Job", "quay-app-upgrade"},
+				{"Service", ""},
+			},
+			wantKinds: []string{"Secret", "Deployment", "Job", "Service"},
 		},
 		{
-			name:           "deferWorkloads true filters Deployments and Jobs",
+			name:           "deferWorkloads true filters dependent workloads",
 			deferWorkloads: true,
-			inputKinds:     []string{"Secret", "Deployment", "Job", "Service", "ConfigMap"},
-			wantKinds:      []string{"Secret", "Service", "ConfigMap"},
+			input: []obj{
+				{"Secret", ""},
+				{"Deployment", "quay-app"},
+				{"Job", "quay-app-upgrade"},
+				{"Service", ""},
+				{"ConfigMap", ""},
+			},
+			wantKinds: []string{"Secret", "Service", "ConfigMap"},
+		},
+		{
+			name:           "deferWorkloads true keeps infrastructure deployments",
+			deferWorkloads: true,
+			input: []obj{
+				{"Secret", ""},
+				{"Deployment", "postgres"},
+				{"Deployment", "clair-postgres"},
+				{"Deployment", "redis"},
+				{"Deployment", "quay-app"},
+				{"Deployment", "clair-app"},
+				{"Deployment", "quay-mirror"},
+				{"Job", "quay-app-upgrade"},
+			},
+			wantKinds: []string{"Secret", "Deployment", "Deployment", "Deployment"},
 		},
 		{
 			name:           "deferWorkloads true with no workloads is a no-op",
 			deferWorkloads: true,
-			inputKinds:     []string{"Secret", "Service"},
-			wantKinds:      []string{"Secret", "Service"},
+			input: []obj{
+				{"Secret", ""},
+				{"Service", ""},
+			},
+			wantKinds: []string{"Secret", "Service"},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			objects := make([]client.Object, len(tt.inputKinds))
-			for i, kind := range tt.inputKinds {
-				objects[i] = testObj(kind)
+			objects := make([]client.Object, len(tt.input))
+			for i, o := range tt.input {
+				if o.component != "" {
+					objects[i] = testObjWithLabel(o.kind, o.component)
+				} else {
+					objects[i] = testObj(o.kind)
+				}
 			}
 
 			result := filterDeferredWorkloads(objects, tt.deferWorkloads)
