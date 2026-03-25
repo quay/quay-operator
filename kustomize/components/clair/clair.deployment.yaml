@@ -29,7 +29,7 @@ spec:
                         - clair-app
                 topologyKey: "kubernetes.io/hostname"
       containers:
-        - image: quay.io/projectquay/clair:nightly
+        - image: quay.io/projectquay/clair:4.8.0
           imagePullPolicy: IfNotPresent
           name: clair-app
           env:
@@ -79,7 +79,7 @@ spec:
           readinessProbe:
             tcpSocket:
               port: 8080
-          livelinessProbe:
+          livenessProbe:
             httpGet:
               port: clair-intro
               path: /healthz

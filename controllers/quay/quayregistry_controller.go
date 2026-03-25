@@ -651,6 +651,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
+	r.checkManagedDatabaseReady(ctx, quayContext, updatedQuay)
+
 	if err := r.checkBuildManagerAvailable(quayContext, cbundle); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
@@ -766,11 +768,20 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// When managed object storage is pending initialization (OBC not yet
-	// bound), defer creating Deployments and Jobs. This prevents the config
-	// secret from being created with incomplete storage values only to be
-	// regenerated (with a different hash) once the OBC is bound, which
-	// would trigger an unnecessary deployment rollout.
-	deferWorkloads := osmanaged && !quayContext.ObjectStorageInitialized
+	// bound) or managed databases are not yet ready, defer creating
+	// dependent Deployments and Jobs. Infrastructure deployments (postgres,
+	// clair-postgres, redis) are always created so they can start up.
+	deferWorkloads := (osmanaged && !quayContext.ObjectStorageInitialized) ||
+		!quayContext.DatabaseInitialized ||
+		!quayContext.ClairDatabaseInitialized
+
+	log.Info("workload deferral decision",
+		"deferWorkloads", deferWorkloads,
+		"objectStorageInitialized", quayContext.ObjectStorageInitialized,
+		"objectStorageManaged", osmanaged,
+		"databaseInitialized", quayContext.DatabaseInitialized,
+		"clairDatabaseInitialized", quayContext.ClairDatabaseInitialized,
+	)
 
 	for _, obj := range filterDeferredWorkloads(kustomize.EnsureCreationOrder(deploymentObjects), deferWorkloads) {
 		// For metrics and dashboards to work, we need to deploy the Grafana ConfigMap
@@ -851,6 +862,11 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if osmanaged && !quayContext.ObjectStorageInitialized {
 		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
+		return r.Requeue, nil
+	}
+
+	if !quayContext.DatabaseInitialized || !quayContext.ClairDatabaseInitialized {
+		r.Log.Info("requeuing to wait for managed database(s) to become ready")
 		return r.Requeue, nil
 	}
 
@@ -1366,9 +1382,19 @@ func (r *QuayRegistryReconciler) finalizeQuay(ctx context.Context, quay *v1.Quay
 	return nil
 }
 
-// filterDeferredWorkloads removes Deployments and Jobs from the given
-// slice when deferWorkloads is true. When false, the slice is returned
-// unchanged.
+// infrastructureComponents lists quay-component label values for
+// infrastructure deployments that must be created before dependent
+// workloads. These are never filtered out during deferral.
+var infrastructureComponents = map[string]bool{
+	"postgres":       true,
+	"clair-postgres": true,
+	"redis":          true,
+}
+
+// filterDeferredWorkloads removes dependent Deployments and Jobs from
+// the given slice when deferWorkloads is true. Infrastructure
+// deployments (postgres, clair-postgres, redis) are always kept.
+// When deferWorkloads is false, the slice is returned unchanged.
 func filterDeferredWorkloads(objects []client.Object, deferWorkloads bool) []client.Object {
 	if !deferWorkloads {
 		return objects
@@ -1377,7 +1403,10 @@ func filterDeferredWorkloads(objects []client.Object, deferWorkloads bool) []cli
 	for _, obj := range objects {
 		kind := obj.GetObjectKind().GroupVersionKind().Kind
 		if kind == "Deployment" || kind == "Job" {
-			continue
+			component := obj.GetLabels()["quay-component"]
+			if !infrastructureComponents[component] {
+				continue
+			}
 		}
 		filtered = append(filtered, obj)
 	}

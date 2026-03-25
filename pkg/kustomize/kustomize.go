@@ -493,6 +493,9 @@ func KustomizationFor(
 				GeneratorArgs: types.GeneratorArgs{
 					Name:     string(component.Kind) + "-config-secret",
 					Behavior: "merge",
+					Options: &types.GeneratorOptions{
+						DisableNameSuffixHash: true,
+					},
 					KvPairSources: types.KvPairSources{
 						LiteralSources: sources,
 					},

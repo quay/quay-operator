@@ -84,5 +84,7 @@ jobs:
             for pod in $(kubectl get pods -n "$ns" -o name 2>/dev/null); do
               echo "--- $ns/$pod ---"
               kubectl logs -n "$ns" "$pod" --all-containers --tail=50 2>/dev/null || true
+              echo "--- $ns/$pod (previous) ---"
+              kubectl logs -n "$ns" "$pod" --all-containers --previous --tail=50 2>/dev/null || true
             done
           done
