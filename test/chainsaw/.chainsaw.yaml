@@ -32,8 +32,27 @@ spec:
       selector: quay-component=clair-app
       tail: 30
   - podLogs:
+      selector: quay-component=clair-postgres
+      tail: 30
+  - podLogs:
       selector: quay-component=quay-app-mirror
       tail: 20
   - podLogs:
       selector: quay-component=quay-database
       tail: 20
+  - script:
+      shell: /bin/bash
+      content: |
+        echo "=== Previous container logs (crash-looping pods) ==="
+        for component in clair-app clair-postgres quay-app quay-database; do
+          for pod in $(kubectl get pods -n $NAMESPACE -l quay-component=$component -o name 2>/dev/null); do
+            echo "--- $pod (previous) ---"
+            kubectl logs -n $NAMESPACE "$pod" --previous --tail=50 2>/dev/null || echo "(no previous logs)"
+          done
+        done
+        echo "=== Operator pod logs (last 200 lines) ==="
+        OPERATOR_NS=${OPERATOR_NS:-openshift-operators}
+        for pod in $(kubectl get pods -n "$OPERATOR_NS" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | grep quay-operator); do
+          echo "--- $OPERATOR_NS/$pod ---"
+          kubectl logs -n "$OPERATOR_NS" "$pod" --all-containers --tail=200 2>/dev/null || echo "(no operator logs)"
+        done
