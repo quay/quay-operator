@@ -33,16 +33,18 @@ type QuayRegistryContext struct {
 	SecretKey         string
 
 	// Database
+	DatabaseInitialized bool
 	DbUri               string
 	DbRootPw            string
 	NeedsPgUpgrade      bool
 	NeedsClairPgUpgrade bool
 
 	// Clair Database
-	ClairDbUser     string
-	ClairDbPassword string
-	ClairDbName     string
-	ClairDbRootPw   string
+	ClairDatabaseInitialized bool
+	ClairDbUser              string
+	ClairDbPassword          string
+	ClairDbName              string
+	ClairDbRootPw            string
 
 	// Clair integration
 	SecurityScannerV4PSK string

@@ -376,6 +376,47 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 	return nil
 }
 
+// checkManagedDatabaseReady checks whether managed database deployments are
+// available. When a database component is unmanaged we cannot verify its
+// readiness so we optimistically mark it as initialized. When managed, the
+// corresponding deployment must have at least one available replica.
+func (r *QuayRegistryReconciler) checkManagedDatabaseReady(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) {
+	log := r.Log.WithValues("QuayRegistry", quay.GetName())
+
+	checkDeployment := func(component v1.ComponentKind, suffix string) bool {
+		if !v1.ComponentIsManaged(quay.Spec.Components, component) {
+			log.Info("database component unmanaged, marking initialized",
+				"component", component, "deployment", suffix)
+			return true
+		}
+		name := fmt.Sprintf("%s-%s", quay.GetName(), suffix)
+		var dep appsv1.Deployment
+		if err := r.Get(ctx, types.NamespacedName{
+			Name:      name,
+			Namespace: quay.GetNamespace(),
+		}, &dep); err != nil {
+			log.Info("database deployment not found, not initialized",
+				"component", component, "deployment", name)
+			return false
+		}
+		ready := dep.Status.AvailableReplicas > 0
+		log.Info("database deployment status",
+			"component", component,
+			"deployment", name,
+			"availableReplicas", dep.Status.AvailableReplicas,
+			"readyReplicas", dep.Status.ReadyReplicas,
+			"replicas", dep.Status.Replicas,
+			"initialized", ready,
+		)
+		return ready
+	}
+
+	qctx.DatabaseInitialized = checkDeployment(v1.ComponentPostgres, "quay-database")
+	qctx.ClairDatabaseInitialized = checkDeployment(v1.ComponentClairPostgres, "clair-postgres")
+}
+
 // checkBuildManagerAvailable verifies if the config bundle contains an entry pointing to the
 // buildman host. If it contains then sets it properly in the provided QuayRegistryContext
 func (r *QuayRegistryReconciler) checkBuildManagerAvailable(

@@ -57,6 +57,59 @@ spec:
           echo "Config bundle created in $NAMESPACE"
     - apply:
         file: 00-create-quay-registry.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          # Verify the database is ready before dependent workloads start.
+          # This catches the race condition from PROJQUAY-6578 where the
+          # migration job started before postgres was available.
+
+          # Wait for the operator to reconcile and create the deployment.
+          echo "Waiting for postgres deployment to be created..."
+          for i in $(seq 1 60); do
+            if kubectl get deployment reconcile-quay-database -n $NAMESPACE &>/dev/null; then
+              echo "Postgres deployment found"
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: postgres deployment not created"; exit 1; }
+            sleep 2
+          done
+
+          echo "Waiting for postgres deployment to have available replicas..."
+          kubectl rollout status deployment/reconcile-quay-database -n $NAMESPACE --timeout=300s
+
+          echo "Checking migration job status..."
+          for i in $(seq 1 60); do
+            JOB_STATUS=$(kubectl get job reconcile-quay-app-upgrade -n $NAMESPACE \
+              -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
+            if [ "${JOB_STATUS}" = "1" ]; then
+              echo "PASS: migration job completed successfully"
+              break
+            fi
+            FAILED=$(kubectl get job reconcile-quay-app-upgrade -n $NAMESPACE \
+              -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+            if [ "${FAILED:-0}" -gt "2" ]; then
+              echo "FAIL: migration job has ${FAILED} failures — database may not have been ready"
+              kubectl logs job/reconcile-quay-app-upgrade -n $NAMESPACE --tail=20 || true
+              exit 1
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: migration job timeout"; exit 1; }
+            sleep 5
+          done
+
+          # Verify the migration job was created AFTER the postgres deployment
+          PG_CREATED=$(kubectl get deployment reconcile-quay-database -n $NAMESPACE \
+            -o jsonpath='{.metadata.creationTimestamp}')
+          JOB_CREATED=$(kubectl get job reconcile-quay-app-upgrade -n $NAMESPACE \
+            -o jsonpath='{.metadata.creationTimestamp}')
+          echo "Postgres created: ${PG_CREATED}, Job created: ${JOB_CREATED}"
+          if [[ "${JOB_CREATED}" < "${PG_CREATED}" ]]; then
+            echo "FAIL: migration job was created before postgres deployment"
+            exit 1
+          fi
+          echo "PASS: migration job created after postgres deployment"
     - assert:
         file: 00-assert-overrides.yaml
     - assert:
