@@ -448,8 +448,20 @@ func clairConfigFor(log logr.Logger, qctx *quaycontext.QuayRegistryContext, quay
 			"name": "prometheus",
 		},
 		"updaters": map[string]interface{}{
+			"sets": []string{
+				"alpine",
+				"aws",
+				"clair.cvss",
+				"debian",
+				"oracle",
+				"photon",
+				"rhcc",
+				"rhel-vex",
+				"suse",
+				"ubuntu",
+			},
 			"config": map[string]interface{}{
-				"rhel": map[string]interface{}{
+				"rhel-vex": map[string]interface{}{
 					"ignore_unpatched": true,
 				},
 			},
