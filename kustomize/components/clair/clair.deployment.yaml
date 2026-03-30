@@ -71,6 +71,8 @@ spec:
               subPath: 01_user_config.yaml
             - mountPath: /var/run/certs
               name: certificates
+            - name: indexer-layer-storage
+              mountPath: /var/tmp
           startupProbe:
             tcpSocket:
               port: clair-intro
@@ -113,3 +115,12 @@ spec:
                   name: cluster-service-ca
               - configMap:
                   name: cluster-trusted-ca
+        - name: indexer-layer-storage
+          ephemeral:
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 20Gi
