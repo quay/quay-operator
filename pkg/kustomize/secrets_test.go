@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/cert"
@@ -516,6 +518,26 @@ func TestEnsureTLSFor(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestClairConfigUpdaters(t *testing.T) {
+	quay := quayRegistry("test")
+	qctx := &quaycontext.QuayRegistryContext{
+		DbUri: "postgresql://user:pass@db:5432/clair",
+	}
+
+	cfgBytes, err := clairConfigFor(logr.Discard(), qctx, quay, "quay.example.com", "dGVzdHBzaw==")
+	assert.NoError(t, err)
+
+	cfg := string(cfgBytes)
+
+	// Must use rhel-vex, not the old rhel name
+	assert.True(t, strings.Contains(cfg, "rhel-vex"), "expected rhel-vex updater in clair config")
+	assert.False(t, strings.Contains(cfg, "  rhel:"), "old rhel updater name should not appear in clair config")
+
+	// Must have explicit sets to avoid enabling all updaters by default (including osv)
+	assert.True(t, strings.Contains(cfg, "sets:"), "expected explicit updater sets in clair config")
+	assert.False(t, strings.Contains(cfg, "osv"), "osv updater should not be in the default sets")
 }
 
 func TestClairMarshal(t *testing.T) {
