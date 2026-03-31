@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconcile-quay-mirror
+spec:
+  replicas: 2
+---
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: reconcile
+status:
+  conditions:
+  - type: ComponentHPAReady
+    status: "True"
+  - type: ComponentRouteReady
+    status: "True"
+  - type: ComponentMonitoringReady
+    status: "True"
+  - type: ComponentPostgresReady
+    status: "True"
+  - type: ComponentObjectStorageReady
+    status: "True"
+  - type: ComponentClairReady
+    status: "True"
+  - type: ComponentClairPostgresReady
+    status: "True"
+  - type: ComponentTLSReady
+    status: "True"
+  - type: ComponentRedisReady
+    status: "True"
+  - type: ComponentQuayReady
+    status: "True"
+  - type: ComponentMirrorReady
+    reason: ComponentReady
+    status: "True"
+  - type: Available
+    status: "True"
+  - type: ComponentsCreated
+    status: "True"
+  - type: RolloutBlocked
+    status: "False"

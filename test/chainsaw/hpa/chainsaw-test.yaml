@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: hpa
+spec:
+  steps:
+  - name: create-registry
+    try:
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert.yaml
+  - name: unmanage-hpa
+    try:
+    - apply:
+        file: 01-unmanage-hpa.yaml
+    - assert:
+        file: 01-assert.yaml
+  - name: bump-hpa-replicas
+    try:
+    - apply:
+        file: 02-bump-hpas.yaml
+    - assert:
+        file: 02-assert.yaml
+  - name: remanage-hpa
+    try:
+    - apply:
+        file: 03-manage-hpa.yaml
+    - assert:
+        file: 03-assert.yaml

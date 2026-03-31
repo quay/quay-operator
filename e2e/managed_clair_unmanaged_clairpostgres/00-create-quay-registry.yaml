@@ -1,8 +1,0 @@
-apiVersion: quay.redhat.com/v1
-kind: QuayRegistry
-metadata:
-  name: testreg
-spec:
-  components:
-  - kind: clairpostgres
-    managed: false
