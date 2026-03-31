@@ -1,0 +1,6 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconcile-quay-mirror
+spec:
+  replicas: 3

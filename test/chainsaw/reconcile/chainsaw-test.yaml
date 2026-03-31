@@ -1,0 +1,281 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: reconcile
+spec:
+  steps:
+  - name: create-registry
+    try:
+    - script:
+        content: |
+          # Create config bundle for KinD (no-op on OpenShift)
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, skipping config bundle setup"
+            exit 0
+          fi
+          echo "KinD detected, creating config bundle..."
+          ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+          SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl.key -out /tmp/ssl.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          CREATE_NAMESPACE_ON_PUSH: true
+          FEATURE_USER_INITIALIZE: true
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: quay-datastore
+                hostname: garage.garage-system.svc.cluster.local
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl.cert \
+            --from-file=ssl.key=/tmp/ssl.key \
+            --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl.cert
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          # Wait for the operator to reconcile and create the deployment.
+          echo "Waiting for postgres deployment to be created..."
+          for i in $(seq 1 60); do
+            if kubectl get deployment reconcile-quay-database -n $NAMESPACE &>/dev/null; then
+              echo "Postgres deployment found"
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: postgres deployment not created"; exit 1; }
+            sleep 2
+          done
+
+          echo "Waiting for postgres deployment to have available replicas..."
+          kubectl rollout status deployment/reconcile-quay-database -n $NAMESPACE --timeout=300s
+
+          echo "Checking migration job status..."
+          for i in $(seq 1 60); do
+            JOB_STATUS=$(kubectl get job reconcile-quay-app-upgrade -n $NAMESPACE \
+              -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
+            if [ "${JOB_STATUS}" = "1" ]; then
+              echo "PASS: migration job completed successfully"
+              break
+            fi
+            FAILED=$(kubectl get job reconcile-quay-app-upgrade -n $NAMESPACE \
+              -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+            if [ "${FAILED:-0}" -gt "2" ]; then
+              echo "FAIL: migration job has ${FAILED} failures — database may not have been ready"
+              kubectl logs job/reconcile-quay-app-upgrade -n $NAMESPACE --tail=20 || true
+              exit 1
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: migration job timeout"; exit 1; }
+            sleep 5
+          done
+
+          echo "PASS: database and migration job are ready"
+    - assert:
+        file: 00-assert-overrides.yaml
+    - assert:
+        file: 00-assert-status.yaml
+  - name: unmanage-mirror
+    try:
+    - apply:
+        file: 01-unmanage-mirror.yaml
+    - assert:
+        file: 01-assert.yaml
+  - name: scale-mirror
+    try:
+    - apply:
+        file: 02-scale-mirror.yaml
+    - assert:
+        file: 02-assert.yaml
+  - name: delete-quay-app
+    try:
+    - script:
+        content: |
+          kubectl delete deployment reconcile-quay-app -n $NAMESPACE
+          echo "Deleted deployment reconcile-quay-app"
+    - assert:
+        file: 03-assert.yaml
+  - name: push-pull-image
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          # Determine registry endpoint
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            # On OpenShift (CRC), the auto-generated config does not include
+            # FEATURE_USER_INITIALIZE or CREATE_NAMESPACE_ON_PUSH, so we
+            # cannot create a superuser or push images via the API.
+            # Skip push/pull on OpenShift; the KinD path provides a
+            # user-supplied config bundle with these flags enabled.
+            echo "OpenShift detected — skipping push/pull (no user-init in auto config)"
+            exit 0
+          else
+            # KinD: create NodePort service
+            if ! kubectl get svc reconcile-quay-nodeport -n $NAMESPACE &>/dev/null; then
+              cat <<'SVCEOF' | sed "s/REPLACE_NS/$NAMESPACE/g" | kubectl apply -f -
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: reconcile-quay-nodeport
+            namespace: REPLACE_NS
+          spec:
+            type: NodePort
+            selector:
+              quay-component: quay-app
+              quay-operator/quayregistry: reconcile
+            ports:
+            - name: https
+              port: 8443
+              targetPort: 8443
+              nodePort: 30443
+              protocol: TCP
+          SVCEOF
+            fi
+            ENDPOINT="https://127.0.0.1:30443"
+            CRANE_FLAGS="--insecure"
+            echo "KinD: using NodePort ${ENDPOINT}"
+          fi
+
+          # Wait for Quay API
+          echo "Waiting for Quay API..."
+          for i in $(seq 1 30); do
+            if curl -sk "${ENDPOINT}/api/v1/discovery" >/dev/null 2>&1; then
+              echo "Quay API responding"
+              break
+            fi
+            [ "$i" -eq 30 ] && { echo "ERROR: Quay API timeout"; exit 1; }
+            sleep 2
+          done
+
+          # Initialize superuser
+          echo "Initializing superuser..."
+          INIT_RESP=$(curl -sk "${ENDPOINT}/api/v1/user/initialize" \
+            -X POST -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"password123","email":"admin@test.com","access_token":true}')
+          TOKEN=$(echo "${INIT_RESP}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || true)
+          [ -z "${TOKEN}" ] && echo "WARNING: no access token (user may exist)"
+
+          REGISTRY=$(echo "${ENDPOINT}" | sed 's|https://||')
+
+          # Authenticate crane with Quay registry
+          crane auth login ${CRANE_FLAGS} "${REGISTRY}" -u admin -p password123
+
+          # Push
+          echo "Pushing busybox to ${REGISTRY}/admin/e2e-test:latest..."
+          crane copy ${CRANE_FLAGS} --platform linux/amd64 \
+            busybox:latest "${REGISTRY}/admin/e2e-test:latest"
+
+          # Verify tag is queryable via the registry API
+          PUSH_DIGEST=$(crane digest ${CRANE_FLAGS} "${REGISTRY}/admin/e2e-test:latest")
+          echo "PASS: push verified digest=${PUSH_DIGEST}"
+  - name: remanage-mirror
+    try:
+    - apply:
+        file: 05-remanage-mirror.yaml
+    - assert:
+        file: 05-assert.yaml
+  - name: scale-to-zero
+    try:
+    - apply:
+        file: 06-scale-to-zero.yaml
+    - assert:
+        file: 06-assert.yaml
+  - name: restore-mirror
+    try:
+    - apply:
+        file: 07-restore-mirror.yaml
+    - assert:
+        file: 07-assert.yaml
+  - name: rotate-config
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          # Record the current config secret name
+          OLD_SECRET=$(kubectl get secret -n $NAMESPACE -o name \
+            | grep "reconcile-quay-config-secret" | head -1 || true)
+          echo "Current config secret: ${OLD_SECRET}"
+
+          if [ -z "${OLD_SECRET}" ]; then
+            echo "ERROR: no config secret found"
+            exit 1
+          fi
+
+          # Ensure config bundle secret exists (on OpenShift it may not)
+          if ! kubectl get secret reconcile-config -n $NAMESPACE &>/dev/null; then
+            echo "Creating config bundle secret for OpenShift..."
+            kubectl create secret generic reconcile-config -n $NAMESPACE \
+              --from-literal=config.yaml="FEATURE_MAILING: false"
+            kubectl patch quayregistry reconcile -n $NAMESPACE --type=merge \
+              -p '{"spec":{"configBundleSecret":"reconcile-config"}}'
+            # Wait for reconcile to settle with the new config bundle
+            echo "Waiting for reconcile to settle..."
+            sleep 30
+            # Re-record after settle since the secret name may have changed
+            OLD_SECRET=$(kubectl get secret -n $NAMESPACE -o name \
+              | grep "reconcile-quay-config-secret" | head -1 || true)
+            echo "Config secret after settle: ${OLD_SECRET}"
+          fi
+
+          # Patch the config bundle to trigger config rotation
+          # Add a new key that doesn't exist in the original config
+          CONFIG=$(kubectl get secret reconcile-config -n $NAMESPACE \
+            -o jsonpath='{.data.config\.yaml}' | base64 -d)
+          UPDATED_CONFIG=$(printf '%s\nTAGGING_DISABLED: true\n' "${CONFIG}")
+          kubectl patch secret reconcile-config -n $NAMESPACE --type=merge \
+            -p "{\"data\":{\"config.yaml\":\"$(echo -n "${UPDATED_CONFIG}" | base64 -w0)\"}}"
+          echo "Config bundle patched"
+
+          # Wait for the operator to create a new config secret
+          echo "Waiting for config secret rotation..."
+          for i in $(seq 1 60); do
+            NEW_SECRET=$(kubectl get secret -n $NAMESPACE -o name \
+              | grep "reconcile-quay-config-secret" | head -1 || true)
+            if [ -n "${NEW_SECRET}" ] && [ "${NEW_SECRET}" != "${OLD_SECRET}" ]; then
+              echo "PASS: config secret rotated: ${OLD_SECRET} -> ${NEW_SECRET}"
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: config secret rotation timeout"; exit 1; }
+            sleep 5
+          done
+
+          # Verify only one config secret exists (old one was cleaned up)
+          COUNT=$(kubectl get secret -n $NAMESPACE -o name \
+            | grep -c "reconcile-quay-config-secret" || true)
+          if [ "${COUNT}" -ne 1 ]; then
+            echo "ERROR: expected 1 config secret, found ${COUNT}"
+            kubectl get secret -n $NAMESPACE -o name | grep "reconcile-quay-config-secret" || true
+            exit 1
+          fi
+          echo "PASS: old config secret cleaned up, ${COUNT} config secret(s) remain"
+    - assert:
+        file: 08-assert.yaml
