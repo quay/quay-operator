@@ -1,0 +1,57 @@
+---
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: hpa
+status:
+  conditions:
+  - type: ComponentHPAReady
+    status: "True"
+  - type: ComponentRouteReady
+    status: "True"
+  - type: ComponentMonitoringReady
+    status: "True"
+  - type: ComponentPostgresReady
+    status: "True"
+  - type: ComponentObjectStorageReady
+    status: "True"
+  - type: ComponentClairReady
+    status: "True"
+  - type: ComponentClairPostgresReady
+    status: "True"
+  - type: ComponentTLSReady
+    status: "True"
+  - type: ComponentRedisReady
+    status: "True"
+  - type: ComponentQuayReady
+    status: "True"
+  - type: ComponentMirrorReady
+    reason: ComponentNotManaged
+    status: "True"
+  - type: Available
+    status: "True"
+  - type: ComponentsCreated
+    status: "True"
+  - type: RolloutBlocked
+    status: "False"
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-clair-app
+spec:
+  minReplicas: 2
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-quay-app
+spec:
+  minReplicas: 2
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-quay-mirror
+spec:
+  minReplicas: 3
