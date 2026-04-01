@@ -1100,6 +1100,10 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		// completed. Jobs are immutable so we normally delete+recreate, but we
 		// must not recreate a Job that is active or has already succeeded —
 		// the migrations are not idempotent and a second run will fail.
+		//
+		// Exception: during an operator upgrade (CurrentVersion != QuayVersionCurrent),
+		// a succeeded Job from the previous version must be deleted and recreated
+		// so the new version's migrations can run.
 		var existingJob batchv1.Job
 		jobKey := types.NamespacedName{
 			Name:      obj.GetName(),
@@ -1107,8 +1111,14 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		}
 		if err := r.Get(ctx, jobKey, &existingJob); err == nil {
 			if existingJob.Status.Succeeded >= 1 {
-				log.Info("immutable resource already completed successfully, skipping recreation")
-				return false, nil
+				if quay.Status.CurrentVersion == v1.QuayVersionCurrent {
+					log.Info("immutable resource already completed successfully, skipping recreation")
+					return false, nil
+				}
+				log.Info("upgrade in progress, deleting old succeeded job for recreation",
+					"currentVersion", quay.Status.CurrentVersion,
+					"targetVersion", v1.QuayVersionCurrent,
+				)
 			}
 			if existingJob.Status.Active >= 1 {
 				log.Info("immutable resource is still running, skipping recreation")

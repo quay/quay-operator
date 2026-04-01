@@ -52,19 +52,15 @@ func TestCreateOrUpdateObject_Job(t *testing.T) {
 		},
 	}
 
-	quay := v1.QuayRegistry{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-registry",
-			Namespace: "default",
-		},
-	}
-
 	for _, tt := range []struct {
 		name              string
 		existing          bool
+		jobStatus         batchv1.JobStatus
+		quayVersion       v1.QuayVersion
 		createInterceptor func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error
 		wantRequeue       bool
 		wantErr           bool
+		wantJobRecreated  bool
 	}{
 		{
 			name:        "job does not exist, create succeeds",
@@ -84,13 +80,50 @@ func TestCreateOrUpdateObject_Job(t *testing.T) {
 			wantRequeue: true,
 			wantErr:     false,
 		},
+		{
+			name:        "succeeded job skipped when versions match",
+			existing:    true,
+			jobStatus:   batchv1.JobStatus{Succeeded: 1},
+			quayVersion: v1.QuayVersionCurrent,
+			wantRequeue: false,
+			wantErr:     false,
+		},
+		{
+			name:             "succeeded job recreated during upgrade",
+			existing:         true,
+			jobStatus:        batchv1.JobStatus{Succeeded: 1},
+			quayVersion:      "old-version",
+			wantRequeue:      false,
+			wantErr:          false,
+			wantJobRecreated: true,
+		},
+		{
+			name:        "active job skipped even during upgrade",
+			existing:    true,
+			jobStatus:   batchv1.JobStatus{Active: 1},
+			quayVersion: "old-version",
+			wantRequeue: false,
+			wantErr:     false,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			quay := v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-registry",
+					Namespace: "default",
+				},
+				Status: v1.QuayRegistryStatus{
+					CurrentVersion: tt.quayVersion,
+				},
+			}
+
 			builder := fake.NewClientBuilder().WithScheme(scheme.Scheme)
 			if tt.existing {
 				existingJob := jobObj.DeepCopy()
 				existingJob.SetResourceVersion("1")
-				builder = builder.WithObjects(existingJob)
+				existingJob.Status = tt.jobStatus
+				builder = builder.WithObjects(existingJob).
+					WithStatusSubresource(&batchv1.Job{})
 			}
 			if tt.createInterceptor != nil {
 				builder = builder.WithInterceptorFuncs(interceptor.Funcs{
@@ -119,6 +152,19 @@ func TestCreateOrUpdateObject_Job(t *testing.T) {
 			}
 			if requeue != tt.wantRequeue {
 				t.Errorf("requeue = %v, want %v", requeue, tt.wantRequeue)
+			}
+
+			if tt.wantJobRecreated {
+				var got batchv1.Job
+				err := fakeClient.Get(context.Background(), types.NamespacedName{
+					Name: jobObj.Name, Namespace: jobObj.Namespace,
+				}, &got)
+				if err != nil {
+					t.Fatalf("expected recreated job to exist: %v", err)
+				}
+				if got.Status.Succeeded != 0 {
+					t.Error("recreated job should not have Succeeded status from old job")
+				}
 			}
 		})
 	}
