@@ -69,6 +69,13 @@ rules:
   - update
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - apiservers
+  verbs:
+  - get
+  - watch
+- apiGroups:
   - monitoring.coreos.com
   resources:
   - prometheusrules
@@ -125,13 +132,6 @@ rules:
   - list
   - patch
   - update
-  - watch
-- apiGroups:
-  - config.openshift.io
-  resources:
-  - apiservers
-  verbs:
-  - get
   - watch
 - apiGroups:
   - route.openshift.io

@@ -1270,11 +1270,6 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 		return err
 	}
-	if err := prometheusv1.AddToScheme(mgr.GetScheme()); err != nil {
-		r.Log.Error(err, "Failed to add `PrometheusRule` API to scheme")
-
-		return err
-	}
 	if err := configv1.Install(mgr.GetScheme()); err != nil {
 		r.Log.Error(err, "Failed to add OpenShift `config` API to scheme")
 		return err
