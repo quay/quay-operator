@@ -98,6 +98,7 @@ func main() {
 		Cache: &client.CacheOptions{
 			DisableFor: []client.Object{
 				&quay.QuayRegistry{},
+				&configv1.APIServer{},
 			},
 		},
 	}
