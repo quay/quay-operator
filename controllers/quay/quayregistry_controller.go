@@ -487,7 +487,7 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 // +kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;watch
+// +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
