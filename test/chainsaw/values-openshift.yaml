@@ -3,3 +3,11 @@ managedObjectStorage: true
 managedMonitoring: true
 managedTLS: true
 configBundle: ""
+routeComponent:
+  kind: route
+  managed: true
+  overrides:
+    labels:
+      l1: TESTING
+    annotations:
+      a1: TESTING

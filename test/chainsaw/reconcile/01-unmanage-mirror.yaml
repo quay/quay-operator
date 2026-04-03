@@ -79,8 +79,7 @@ spec:
     managed: false
   - kind: objectstorage
     managed: ($values.managedObjectStorage)
-  - kind: route
-    managed: ($values.managedRoute)
+  - ($values.routeComponent)
   - kind: monitoring
     managed: ($values.managedMonitoring)
   - kind: tls

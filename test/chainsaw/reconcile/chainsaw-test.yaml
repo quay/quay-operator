@@ -114,6 +114,44 @@ spec:
         file: 00-assert-overrides.yaml
     - assert:
         file: 00-assert-status.yaml
+  - name: assert-route-overrides
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          if ! kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "KinD detected — skipping route override assertion (no routes)"
+            exit 0
+          fi
+
+          echo "Verifying route annotation and label overrides..."
+          ROUTE_JSON=$(kubectl get route reconcile-quay -n $NAMESPACE -o json)
+
+          # Check annotation override
+          A1=$(echo "${ROUTE_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin)['metadata'].get('annotations',{}).get('a1',''))")
+          if [ "${A1}" != "TESTING" ]; then
+            echo "FAIL: expected annotation a1=TESTING, got '${A1}'"
+            exit 1
+          fi
+          echo "PASS: annotation a1=TESTING"
+
+          # Check label override
+          L1=$(echo "${ROUTE_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin)['metadata'].get('labels',{}).get('l1',''))")
+          if [ "${L1}" != "TESTING" ]; then
+            echo "FAIL: expected label l1=TESTING, got '${L1}'"
+            exit 1
+          fi
+          echo "PASS: label l1=TESTING"
+
+          # Verify existing annotations were preserved
+          TIMEOUT=$(echo "${ROUTE_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin)['metadata'].get('annotations',{}).get('haproxy.router.openshift.io/timeout',''))")
+          if [ "${TIMEOUT}" != "30m" ]; then
+            echo "FAIL: expected haproxy timeout annotation preserved, got '${TIMEOUT}'"
+            exit 1
+          fi
+          echo "PASS: existing annotations preserved"
   - name: unmanage-mirror
     try:
     - apply:
