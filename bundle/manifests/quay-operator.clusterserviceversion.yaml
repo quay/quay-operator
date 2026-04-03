@@ -245,6 +245,12 @@ spec:
                 - jobs
               verbs:
                 - '*'
+            - apiGroups:
+                - config.openshift.io
+              resources:
+                - apiservers
+              verbs:
+                - get
           serviceAccountName: quay-operator
     strategy: deployment
   installModes:

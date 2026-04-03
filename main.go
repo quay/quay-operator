@@ -35,6 +35,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	configv1 "github.com/openshift/api/config/v1"
 	quay "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontroller "github.com/quay/quay-operator/controllers/quay"
 	corev1 "k8s.io/api/core/v1"
@@ -50,6 +51,7 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	_ = quay.AddToScheme(scheme)
+	_ = configv1.Install(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -96,6 +98,7 @@ func main() {
 		Cache: &client.CacheOptions{
 			DisableFor: []client.Object{
 				&quay.QuayRegistry{},
+				&configv1.APIServer{},
 			},
 		},
 	}
