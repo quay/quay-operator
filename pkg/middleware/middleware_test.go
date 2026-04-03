@@ -125,6 +125,79 @@ var processTests = []struct {
 		nil,
 	},
 	{
+		"routeAnnotationOverrideTLSManaged",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "route", Managed: true, Overrides: &v1.Override{
+						Annotations: map[string]string{
+							"haproxy.router.openshift.io/ip_whitelist": "1.2.3.4",
+						},
+					}},
+					{Kind: "tls", Managed: true},
+				},
+			},
+		},
+		&route.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"quay-component": "quay-app-route"},
+			},
+		},
+		&route.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"quay-component": "quay-app-route"},
+				Annotations: map[string]string{
+					"haproxy.router.openshift.io/ip_whitelist": "1.2.3.4",
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"routeLabelOverrideTLSUnmanaged",
+		&v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "route", Managed: true, Overrides: &v1.Override{
+						Labels: map[string]string{
+							"custom-label": "my-value",
+						},
+						Annotations: map[string]string{
+							"haproxy.router.openshift.io/ip_whitelist": "1.2.3.4",
+						},
+					}},
+					{Kind: "tls", Managed: false},
+				},
+			},
+		},
+		&route.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"quay-component": "quay-app-route"},
+			},
+		},
+		&route.Route{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"quay-component": "quay-app-route",
+					"custom-label":   "my-value",
+				},
+				Annotations: map[string]string{
+					"haproxy.router.openshift.io/ip_whitelist": "1.2.3.4",
+				},
+			},
+			Spec: route.RouteSpec{
+				Port: &route.RoutePort{
+					TargetPort: intstr.Parse("https"),
+				},
+				TLS: &route.TLSConfig{
+					Termination:                   route.TLSTerminationPassthrough,
+					InsecureEdgeTerminationPolicy: route.InsecureEdgeTerminationPolicyRedirect,
+				},
+			},
+		},
+		nil,
+	},
+	{
 		"volumeSizeDefault",
 		&v1.QuayRegistry{
 			Spec: v1.QuayRegistrySpec{

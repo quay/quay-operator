@@ -3,3 +3,6 @@ managedObjectStorage: false
 managedMonitoring: false
 managedTLS: false
 configBundle: reconcile-config
+routeComponent:
+  kind: route
+  managed: false

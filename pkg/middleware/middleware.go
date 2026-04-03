@@ -301,6 +301,27 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		return obj, nil
 	}
 
+	if olabels := v1.GetLabelsOverrideForComponent(quay, v1.ComponentRoute); olabels != nil {
+		if rt.Labels == nil {
+			rt.Labels = map[string]string{}
+		}
+		for key, value := range olabels {
+			if v1.ExceptionLabel(key) {
+				continue
+			}
+			rt.Labels[key] = value
+		}
+	}
+
+	if oannot := v1.GetAnnotationsOverrideForComponent(quay, v1.ComponentRoute); oannot != nil {
+		if rt.Annotations == nil {
+			rt.Annotations = map[string]string{}
+		}
+		for key, value := range oannot {
+			rt.Annotations[key] = value
+		}
+	}
+
 	// if we are managing TLS we can simply return the original route as no change is needed.
 	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentTLS) {
 		return obj, nil
