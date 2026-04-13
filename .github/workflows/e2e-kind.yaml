@@ -27,7 +27,7 @@ jobs:
           cache: true
 
       - name: Install crane
-        run: go install github.com/google/go-containerregistry/cmd/crane@latest
+        run: go install github.com/google/go-containerregistry/cmd/crane@v0.21.3
 
       - name: Build operator
         run: go build -o bin/manager main.go
