@@ -1,0 +1,71 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: resource-override
+spec:
+  configBundleSecret: ($values.configBundle)
+  components:
+  - kind: quay
+    managed: true
+    overrides:
+      resources:
+        limits:
+          cpu: "3"
+          memory: 9Gi
+        requests:
+          cpu: 2100m
+          memory: 8100Mi
+  - kind: clair
+    managed: true
+    overrides:
+      resources:
+        limits:
+          cpu: 4100m
+          memory: 17Gi
+        requests:
+          cpu: 2100m
+          memory: 2100Mi
+  - kind: mirror
+    managed: true
+    overrides:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 5Gi
+        requests:
+          cpu: 500m
+          memory: 512Mi
+  - kind: postgres
+    managed: true
+    overrides:
+      resources:
+        limits:
+          cpu: "1"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 2Gi
+      volumeSize: 70Gi
+  - kind: clairpostgres
+    managed: true
+    overrides:
+      resources:
+        limits:
+          cpu: "1"
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 2Gi
+      volumeSize: 70Gi
+  - kind: redis
+    managed: true
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: ($values.managedObjectStorage)
+  - kind: route
+    managed: ($values.managedRoute)
+  - kind: monitoring
+    managed: ($values.managedMonitoring)
+  - kind: tls
+    managed: ($values.managedTLS)

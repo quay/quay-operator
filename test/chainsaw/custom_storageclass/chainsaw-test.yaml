@@ -1,0 +1,150 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: custom-storageclass
+spec:
+  steps:
+  - name: valid-storageclass
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Create config bundle for KinD (no-op on OpenShift)
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, skipping config bundle setup"
+          else
+            echo "KinD detected, creating config bundle..."
+            ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+            SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+            BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+            ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+            openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+              -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+              -subj "/O=Quay E2E" \
+              -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+            CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          FEATURE_PROXY_STORAGE: true
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+            kubectl create secret generic reconcile-config -n $NAMESPACE \
+              --from-literal=config.yaml="${CONFIG}" \
+              --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+              --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+              --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          fi
+
+          # Clone an existing StorageClass to preserve driver-specific fields
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            SOURCE_SC=$(kubectl get sc -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}' | awk '{print $1}')
+          else
+            SOURCE_SC=$(kubectl get sc -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "standard")
+          fi
+          [ -n "${SOURCE_SC}" ] || { echo "ERROR: no usable StorageClass found"; exit 1; }
+          echo "Cloning StorageClass: ${SOURCE_SC}"
+
+          kubectl get sc "${SOURCE_SC}" -o yaml \
+            | sed '/^\s*uid:/d; /^\s*resourceVersion:/d; /^\s*creationTimestamp:/d; /^\s*selfLink:/d' \
+            | sed 's/^\(\s*name:\).*/\1 quay-e2e-sc/' \
+            | sed '/is-default-class/d' \
+            | kubectl apply -f -
+          echo "StorageClass quay-e2e-sc created"
+    - apply:
+        file: 00-create-valid-sc-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          # Verify PVCs use the custom StorageClass
+          QUAY_SC=$(kubectl get pvc custom-sc-quay-postgres-13 -n $NAMESPACE \
+            -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "not-found")
+          echo "Quay postgres PVC storageClass: ${QUAY_SC}"
+          [ "${QUAY_SC}" = "quay-e2e-sc" ] || { echo "FAIL: expected quay-e2e-sc, got ${QUAY_SC}"; exit 1; }
+          echo "PASS: quay-postgres PVC uses custom StorageClass"
+
+          CLAIR_SC=$(kubectl get pvc custom-sc-clair-postgres-15 -n $NAMESPACE \
+            -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "not-found")
+          echo "Clair postgres PVC storageClass: ${CLAIR_SC}"
+          [ "${CLAIR_SC}" = "quay-e2e-sc" ] || { echo "FAIL: expected quay-e2e-sc, got ${CLAIR_SC}"; exit 1; }
+          echo "PASS: clair-postgres PVC uses custom StorageClass"
+
+          # Verify the QuayRegistry CR reflects the storageClassName
+          QR_SC=$(kubectl get quayregistry custom-sc -n $NAMESPACE \
+            -o jsonpath='{.spec.components[?(@.kind=="postgres")].overrides.storageClassName}')
+          [ "${QR_SC}" = "quay-e2e-sc" ] || { echo "FAIL: CR postgres storageClassName ${QR_SC} != quay-e2e-sc"; exit 1; }
+          echo "PASS: QuayRegistry CR postgres storageClassName matches"
+  - name: invalid-storageclass
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Delete the valid registry first
+          kubectl delete quayregistry custom-sc -n $NAMESPACE --timeout=5m 2>/dev/null || true
+          sleep 10
+
+          # Clean up the valid StorageClass
+          kubectl delete sc quay-e2e-sc 2>/dev/null || true
+    - apply:
+        file: 01-create-invalid-sc-registry.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          # PVCs with an invalid StorageClass should stay Pending.
+          # Poll instead of a long sleep — check every 10s for 60s.
+          echo "Waiting for PVCs to be created..."
+          for i in $(seq 1 30); do
+            if kubectl get pvc invalid-sc-quay-postgres-13 -n $NAMESPACE &>/dev/null; then
+              echo "PVCs created"
+              break
+            fi
+            [ "$i" -eq 30 ] && { echo "ERROR: PVCs not created after 5m"; exit 1; }
+            sleep 10
+          done
+
+          # Give a moment for any provisioner to attempt binding
+          sleep 30
+
+          # Verify PVCs are in Pending state
+          QUAY_PVC_PHASE=$(kubectl get pvc invalid-sc-quay-postgres-13 -n $NAMESPACE \
+            -o jsonpath='{.status.phase}' 2>/dev/null || echo "not-found")
+          echo "Quay postgres PVC phase: ${QUAY_PVC_PHASE}"
+          [ "${QUAY_PVC_PHASE}" = "Pending" ] || { echo "FAIL: expected Pending, got ${QUAY_PVC_PHASE}"; exit 1; }
+          echo "PASS: quay-postgres PVC is Pending (invalid StorageClass)"
+
+          CLAIR_PVC_PHASE=$(kubectl get pvc invalid-sc-clair-postgres-15 -n $NAMESPACE \
+            -o jsonpath='{.status.phase}' 2>/dev/null || echo "not-found")
+          echo "Clair postgres PVC phase: ${CLAIR_PVC_PHASE}"
+          [ "${CLAIR_PVC_PHASE}" = "Pending" ] || { echo "FAIL: expected Pending, got ${CLAIR_PVC_PHASE}"; exit 1; }
+          echo "PASS: clair-postgres PVC is Pending (invalid StorageClass)"

@@ -1,0 +1,220 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: unmanaged-route-tls
+spec:
+  steps:
+  - name: guard-openshift-only
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          if ! kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "KinD detected — skipping route/TLS tests (no OpenShift routes)"
+            # Chainsaw does not support conditional skip, so we exit the entire test
+            # by creating a marker file. Subsequent steps check for it.
+            touch /tmp/skip-route-tls-${NAMESPACE}
+          fi
+  # Step A: Managed route + unmanaged TLS (user provides certs)
+  # Covers OCP-42393 and OCP-42387
+  - name: managed-route-unmanaged-tls-with-certs
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          [ -f /tmp/skip-route-tls-${NAMESPACE} ] && { echo "SKIP: not OpenShift"; exit 0; }
+
+          BASE_DOMAIN=$(kubectl get dns/cluster -o jsonpath='{.spec.baseDomain}')
+          QUAY_HOSTNAME="route-tls-a-quay-${NAMESPACE}.apps.${BASE_DOMAIN}"
+          echo "Generating SSL cert for ${QUAY_HOSTNAME}..."
+
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=DNS:${QUAY_HOSTNAME}" 2>/dev/null
+
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: ${QUAY_HOSTNAME}
+          PREFERRED_URL_SCHEME: https
+          EXTERNAL_TLS_TERMINATION: false
+          CFGEOF
+          )
+
+          kubectl create secret generic route-tls-config-a -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key
+          echo "Config bundle created for managed route + unmanaged TLS"
+    - script:
+        shell: /bin/bash
+        content: |
+          [ -f /tmp/skip-route-tls-${NAMESPACE} ] && { echo "SKIP"; exit 0; }
+          kubectl apply -f 00-create-managed-route-unmanaged-tls.yaml -n $NAMESPACE
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          [ -f /tmp/skip-route-tls-${NAMESPACE} ] && { echo "SKIP"; exit 0; }
+
+          echo "Waiting for QuayRegistry route-tls-a to become Available..."
+          for i in $(seq 1 120); do
+            STATUS=$(kubectl get quayregistry route-tls-a -n $NAMESPACE \
+              -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)
+            if [ "${STATUS}" = "True" ]; then
+              echo "PASS: QuayRegistry Available"
+              break
+            fi
+            [ "$i" -eq 120 ] && { echo "ERROR: QuayRegistry not Available after 10m"; exit 1; }
+            sleep 5
+          done
+
+          # Verify route exists with passthrough TLS termination
+          TLS_TERM=$(kubectl get route route-tls-a-quay -n $NAMESPACE \
+            -o jsonpath='{.spec.tls.termination}' 2>/dev/null || echo "not-found")
+          echo "Route TLS termination: ${TLS_TERM}"
+          [ "${TLS_TERM}" = "passthrough" ] || { echo "FAIL: expected passthrough, got ${TLS_TERM}"; exit 1; }
+          echo "PASS: Route has passthrough TLS termination (user-provided certs)"
+  # Step B: Unmanaged route + unmanaged TLS with custom hostname
+  # Covers OCP-42396 and OCP-42374
+  - name: unmanaged-route-unmanaged-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          [ -f /tmp/skip-route-tls-${NAMESPACE} ] && { echo "SKIP"; exit 0; }
+
+          # Clean up previous registry
+          kubectl delete quayregistry route-tls-a -n $NAMESPACE --timeout=5m 2>/dev/null || true
+          sleep 10
+
+          BASE_DOMAIN=$(kubectl get dns/cluster -o jsonpath='{.spec.baseDomain}')
+          # Use a custom hostname to test hostname override (OCP-42374)
+          QUAY_HOSTNAME="quayqe-${NAMESPACE}.apps.${BASE_DOMAIN}"
+          echo "Generating SSL cert for custom hostname ${QUAY_HOSTNAME}..."
+
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=DNS:${QUAY_HOSTNAME}" 2>/dev/null
+
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: ${QUAY_HOSTNAME}
+          PREFERRED_URL_SCHEME: https
+          EXTERNAL_TLS_TERMINATION: false
+          CFGEOF
+          )
+
+          kubectl create secret generic route-tls-config-b -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key
+          echo "Config bundle created for unmanaged route + unmanaged TLS"
+    - script:
+        shell: /bin/bash
+        content: |
+          [ -f /tmp/skip-route-tls-${NAMESPACE} ] && { echo "SKIP"; exit 0; }
+          kubectl apply -f 01-create-unmanaged-route-tls.yaml -n $NAMESPACE
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          [ -f /tmp/skip-route-tls-${NAMESPACE} ] && { echo "SKIP"; exit 0; }
+
+          echo "Waiting for QuayRegistry route-tls-b to become Available..."
+          for i in $(seq 1 120); do
+            STATUS=$(kubectl get quayregistry route-tls-b -n $NAMESPACE \
+              -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)
+            if [ "${STATUS}" = "True" ]; then
+              echo "PASS: QuayRegistry Available"
+              break
+            fi
+            [ "$i" -eq 120 ] && { echo "ERROR: QuayRegistry not Available after 10m"; exit 1; }
+            sleep 5
+          done
+
+          # Verify NO route was created by the operator
+          ROUTE_COUNT=$(kubectl get route -n $NAMESPACE -l quay-operator/quayregistry=route-tls-b \
+            -o name 2>/dev/null | wc -l)
+          echo "Operator-created routes: ${ROUTE_COUNT}"
+          [ "${ROUTE_COUNT}" -eq 0 ] || { echo "FAIL: operator created ${ROUTE_COUNT} routes, expected 0"; exit 1; }
+          echo "PASS: No route created by operator (unmanaged route)"
+  # Step C: Managed route + unmanaged TLS WITHOUT certs (NEGATIVE test)
+  # Covers OCP-42395
+  - name: managed-route-unmanaged-tls-no-certs-negative
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          [ -f /tmp/skip-route-tls-${NAMESPACE} ] && { echo "SKIP"; exit 0; }
+
+          # Clean up previous registry
+          kubectl delete quayregistry route-tls-b -n $NAMESPACE --timeout=5m 2>/dev/null || true
+          sleep 10
+
+          BASE_DOMAIN=$(kubectl get dns/cluster -o jsonpath='{.spec.baseDomain}')
+          QUAY_HOSTNAME="route-tls-neg-quay-${NAMESPACE}.apps.${BASE_DOMAIN}"
+
+          # Config with SERVER_HOSTNAME but NO ssl.cert/ssl.key
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: ${QUAY_HOSTNAME}
+          PREFERRED_URL_SCHEME: https
+          EXTERNAL_TLS_TERMINATION: false
+          CFGEOF
+          )
+
+          kubectl create secret generic route-tls-config-neg -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}"
+
+          cat <<EOF | kubectl apply -n $NAMESPACE -f -
+          apiVersion: quay.redhat.com/v1
+          kind: QuayRegistry
+          metadata:
+            name: route-tls-neg
+          spec:
+            configBundleSecret: route-tls-config-neg
+            components:
+            - kind: quay
+              managed: true
+            - kind: clair
+              managed: true
+            - kind: clairpostgres
+              managed: true
+            - kind: postgres
+              managed: true
+            - kind: redis
+              managed: true
+            - kind: mirror
+              managed: true
+            - kind: horizontalpodautoscaler
+              managed: false
+            - kind: objectstorage
+              managed: true
+            - kind: route
+              managed: true
+            - kind: monitoring
+              managed: true
+            - kind: tls
+              managed: false
+          EOF
+
+          # Poll for 2 minutes: verify quay-app deployment never gets available replicas.
+          # Without TLS certs, the pod's volume mount fails and containers cannot start.
+          echo "Verifying quay-app stays unavailable (no TLS certs)..."
+          for i in $(seq 1 24); do
+            AVAILABLE=$(kubectl get deployment route-tls-neg-quay-app -n $NAMESPACE \
+              -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
+            if [ "${AVAILABLE:-0}" -gt 0 ]; then
+              echo "FAIL: quay-app has ${AVAILABLE} available replicas despite missing TLS certs"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "PASS: quay-app has 0 available replicas after 2m (no TLS certs provided)"

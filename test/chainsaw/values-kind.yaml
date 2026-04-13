@@ -3,6 +3,7 @@ managedObjectStorage: false
 managedMonitoring: false
 managedTLS: false
 configBundle: reconcile-config
+openshift: ""
 routeComponent:
   kind: route
   managed: false
