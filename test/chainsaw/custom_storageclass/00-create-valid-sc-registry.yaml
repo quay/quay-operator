@@ -1,0 +1,33 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: custom-sc
+spec:
+  configBundleSecret: ($values.configBundle)
+  components:
+  - kind: quay
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: clairpostgres
+    managed: true
+    overrides:
+      storageClassName: quay-e2e-sc
+  - kind: postgres
+    managed: true
+    overrides:
+      storageClassName: quay-e2e-sc
+  - kind: redis
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: ($values.managedObjectStorage)
+  - kind: route
+    managed: ($values.managedRoute)
+  - kind: monitoring
+    managed: ($values.managedMonitoring)
+  - kind: tls
+    managed: ($values.managedTLS)

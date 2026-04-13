@@ -1,0 +1,135 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: unmanaged-postgres
+spec:
+  steps:
+  - name: deploy-external-postgres
+    try:
+    - apply:
+        file: 00-deploy-postgres.yaml
+    - assert:
+        file: 00-assert-postgres.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "Waiting for external postgres to accept connections..."
+          for i in $(seq 1 60); do
+            POD=$(kubectl get pod -n $NAMESPACE -l app=external-postgres \
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+            if [ -n "${POD}" ]; then
+              if kubectl exec -n $NAMESPACE "${POD}" -- \
+                psql -U quay -d quay -c "SELECT 1" >/dev/null 2>&1; then
+                echo "Postgres is accepting connections"
+                break
+              fi
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: postgres not ready"; exit 1; }
+            sleep 3
+          done
+
+          kubectl exec -n $NAMESPACE "${POD}" -- \
+            psql -U quay -d quay -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+          echo "pg_trgm extension created"
+  - name: create-registry
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          DB_URI="postgresql://quay:quaypass@external-postgres.${NAMESPACE}.svc.cluster.local:5432/quay"
+
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected"
+            CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          DB_URI: ${DB_URI}
+          DB_CONNECTION_ARGS:
+            autorollback: true
+            threadlocals: true
+          CFGEOF
+          )
+            kubectl create secret generic unmanaged-pg-config -n $NAMESPACE \
+              --from-literal=config.yaml="${CONFIG}"
+          else
+            echo "KinD detected, creating config bundle..."
+            ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+            SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+            BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+            ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+            openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+              -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+              -subj "/O=Quay E2E" \
+              -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+            CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          FEATURE_PROXY_STORAGE: true
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          DB_URI: ${DB_URI}
+          DB_CONNECTION_ARGS:
+            autorollback: true
+            threadlocals: true
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+            kubectl create secret generic unmanaged-pg-config -n $NAMESPACE \
+              --from-literal=config.yaml="${CONFIG}" \
+              --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+              --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+              --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          fi
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 01-create-quay-registry.yaml
+    - assert:
+        file: 01-assert-status.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Verify no operator-managed postgres deployment exists
+          if kubectl get deployment -n $NAMESPACE -l quay-component=postgres \
+            -o name 2>/dev/null | grep -q .; then
+            echo "ERROR: Found operator-managed postgres deployment, expected none"
+            kubectl get deployment -n $NAMESPACE -l quay-component=postgres
+            exit 1
+          fi
+          echo "PASS: No operator-managed postgres deployment found"
+
+          # Verify quay-app pods are running
+          echo "Waiting for quay-app to have ready replicas..."
+          for i in $(seq 1 60); do
+            READY=$(kubectl get deployment unmanaged-pg-quay-app -n $NAMESPACE \
+              -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+            if [ "${READY:-0}" -ge 1 ]; then
+              echo "PASS: quay-app has ${READY} ready replicas"
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: quay-app has no ready replicas after 3m"; exit 1; }
+            sleep 3
+          done

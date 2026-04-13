@@ -3,6 +3,7 @@ managedObjectStorage: true
 managedMonitoring: true
 managedTLS: true
 configBundle: ""
+openshift: "true"
 routeComponent:
   kind: route
   managed: true

@@ -1,0 +1,135 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: resource-overrides
+spec:
+  steps:
+  - name: create-registry-with-resource-overrides
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Create config bundle for KinD (no-op on OpenShift)
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, skipping config bundle setup"
+            exit 0
+          fi
+          echo "KinD detected, creating config bundle..."
+          ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+          SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+          BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+          ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          FEATURE_PROXY_STORAGE: true
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+            --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+  - name: verify-resource-overrides
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          verify_resources() {
+            local DEPLOY_NAME=$1
+            local CONTAINER=$2
+            local EXPECTED_CPU_LIMIT=$3
+            local EXPECTED_MEM_LIMIT=$4
+            local EXPECTED_CPU_REQ=$5
+            local EXPECTED_MEM_REQ=$6
+
+            CPU_LIMIT=$(kubectl get deployment "${DEPLOY_NAME}" -n $NAMESPACE \
+              -o jsonpath="{.spec.template.spec.containers[?(@.name==\"${CONTAINER}\")].resources.limits.cpu}")
+            MEM_LIMIT=$(kubectl get deployment "${DEPLOY_NAME}" -n $NAMESPACE \
+              -o jsonpath="{.spec.template.spec.containers[?(@.name==\"${CONTAINER}\")].resources.limits.memory}")
+            CPU_REQ=$(kubectl get deployment "${DEPLOY_NAME}" -n $NAMESPACE \
+              -o jsonpath="{.spec.template.spec.containers[?(@.name==\"${CONTAINER}\")].resources.requests.cpu}")
+            MEM_REQ=$(kubectl get deployment "${DEPLOY_NAME}" -n $NAMESPACE \
+              -o jsonpath="{.spec.template.spec.containers[?(@.name==\"${CONTAINER}\")].resources.requests.memory}")
+
+            echo "Checking ${DEPLOY_NAME}/${CONTAINER}: limits=${CPU_LIMIT}/${MEM_LIMIT}, requests=${CPU_REQ}/${MEM_REQ}"
+
+            [ "${CPU_LIMIT}" = "${EXPECTED_CPU_LIMIT}" ] || { echo "FAIL: cpu limit ${CPU_LIMIT} != ${EXPECTED_CPU_LIMIT}"; exit 1; }
+            [ "${MEM_LIMIT}" = "${EXPECTED_MEM_LIMIT}" ] || { echo "FAIL: mem limit ${MEM_LIMIT} != ${EXPECTED_MEM_LIMIT}"; exit 1; }
+            [ "${CPU_REQ}" = "${EXPECTED_CPU_REQ}" ] || { echo "FAIL: cpu request ${CPU_REQ} != ${EXPECTED_CPU_REQ}"; exit 1; }
+            [ "${MEM_REQ}" = "${EXPECTED_MEM_REQ}" ] || { echo "FAIL: mem request ${MEM_REQ} != ${EXPECTED_MEM_REQ}"; exit 1; }
+            echo "PASS: ${DEPLOY_NAME}/${CONTAINER} resources match"
+          }
+
+          verify_resources "resource-override-quay-app" "quay-app" "3" "9Gi" "2100m" "8100Mi"
+          verify_resources "resource-override-clair-app" "clair-app" "4100m" "17Gi" "2100m" "2100Mi"
+          verify_resources "resource-override-quay-mirror" "quay-mirror" "2" "5Gi" "500m" "512Mi"
+          verify_resources "resource-override-quay-database" "postgres" "1" "4Gi" "500m" "2Gi"
+          verify_resources "resource-override-clair-postgres" "clair-postgres" "1" "4Gi" "500m" "2Gi"
+
+          echo "=== All resource overrides verified ==="
+  - name: verify-pvc-volume-overrides
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          EXPECTED_SIZE="70Gi"
+
+          # PVC names embed the postgres version suffix (e.g. -13, -15) from kustomize overlays.
+          # Update these if the postgres versions change in kustomize/components/.
+          QUAY_PVC_SIZE=$(kubectl get pvc resource-override-quay-postgres-13 -n $NAMESPACE \
+            -o jsonpath='{.spec.resources.requests.storage}' 2>/dev/null || echo "not-found")
+          echo "Quay postgres PVC size: ${QUAY_PVC_SIZE}"
+          [ "${QUAY_PVC_SIZE}" = "${EXPECTED_SIZE}" ] || { echo "FAIL: quay-postgres PVC ${QUAY_PVC_SIZE} != ${EXPECTED_SIZE}"; exit 1; }
+          echo "PASS: quay-postgres PVC size matches"
+
+          CLAIR_PVC_SIZE=$(kubectl get pvc resource-override-clair-postgres-15 -n $NAMESPACE \
+            -o jsonpath='{.spec.resources.requests.storage}' 2>/dev/null || echo "not-found")
+          echo "Clair postgres PVC size: ${CLAIR_PVC_SIZE}"
+          [ "${CLAIR_PVC_SIZE}" = "${EXPECTED_SIZE}" ] || { echo "FAIL: clair-postgres PVC ${CLAIR_PVC_SIZE} != ${EXPECTED_SIZE}"; exit 1; }
+          echo "PASS: clair-postgres PVC size matches"
+  # NOTE: OCP-53302 (requiredDuringScheduling anti-affinity overrides) is skipped.
+  # The operator middleware resolves component kind from the deployment's
+  # quay-component annotation (e.g. "quay-app" → "quayapp") which doesn't match
+  # ComponentKind "quay", so GetAffinityForComponent() never matches and the
+  # override is silently dropped. The preferred anti-affinity in the reconcile
+  # test comes from the kustomize base, not the override mechanism.
+  # This is a pre-existing operator bug — file a PROJQUAY ticket to fix the
+  # annotation-to-ComponentKind mapping in pkg/middleware/middleware.go:88.
