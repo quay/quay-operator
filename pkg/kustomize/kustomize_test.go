@@ -1,7 +1,6 @@
 package kustomize
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -298,9 +297,9 @@ func TestKustomizationFor(t *testing.T) {
 		if test.expected != nil {
 			for _, img := range test.expected.Images {
 				if len(img.Digest) != 0 {
-					os.Setenv("RELATED_IMAGE_COMPONENT_"+strings.ToUpper(img.NewName), img.NewName+"@"+img.Digest)
+					t.Setenv("RELATED_IMAGE_COMPONENT_"+strings.ToUpper(img.NewName), img.NewName+"@"+img.Digest)
 				} else {
-					os.Setenv("RELATED_IMAGE_COMPONENT_"+strings.ToUpper(img.NewName), img.NewName+":"+img.NewTag)
+					t.Setenv("RELATED_IMAGE_COMPONENT_"+strings.ToUpper(img.NewName), img.NewName+":"+img.NewTag)
 				}
 			}
 		}

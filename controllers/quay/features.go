@@ -25,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/quay/quay-operator/pkg/kustomize"
+	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 )
 
 const (
@@ -236,7 +236,7 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 	// we consider as if the cluster does not support Route objects. XXX This must be
 	// redesigned. I am keeping the logic as is but we shouldn't blindly trust that any
 	// error means "does not support routes".
-	if err := r.Client.Create(ctx, fakeRoute); err != nil && !errors.IsAlreadyExists(err) {
+	if err := r.Create(ctx, fakeRoute); err != nil && !errors.IsAlreadyExists(err) {
 		r.Log.Info("cluster does not support `Route` API", "error", err)
 		return nil
 	}
@@ -255,7 +255,7 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 				Namespace: quay.GetNamespace(),
 			}
 
-			if err := r.Client.Get(ctx, routensn, &rt); err != nil {
+			if err := r.Get(ctx, routensn, &rt); err != nil {
 				return true, err
 			}
 
@@ -290,7 +290,7 @@ func (r *QuayRegistryReconciler) checkRoutesAvailable(
 	}
 	qctx.ClusterWildcardCert = wildcard
 
-	return r.Client.Delete(ctx, &rt)
+	return r.Delete(ctx, &rt)
 }
 
 func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
@@ -302,7 +302,7 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 	}
 
 	var claims objectbucket.ObjectBucketClaimList
-	if err := r.Client.List(ctx, &claims); err != nil {
+	if err := r.List(ctx, &claims); err != nil {
 		return fmt.Errorf("unable to list object bucket claims: %s", err)
 	}
 
@@ -317,13 +317,13 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 		r.Log.Info("`ObjectBucketClaim` exists")
 
 		var datastoreSecret corev1.Secret
-		if err := r.Client.Get(ctx, dstorensn, &datastoreSecret); err != nil {
+		if err := r.Get(ctx, dstorensn, &datastoreSecret); err != nil {
 			r.Log.Error(err, "error retrieving secret, bucket claim not ready")
 			return fmt.Errorf("awaiting for bucket claim to be processed")
 		}
 
 		var datastoreConfig corev1.ConfigMap
-		if err := r.Client.Get(ctx, dstorensn, &datastoreConfig); err != nil {
+		if err := r.Get(ctx, dstorensn, &datastoreConfig); err != nil {
 			r.Log.Error(err, "error retrieving config map, bucket claim not ready")
 			return fmt.Errorf("awaiting for bucket claim to be processed")
 		}
@@ -372,20 +372,20 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext,
 ) error {
 	if len(r.WatchNamespace) > 0 {
-		msg := "Monitoring is only supported in AllNamespaces mode. Disabling."
+		msg := "monitoring is only supported in AllNamespaces mode, disabling"
 		r.Log.Info(msg)
 		return err.New(msg)
 	}
 
 	var serviceMonitors prometheusv1.ServiceMonitorList
-	if err := r.Client.List(ctx, &serviceMonitors); err != nil {
+	if err := r.List(ctx, &serviceMonitors); err != nil {
 		r.Log.Info("Unable to find ServiceMonitor CRD. Monitoring component disabled")
 		return err
 	}
 	r.Log.Info("cluster supports `ServiceMonitor` API")
 
 	var prometheusRules prometheusv1.PrometheusRuleList
-	if err := r.Client.List(ctx, &prometheusRules); err != nil {
+	if err := r.List(ctx, &prometheusRules); err != nil {
 		r.Log.Info("Unable to find PrometheusRule CRD. Monitoring component disabled")
 		return err
 	}
@@ -396,7 +396,7 @@ func (r *QuayRegistryReconciler) checkMonitoringAvailable(
 	}
 
 	var grafanaDashboardNamespace corev1.Namespace
-	if err := r.Client.Get(ctx, namespaceKey, &grafanaDashboardNamespace); err != nil {
+	if err := r.Get(ctx, namespaceKey, &grafanaDashboardNamespace); err != nil {
 		return fmt.Errorf("unable to get grafana namespace: %s", err)
 	}
 
@@ -426,7 +426,7 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	r.Log.Info(fmt.Sprintf("getting %s version", component))
 
 	postgresDeployment := &appsv1.Deployment{}
-	if err := r.Client.Get(
+	if err := r.Get(
 		ctx,
 		types.NamespacedName{
 			Name:      deploymentName,
@@ -466,7 +466,7 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	r.Log.Info(fmt.Sprintf("scaling down %s deployment", component))
 	postgresDeployment.Spec.Replicas = &[]int32{0}[0]
 	postgresDeployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &[]int64{600}[0]
-	if err := r.Client.Update(ctx, postgresDeployment); err != nil {
+	if err := r.Update(ctx, postgresDeployment); err != nil {
 		r.Log.Error(err, "unable to update postgres deployment replicas")
 	}
 	// now we wait to ensure that the deployment has scaled down before we proceed
@@ -477,7 +477,7 @@ func (r *QuayRegistryReconciler) checkNeedsPostgresUpgradeForComponent(
 	if err != nil {
 		r.Log.Error(err, "unable to get label selector for postgres deployment")
 	}
-	err = r.Client.List(ctx, podList, &client.ListOptions{
+	err = r.List(ctx, podList, &client.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -519,7 +519,7 @@ func getCertificatesPEM(address string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	var b bytes.Buffer
 	for _, cert := range conn.ConnectionState().PeerCertificates {
 		err := pem.Encode(&b, &pem.Block{
