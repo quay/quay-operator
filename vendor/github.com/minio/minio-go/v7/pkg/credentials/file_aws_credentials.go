@@ -18,17 +18,33 @@
 package credentials
 
 import (
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
-	ini "gopkg.in/ini.v1"
+	"github.com/go-ini/ini"
+	"github.com/minio/minio-go/v7/internal/json"
 )
+
+// A externalProcessCredentials stores the output of a credential_process
+type externalProcessCredentials struct {
+	Version         int
+	SessionToken    string
+	AccessKeyID     string `json:"AccessKeyId"`
+	SecretAccessKey string
+	Expiration      time.Time
+}
 
 // A FileAWSCredentials retrieves credentials from the current user's home
 // directory, and keeps track if those credentials are expired.
 //
 // Profile ini file example: $HOME/.aws/credentials
 type FileAWSCredentials struct {
+	Expiry
+
 	// Path to the shared credentials file.
 	//
 	// If empty will look for "AWS_SHARED_CREDENTIALS_FILE" env variable. If the
@@ -48,16 +64,14 @@ type FileAWSCredentials struct {
 
 // NewFileAWSCredentials returns a pointer to a new Credentials object
 // wrapping the Profile file provider.
-func NewFileAWSCredentials(filename string, profile string) *Credentials {
+func NewFileAWSCredentials(filename, profile string) *Credentials {
 	return New(&FileAWSCredentials{
 		Filename: filename,
 		Profile:  profile,
 	})
 }
 
-// Retrieve reads and extracts the shared credentials from the current
-// users home directory.
-func (p *FileAWSCredentials) Retrieve() (Value, error) {
+func (p *FileAWSCredentials) retrieve() (Value, error) {
 	if p.Filename == "" {
 		p.Filename = os.Getenv("AWS_SHARED_CREDENTIALS_FILE")
 		if p.Filename == "" {
@@ -89,6 +103,34 @@ func (p *FileAWSCredentials) Retrieve() (Value, error) {
 	// Default to empty string if not found.
 	token := iniProfile.Key("aws_session_token")
 
+	// If credential_process is defined, obtain credentials by executing
+	// the external process
+	credentialProcess := strings.TrimSpace(iniProfile.Key("credential_process").String())
+	if credentialProcess != "" {
+		args := strings.Fields(credentialProcess)
+		if len(args) <= 1 {
+			return Value{}, errors.New("invalid credential process args")
+		}
+		cmd := exec.Command(args[0], args[1:]...)
+		out, err := cmd.Output()
+		if err != nil {
+			return Value{}, err
+		}
+		var externalProcessCredentials externalProcessCredentials
+		err = json.Unmarshal([]byte(out), &externalProcessCredentials)
+		if err != nil {
+			return Value{}, err
+		}
+		p.retrieved = true
+		p.SetExpiration(externalProcessCredentials.Expiration, DefaultExpiryWindow)
+		return Value{
+			AccessKeyID:     externalProcessCredentials.AccessKeyID,
+			SecretAccessKey: externalProcessCredentials.SecretAccessKey,
+			SessionToken:    externalProcessCredentials.SessionToken,
+			Expiration:      externalProcessCredentials.Expiration,
+			SignerType:      SignatureV4,
+		}, nil
+	}
 	p.retrieved = true
 	return Value{
 		AccessKeyID:     id.String(),
@@ -98,9 +140,15 @@ func (p *FileAWSCredentials) Retrieve() (Value, error) {
 	}, nil
 }
 
-// IsExpired returns if the shared credentials have expired.
-func (p *FileAWSCredentials) IsExpired() bool {
-	return !p.retrieved
+// Retrieve reads and extracts the shared credentials from the current
+// users home directory.
+func (p *FileAWSCredentials) Retrieve() (Value, error) {
+	return p.retrieve()
+}
+
+// RetrieveWithCredContext is like Retrieve(), cred context is no-op for File credentials
+func (p *FileAWSCredentials) RetrieveWithCredContext(_ *CredContext) (Value, error) {
+	return p.retrieve()
 }
 
 // loadProfiles loads from the file pointed to by shared credentials filename for profile.
