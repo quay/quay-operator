@@ -787,11 +787,23 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	// Collect old rendered config secrets before the createOrUpdateObject loop so
-	// that only secrets existing prior to this reconcile pass are captured. The new
-	// rendered secret (created inside the loop below) must not be included in this
-	// list. Deletion is intentionally deferred until after the loop and gated on the
-	// quay-app Deployment rollout being complete (see PROJQUAY-9157).
+	// Identify the current rendered config secret that the loop below will
+	// create/update so we can exclude it from the cleanup list.
+	configSecretPrefix := updatedQuay.GetName() + "-quay-config-secret"
+	var currentConfigSecretName string
+	for _, obj := range deploymentObjects {
+		if strings.HasPrefix(obj.GetName(), configSecretPrefix) {
+			currentConfigSecretName = obj.GetName()
+			break
+		}
+	}
+
+	// Collect rendered config secrets that already exist in the namespace.
+	// GetOldConfigBundleSecrets returns ALL rendered secrets (it cannot
+	// distinguish the current one from truly old ones), so we filter out
+	// the secret that the createOrUpdateObject loop will create/update.
+	// Deletion is deferred until after the loop and gated on the quay-app
+	// Deployment rollout being complete (see PROJQUAY-9157).
 	previousSecrets, err := r.GetOldConfigBundleSecrets(ctx, updatedQuay)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -804,6 +816,15 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				fmt.Sprintf("could not get previous config bundle secrets: %s", err),
 			)
 		}
+	}
+	if currentConfigSecretName != "" {
+		filtered := make([]corev1.Secret, 0, len(previousSecrets))
+		for _, s := range previousSecrets {
+			if s.Name != currentConfigSecretName {
+				filtered = append(filtered, s)
+			}
+		}
+		previousSecrets = filtered
 	}
 
 	// When managed object storage is pending initialization (OBC not yet
