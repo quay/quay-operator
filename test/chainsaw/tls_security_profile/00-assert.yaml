@@ -4,19 +4,31 @@ metadata:
   name: tls-profile
 status:
   conditions:
+  - type: ComponentHPAReady
+    status: "True"
+  - type: ComponentRouteReady
+    status: "True"
+  - type: ComponentMonitoringReady
+    status: "True"
   - type: ComponentPostgresReady
+    status: "True"
+  - type: ComponentObjectStorageReady
+    status: "True"
+  - type: ComponentClairReady
+    status: "True"
+  - type: ComponentClairPostgresReady
+    status: "True"
+  - type: ComponentTLSReady
     status: "True"
   - type: ComponentRedisReady
     status: "True"
   - type: ComponentQuayReady
     status: "True"
-  - type: ComponentTLSReady
+  - type: ComponentMirrorReady
     status: "True"
-    reason: ComponentNotManaged
-  - type: ComponentRouteReady
-    status: "True"
-    reason: ComponentNotManaged
   - type: Available
+    status: "True"
+  - type: ComponentsCreated
     status: "True"
   - type: RolloutBlocked
     status: "False"
