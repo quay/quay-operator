@@ -5,7 +5,7 @@ metadata:
   creationTimestamp: null
   name: configuration
 spec:
-  parallel: 2
+  parallel: 1
   template: true
   timeouts:
     apply: 10m0s
