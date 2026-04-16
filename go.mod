@@ -8,7 +8,7 @@ require (
 	github.com/onsi/gomega v1.39.1
 	github.com/openshift/api v0.0.0-20240729140855-0a58f8c30a8c
 	github.com/quay/clair/config v1.4.3
-	github.com/quay/quay/config-tool v0.0.0-20260414152047-cf0c4b0f613b
+	github.com/quay/quay/config-tool v0.0.0-20260416123904-bcb6cd389034
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/sjson v1.2.5
 	go.uber.org/zap v1.27.1
