@@ -1307,9 +1307,9 @@ func TestQuayAppDeploymentRolledOut(t *testing.T) {
 			name: "all replicas updated and available — rollout complete",
 			deployments: []appsv1.Deployment{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app", Namespace: "default"},
+					ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app", Namespace: "default", Generation: 2},
 					Spec:       appsv1.DeploymentSpec{Replicas: int32Ptr(2)},
-					Status:     appsv1.DeploymentStatus{UpdatedReplicas: 2, AvailableReplicas: 2},
+					Status:     appsv1.DeploymentStatus{ObservedGeneration: 2, UpdatedReplicas: 2, AvailableReplicas: 2},
 				},
 			},
 			wantRolledOut: true,
@@ -1320,6 +1320,28 @@ func TestQuayAppDeploymentRolledOut(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app", Namespace: "default"},
 					Status:     appsv1.DeploymentStatus{UpdatedReplicas: 1, AvailableReplicas: 1},
+				},
+			},
+			wantRolledOut: true,
+		},
+		{
+			name: "stale ObservedGeneration — controller has not processed latest spec",
+			deployments: []appsv1.Deployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app", Namespace: "default", Generation: 3},
+					Spec:       appsv1.DeploymentSpec{Replicas: int32Ptr(2)},
+					Status:     appsv1.DeploymentStatus{ObservedGeneration: 2, UpdatedReplicas: 2, AvailableReplicas: 2},
+				},
+			},
+			wantRolledOut: false,
+		},
+		{
+			name: "ObservedGeneration matches Generation — rollout complete",
+			deployments: []appsv1.Deployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app", Namespace: "default", Generation: 5},
+					Spec:       appsv1.DeploymentSpec{Replicas: int32Ptr(3)},
+					Status:     appsv1.DeploymentStatus{ObservedGeneration: 5, UpdatedReplicas: 3, AvailableReplicas: 3},
 				},
 			},
 			wantRolledOut: true,

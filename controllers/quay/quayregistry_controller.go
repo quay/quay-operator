@@ -498,6 +498,14 @@ func (r *QuayRegistryReconciler) quayAppDeploymentRolledOut(
 		return false, err
 	}
 
+	// The Deployment controller must have observed the latest spec before
+	// its status counters are meaningful for the new revision. Without this
+	// guard we can read stale counters from the previous (completed) rollout
+	// and prematurely delete the old config secret (PROJQUAY-9157).
+	if deployment.Status.ObservedGeneration < deployment.Generation {
+		return false, nil
+	}
+
 	desired := int32(1)
 	if deployment.Spec.Replicas != nil {
 		desired = *deployment.Spec.Replicas
