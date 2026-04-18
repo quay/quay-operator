@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"strings"
 	"testing"
 	"time"
 
@@ -1376,6 +1377,123 @@ func TestQuayAppDeploymentRolledOut(t *testing.T) {
 			}
 			if got != tt.wantRolledOut {
 				t.Errorf("rolledOut = %v, want %v", got, tt.wantRolledOut)
+			}
+		})
+	}
+}
+
+func newTypedSecret(name, namespace string) client.Object {
+	s := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+	}
+	s.SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "Secret"})
+	return s
+}
+
+func newTypedDeployment(name, namespace string) client.Object {
+	d := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+	}
+	d.SetGroupVersionKind(schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"})
+	return d
+}
+
+func newTypedService(name, namespace string) client.Object {
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+	}
+	svc.SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "Service"})
+	return svc
+}
+
+func TestFilterCurrentConfigSecret(t *testing.T) {
+	configSecretPrefix := "test-quay-config-secret"
+
+	for _, tt := range []struct {
+		name                string
+		deploymentObjects   []client.Object
+		existingSecrets     []corev1.Secret
+		wantFilteredCount   int
+		wantCleanupDeferred bool
+	}{
+		{
+			name: "secret correctly identified and filtered from previous secrets",
+			deploymentObjects: []client.Object{
+				newTypedSecret("test-quay-config-secret-abc123", "default"),
+				newTypedDeployment("test-quay-app", "default"),
+			},
+			existingSecrets: []corev1.Secret{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-quay-config-secret-abc123", Namespace: "default"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-quay-config-secret-old111", Namespace: "default"}},
+			},
+			wantFilteredCount:   1,
+			wantCleanupDeferred: false,
+		},
+		{
+			name: "no matching secret in deployment objects — cleanup deferred",
+			deploymentObjects: []client.Object{
+				newTypedDeployment("test-quay-app", "default"),
+				newTypedService("test-quay-app", "default"),
+			},
+			existingSecrets: []corev1.Secret{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-quay-config-secret-old111", Namespace: "default"}},
+			},
+			wantFilteredCount:   0,
+			wantCleanupDeferred: true,
+		},
+		{
+			name: "non-Secret object with matching prefix name is skipped — cleanup deferred",
+			deploymentObjects: []client.Object{
+				newTypedDeployment("test-quay-config-secret-something", "default"),
+			},
+			existingSecrets: []corev1.Secret{
+				{ObjectMeta: metav1.ObjectMeta{Name: "test-quay-config-secret-old111", Namespace: "default"}},
+			},
+			wantFilteredCount:   0,
+			wantCleanupDeferred: true,
+		},
+		{
+			name: "no previous secrets — nothing to filter",
+			deploymentObjects: []client.Object{
+				newTypedSecret("test-quay-config-secret-abc123", "default"),
+			},
+			existingSecrets:     []corev1.Secret{},
+			wantFilteredCount:   0,
+			wantCleanupDeferred: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var currentConfigSecretName string
+			for _, obj := range tt.deploymentObjects {
+				if obj.GetObjectKind().GroupVersionKind().Kind != "Secret" {
+					continue
+				}
+				if strings.HasPrefix(obj.GetName(), configSecretPrefix) {
+					currentConfigSecretName = obj.GetName()
+					break
+				}
+			}
+
+			previousSecrets := tt.existingSecrets
+			cleanupDeferred := false
+			if currentConfigSecretName == "" {
+				cleanupDeferred = true
+				previousSecrets = nil
+			} else {
+				filtered := make([]corev1.Secret, 0, len(previousSecrets))
+				for _, s := range previousSecrets {
+					if s.Name != currentConfigSecretName {
+						filtered = append(filtered, s)
+					}
+				}
+				previousSecrets = filtered
+			}
+
+			if cleanupDeferred != tt.wantCleanupDeferred {
+				t.Errorf("cleanupDeferred = %v, want %v", cleanupDeferred, tt.wantCleanupDeferred)
+			}
+			if len(previousSecrets) != tt.wantFilteredCount {
+				t.Errorf("filtered secrets count = %d, want %d", len(previousSecrets), tt.wantFilteredCount)
 			}
 		})
 	}

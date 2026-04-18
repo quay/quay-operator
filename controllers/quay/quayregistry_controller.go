@@ -800,6 +800,9 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	configSecretPrefix := updatedQuay.GetName() + "-quay-config-secret"
 	var currentConfigSecretName string
 	for _, obj := range deploymentObjects {
+		if obj.GetObjectKind().GroupVersionKind().Kind != "Secret" {
+			continue
+		}
 		if strings.HasPrefix(obj.GetName(), configSecretPrefix) {
 			currentConfigSecretName = obj.GetName()
 			break
@@ -825,7 +828,10 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			)
 		}
 	}
-	if currentConfigSecretName != "" {
+	if currentConfigSecretName == "" {
+		log.Info("could not identify current rendered config secret in inflated objects, deferring old config secret cleanup")
+		previousSecrets = nil
+	} else {
 		filtered := make([]corev1.Secret, 0, len(previousSecrets))
 		for _, s := range previousSecrets {
 			if s.Name != currentConfigSecretName {
