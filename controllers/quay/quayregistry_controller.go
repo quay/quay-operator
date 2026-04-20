@@ -476,6 +476,45 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 	return oldConfigBundleSecrets, nil
 }
 
+// quayAppDeploymentRolledOut returns true when the quay-app Deployment has fully
+// rolled out — that is, every desired replica is both updated and available. It is
+// used to gate the deletion of old rendered config secrets so that no running pod
+// is ever left unable to mount its config volume (PROJQUAY-9157).
+//
+// If the Deployment does not yet exist (first reconcile pass) the function returns
+// true so that any pre-existing orphaned secrets are still cleaned up promptly.
+func (r *QuayRegistryReconciler) quayAppDeploymentRolledOut(
+	ctx context.Context, quay *v1.QuayRegistry,
+) (bool, error) {
+	name := fmt.Sprintf("%s-quay-app", quay.GetName())
+	var deployment appsv1.Deployment
+	if err := r.Get(ctx, types.NamespacedName{
+		Name:      name,
+		Namespace: quay.GetNamespace(),
+	}, &deployment); err != nil {
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+
+	// The Deployment controller must have observed the latest spec before
+	// its status counters are meaningful for the new revision. Without this
+	// guard we can read stale counters from the previous (completed) rollout
+	// and prematurely delete the old config secret (PROJQUAY-9157).
+	if deployment.Status.ObservedGeneration < deployment.Generation {
+		return false, nil
+	}
+
+	desired := int32(1)
+	if deployment.Spec.Replicas != nil {
+		desired = *deployment.Spec.Replicas
+	}
+
+	return deployment.Status.UpdatedReplicas == desired &&
+		deployment.Status.AvailableReplicas == desired, nil
+}
+
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=quay.redhat.com,resources=quayregistries/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
@@ -756,6 +795,26 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	// Identify the current rendered config secret that the loop below will
+	// create/update so we can exclude it from the cleanup list.
+	configSecretPrefix := updatedQuay.GetName() + "-quay-config-secret"
+	var currentConfigSecretName string
+	for _, obj := range deploymentObjects {
+		if obj.GetObjectKind().GroupVersionKind().Kind != "Secret" {
+			continue
+		}
+		if strings.HasPrefix(obj.GetName(), configSecretPrefix) {
+			currentConfigSecretName = obj.GetName()
+			break
+		}
+	}
+
+	// Collect rendered config secrets that already exist in the namespace.
+	// GetOldConfigBundleSecrets returns ALL rendered secrets (it cannot
+	// distinguish the current one from truly old ones), so we filter out
+	// the secret that the createOrUpdateObject loop will create/update.
+	// Deletion is deferred until after the loop and gated on the quay-app
+	// Deployment rollout being complete (see PROJQUAY-9157).
 	previousSecrets, err := r.GetOldConfigBundleSecrets(ctx, updatedQuay)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -769,16 +828,17 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			)
 		}
 	}
-
-	if err := r.cleanupPreviousSecrets(log, ctx, &quay, previousSecrets); err != nil {
-		return r.reconcileWithCondition(
-			ctx,
-			&quay,
-			v1.ConditionTypeRolloutBlocked,
-			metav1.ConditionTrue,
-			v1.ConditionReasonConfigInvalid,
-			fmt.Sprintf("could not remove previous config bundle secret: %s", err),
-		)
+	if currentConfigSecretName == "" {
+		log.Info("could not identify current rendered config secret in inflated objects, deferring old config secret cleanup")
+		previousSecrets = nil
+	} else {
+		filtered := make([]corev1.Secret, 0, len(previousSecrets))
+		for _, s := range previousSecrets {
+			if s.Name != currentConfigSecretName {
+				filtered = append(filtered, s)
+			}
+		}
+		previousSecrets = filtered
 	}
 
 	// When managed object storage is pending initialization (OBC not yet
@@ -841,6 +901,30 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				v1.ConditionReasonMonitoringComponentDependencyError,
 				err.Error(),
 			)
+		}
+	}
+
+	// Delete old rendered config secrets, but only once the quay-app Deployment has
+	// fully rolled out. This ensures every running pod has successfully mounted the
+	// new secret before we remove the old one, eliminating the FailedMount warning
+	// described in PROJQUAY-9157.
+	if len(previousSecrets) > 0 {
+		rolledOut, err := r.quayAppDeploymentRolledOut(ctx, updatedQuay)
+		if err != nil {
+			log.Error(err, "could not check quay-app rollout status, deferring old config secret cleanup")
+		} else if !rolledOut {
+			log.Info("quay-app rollout in progress, deferring old config secret cleanup")
+		} else {
+			if err := r.cleanupPreviousSecrets(log, ctx, &quay, previousSecrets); err != nil {
+				return r.reconcileWithCondition(
+					ctx,
+					&quay,
+					v1.ConditionTypeRolloutBlocked,
+					metav1.ConditionTrue,
+					v1.ConditionReasonConfigInvalid,
+					fmt.Sprintf("could not remove previous config bundle secret: %s", err),
+				)
+			}
 		}
 	}
 
