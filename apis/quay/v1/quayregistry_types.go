@@ -814,7 +814,7 @@ func GetReplicasOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *in
 		}
 
 		if cmp.Overrides.Replicas == nil {
-			return nil
+			return ptr.To[int32](2)
 		}
 
 		return cmp.Overrides.Replicas
