@@ -13,9 +13,6 @@ jobs:
   e2e-kind:
     name: E2E Tests on KinD
     runs-on: quay-002-small-ubuntu-24-x64
-    permissions:
-      checks: write
-      contents: read
     env:
       SKIP_RESOURCE_REQUESTS: "true"
       QUAY_VERSION: dev
@@ -114,18 +111,6 @@ jobs:
           except Exception as e:
               print(f'Warning: failed to fix classnames in {sys.argv[1]}: {e}', file=sys.stderr)
           " "$REPORT"
-
-      - name: Publish JUnit test report
-        if: always()
-        uses: mikepenz/action-junit-report@bccf2e31636835cf0874589931c4116687171386 # v6.4.0
-        with:
-          report_paths: '/tmp/e2e-reports/chainsaw-report.xml'
-          check_name: 'E2E Test Results (KinD)'
-          fail_on_failure: false
-          require_tests: false
-          include_passed: true
-          detailed_summary: true
-          job_summary: false
 
       - name: Write job summary
         if: always()
