@@ -20,7 +20,6 @@ package minio
 import (
 	"context"
 	"net/http"
-	"net/url"
 
 	"github.com/minio/minio-go/v7/pkg/s3utils"
 )
@@ -40,14 +39,14 @@ func (c *Client) BucketExists(ctx context.Context, bucketName string) (bool, err
 	})
 	defer closeResponse(resp)
 	if err != nil {
-		if ToErrorResponse(err).Code == "NoSuchBucket" {
+		if ToErrorResponse(err).Code == NoSuchBucket {
 			return false, nil
 		}
 		return false, err
 	}
 	if resp != nil {
 		resperr := httpRespToErrorResponse(resp, bucketName, "")
-		if ToErrorResponse(resperr).Code == "NoSuchBucket" {
+		if ToErrorResponse(resperr).Code == NoSuchBucket {
 			return false, nil
 		}
 		if resp.StatusCode != http.StatusOK {
@@ -57,29 +56,37 @@ func (c *Client) BucketExists(ctx context.Context, bucketName string) (bool, err
 	return true, nil
 }
 
-// StatObject verifies if object exists and you have permission to access.
+// StatObject verifies if object exists, you have permission to access it
+// and returns information about the object.
 func (c *Client) StatObject(ctx context.Context, bucketName, objectName string, opts StatObjectOptions) (ObjectInfo, error) {
 	// Input validation.
 	if err := s3utils.CheckValidBucketName(bucketName); err != nil {
-		return ObjectInfo{}, err
+		return ObjectInfo{}, ErrorResponse{
+			StatusCode: http.StatusBadRequest,
+			Code:       InvalidBucketName,
+			Message:    err.Error(),
+		}
 	}
 	if err := s3utils.CheckValidObjectName(objectName); err != nil {
-		return ObjectInfo{}, err
+		return ObjectInfo{}, ErrorResponse{
+			StatusCode: http.StatusBadRequest,
+			Code:       XMinioInvalidObjectName,
+			Message:    err.Error(),
+		}
 	}
 	headers := opts.Header()
 	if opts.Internal.ReplicationDeleteMarker {
 		headers.Set(minIOBucketReplicationDeleteMarker, "true")
 	}
-
-	urlValues := make(url.Values)
-	if opts.VersionID != "" {
-		urlValues.Set("versionId", opts.VersionID)
+	if opts.Internal.IsReplicationReadyForDeleteMarker {
+		headers.Set(isMinioTgtReplicationReady, "true")
 	}
+
 	// Execute HEAD on objectName.
 	resp, err := c.executeMethod(ctx, http.MethodHead, requestMetadata{
 		bucketName:       bucketName,
 		objectName:       objectName,
-		queryValues:      urlValues,
+		queryValues:      opts.toQueryValues(),
 		contentSHA256Hex: emptySHA256Hex,
 		customHeader:     headers,
 	})
@@ -90,12 +97,13 @@ func (c *Client) StatObject(ctx context.Context, bucketName, objectName string, 
 
 	if resp != nil {
 		deleteMarker := resp.Header.Get(amzDeleteMarker) == "true"
+		replicationReady := resp.Header.Get(minioTgtReplicationReady) == "true"
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 			if resp.StatusCode == http.StatusMethodNotAllowed && opts.VersionID != "" && deleteMarker {
 				errResp := ErrorResponse{
 					StatusCode: resp.StatusCode,
-					Code:       "MethodNotAllowed",
-					Message:    "The specified method is not allowed against this resource.",
+					Code:       MethodNotAllowed,
+					Message:    s3ErrorResponseMap[MethodNotAllowed],
 					BucketName: bucketName,
 					Key:        objectName,
 				}
@@ -105,8 +113,9 @@ func (c *Client) StatObject(ctx context.Context, bucketName, objectName string, 
 				}, errResp
 			}
 			return ObjectInfo{
-				VersionID:      resp.Header.Get(amzVersionID),
-				IsDeleteMarker: deleteMarker,
+				VersionID:        resp.Header.Get(amzVersionID),
+				IsDeleteMarker:   deleteMarker,
+				ReplicationReady: replicationReady, // whether delete marker can be replicated
 			}, httpRespToErrorResponse(resp, bucketName, objectName)
 		}
 	}
