@@ -13,6 +13,9 @@ jobs:
   e2e-kind:
     name: E2E Tests on KinD
     runs-on: quay-002-small-ubuntu-24-x64
+    permissions:
+      checks: write
+      contents: read
     env:
       SKIP_RESOURCE_REQUESTS: "true"
       QUAY_VERSION: dev
@@ -51,7 +54,12 @@ jobs:
           curl -sf --retry 10 --retry-delay 1 --retry-connrefused http://localhost:8081/readyz
 
       - name: Run E2E tests
-        run: make test-e2e-kind CHAINSAW_EXTRA_ARGS="--skip-delete"
+        run: |
+          mkdir -p /tmp/e2e-reports
+          make test-e2e-kind \
+            CHAINSAW_REPORT_FORMAT=JUNIT-STEP \
+            CHAINSAW_REPORT_PATH=/tmp/e2e-reports \
+            CHAINSAW_EXTRA_ARGS="--skip-delete"
         timeout-minutes: 30
 
       - name: Stop operator
@@ -61,17 +69,18 @@ jobs:
             kill $(cat /tmp/operator.pid) 2>/dev/null || true
           fi
 
-      - name: Collect logs on failure
-        if: failure()
+      - name: Collect diagnostic logs
+        if: always()
         run: |
+          exec > >(tee /tmp/e2e-reports/diagnostics.log) 2>&1
           echo "=== Pod status (all namespaces) ==="
-          kubectl get pods -A -o wide
+          kubectl get pods -A -o wide || true
           echo ""
           echo "=== QuayRegistry status ==="
           kubectl get quayregistries -A -o yaml 2>/dev/null || true
           echo ""
           echo "=== Events ==="
-          kubectl get events -A --sort-by='.lastTimestamp' | tail -50
+          kubectl get events -A --sort-by='.lastTimestamp' | tail -50 || true
           echo ""
           echo "=== Operator logs (last 100 lines) ==="
           tail -100 /tmp/operator.log 2>/dev/null || true
@@ -88,3 +97,113 @@ jobs:
               kubectl logs -n "$ns" "$pod" --all-containers --previous --tail=50 2>/dev/null || true
             done
           done
+
+      - name: Fix JUnit classnames
+        if: always()
+        run: |
+          REPORT="/tmp/e2e-reports/chainsaw-report.xml"
+          [ -f "$REPORT" ] || exit 0
+          python3 -c "
+          import xml.etree.ElementTree as ET, sys
+          tree = ET.parse(sys.argv[1])
+          for suite in tree.getroot().findall('.//testsuite'):
+              for tc in suite.findall('testcase'):
+                  tc.set('classname', suite.get('name', ''))
+          tree.write(sys.argv[1], xml_declaration=True, encoding='unicode')
+          " "$REPORT"
+
+      - name: Publish JUnit test report
+        if: always()
+        uses: mikepenz/action-junit-report@bccf2e31636835cf0874589931c4116687171386 # v6.4.0
+        with:
+          report_paths: '/tmp/e2e-reports/chainsaw-report.xml'
+          check_name: 'E2E Test Results (KinD)'
+          fail_on_failure: false
+          require_tests: false
+          include_passed: true
+          detailed_summary: true
+
+      - name: Write job summary
+        if: always()
+        run: |
+          REPORT="/tmp/e2e-reports/chainsaw-report.xml"
+          if [ ! -f "$REPORT" ]; then
+            echo "## E2E Test Results" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "> **Warning:** No JUnit report was generated. Chainsaw may have crashed before producing output." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 - "$REPORT" <<'PYEOF'
+          import sys
+          import xml.etree.ElementTree as ET
+          import os
+
+          report = sys.argv[1]
+          tree = ET.parse(report)
+          root = tree.getroot()
+          suites = root.findall('.//testsuite') if root.tag == 'testsuites' else [root]
+
+          total = passed = failed = skipped = 0
+          suite_data = []
+          for suite in suites:
+              s = {'name': suite.get('name', '?'), 'time': float(suite.get('time', 0)),
+                   'steps': [], 'passed': 0, 'failed': 0, 'skipped': 0}
+              for tc in suite.findall('testcase'):
+                  total += 1
+                  fail_el, skip_el = tc.find('failure'), tc.find('skipped')
+                  step = {'name': tc.get('name', '?'), 'time': float(tc.get('time', 0))}
+                  if fail_el is not None:
+                      failed += 1; s['failed'] += 1; step['status'] = 'failed'
+                      msg = fail_el.get('message', fail_el.text or 'no message')
+                      step['message'] = msg[:500] + '...' if len(msg) > 500 else msg
+                  elif skip_el is not None:
+                      skipped += 1; s['skipped'] += 1; step['status'] = 'skipped'
+                  else:
+                      passed += 1; s['passed'] += 1; step['status'] = 'passed'
+                  s['steps'].append(step)
+              suite_data.append(s)
+
+          def fmt(sec):
+              if sec < 1: return f'{sec:.1f}s'
+              m, s = divmod(int(sec), 60)
+              return f'{m}m{s}s' if m else f'{s}s'
+
+          icons = {'passed': ':white_check_mark:', 'failed': ':x:', 'skipped': ':fast_forward:'}
+          suite_data.sort(key=lambda s: (s['failed'] == 0, s['name']))
+
+          out = open(os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null'), 'a')
+          icon = ':white_check_mark:' if failed == 0 else ':x:'
+          out.write(f'## {icon} E2E Test Results (KinD)\n\n')
+          out.write('| Total | Passed | Failed | Skipped |\n|-------|--------|--------|---------|\n')
+          out.write(f'| {total} | {passed} | {failed} | {skipped} |\n\n')
+
+          for s in suite_data:
+              s_icon = ':x:' if s['failed'] > 0 else ':white_check_mark:'
+              hdr = f'{s_icon} **{s["name"]}** ({s["passed"]}/{len(s["steps"])} passed, {fmt(s["time"])})'
+              if s['failed'] > 0:
+                  out.write(f'### {hdr}\n\n')
+              else:
+                  out.write(f'<details>\n<summary>{hdr}</summary>\n\n')
+              out.write('| Step | Status | Duration |\n|------|--------|----------|\n')
+              for step in s['steps']:
+                  out.write(f'| {step["name"]} | {icons[step["status"]]} | {fmt(step["time"])} |\n')
+              out.write('\n')
+              for step in s['steps']:
+                  if step['status'] == 'failed':
+                      out.write(f'> **{step["name"]}** failed: `{step["message"]}`\n\n')
+              if s['failed'] == 0:
+                  out.write('</details>\n\n')
+          out.close()
+          PYEOF
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-diagnostics
+          path: |
+            /tmp/e2e-reports/chainsaw-report.xml
+            /tmp/e2e-reports/diagnostics.log
+            /tmp/operator.log
+          retention-days: 14
+          if-no-files-found: warn
