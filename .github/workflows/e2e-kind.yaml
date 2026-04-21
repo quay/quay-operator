@@ -105,11 +105,14 @@ jobs:
           [ -f "$REPORT" ] || exit 0
           python3 -c "
           import xml.etree.ElementTree as ET, sys
-          tree = ET.parse(sys.argv[1])
-          for suite in tree.getroot().findall('.//testsuite'):
-              for tc in suite.findall('testcase'):
-                  tc.set('classname', suite.get('name', ''))
-          tree.write(sys.argv[1], xml_declaration=True, encoding='unicode')
+          try:
+              tree = ET.parse(sys.argv[1])
+              for suite in tree.getroot().findall('.//testsuite'):
+                  for tc in suite.findall('testcase'):
+                      tc.set('classname', suite.get('name', ''))
+              tree.write(sys.argv[1], xml_declaration=True, encoding='unicode')
+          except Exception as e:
+              print(f'Warning: failed to fix classnames in {sys.argv[1]}: {e}', file=sys.stderr)
           " "$REPORT"
 
       - name: Publish JUnit test report
@@ -171,29 +174,28 @@ jobs:
           icons = {'passed': ':white_check_mark:', 'failed': ':x:', 'skipped': ':fast_forward:'}
           suite_data.sort(key=lambda s: (s['failed'] == 0, s['name']))
 
-          out = open(os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null'), 'a')
-          icon = ':white_check_mark:' if failed == 0 else ':x:'
-          out.write(f'## {icon} E2E Test Results (KinD)\n\n')
-          out.write('| Total | Passed | Failed | Skipped |\n|-------|--------|--------|---------|\n')
-          out.write(f'| {total} | {passed} | {failed} | {skipped} |\n\n')
+          with open(os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null'), 'a') as out:
+              icon = ':white_check_mark:' if failed == 0 else ':x:'
+              out.write(f'## {icon} E2E Test Results (KinD)\n\n')
+              out.write('| Total | Passed | Failed | Skipped |\n|-------|--------|--------|---------|\n')
+              out.write(f'| {total} | {passed} | {failed} | {skipped} |\n\n')
 
-          for s in suite_data:
-              s_icon = ':x:' if s['failed'] > 0 else ':white_check_mark:'
-              hdr = f'{s_icon} **{s["name"]}** ({s["passed"]}/{len(s["steps"])} passed, {fmt(s["time"])})'
-              if s['failed'] > 0:
-                  out.write(f'### {hdr}\n\n')
-              else:
-                  out.write(f'<details>\n<summary>{hdr}</summary>\n\n')
-              out.write('| Step | Status | Duration |\n|------|--------|----------|\n')
-              for step in s['steps']:
-                  out.write(f'| {step["name"]} | {icons[step["status"]]} | {fmt(step["time"])} |\n')
-              out.write('\n')
-              for step in s['steps']:
-                  if step['status'] == 'failed':
-                      out.write(f'> **{step["name"]}** failed: `{step["message"]}`\n\n')
-              if s['failed'] == 0:
-                  out.write('</details>\n\n')
-          out.close()
+              for s in suite_data:
+                  s_icon = ':x:' if s['failed'] > 0 else ':white_check_mark:'
+                  hdr = f'{s_icon} **{s["name"]}** ({s["passed"]}/{len(s["steps"])} passed, {fmt(s["time"])})'
+                  if s['failed'] > 0:
+                      out.write(f'### {hdr}\n\n')
+                  else:
+                      out.write(f'<details>\n<summary>{hdr}</summary>\n\n')
+                  out.write('| Step | Status | Duration |\n|------|--------|----------|\n')
+                  for step in s['steps']:
+                      out.write(f'| {step["name"]} | {icons[step["status"]]} | {fmt(step["time"])} |\n')
+                  out.write('\n')
+                  for step in s['steps']:
+                      if step['status'] == 'failed':
+                          out.write(f'> **{step["name"]}** failed: `{step["message"]}`\n\n')
+                  if s['failed'] == 0:
+                      out.write('</details>\n\n')
           PYEOF
 
       - name: Upload E2E artifacts
