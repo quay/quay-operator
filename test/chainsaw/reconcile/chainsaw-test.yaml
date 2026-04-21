@@ -506,11 +506,21 @@ spec:
     - assert:
         file: 08-assert.yaml
   - name: switch-external-tls
+    timeouts:
+      exec: 15m0s
+      assert: 5m0s
     try:
     - script:
         shell: /bin/bash
         content: |
           set -euo pipefail
+
+          # Record generation before apply so we can detect when the operator
+          # has reconciled the new spec (gate 1).
+          OLD_GEN=$(kubectl get quayregistry reconcile -n $NAMESPACE \
+            -o jsonpath='{.metadata.generation}')
+          echo "Pre-apply generation: ${OLD_GEN}"
+          echo "${OLD_GEN}" > /tmp/pre-switch-generation
 
           # Determine the SAN for the certificate based on platform.
           # On OpenShift the operator derives SERVER_HOSTNAME from the route:
@@ -558,27 +568,53 @@ spec:
         file: 09-switch-external-tls.yaml
     - assert:
         file: 09-assert-tls-label.yaml
-    - assert:
-        file: 00-assert-status.yaml
     - script:
         shell: /bin/bash
         content: |
           set -euo pipefail
+          OLD_GEN=$(cat /tmp/pre-switch-generation)
 
-          # Wait for TLS hash annotation to appear on quay-app deployment pod template
-          echo "Waiting for tls-secret-hash annotation..."
+          # Gate 1: Wait for the operator to reconcile the new spec.
+          echo "Gate 1: waiting for observedGeneration > ${OLD_GEN}..."
+          for i in $(seq 1 120); do
+            GEN=$(kubectl get quayregistry reconcile -n $NAMESPACE \
+              -o jsonpath='{.metadata.generation}' 2>/dev/null || echo "0")
+            OBS=$(kubectl get quayregistry reconcile -n $NAMESPACE \
+              -o jsonpath='{.status.observedGeneration}' 2>/dev/null || echo "0")
+            if [ "${GEN}" -gt "${OLD_GEN}" ] && [ "${OBS}" -ge "${GEN}" ]; then
+              echo "Gate 1 passed: generation=${GEN} observedGeneration=${OBS}"
+              break
+            fi
+            [ "$i" -eq 120 ] && { echo "ERROR: observedGeneration not updated after 10m"; exit 1; }
+            sleep 5
+          done
+
+          # Gate 2: Wait for tls-secret-hash annotation on quay-app deployment.
+          echo "Gate 2: waiting for tls-secret-hash annotation..."
           for i in $(seq 1 60); do
             HASH=$(kubectl get deployment reconcile-quay-app -n $NAMESPACE \
               -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}' 2>/dev/null || true)
             if [ -n "${HASH}" ]; then
-              echo "PASS: initial tls-secret-hash = ${HASH}"
+              echo "Gate 2 passed: tls-secret-hash=${HASH}"
               echo "${HASH}" > /tmp/initial-tls-hash
               break
             fi
             [ "$i" -eq 60 ] && { echo "ERROR: tls-secret-hash annotation not found after 5m"; exit 1; }
             sleep 5
           done
+
+          # Gate 3: Wait for rollouts to complete.
+          echo "Gate 3: waiting for deployment rollouts..."
+          kubectl rollout status deployment/reconcile-quay-app -n $NAMESPACE --timeout=600s
+          echo "quay-app rollout complete"
+          kubectl rollout status deployment/reconcile-clair-app -n $NAMESPACE --timeout=600s || true
+          echo "clair-app rollout complete (or timed out)"
+    - assert:
+        file: 00-assert-status.yaml
   - name: rotate-external-tls
+    timeouts:
+      exec: 15m0s
+      assert: 5m0s
     try:
     - script:
         shell: /bin/bash
@@ -608,13 +644,13 @@ spec:
             --dry-run=client -o yaml | kubectl apply -f -
           echo "External TLS secret updated with rotated certificate"
 
-          # Wait for hash annotation to change on quay-app deployment
-          echo "Waiting for TLS hash rotation..."
+          # Gate 2: Wait for hash annotation to change on quay-app deployment.
+          echo "Gate 2: waiting for TLS hash rotation..."
           for i in $(seq 1 60); do
             NEW_HASH=$(kubectl get deployment reconcile-quay-app -n $NAMESPACE \
               -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}' 2>/dev/null || true)
             if [ -n "${NEW_HASH}" ] && [ "${NEW_HASH}" != "${OLD_HASH}" ]; then
-              echo "PASS: hash rotated: ${OLD_HASH} -> ${NEW_HASH}"
+              echo "Gate 2 passed: hash rotated ${OLD_HASH} -> ${NEW_HASH}"
               break
             fi
             [ "$i" -eq 60 ] && { echo "ERROR: TLS hash rotation timeout after 5m"; exit 1; }
@@ -622,23 +658,21 @@ spec:
           done
 
           # Verify clair-app also has the same new hash
-          if ! kubectl get deployment reconcile-clair-app -n $NAMESPACE &>/dev/null; then
-            echo "SKIP: clair-app deployment not found, skipping hash consistency check"
-          else
+          if kubectl get deployment reconcile-clair-app -n $NAMESPACE &>/dev/null; then
             CLAIR_HASH=$(kubectl get deployment reconcile-clair-app -n $NAMESPACE \
               -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}' 2>/dev/null || true)
             if [ "${CLAIR_HASH}" != "${NEW_HASH}" ]; then
               echo "ERROR: clair-app hash (${CLAIR_HASH}) != quay-app hash (${NEW_HASH})"
               exit 1
             fi
-            echo "PASS: all deployments have consistent rotated hash"
+            echo "All deployments have consistent rotated hash"
           fi
 
-          # Wait for rollouts to complete before asserting status.
-          # The hash annotation change triggers new rollouts and on
-          # resource-constrained CI runners these can take a while.
-          echo "Waiting for deployment rollouts to complete..."
-          kubectl rollout status deployment/reconcile-quay-app -n $NAMESPACE --timeout=300s
-          kubectl rollout status deployment/reconcile-clair-app -n $NAMESPACE --timeout=300s || true
+          # Gate 3: Wait for rollouts to complete.
+          echo "Gate 3: waiting for deployment rollouts..."
+          kubectl rollout status deployment/reconcile-quay-app -n $NAMESPACE --timeout=600s
+          echo "quay-app rollout complete"
+          kubectl rollout status deployment/reconcile-clair-app -n $NAMESPACE --timeout=600s || true
+          echo "clair-app rollout complete (or timed out)"
     - assert:
         file: 00-assert-status.yaml
