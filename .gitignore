@@ -5,3 +5,4 @@ kubeconfig
 .DS_Store
 .vscode
 .idea
+chainsaw-report.*
