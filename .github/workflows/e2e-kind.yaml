@@ -157,29 +157,30 @@ jobs:
               m, s = divmod(int(sec), 60)
               return f'{m}m{s}s' if m else f'{s}s'
 
-          icons = {'passed': ':white_check_mark:', 'failed': ':x:', 'skipped': ':fast_forward:'}
+          icons = {'passed': '✅', 'failed': '❌', 'skipped': '⏭️'}
           suite_data.sort(key=lambda s: (s['failed'] == 0, s['name']))
 
           with open(os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null'), 'a') as out:
-              icon = ':white_check_mark:' if failed == 0 else ':x:'
+              icon = '✅' if failed == 0 else '❌'
               out.write(f'## {icon} E2E Test Results (KinD) — {passed}/{total} passed\n\n')
 
               for s in suite_data:
-                  s_icon = ':x:' if s['failed'] > 0 else ':white_check_mark:'
-                  hdr = f'{s_icon} **{s["name"]}** ({s["passed"]}/{len(s["steps"])} passed, {fmt(s["time"])})'
+                  s_icon = '❌' if s['failed'] > 0 else '✅'
+                  tag = '<details open>' if s['failed'] > 0 else '<details>'
+                  out.write(f'{tag}\n<summary>{s_icon} {s["name"]} ({s["passed"]}/{len(s["steps"])} passed, {fmt(s["time"])})</summary>\n\n')
                   if s['failed'] > 0:
-                      out.write(f'### {hdr}\n\n')
+                      out.write('| Step | Status | Duration |\n|------|--------|----------|\n')
+                      for step in s['steps']:
+                          out.write(f'| {step["name"]} | {icons[step["status"]]} | {fmt(step["time"])} |\n')
                   else:
-                      out.write(f'<details>\n<summary>{hdr}</summary>\n\n')
-                  out.write('| Step | Status | Duration |\n|------|--------|----------|\n')
-                  for step in s['steps']:
-                      out.write(f'| {step["name"]} | {icons[step["status"]]} | {fmt(step["time"])} |\n')
+                      out.write('| Step | Duration |\n|------|----------|\n')
+                      for step in s['steps']:
+                          out.write(f'| {step["name"]} | {fmt(step["time"])} |\n')
                   out.write('\n')
                   for step in s['steps']:
                       if step['status'] == 'failed':
-                          out.write(f'> **{step["name"]}** failed: `{step["message"]}`\n\n')
-                  if s['failed'] == 0:
-                      out.write('</details>\n\n')
+                          out.write(f'**Failure:** `{step["name"]}` — {step["message"]}\n\n')
+                  out.write('</details>\n\n')
           PYEOF
 
       - name: Upload E2E artifacts
