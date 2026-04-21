@@ -135,7 +135,18 @@ const (
 	ClairPostgresUpgradeJobName = "clair-postgres-upgrade"
 	ClusterServiceCAName        = "cluster-service-ca"
 	ClusterTrustedCAName        = "cluster-trusted-ca"
+	TLSSecretHashAnnotation     = "quay.redhat.com/tls-secret-hash"
+	TLSSecretLabel              = "quay.redhat.com/tls-secret"
 )
+
+// TLSConfig defines TLS configuration for the QuayRegistry.
+// +kubebuilder:validation:XValidation:rule="!has(self.secretRef) || size(self.secretRef.name) > 0",message="tls.secretRef.name must not be empty"
+type TLSConfig struct {
+	// SecretRef references a Kubernetes `kubernetes.io/tls` Secret in the same namespace
+	// containing `tls.crt` and `tls.key` entries. The operator watches this Secret and
+	// triggers a rolling restart of Quay pods when its contents change.
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+}
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
 type QuayRegistrySpec struct {
@@ -144,6 +155,8 @@ type QuayRegistrySpec struct {
 	ConfigBundleSecret string `json:"configBundleSecret,omitempty"`
 	// Components declare how the Operator should handle backing Quay services.
 	Components []Component `json:"components,omitempty"`
+	// TLS allows referencing an external TLS Secret for Quay's HTTPS certificate.
+	TLS *TLSConfig `json:"tls,omitempty"`
 }
 
 // Component describes how the Operator should handle a backing Quay service.

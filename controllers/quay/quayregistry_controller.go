@@ -15,9 +15,11 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
 	goerrors "errors"
 	"fmt"
+	"maps"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -40,10 +42,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -578,6 +584,18 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	quayContext := quaycontext.NewQuayRegistryContext()
+
+	if err := r.checkExternalTLSSecret(ctx, quayContext, updatedQuay, cbundle); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("external TLS secret error: %s", err),
+		)
+	}
+
 	r.checkManagedTLS(quayContext, cbundle)
 
 	if err := r.checkClusterCAHash(ctx, quayContext, updatedQuay); err != nil {
@@ -1027,6 +1045,12 @@ func (r *QuayRegistryReconciler) hasNecessaryConfig(
 	quay v1.QuayRegistry, cfg map[string][]byte,
 ) error {
 	for _, cmp := range quay.Spec.Components {
+		// When using an external TLS secret via secretRef, the config bundle won't
+		// contain ssl.cert/ssl.key — skip the TLS config bundle check.
+		if cmp.Kind == v1.ComponentTLS && quay.Spec.TLS != nil && quay.Spec.TLS.SecretRef != nil {
+			continue
+		}
+
 		hascfg, err := kustomize.ContainsComponentConfig(cfg, cmp)
 		if err != nil {
 			return fmt.Errorf("unable to verify component config: %w", err)
@@ -1379,7 +1403,72 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(r.findQuayRegistriesForSecret),
+			builder.WithPredicates(r.externalTLSSecretPredicate()),
+		).
 		Complete(r)
+}
+
+// findQuayRegistriesForSecret maps a Secret event to reconcile requests for QuayRegistries
+// that reference the Secret via spec.tls.secretRef.
+func (r *QuayRegistryReconciler) findQuayRegistriesForSecret(
+	ctx context.Context, obj client.Object,
+) []reconcile.Request {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return nil
+	}
+
+	var registries v1.QuayRegistryList
+	if err := r.List(ctx, &registries, &client.ListOptions{
+		Namespace: secret.GetNamespace(),
+	}); err != nil {
+		r.Log.Error(err, "unable to list QuayRegistries for Secret watch")
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, reg := range registries.Items {
+		if reg.Spec.TLS == nil || reg.Spec.TLS.SecretRef == nil {
+			continue
+		}
+		if reg.Spec.TLS.SecretRef.Name != secret.GetName() {
+			continue
+		}
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      reg.GetName(),
+				Namespace: reg.GetNamespace(),
+			},
+		})
+	}
+	return requests
+}
+
+// externalTLSSecretPredicate returns a predicate that only triggers reconciliation when
+// a Secret's data changes, or on create/delete events.
+func (r *QuayRegistryReconciler) externalTLSSecretPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return true
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldSecret, ok1 := e.ObjectOld.(*corev1.Secret)
+			newSecret, ok2 := e.ObjectNew.(*corev1.Secret)
+			if !ok1 || !ok2 {
+				return false
+			}
+			return !maps.EqualFunc(oldSecret.Data, newSecret.Data, bytes.Equal)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return true
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return false
+		},
+	}
 }
 
 // patchNamespaceForMonitoring adds a few labels to the namespace, these labels are
