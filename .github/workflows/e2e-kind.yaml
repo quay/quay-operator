@@ -125,6 +125,7 @@ jobs:
           require_tests: false
           include_passed: true
           detailed_summary: true
+          job_summary: false
 
       - name: Write job summary
         if: always()
@@ -176,9 +177,7 @@ jobs:
 
           with open(os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null'), 'a') as out:
               icon = ':white_check_mark:' if failed == 0 else ':x:'
-              out.write(f'## {icon} E2E Test Results (KinD)\n\n')
-              out.write('| Total | Passed | Failed | Skipped |\n|-------|--------|--------|---------|\n')
-              out.write(f'| {total} | {passed} | {failed} | {skipped} |\n\n')
+              out.write(f'## {icon} E2E Test Results (KinD) — {passed}/{total} passed\n\n')
 
               for s in suite_data:
                   s_icon = ':x:' if s['failed'] > 0 else ':white_check_mark:'
