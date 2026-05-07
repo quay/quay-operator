@@ -106,6 +106,7 @@ var supportsResourceOverrides = []ComponentKind{
 	ComponentMirror,
 	ComponentPostgres,
 	ComponentClairPostgres,
+	ComponentRedis,
 }
 
 var supportsReplicasOverride = []ComponentKind{
