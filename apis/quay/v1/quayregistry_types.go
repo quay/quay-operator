@@ -347,7 +347,7 @@ func NeedsBundleSecret(quay *QuayRegistry) bool {
 // being Managed AND containing a custom user config provided through the config bundle
 // secret.
 func ComponentSupportsConfigWhenManaged(cmp Component) bool {
-	return cmp.Kind == ComponentRoute || cmp.Kind == ComponentMirror
+	return cmp.Kind == ComponentRoute || cmp.Kind == ComponentMirror || cmp.Kind == ComponentRedis
 }
 
 func EnsureComponents(components []Component) []Component {
