@@ -686,10 +686,22 @@ func Test_hasNecessaryConfig(t *testing.T) {
 			quay: quayWithUnmanagedComponents(v1.ComponentRedis),
 		},
 		{
-			name:   "managed redis",
-			experr: true,
+			// managed Redis supports user config: operator overwrites infra fields anyway
+			name:   "managed redis with redis field",
+			experr: false,
 			cfg: map[string][]byte{
 				"config.yaml": []byte("USER_EVENTS_REDIS: 'redis.addr.io'"),
+			},
+			quay: quayWithUnmanagedComponents(),
+		},
+		{
+			// regression: PULL_METRICS_REDIS (added to Fields() in config-tool monorepo
+			// migration) must not block managed Redis — it is an app-level knob, not an
+			// infrastructure conflict (PROJQUAY-11501)
+			name:   "managed redis with PULL_METRICS_REDIS",
+			experr: false,
+			cfg: map[string][]byte{
+				"config.yaml": []byte("FEATURE_IMAGE_PULL_STATS: true\nPULL_METRICS_REDIS:\n  host: quay-quay-redis\n  port: 6379\n  db: 1"),
 			},
 			quay: quayWithUnmanagedComponents(),
 		},
