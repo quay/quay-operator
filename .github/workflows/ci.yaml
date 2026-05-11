@@ -1,5 +1,9 @@
 name: CI
-on: [pull_request]
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
 jobs:
   lint:
     name: Lint
@@ -53,9 +57,12 @@ jobs:
       - name: Tests
         run: go test -v -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit-tests
+          files: coverage.out
+          fail_ci_if_error: false
   validate-build:
     name: Validate Build
     runs-on: ubuntu-latest
