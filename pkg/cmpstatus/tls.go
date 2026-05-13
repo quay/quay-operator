@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
+	quaytls "github.com/quay/quay-operator/pkg/tls"
 )
 
 // TLS checks a quay registry TLS status.
@@ -56,6 +57,52 @@ func (t *TLS) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, e
 			}, nil
 		}
 		return zero, err
+	}
+
+	// External TLS secret mode: secretRef is set on the TLS component.
+	secretRef := qv1.GetTLSSecretRef(reg.Spec.Components)
+	if secretRef != nil {
+		if _, hasCert := secret.Data["ssl.cert"]; hasCert {
+			return qv1.Condition{
+				Type:           qv1.ComponentTLSReady,
+				Status:         metav1.ConditionFalse,
+				Reason:         qv1.ConditionReasonComponentNotReady,
+				Message:        "tls component secretRef and ssl.cert in configBundleSecret are mutually exclusive",
+				LastUpdateTime: metav1.NewTime(time.Now()),
+			}, nil
+		}
+		if _, hasKey := secret.Data["ssl.key"]; hasKey {
+			return qv1.Condition{
+				Type:           qv1.ComponentTLSReady,
+				Status:         metav1.ConditionFalse,
+				Reason:         qv1.ConditionReasonComponentNotReady,
+				Message:        "tls component secretRef and ssl.key in configBundleSecret are mutually exclusive",
+				LastUpdateTime: metav1.NewTime(time.Now()),
+			}, nil
+		}
+
+		_, _, _, err := quaytls.FetchAndValidate(ctx, t.Client, reg.Namespace, secretRef.Name)
+		if err != nil {
+			msg := err.Error()
+			if errors.IsNotFound(err) {
+				msg = "External TLS secret not found"
+			}
+			return qv1.Condition{
+				Type:           qv1.ComponentTLSReady,
+				Status:         metav1.ConditionFalse,
+				Reason:         qv1.ConditionReasonComponentNotReady,
+				Message:        msg,
+				LastUpdateTime: metav1.NewTime(time.Now()),
+			}, nil
+		}
+
+		return qv1.Condition{
+			Type:           qv1.ComponentTLSReady,
+			Status:         metav1.ConditionTrue,
+			Reason:         qv1.ConditionReasonComponentReady,
+			Message:        "Using externally managed TLS certificate",
+			LastUpdateTime: metav1.NewTime(time.Now()),
+		}, nil
 	}
 
 	_, hasCRT := secret.Data["ssl.cert"]

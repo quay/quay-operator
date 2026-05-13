@@ -1186,6 +1186,20 @@ spec:
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                       type: object
+                    secretRef:
+                      description: |-
+                        SecretRef references a Kubernetes Secret for this component. For the TLS component,
+                        this references a `kubernetes.io/tls` Secret containing `tls.crt` and `tls.key`.
+                        The operator watches the Secret and triggers rolling restarts when its contents change.
+                        Only valid when managed is false.
+                      properties:
+                        name:
+                          description: |-
+                            Name of the referent.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
                   required:
                   - kind
                   - managed
@@ -1193,6 +1207,10 @@ spec:
                   x-kubernetes-validations:
                   - message: cannot set overrides on unmanaged component
                     rule: self.managed || !has(self.overrides)
+                  - message: secretRef cannot be set on a managed component
+                    rule: '!self.managed || !has(self.secretRef)'
+                  - message: secretRef.name must not be empty
+                    rule: '!has(self.secretRef) || self.secretRef.name.size() != 0'
                 type: array
               configBundleSecret:
                 description: |-
@@ -1210,7 +1228,7 @@ spec:
                   description: |-
                     Condition is a single condition of a QuayRegistry.
                     Conditions should follow the "abnormal-true" principle in order to only bring the attention of users to "broken" states.
-                    Example: a condition of `type: "Ready", status: "True"“ is less useful and should be omitted whereas `type: "NotReady", status: "True"`
+                    Example: a condition of `type: "Ready", status: "True"" is less useful and should be omitted whereas `type: "NotReady", status: "True"`
                     is more useful when trying to monitor when something is wrong.
                   properties:
                     lastTransitionTime:
