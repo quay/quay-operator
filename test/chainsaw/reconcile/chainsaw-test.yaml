@@ -5,6 +5,7 @@ metadata:
   creationTimestamp: null
   name: reconcile
 spec:
+  concurrent: false
   steps:
   - name: create-registry
     try:
@@ -494,14 +495,25 @@ spec:
             sleep 5
           done
 
-          # Verify only one config secret exists (old one was cleaned up)
-          COUNT=$(kubectl get secret -n $NAMESPACE -o name \
-            | grep -c "reconcile-quay-config-secret" || true)
-          if [ "${COUNT}" -ne 1 ]; then
-            echo "ERROR: expected 1 config secret, found ${COUNT}"
-            kubectl get secret -n $NAMESPACE -o name | grep "reconcile-quay-config-secret" || true
-            exit 1
-          fi
-          echo "PASS: old config secret cleaned up, ${COUNT} config secret(s) remain"
+          # Old config secret cleanup is deferred until quay-app rollout completes
+          # (PROJQUAY-9157), so wait for the rollout before checking.
+          echo "Waiting for quay-app rollout to complete..."
+          kubectl rollout status deployment/reconcile-quay-app -n $NAMESPACE --timeout=300s
+
+          echo "Waiting for old config secret cleanup..."
+          for i in $(seq 1 30); do
+            COUNT=$(kubectl get secret -n $NAMESPACE -o name \
+              | grep -c "reconcile-quay-config-secret" || true)
+            if [ "${COUNT}" -eq 1 ]; then
+              echo "PASS: old config secret cleaned up, 1 config secret remains"
+              break
+            fi
+            [ "$i" -eq 30 ] && {
+              echo "ERROR: expected 1 config secret, found ${COUNT}"
+              kubectl get secret -n $NAMESPACE -o name | grep "reconcile-quay-config-secret" || true
+              exit 1
+            }
+            sleep 5
+          done
     - assert:
         file: 08-assert.yaml
