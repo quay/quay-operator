@@ -1,0 +1,217 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: external-tls
+spec:
+  concurrent: false
+  steps:
+  - name: create-registry-with-external-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Generate TLS certificate
+          if kubectl get ingresses.config.openshift.io cluster &>/dev/null; then
+            APPS_DOMAIN=$(kubectl get ingresses.config.openshift.io cluster \
+              -o jsonpath='{.spec.domain}')
+            SAN="DNS:external-tls-quay-${NAMESPACE}.${APPS_DOMAIN}"
+            echo "OpenShift detected: SAN=${SAN}"
+          else
+            SAN="IP:127.0.0.1,DNS:localhost"
+            echo "KinD detected: SAN=${SAN}"
+          fi
+
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/external-tls.key -out /tmp/external-tls.crt -days 1 \
+            -subj "/O=Quay E2E/CN=external-tls" \
+            -addext "subjectAltName=${SAN}" 2>/dev/null
+
+          kubectl create secret tls external-tls-cert -n $NAMESPACE \
+            --cert=/tmp/external-tls.crt --key=/tmp/external-tls.key
+          echo "Created external TLS secret"
+
+          # Create config bundle WITHOUT ssl.cert/ssl.key (secretRef provides TLS)
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, creating minimal config bundle"
+            CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          CFGEOF
+          )
+            kubectl create secret generic external-tls-config -n $NAMESPACE \
+              --from-literal=config.yaml="${CONFIG}"
+          else
+            echo "KinD detected, creating config bundle..."
+            ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+            SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+            BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+            ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+            CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          FEATURE_PROXY_STORAGE: true
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+            kubectl create secret generic external-tls-config -n $NAMESPACE \
+              --from-literal=config.yaml="${CONFIG}" \
+              --from-file=extra_ca_cert_e2e-ca.crt=/tmp/external-tls.crt
+          fi
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Verify the external TLS secret was auto-labeled by the operator
+          LABEL=$(kubectl get secret external-tls-cert -n $NAMESPACE \
+            -o jsonpath='{.metadata.labels.quay\.redhat\.com/tls-secret}')
+          if [ "${LABEL}" != "true" ]; then
+            echo "ERROR: external TLS secret missing auto-label, got '${LABEL}'"
+            exit 1
+          fi
+          echo "PASS: external TLS secret has auto-label"
+
+          # Verify tls-secret-hash annotation on quay-app deployment
+          HASH=$(kubectl get deployment external-tls-quay-app -n $NAMESPACE \
+            -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}')
+          if [ -z "${HASH}" ]; then
+            echo "ERROR: quay-app deployment missing tls-secret-hash annotation"
+            exit 1
+          fi
+          echo "PASS: tls-secret-hash=${HASH}"
+          echo "${HASH}" > /tmp/initial-tls-hash-${NAMESPACE}
+
+          # Verify quay-app has ready replicas
+          READY=$(kubectl get deployment external-tls-quay-app -n $NAMESPACE \
+            -o jsonpath='{.status.readyReplicas}')
+          if [ "${READY:-0}" -lt 1 ]; then
+            echo "ERROR: quay-app has no ready replicas"
+            exit 1
+          fi
+          echo "PASS: quay-app has ${READY} ready replicas"
+  - name: rotate-certificate
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          OLD_HASH=$(cat /tmp/initial-tls-hash-${NAMESPACE})
+          echo "Old TLS hash: ${OLD_HASH}"
+
+          if kubectl get ingresses.config.openshift.io cluster &>/dev/null; then
+            APPS_DOMAIN=$(kubectl get ingresses.config.openshift.io cluster \
+              -o jsonpath='{.spec.domain}')
+            SAN="DNS:external-tls-quay-${NAMESPACE}.${APPS_DOMAIN}"
+          else
+            SAN="IP:127.0.0.1,DNS:localhost"
+          fi
+
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/rotated.key -out /tmp/rotated.crt -days 1 \
+            -subj "/O=Quay E2E/CN=rotated" \
+            -addext "subjectAltName=${SAN}" 2>/dev/null
+
+          kubectl create secret tls external-tls-cert -n $NAMESPACE \
+            --cert=/tmp/rotated.crt --key=/tmp/rotated.key \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "External TLS secret updated with rotated certificate"
+
+          echo "Waiting for TLS hash rotation..."
+          for i in $(seq 1 36); do
+            NEW_HASH=$(kubectl get deployment external-tls-quay-app -n $NAMESPACE \
+              -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}' 2>/dev/null || true)
+            if [ -n "${NEW_HASH}" ] && [ "${NEW_HASH}" != "${OLD_HASH}" ]; then
+              echo "PASS: hash rotated ${OLD_HASH} -> ${NEW_HASH}"
+              break
+            fi
+            [ "$i" -eq 36 ] && { echo "ERROR: TLS hash rotation timeout after 3m"; exit 1; }
+            sleep 5
+          done
+
+          # Verify clair-app has the same new hash
+          if kubectl get deployment external-tls-clair-app -n $NAMESPACE &>/dev/null; then
+            CLAIR_HASH=$(kubectl get deployment external-tls-clair-app -n $NAMESPACE \
+              -o jsonpath='{.spec.template.metadata.annotations.quay\.redhat\.com/tls-secret-hash}' 2>/dev/null || true)
+            if [ "${CLAIR_HASH}" != "${NEW_HASH}" ]; then
+              echo "ERROR: clair-app hash (${CLAIR_HASH}) != quay-app hash (${NEW_HASH})"
+              exit 1
+            fi
+            echo "PASS: all deployments have consistent rotated hash"
+          fi
+
+          kubectl rollout status deployment/external-tls-quay-app -n $NAMESPACE --timeout=180s
+          echo "quay-app rollout complete"
+          kubectl rollout status deployment/external-tls-clair-app -n $NAMESPACE --timeout=180s || true
+          echo "clair-app rollout complete (or timed out)"
+    - assert:
+        file: 00-assert-status.yaml
+  - name: delete-and-recreate-secret
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          kubectl delete secret external-tls-cert -n $NAMESPACE
+          echo "Deleted external TLS secret"
+
+          echo "Waiting for ComponentTLSReady=False..."
+          for i in $(seq 1 36); do
+            STATUS=$(kubectl get quayregistry external-tls -n $NAMESPACE \
+              -o jsonpath='{.status.conditions[?(@.type=="ComponentTLSReady")].status}' 2>/dev/null || true)
+            if [ "${STATUS}" = "False" ]; then
+              echo "PASS: ComponentTLSReady=False"
+              break
+            fi
+            [ "$i" -eq 36 ] && { echo "ERROR: ComponentTLSReady did not become False after 3m"; exit 1; }
+            sleep 5
+          done
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          if kubectl get ingresses.config.openshift.io cluster &>/dev/null; then
+            APPS_DOMAIN=$(kubectl get ingresses.config.openshift.io cluster \
+              -o jsonpath='{.spec.domain}')
+            SAN="DNS:external-tls-quay-${NAMESPACE}.${APPS_DOMAIN}"
+          else
+            SAN="IP:127.0.0.1,DNS:localhost"
+          fi
+
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/recreated.key -out /tmp/recreated.crt -days 1 \
+            -subj "/O=Quay E2E/CN=recreated" \
+            -addext "subjectAltName=${SAN}" 2>/dev/null
+
+          kubectl create secret tls external-tls-cert -n $NAMESPACE \
+            --cert=/tmp/recreated.crt --key=/tmp/recreated.key
+          echo "Recreated external TLS secret"
+    - assert:
+        file: 00-assert-status.yaml
