@@ -12,7 +12,8 @@ concurrency:
 jobs:
   e2e-kind:
     name: E2E Tests on KinD
-    runs-on: quay-002-small-ubuntu-24-x64
+    runs-on: quay-003-medium-ubuntu-24-x64
+    timeout-minutes: 45
     env:
       SKIP_RESOURCE_REQUESTS: "true"
       QUAY_VERSION: dev

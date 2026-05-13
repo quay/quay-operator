@@ -1,0 +1,31 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: external-tls
+spec:
+  configBundleSecret: external-tls-config
+  components:
+  - kind: quay
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: postgres
+    managed: true
+  - kind: redis
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: clairpostgres
+    managed: true
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: ($values.managedObjectStorage)
+  - kind: route
+    managed: ($values.managedRoute)
+  - kind: monitoring
+    managed: ($values.managedMonitoring)
+  - kind: tls
+    managed: false
+    secretRef:
+      name: external-tls-cert
