@@ -135,6 +135,8 @@ const (
 	ClairPostgresUpgradeJobName = "clair-postgres-upgrade"
 	ClusterServiceCAName        = "cluster-service-ca"
 	ClusterTrustedCAName        = "cluster-trusted-ca"
+	TLSSecretHashAnnotation     = "quay.redhat.com/tls-secret-hash"
+	TLSSecretLabel              = "quay.redhat.com/tls-secret"
 )
 
 // QuayRegistrySpec defines the desired state of QuayRegistry.
@@ -148,6 +150,8 @@ type QuayRegistrySpec struct {
 
 // Component describes how the Operator should handle a backing Quay service.
 // +kubebuilder:validation:XValidation:rule="self.managed || !has(self.overrides)",message="cannot set overrides on unmanaged component"
+// +kubebuilder:validation:XValidation:rule="!self.managed || !has(self.secretRef)",message="secretRef cannot be set on a managed component"
+// +kubebuilder:validation:XValidation:rule="!has(self.secretRef) || self.secretRef.name.size() != 0",message="secretRef.name must not be empty"
 type Component struct {
 	// Kind is the unique name of this type of component.
 	Kind ComponentKind `json:"kind"`
@@ -156,6 +160,11 @@ type Component struct {
 	Managed bool `json:"managed"`
 	// Overrides holds information regarding component specific configurations.
 	Overrides *Override `json:"overrides,omitempty"`
+	// SecretRef references a Kubernetes Secret for this component. For the TLS component,
+	// this references a `kubernetes.io/tls` Secret containing `tls.crt` and `tls.key`.
+	// The operator watches the Secret and triggers rolling restarts when its contents change.
+	// Only valid when managed is false.
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
 // Override describes configuration overrides for the given managed component
@@ -232,7 +241,7 @@ const (
 
 // Condition is a single condition of a QuayRegistry.
 // Conditions should follow the "abnormal-true" principle in order to only bring the attention of users to "broken" states.
-// Example: a condition of `type: "Ready", status: "True"“ is less useful and should be omitted whereas `type: "NotReady", status: "True"`
+// Example: a condition of `type: "Ready", status: "True"" is less useful and should be omitted whereas `type: "NotReady", status: "True"`
 // is more useful when trying to monitor when something is wrong.
 type Condition struct {
 	Type               ConditionType          `json:"type,omitempty"`
@@ -404,6 +413,15 @@ func ComponentIsManaged(components []Component, name ComponentKind) bool {
 		}
 	}
 	return false
+}
+
+func GetTLSSecretRef(components []Component) *corev1.LocalObjectReference {
+	for _, c := range components {
+		if c.Kind == ComponentTLS && c.SecretRef != nil {
+			return c.SecretRef
+		}
+	}
+	return nil
 }
 
 func ComponentIsExplicitlyDefined(components []Component, name ComponentKind) bool {
