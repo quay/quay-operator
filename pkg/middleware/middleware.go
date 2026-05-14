@@ -207,9 +207,10 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			}
 		}
 
-		// TODO we must not set annotations in objects where they are not needed. we also
-		// must stop mangling objects in this "middleware" thingy, what is the point of
-		// using kustomize if we keep changing stuff on the fly ?
+		if strings.HasSuffix(dep.Name, "clair-app") {
+			applyClairEphemeralVolumeOverrides(quay, dep)
+		}
+
 		isQuayDB := strings.Contains(dep.GetName(), "quay-database")
 		isClairDB := strings.Contains(dep.GetName(), "clair-postgres")
 		if isQuayDB || isClairDB {
@@ -404,4 +405,31 @@ func FlattenSecret(configBundle *corev1.Secret) (*corev1.Secret, error) {
 
 	flattenedSecret.Data["config.yaml"] = flattenedConfigYAML
 	return flattenedSecret, nil
+}
+
+const clairEphemeralVolumeName = "indexer-layer-storage"
+
+func applyClairEphemeralVolumeOverrides(quay *v1.QuayRegistry, dep *appsv1.Deployment) {
+	volumeSizeOverride := v1.GetVolumeSizeOverrideForComponent(quay, v1.ComponentClair)
+	storageClassOverride := v1.GetStorageClassNameOverrideForComponent(quay, v1.ComponentClair)
+	if volumeSizeOverride == nil && storageClassOverride == nil {
+		return
+	}
+
+	for i := range dep.Spec.Template.Spec.Volumes {
+		vol := &dep.Spec.Template.Spec.Volumes[i]
+		if vol.Name != clairEphemeralVolumeName || vol.Ephemeral == nil || vol.Ephemeral.VolumeClaimTemplate == nil {
+			continue
+		}
+		vct := &vol.Ephemeral.VolumeClaimTemplate.Spec
+		if volumeSizeOverride != nil {
+			vct.Resources.Requests = corev1.ResourceList{
+				corev1.ResourceStorage: *volumeSizeOverride,
+			}
+		}
+		if storageClassOverride != nil {
+			vct.StorageClassName = storageClassOverride
+		}
+		return
+	}
 }

@@ -1,0 +1,31 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: clair-vol
+spec:
+  configBundleSecret: ($values.configBundle)
+  components:
+  - kind: quay
+    managed: true
+  - kind: clair
+    managed: true
+    overrides:
+      volumeSize: 50Gi
+  - kind: clairpostgres
+    managed: true
+  - kind: postgres
+    managed: true
+  - kind: redis
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: ($values.managedObjectStorage)
+  - kind: route
+    managed: ($values.managedRoute)
+  - kind: monitoring
+    managed: ($values.managedMonitoring)
+  - kind: tls
+    managed: ($values.managedTLS)
