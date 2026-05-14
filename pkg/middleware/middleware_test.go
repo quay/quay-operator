@@ -328,6 +328,147 @@ func parseResourceString(s string) *resource.Quantity {
 	return &resourceSize
 }
 
+func newClairDeployment() *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-clair-app",
+			Labels:      map[string]string{"quay-component": "clair-app"},
+			Annotations: map[string]string{"quay-component": "clair"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "clair-app"},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "indexer-layer-storage",
+							VolumeSource: corev1.VolumeSource{
+								Ephemeral: &corev1.EphemeralVolumeSource{
+									VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+										Spec: corev1.PersistentVolumeClaimSpec{
+											AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+											Resources: corev1.ResourceRequirements{
+												Requests: corev1.ResourceList{
+													corev1.ResourceStorage: resource.MustParse("20Gi"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestProcessClairEphemeralVolumeOverrides(t *testing.T) {
+	strPtr := func(s string) *string { return &s }
+
+	tests := []struct {
+		name                 string
+		quay                 *v1.QuayRegistry
+		expectedStorage      string
+		expectedStorageClass *string
+	}{
+		{
+			name: "NoOverrides",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentClair, Managed: true},
+					},
+				},
+			},
+			expectedStorage:      "20Gi",
+			expectedStorageClass: nil,
+		},
+		{
+			name: "VolumeSizeOverride",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentClair, Managed: true, Overrides: &v1.Override{
+							VolumeSize: parseResourceString("50Gi"),
+						}},
+					},
+				},
+			},
+			expectedStorage:      "50Gi",
+			expectedStorageClass: nil,
+		},
+		{
+			name: "StorageClassOverride",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentClair, Managed: true, Overrides: &v1.Override{
+							StorageClassName: strPtr("fast-storage"),
+						}},
+					},
+				},
+			},
+			expectedStorage:      "20Gi",
+			expectedStorageClass: strPtr("fast-storage"),
+		},
+		{
+			name: "BothOverrides",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentClair, Managed: true, Overrides: &v1.Override{
+							VolumeSize:       parseResourceString("100Gi"),
+							StorageClassName: strPtr("premium-storage"),
+						}},
+					},
+				},
+			},
+			expectedStorage:      "100Gi",
+			expectedStorageClass: strPtr("premium-storage"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := newClairDeployment()
+			qctx := quaycontext.NewQuayRegistryContext()
+
+			result, err := Process(tt.quay, qctx, dep, false)
+			assert.NoError(t, err)
+
+			processedDep, ok := result.(*appsv1.Deployment)
+			assert.True(t, ok)
+
+			var found bool
+			for _, vol := range processedDep.Spec.Template.Spec.Volumes {
+				if vol.Name != "indexer-layer-storage" {
+					continue
+				}
+				found = true
+				vct := vol.Ephemeral.VolumeClaimTemplate.Spec
+				actualStorage := vct.Resources.Requests[corev1.ResourceStorage]
+				assert.Equal(t, tt.expectedStorage, actualStorage.String(),
+					"volume size mismatch")
+
+				if tt.expectedStorageClass == nil {
+					assert.Nil(t, vct.StorageClassName, "expected no storageClassName")
+				} else {
+					assert.NotNil(t, vct.StorageClassName, "expected storageClassName to be set")
+					assert.Equal(t, *tt.expectedStorageClass, *vct.StorageClassName)
+				}
+			}
+			assert.True(t, found, "indexer-layer-storage volume not found")
+		})
+	}
+}
+
 func TestHPAWithUnmanagedMirrorAndClair(t *testing.T) {
 	quayRegistry := &v1.QuayRegistry{
 		Spec: v1.QuayRegistrySpec{
