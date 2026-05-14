@@ -48,7 +48,7 @@ yq eval -i '
 ' ./bundle/manifests/quay-operator.clusterserviceversion.yaml
 
 yq eval -i '
-    .annotations["operators.operatorframework.io.bundle.channel.default.v1"] = strenv(DEFAULT_CHANNEL) |
+    .annotations["operators.operatorframework.io.bundle.channel.default.v1"] = strenv(CHANNEL) |
     .annotations["operators.operatorframework.io.bundle.channels.v1"] = strenv(CHANNEL) |
     .annotations["operators.operatorframework.io.bundle.package.v1"] = "project-quay"
 ' ./bundle/metadata/annotations.yaml
