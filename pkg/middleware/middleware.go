@@ -207,6 +207,10 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			}
 		}
 
+		// TODO we must not set annotations in objects where they are not needed. we also
+		// must stop mangling objects in this "middleware" thingy, what is the point of
+		// using kustomize if we keep changing stuff on the fly ?
+
 		if strings.HasSuffix(dep.Name, "clair-app") {
 			applyClairEphemeralVolumeOverrides(quay, dep)
 		}

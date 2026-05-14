@@ -558,7 +558,7 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		hasresources := component.Overrides.Resources != nil
 		hassecuritycontext := component.Overrides.SecurityContext != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas || hassecuritycontext
+		hasoverride := hasaffinity || hasvolume || hasstorageclass || hasenvvar || hasreplicas || hasresources || hassecuritycontext
 
 		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
