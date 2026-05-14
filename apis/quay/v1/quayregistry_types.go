@@ -89,6 +89,7 @@ var supportsVolumeOverride = []ComponentKind{
 
 var supportsStorageClassOverride = []ComponentKind{
 	ComponentPostgres,
+	ComponentClair,
 	ComponentClairPostgres,
 }
 

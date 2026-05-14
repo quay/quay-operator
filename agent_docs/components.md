@@ -45,7 +45,7 @@ Overrides customize managed component resources.
 | Override | quay | clair | mirror | postgres | clairpostgres | redis |
 |----------|------|-------|--------|----------|---------------|-------|
 | `volumeSize` | - | Yes | - | Yes | Yes | - |
-| `storageClassName` | - | - | - | Yes | Yes | - |
+| `storageClassName` | - | Yes | - | Yes | Yes | - |
 | `env` | Yes | Yes | Yes | Yes | Yes | Yes |
 | `replicas` | Yes | Yes | Yes | - | - | - |
 | `affinity` | Yes | Yes | Yes | - | - | - |
