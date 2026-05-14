@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -370,8 +371,6 @@ func newClairDeployment() *appsv1.Deployment {
 }
 
 func TestProcessClairEphemeralVolumeOverrides(t *testing.T) {
-	strPtr := func(s string) *string { return &s }
-
 	tests := []struct {
 		name                 string
 		quay                 *v1.QuayRegistry
@@ -410,13 +409,13 @@ func TestProcessClairEphemeralVolumeOverrides(t *testing.T) {
 				Spec: v1.QuayRegistrySpec{
 					Components: []v1.Component{
 						{Kind: v1.ComponentClair, Managed: true, Overrides: &v1.Override{
-							StorageClassName: strPtr("fast-storage"),
+							StorageClassName: ptr.To("fast-storage"),
 						}},
 					},
 				},
 			},
 			expectedStorage:      "20Gi",
-			expectedStorageClass: strPtr("fast-storage"),
+			expectedStorageClass: ptr.To("fast-storage"),
 		},
 		{
 			name: "BothOverrides",
@@ -425,13 +424,13 @@ func TestProcessClairEphemeralVolumeOverrides(t *testing.T) {
 					Components: []v1.Component{
 						{Kind: v1.ComponentClair, Managed: true, Overrides: &v1.Override{
 							VolumeSize:       parseResourceString("100Gi"),
-							StorageClassName: strPtr("premium-storage"),
+							StorageClassName: ptr.To("premium-storage"),
 						}},
 					},
 				},
 			},
 			expectedStorage:      "100Gi",
-			expectedStorageClass: strPtr("premium-storage"),
+			expectedStorageClass: ptr.To("premium-storage"),
 		},
 	}
 
@@ -503,9 +502,6 @@ func TestHPAWithUnmanagedMirrorAndClair(t *testing.T) {
 }
 
 func TestProcessPVCStorageClassNameOverride(t *testing.T) {
-	// Helper for getting string pointers
-	strPtr := func(s string) *string { return &s }
-
 	tests := []struct {
 		name                   string
 		componentKind          v1.ComponentKind
@@ -518,8 +514,8 @@ func TestProcessPVCStorageClassNameOverride(t *testing.T) {
 			name:                 "Postgres with StorageClassName override",
 			componentKind:        v1.ComponentPostgres,
 			componentLabel:       "postgres",
-			storageClassName:     strPtr("my-fast-storage"),
-			expectedStorageClass: strPtr("my-fast-storage"),
+			storageClassName:     ptr.To("my-fast-storage"),
+			expectedStorageClass: ptr.To("my-fast-storage"),
 		},
 		{
 			name:                 "Postgres without StorageClassName override",
@@ -532,30 +528,30 @@ func TestProcessPVCStorageClassNameOverride(t *testing.T) {
 			name:                 "ClairPostgres with StorageClassName override",
 			componentKind:        v1.ComponentClairPostgres,
 			componentLabel:       "clair-postgres",
-			storageClassName:     strPtr("clair-storage"),
-			expectedStorageClass: strPtr("clair-storage"),
+			storageClassName:     ptr.To("clair-storage"),
+			expectedStorageClass: ptr.To("clair-storage"),
 		},
 		{
 			name:                   "Postgres with initial StorageClassName and no override",
 			componentKind:          v1.ComponentPostgres,
 			componentLabel:         "postgres",
 			storageClassName:       nil,
-			initialPVCStorageClass: strPtr("default-storage"),
-			expectedStorageClass:   strPtr("default-storage"),
+			initialPVCStorageClass: ptr.To("default-storage"),
+			expectedStorageClass:   ptr.To("default-storage"),
 		},
 		{
 			name:                   "Postgres with initial StorageClassName and different override",
 			componentKind:          v1.ComponentPostgres,
 			componentLabel:         "postgres",
-			storageClassName:       strPtr("override-storage"),
-			initialPVCStorageClass: strPtr("initial-storage"),
-			expectedStorageClass:   strPtr("override-storage"),
+			storageClassName:       ptr.To("override-storage"),
+			initialPVCStorageClass: ptr.To("initial-storage"),
+			expectedStorageClass:   ptr.To("override-storage"),
 		},
 		{
 			name:                 "Irrelevant component (redis) with override, postgres PVC without",
 			componentKind:        v1.ComponentRedis,       // Override set for Redis
 			componentLabel:       "postgres",              // PVC is for Postgres
-			storageClassName:     strPtr("redis-storage"), // This should not apply to the postgres PVC
+			storageClassName:     ptr.To("redis-storage"), // This should not apply to the postgres PVC
 			expectedStorageClass: nil,                     // Postgres PVC should not get redis-storage
 		},
 	}
