@@ -341,8 +341,17 @@ func KustomizationFor(
 		return nil, errors.New("given QuayRegistry should not be nil")
 	}
 
+	// Sort keys to ensure deterministic ordering. Without this, map iteration
+	// is randomized (by Go design), causing Kustomize to compute a different
+	// content hash on every reconcile, which creates a new config secret name
+	// each time even when the content hasn't changed.
 	configFiles := []string{}
+	configKeys := make([]string, 0, len(quayConfigFiles))
 	for key := range quayConfigFiles {
+		configKeys = append(configKeys, key)
+	}
+	sort.Strings(configKeys)
+	for _, key := range configKeys {
 		configFiles = append(configFiles, filepath.Join("bundle", key))
 	}
 
@@ -377,11 +386,17 @@ func KustomizationFor(
 		ctx.DbRootPw = rootpw
 	}
 
+	// Sort keys to ensure deterministic ordering of CA certs
 	userProvidedCaCerts := []string{}
-	for key, val := range quayConfigFiles {
-		if !strings.HasPrefix(key, "extra_ca_cert_") {
-			continue
+	caCertKeys := make([]string, 0)
+	for key := range quayConfigFiles {
+		if strings.HasPrefix(key, "extra_ca_cert_") {
+			caCertKeys = append(caCertKeys, key)
 		}
+	}
+	sort.Strings(caCertKeys)
+	for _, key := range caCertKeys {
+		val := quayConfigFiles[key]
 		userProvidedCaCerts = append(userProvidedCaCerts, strings.TrimPrefix(key, "extra_ca_cert_")+"="+string(val))
 	}
 
