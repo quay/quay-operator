@@ -118,6 +118,19 @@ spec:
         file: 00-assert-overrides.yaml
     - assert:
         file: 00-assert-status.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          SECRET_NAME=$(kubectl get secret -n $NAMESPACE -o name \
+            | grep "reconcile-quay-config-secret" | head -1)
+          if [ -z "${SECRET_NAME}" ]; then
+            echo "ERROR: no config secret found"
+            exit 1
+          fi
+          kubectl create configmap e2e-config-secret-tracker -n $NAMESPACE \
+            --from-literal=secret-name="${SECRET_NAME}"
+          echo "Recorded config secret: ${SECRET_NAME}"
   - name: assert-route-overrides
     try:
     - script:
@@ -440,6 +453,37 @@ spec:
           done
     - assert:
         file: 00-assert-status.yaml
+  - name: assert-config-secret-stable
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          INITIAL=$(kubectl get configmap e2e-config-secret-tracker -n $NAMESPACE \
+            -o jsonpath='{.data.secret-name}')
+          CURRENT=$(kubectl get secret -n $NAMESPACE -o name \
+            | grep "reconcile-quay-config-secret" | head -1 || true)
+
+          echo "Initial config secret: ${INITIAL}"
+          echo "Current config secret: ${CURRENT}"
+
+          if [ "${INITIAL}" != "${CURRENT}" ]; then
+            echo "FAIL: config secret name changed without config change (non-deterministic hash)"
+            echo "  This indicates the Kustomize secret generator is producing different"
+            echo "  content hashes across reconcile loops despite identical input."
+            exit 1
+          fi
+          echo "PASS: config secret name stable across reconcile cycles"
+
+          COUNT=$(kubectl get secret -n $NAMESPACE -o name \
+            | grep -c "reconcile-quay-config-secret" || true)
+          if [ "${COUNT}" -ne 1 ]; then
+            echo "FAIL: expected 1 config secret, found ${COUNT}"
+            kubectl get secret -n $NAMESPACE -o name | grep "reconcile-quay-config-secret" || true
+            exit 1
+          fi
+          echo "PASS: exactly 1 config secret exists (no stale copies)"
   - name: rotate-config
     try:
     - script:
