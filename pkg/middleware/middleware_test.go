@@ -866,3 +866,91 @@ func TestProcessJobSecurityContextOverride(t *testing.T) {
 		})
 	}
 }
+
+func TestSTSVolumeInjection(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentQuay, Managed: true},
+			},
+		},
+	}
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-quay-app",
+			Annotations: map[string]string{"quay-component": "quay-app"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "quay-app"},
+					},
+				},
+			},
+		},
+	}
+
+	t.Run("STS disabled leaves deployment unchanged", func(t *testing.T) {
+		qctx := quaycontext.NewQuayRegistryContext()
+		result, err := Process(quay, qctx, dep.DeepCopy(), false)
+		assert.NoError(t, err)
+
+		d := result.(*appsv1.Deployment)
+		for _, c := range d.Spec.Template.Spec.Containers {
+			for _, env := range c.Env {
+				assert.NotEqual(t, "AWS_SHARED_CREDENTIALS_FILE", env.Name)
+			}
+		}
+		for _, vol := range d.Spec.Template.Spec.Volumes {
+			assert.NotEqual(t, "sts-credentials", vol.Name)
+		}
+	})
+
+	t.Run("STS enabled and provisioned injects volume and env", func(t *testing.T) {
+		qctx := quaycontext.NewQuayRegistryContext()
+		qctx.STSEnabled = true
+		qctx.STSCredentialProvisioned = true
+		qctx.STSCredentialSecretName = "test-quay-app-aws"
+
+		result, err := Process(quay, qctx, dep.DeepCopy(), false)
+		assert.NoError(t, err)
+
+		d := result.(*appsv1.Deployment)
+
+		foundVol := false
+		for _, vol := range d.Spec.Template.Spec.Volumes {
+			if vol.Name == "sts-credentials" {
+				foundVol = true
+				assert.Equal(t, "test-quay-app-aws", vol.Secret.SecretName)
+			}
+		}
+		assert.True(t, foundVol, "expected sts-credentials volume")
+
+		for _, c := range d.Spec.Template.Spec.Containers {
+			foundMount := false
+			for _, vm := range c.VolumeMounts {
+				if vm.Name == "sts-credentials" {
+					foundMount = true
+					assert.Equal(t, "/var/run/secrets/cloud", vm.MountPath)
+					assert.True(t, vm.ReadOnly)
+				}
+			}
+			assert.True(t, foundMount, "expected sts-credentials volume mount")
+
+			foundEnv := false
+			for _, env := range c.Env {
+				if env.Name == "AWS_SHARED_CREDENTIALS_FILE" {
+					foundEnv = true
+					assert.Equal(t, "/var/run/secrets/cloud/credentials", env.Value)
+				}
+			}
+			assert.True(t, foundEnv, "expected AWS_SHARED_CREDENTIALS_FILE env var")
+		}
+	})
+}

@@ -16,6 +16,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -192,6 +193,7 @@ func (r *QuayRegistryReconciler) checkManagedTLS(
 }
 
 var errRouteProbeInProgress = fmt.Errorf("route probe in progress, awaiting ingress status")
+var errCredentialRequestPending = fmt.Errorf("CredentialRequest not yet provisioned by CCO")
 
 // checkExternalTLSSecret validates and reads TLS cert/key from an external Secret referenced
 // by the TLS component's secretRef. Populates TLSCert, TLSKey, and TLSSecretHash on the context.
@@ -668,4 +670,78 @@ func getCertificatesPEM(address string) ([]byte, error) {
 	}
 
 	return b.Bytes(), nil
+}
+
+func (r *QuayRegistryReconciler) checkSTSCapability(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) error {
+	if r.STSRoleARN == "" {
+		return nil
+	}
+
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentObjectStorage) {
+		r.Log.Info("ROLEARN is set but ObjectStorage is managed, skipping STS path")
+		return nil
+	}
+
+	var infra unstructured.Unstructured
+	infra.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "config.openshift.io",
+		Version: "v1",
+		Kind:    "Infrastructure",
+	})
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, &infra); err != nil {
+		if errors.IsNotFound(err) || meta.IsNoMatchError(err) {
+			r.Log.Info("Infrastructure API not available, skipping STS path")
+			return nil
+		}
+		return fmt.Errorf("unable to get Infrastructure: %w", err)
+	}
+
+	platformType, _, _ := unstructured.NestedString(infra.Object, "status", "platformStatus", "type")
+	if platformType != "AWS" {
+		r.Log.Info("cluster platform is not AWS, skipping STS path", "platform", platformType)
+		return nil
+	}
+
+	var cco unstructured.Unstructured
+	cco.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "operator.openshift.io",
+		Version: "v1",
+		Kind:    "CloudCredential",
+	})
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, &cco); err != nil {
+		if errors.IsNotFound(err) || meta.IsNoMatchError(err) {
+			r.Log.Info("CloudCredential API not available, skipping STS path")
+			return nil
+		}
+		return fmt.Errorf("unable to get CloudCredential: %w", err)
+	}
+
+	credentialsMode, _, _ := unstructured.NestedString(cco.Object, "spec", "credentialsMode")
+	if credentialsMode == "Mint" || credentialsMode == "Passthrough" {
+		r.Log.Info("CCO credentials mode is not STS-compatible, skipping STS path", "mode", credentialsMode)
+		return nil
+	}
+
+	var crList unstructured.UnstructuredList
+	crList.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "cloudcredential.openshift.io",
+		Version: "v1",
+		Kind:    "CredentialsRequestList",
+	})
+	if err := r.List(ctx, &crList, client.InNamespace(quay.GetNamespace())); err != nil {
+		r.Log.Info("CredentialsRequest CRD not available, skipping STS path")
+		return nil
+	}
+
+	qctx.STSEnabled = true
+	qctx.STSRoleARN = r.STSRoleARN
+	qctx.STSCredentialRequestName = fmt.Sprintf("%s-quay-app", quay.GetName())
+	qctx.STSCredentialSecretName = fmt.Sprintf("%s-quay-app-aws", quay.GetName())
+	r.Log.Info("STS capability detected",
+		"roleARN", r.STSRoleARN,
+		"credentialRequestName", qctx.STSCredentialRequestName,
+	)
+	return nil
 }

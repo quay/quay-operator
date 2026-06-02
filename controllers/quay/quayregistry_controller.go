@@ -82,6 +82,7 @@ type QuayRegistryReconciler struct {
 	WatchNamespace       string
 	Requeue              ctrl.Result
 	SkipResourceRequests bool
+	STSRoleARN           string
 
 	// Cached route discovery results (write-once, read-many)
 	supportsRoutes      bool
@@ -533,6 +534,9 @@ func (r *QuayRegistryReconciler) quayAppDeploymentRolledOut(
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get
+// +kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get
+// +kubebuilder:rbac:groups=operator.openshift.io,resources=cloudcredentials,verbs=get
+// +kubebuilder:rbac:groups=cloudcredential.openshift.io,resources=credentialsrequests,verbs=create;delete;get;list;patch;update;watch
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
@@ -747,6 +751,17 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	if err := r.checkSTSCapability(ctx, quayContext, updatedQuay); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("error checking STS capability: %s", err),
+		)
+	}
+
 	if err = v1.EnsureDefaultComponents(quayContext, updatedQuay); err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
 		return r.Requeue, err
@@ -796,6 +811,34 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			v1.ConditionReasonConfigInvalid,
 			err.Error(),
 		)
+	}
+
+	if quayContext.STSEnabled {
+		if err := checkSTSCredentialConflict(usercfg); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConflictingCredentials,
+				err.Error(),
+			)
+		}
+
+		if err := r.ensureCredentialRequest(ctx, quayContext, updatedQuay); err != nil {
+			if goerrors.Is(err, errCredentialRequestPending) {
+				log.Info("STS CredentialRequest not yet provisioned, requeueing")
+				return r.Requeue, nil
+			}
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonCredentialRequestNotProvisioned,
+				fmt.Sprintf("STS CredentialRequest error: %s", err),
+			)
+		}
 	}
 
 	log.Info("inflating QuayRegistry into Kubernetes objects")
@@ -1608,4 +1651,124 @@ func filterDeferredWorkloads(objects []client.Object, deferWorkloads bool) []cli
 		filtered = append(filtered, obj)
 	}
 	return filtered
+}
+
+func checkSTSCredentialConflict(usercfg map[string]interface{}) error {
+	dsc, ok := usercfg["DISTRIBUTED_STORAGE_CONFIG"]
+	if !ok {
+		return nil
+	}
+
+	storageMap, ok := dsc.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	for name, entry := range storageMap {
+		arr, ok := entry.([]interface{})
+		if !ok || len(arr) < 2 {
+			continue
+		}
+
+		cfg, ok := arr[1].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if _, has := cfg["s3_access_key"]; has {
+			return fmt.Errorf(
+				"storage entry %q contains s3_access_key; remove static AWS "+
+					"credentials from configBundleSecret when using STS", name,
+			)
+		}
+		if _, has := cfg["s3_secret_key"]; has {
+			return fmt.Errorf(
+				"storage entry %q contains s3_secret_key; remove static AWS "+
+					"credentials from configBundleSecret when using STS", name,
+			)
+		}
+	}
+	return nil
+}
+
+func (r *QuayRegistryReconciler) ensureCredentialRequest(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) error {
+	cr := &unstructured.Unstructured{}
+	cr.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "cloudcredential.openshift.io",
+		Version: "v1",
+		Kind:    "CredentialsRequest",
+	})
+	cr.SetName(qctx.STSCredentialRequestName)
+	cr.SetNamespace(quay.GetNamespace())
+
+	providerSpec := map[string]interface{}{
+		"apiVersion":    "cloudcredential.openshift.io/v1",
+		"kind":          "AWSProviderSpec",
+		"stsIAMRoleARN": qctx.STSRoleARN,
+		"statementEntries": []interface{}{
+			map[string]interface{}{
+				"effect": "Allow",
+				"action": []interface{}{
+					"s3:GetObject",
+					"s3:PutObject",
+					"s3:DeleteObject",
+					"s3:ListBucket",
+					"s3:GetBucketLocation",
+					"s3:ListBucketMultipartUploads",
+					"s3:AbortMultipartUpload",
+					"s3:ListMultipartUploadParts",
+				},
+				"resource": "*",
+			},
+		},
+	}
+
+	if err := unstructured.SetNestedField(cr.Object, providerSpec, "spec", "providerSpec"); err != nil {
+		return fmt.Errorf("unable to set providerSpec: %w", err)
+	}
+
+	secretRef := map[string]interface{}{
+		"name":      qctx.STSCredentialSecretName,
+		"namespace": quay.GetNamespace(),
+	}
+	if err := unstructured.SetNestedField(cr.Object, secretRef, "spec", "secretRef"); err != nil {
+		return fmt.Errorf("unable to set secretRef: %w", err)
+	}
+
+	serviceAccountNames := []interface{}{fmt.Sprintf("%s-quay-app", quay.GetName())}
+	if err := unstructured.SetNestedSlice(cr.Object, serviceAccountNames, "spec", "serviceAccountNames"); err != nil {
+		return fmt.Errorf("unable to set serviceAccountNames: %w", err)
+	}
+
+	if err := unstructured.SetNestedField(cr.Object, "/var/run/secrets/openshift/serviceaccount/token", "spec", "cloudTokenPath"); err != nil {
+		return fmt.Errorf("unable to set cloudTokenPath: %w", err)
+	}
+
+	isController := true
+	cr.SetOwnerReferences([]metav1.OwnerReference{
+		{
+			APIVersion: v1.GroupVersion.String(),
+			Kind:       "QuayRegistry",
+			Name:       quay.Name,
+			UID:        quay.UID,
+			Controller: &isController,
+		},
+	})
+
+	if err := r.Patch(ctx, cr, client.Apply, client.FieldOwner("quay-operator"), client.ForceOwnership); err != nil {
+		return fmt.Errorf("unable to apply CredentialRequest: %w", err)
+	}
+
+	r.Log.Info("CredentialRequest applied", "name", qctx.STSCredentialRequestName)
+
+	provisioned, _, _ := unstructured.NestedBool(cr.Object, "status", "provisioned")
+	if !provisioned {
+		return errCredentialRequestPending
+	}
+
+	qctx.STSCredentialProvisioned = true
+	r.Log.Info("CredentialRequest provisioned", "name", qctx.STSCredentialRequestName)
+	return nil
 }
