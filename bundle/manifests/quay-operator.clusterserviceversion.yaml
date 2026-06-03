@@ -42,7 +42,7 @@ metadata:
     features.operators.openshift.io/fips-compliant: "true"
     features.operators.openshift.io/proxy-aware: "true"
     features.operators.openshift.io/tls-profiles: "false"
-    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-aws: "true"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
   name: quay-operator.v3.99.0-dev
@@ -168,6 +168,17 @@ spec:
                         value: quay.io/sclorg/postgresql-13-c9s:latest
                       - name: RELATED_IMAGE_COMPONENT_REDIS
                         value: quay.io/sclorg/redis-7-c9s:latest
+                    volumeMounts:
+                      - name: bound-sa-token
+                        mountPath: /var/run/secrets/openshift/serviceaccount
+                        readOnly: true
+                volumes:
+                  - name: bound-sa-token
+                    projected:
+                      sources:
+                        - serviceAccountToken:
+                            path: token
+                            audience: openshift
                 serviceAccountName: quay-operator
       permissions:
         - rules:
@@ -251,6 +262,33 @@ spec:
                 - apiservers
               verbs:
                 - get
+          serviceAccountName: quay-operator
+      clusterPermissions:
+        - rules:
+            - apiGroups:
+                - config.openshift.io
+              resources:
+                - infrastructures
+              verbs:
+                - get
+            - apiGroups:
+                - operator.openshift.io
+              resources:
+                - cloudcredentials
+              verbs:
+                - get
+            - apiGroups:
+                - cloudcredential.openshift.io
+              resources:
+                - credentialsrequests
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
           serviceAccountName: quay-operator
     strategy: deployment
   installModes:

@@ -53,6 +53,13 @@ type QuayRegistryContext struct {
 
 	// Clair integration
 	SecurityScannerV4PSK string
+
+	// STS/CCO
+	STSEnabled               bool
+	STSRoleARN               string
+	STSCredentialRequestName string
+	STSCredentialSecretName  string
+	STSCredentialProvisioned bool
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.
