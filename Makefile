@@ -68,6 +68,18 @@ docker-build: test
 docker-push:
 	docker push ${IMG}
 
+##@ Local Development
+
+.PHONY: local-dev-up local-dev-down local-dev-status
+local-dev-up: ## Create a local KinD cluster with Quay dependencies (Garage S3, TLS, config)
+	@./hack/local-dev.sh up
+
+local-dev-down: ## Tear down the local KinD cluster
+	@./hack/local-dev.sh down
+
+local-dev-status: ## Show status of the local development environment
+	@./hack/local-dev.sh status
+
 ##@ Build Dependencies
 
 ## Location to install dependencies to

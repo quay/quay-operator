@@ -31,6 +31,29 @@ make fmt && make vet
 make generate && make manifests
 ```
 
+## Local Development (KinD)
+
+For local development without an existing cluster:
+
+```bash
+# Create a local KinD cluster with all dependencies
+make local-dev-up
+
+# Start the operator (in a separate terminal)
+SKIP_RESOURCE_REQUESTS=true make run
+
+# Check environment status
+make local-dev-status
+
+# Tear down when done
+make local-dev-down
+```
+
+Prerequisites: `go`, `podman` (or `docker`), `kind`, `openssl`.
+The setup creates a 3-node KinD cluster with Garage S3 for object
+storage, self-signed TLS, and a ready-to-use QuayRegistry CR.
+After running the operator, Quay is accessible at `https://127.0.0.1:30443`.
+
 ## Project Structure
 
 ```
