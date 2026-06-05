@@ -54,6 +54,17 @@ The setup creates a 3-node KinD cluster with Garage S3 for object
 storage, self-signed TLS, and a ready-to-use QuayRegistry CR.
 After running the operator, Quay is accessible at `https://127.0.0.1:30443`.
 
+Optional auth providers can be added with `LOCAL_DEV_OPTS`:
+
+```bash
+# With LDAP (389 Directory Server) and Keycloak (OIDC)
+LOCAL_DEV_OPTS="--ldap --keycloak" make local-dev-up
+```
+
+**LDAP users** (password: `password`): admin, user1, testuser, admin\_ldap, testuser\_ldap.
+**Keycloak OIDC users** (password: `password`): admin\_oidc, testuser\_oidc, readonly\_oidc.
+Keycloak admin console: `http://127.0.0.1:30080` (admin/admin).
+
 ## Project Structure
 
 ```

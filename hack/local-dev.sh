@@ -2,9 +2,9 @@
 # local-dev.sh — Create a local KinD development environment for the Quay Operator.
 #
 # Usage:
-#   ./hack/local-dev.sh up      Create cluster, deploy dependencies, create QuayRegistry
-#   ./hack/local-dev.sh down    Tear down the KinD cluster
-#   ./hack/local-dev.sh status  Show environment status
+#   ./hack/local-dev.sh up [--ldap] [--keycloak]   Create cluster and deploy dependencies
+#   ./hack/local-dev.sh down                        Tear down the KinD cluster
+#   ./hack/local-dev.sh status                      Show environment status
 #
 # After 'up', start the operator in a separate terminal:
 #   SKIP_RESOURCE_REQUESTS=true make run
@@ -68,6 +68,16 @@ cluster_exists() {
 }
 
 cmd_up() {
+  local enable_ldap=false
+  local enable_keycloak=false
+
+  for arg in "$@"; do
+    case "$arg" in
+      --ldap)     enable_ldap=true ;;
+      --keycloak) enable_keycloak=true ;;
+    esac
+  done
+
   check_prerequisites
   ensure_podman_running
 
@@ -90,6 +100,24 @@ cmd_up() {
   echo "Setting up Garage S3 storage..."
   bash hack/setup-kind-e2e.sh
 
+  # --- Optional: LDAP ---
+  if [ "${enable_ldap}" = true ]; then
+    echo ""
+    echo "Deploying LDAP (389 Directory Server)..."
+    kubectl apply -n "${NAMESPACE}" -f hack/ldap.yaml
+    echo "Waiting for LDAP deployment..."
+    kubectl rollout status deployment/ldap -n "${NAMESPACE}" --timeout=120s
+  fi
+
+  # --- Optional: Keycloak ---
+  if [ "${enable_keycloak}" = true ]; then
+    echo ""
+    echo "Deploying Keycloak..."
+    kubectl apply -n "${NAMESPACE}" -f hack/keycloak.yaml
+    echo "Waiting for Keycloak deployment..."
+    kubectl rollout status deployment/keycloak -n "${NAMESPACE}" --timeout=180s
+  fi
+
   echo ""
   echo "Reading Garage credentials..."
   local access_key secret_key bucket endpoint
@@ -106,11 +134,10 @@ cmd_up() {
     -subj "/O=Quay Dev" \
     -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
 
-  echo "Creating config bundle secret..."
-  kubectl create secret generic "${REGISTRY_NAME}-config-bundle" -n "${NAMESPACE}" \
-    --from-literal=config.yaml="$(cat <<EOF
-FEATURE_MAILING: false
-SERVER_HOSTNAME: "127.0.0.1:30443"
+  # Build config.yaml — base config plus optional auth blocks.
+  local config_yaml
+  config_yaml="FEATURE_MAILING: false
+SERVER_HOSTNAME: \"127.0.0.1:30443\"
 PREFERRED_URL_SCHEME: https
 WORKER_COUNT: 1
 WORKER_COUNT_WEB: 1
@@ -133,9 +160,46 @@ DISTRIBUTED_STORAGE_CONFIG:
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
   - default
 DISTRIBUTED_STORAGE_PREFERENCE:
-  - default
-EOF
-)" \
+  - default"
+
+  if [ "${enable_ldap}" = true ]; then
+    config_yaml="${config_yaml}
+AUTHENTICATION_TYPE: LDAP
+FEATURE_TEAM_SYNCING: true
+LDAP_ADMIN_DN: cn=Directory Manager
+LDAP_ADMIN_PASSWD: admin
+LDAP_ALLOW_INSECURE_FALLBACK: true
+LDAP_BASE_DN:
+  - dc=example
+  - dc=org
+LDAP_EMAIL_ATTR: mail
+LDAP_MEMBEROF_ATTR: quayMemberOf
+LDAP_UID_ATTR: uid
+LDAP_URI: ldap://ldap.${NAMESPACE}.svc.cluster.local:3389
+LDAP_USER_RDN:
+  - ou=users"
+  fi
+
+  if [ "${enable_keycloak}" = true ]; then
+    config_yaml="${config_yaml}
+SOMEOIDC_LOGIN_CONFIG:
+  SERVICE_NAME: Keycloak
+  OIDC_SERVER: http://keycloak.${NAMESPACE}.svc.cluster.local:8080/realms/quay/
+  CLIENT_ID: quay-ui
+  CLIENT_SECRET: unused-public-client
+  LOGIN_SCOPES:
+    - openid
+    - profile
+    - email
+  DEBUGGING: true
+  USE_PKCE: true
+  PKCE_METHOD: S256
+  PUBLIC_CLIENT: true"
+  fi
+
+  echo "Creating config bundle secret..."
+  kubectl create secret generic "${REGISTRY_NAME}-config-bundle" -n "${NAMESPACE}" \
+    --from-literal=config.yaml="${config_yaml}" \
     --from-file=ssl.cert="${certdir}/ssl.cert" \
     --from-file=ssl.key="${certdir}/ssl.key" \
     --from-file=extra_ca_cert_dev-ca.crt="${certdir}/ssl.cert" \
@@ -212,16 +276,25 @@ EOF
   echo "  2. Wait for pods to be ready:"
   echo "     make local-dev-status"
   echo ""
-  echo "  3. Initialize the superuser:"
-  echo "     curl -sk https://127.0.0.1:30443/api/v1/user/initialize \\"
-  echo "       -X POST -H 'Content-Type: application/json' \\"
-  echo "       -d '{\"username\":\"admin\",\"password\":\"password123\",\"email\":\"admin@test.com\"}'"
-  echo ""
-  echo "  4. Push a test image:"
-  echo "     crane auth login --insecure 127.0.0.1:30443 -u admin -p password123"
-  echo "     crane copy --insecure --platform linux/amd64 \\"
-  echo "       quay.io/quay/busybox:latest 127.0.0.1:30443/admin/test:latest"
-  echo ""
+  if [ "${enable_ldap}" = true ]; then
+    echo "  LDAP is enabled (389 Directory Server)."
+    echo "    Users (password 'password'): admin, user1, testuser, admin_ldap, testuser_ldap"
+    echo "    Bind DN: cn=Directory Manager / password: admin"
+    echo ""
+  fi
+  if [ "${enable_keycloak}" = true ]; then
+    echo "  Keycloak OIDC is enabled."
+    echo "    Admin console: http://127.0.0.1:30080 (admin/admin)"
+    echo "    OIDC users (password 'password'): admin_oidc, testuser_oidc, readonly_oidc"
+    echo ""
+  fi
+  if [ "${enable_ldap}" = false ]; then
+    echo "  3. Initialize the superuser:"
+    echo "     curl -sk https://127.0.0.1:30443/api/v1/user/initialize \\"
+    echo "       -X POST -H 'Content-Type: application/json' \\"
+    echo "       -d '{\"username\":\"admin\",\"password\":\"password123\",\"email\":\"admin@test.com\"}'"
+    echo ""
+  fi
   echo "  Registry: https://127.0.0.1:30443 (self-signed cert)"
   echo ""
 }
@@ -257,16 +330,20 @@ cmd_status() {
   echo ""
 }
 
-case "${1:-}" in
-  up)     cmd_up ;;
+# Parse subcommand and pass remaining args.
+subcmd="${1:-}"
+shift || true
+
+case "${subcmd}" in
+  up)     cmd_up "$@" ;;
   down)   cmd_down ;;
   status) cmd_status ;;
   *)
-    echo "Usage: $0 {up|down|status}"
+    echo "Usage: $0 {up|down|status} [options]"
     echo ""
-    echo "  up      Create KinD cluster and deploy Quay dependencies"
-    echo "  down    Tear down the KinD cluster"
-    echo "  status  Show environment status"
+    echo "  up [--ldap] [--keycloak]  Create KinD cluster and deploy Quay dependencies"
+    echo "  down                      Tear down the KinD cluster"
+    echo "  status                    Show environment status"
     exit 1
     ;;
 esac
