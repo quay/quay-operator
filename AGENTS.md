@@ -61,7 +61,7 @@ Optional auth providers can be added with `LOCAL_DEV_OPTS`:
 LOCAL_DEV_OPTS="--ldap --keycloak" make local-dev-up
 ```
 
-**LDAP users** (password: `password`): admin, user1, testuser, admin\_ldap, testuser\_ldap.
+**LDAP users** (password: `password`): admin, user1, quayadmin, readonly, testuser, admin\_ldap, testuser\_ldap, readonly\_ldap.
 **Keycloak OIDC users** (password: `password`): admin\_oidc, testuser\_oidc, readonly\_oidc.
 Keycloak admin console: `http://127.0.0.1:30080` (admin/admin).
 

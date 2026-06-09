@@ -91,6 +91,7 @@ cmd_up() {
   echo ""
   echo "Installing QuayRegistry CRD..."
   kubectl apply -f "${CRD_PATH}"
+  kubectl wait --for=condition=Established -f "${CRD_PATH}" --timeout=60s
 
   echo ""
   echo "Creating namespace '${NAMESPACE}'..."
@@ -150,10 +151,10 @@ FEATURE_PROXY_STORAGE: true
 DISTRIBUTED_STORAGE_CONFIG:
   default:
     - RadosGWStorage
-    - access_key: ${access_key}
-      secret_key: ${secret_key}
-      bucket_name: ${bucket}
-      hostname: ${endpoint}
+    - access_key: \"${access_key}\"
+      secret_key: \"${secret_key}\"
+      bucket_name: \"${bucket}\"
+      hostname: \"${endpoint}\"
       port: 3900
       is_secure: false
       storage_path: /datastorage/registry
@@ -278,7 +279,7 @@ EOF
   echo ""
   if [ "${enable_ldap}" = true ]; then
     echo "  LDAP is enabled (389 Directory Server)."
-    echo "    Users (password 'password'): admin, user1, testuser, admin_ldap, testuser_ldap"
+    echo "    Users (password 'password'): admin, user1, quayadmin, readonly, testuser, admin_ldap, testuser_ldap, readonly_ldap"
     echo "    Bind DN: cn=Directory Manager / password: admin"
     echo ""
   fi
@@ -316,7 +317,7 @@ cmd_status() {
   fi
 
   echo "=== Cluster ==="
-  kubectl cluster-info --context "kind-${CLUSTER_NAME}" 2>&1 | head -2
+  kubectl cluster-info --context "kind-${CLUSTER_NAME}" 2>&1 | { head -2 || true; }
   echo ""
 
   echo "=== Pods (namespace: ${NAMESPACE}) ==="
