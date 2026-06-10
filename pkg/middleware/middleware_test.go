@@ -866,3 +866,335 @@ func TestProcessJobSecurityContextOverride(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyPostgresTLS(t *testing.T) {
+	makePostgresDep := func(name, component string) *appsv1.Deployment {
+		return &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        name,
+				Annotations: map[string]string{"quay-component": component},
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "postgres",
+								Image: "quay.io/sclorg/postgresql-13-c9s:latest",
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "postgres-data",
+								VolumeSource: corev1.VolumeSource{
+									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "quay-postgres-13",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("injects init container and volume when TLS enabled", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+				},
+			},
+		}
+		dep := makePostgresDep("test-quay-database", "postgres")
+
+		applyPostgresTLS(quay, dep, v1.ComponentPostgres)
+
+		assert.Len(t, dep.Spec.Template.Spec.InitContainers, 1)
+		assert.Equal(t, "postgres-tls-init", dep.Spec.Template.Spec.InitContainers[0].Name)
+		assert.Equal(t, "quay.io/sclorg/postgresql-13-c9s:latest", dep.Spec.Template.Spec.InitContainers[0].Image)
+
+		// Check projected volume added with correct mode
+		var found bool
+		for _, vol := range dep.Spec.Template.Spec.Volumes {
+			if vol.Name == "postgres-tls-certs" {
+				found = true
+				assert.NotNil(t, vol.Projected)
+				assert.Equal(t, "test-postgres-tls", vol.Projected.Sources[0].Secret.Name)
+				assert.NotNil(t, vol.Projected.DefaultMode)
+				assert.Equal(t, int32(0600), *vol.Projected.DefaultMode)
+			}
+		}
+		assert.True(t, found, "expected postgres-tls-certs volume")
+
+		// Check init container only mounts the data volume (for patching postgresql.conf)
+		initMounts := dep.Spec.Template.Spec.InitContainers[0].VolumeMounts
+		assert.Len(t, initMounts, 1)
+		assert.Equal(t, "postgres-data", initMounts[0].Name)
+		assert.Equal(t, "/var/lib/pgsql/data", initMounts[0].MountPath)
+
+		// Check main container has the TLS certs volume mount
+		mainMounts := dep.Spec.Template.Spec.Containers[0].VolumeMounts
+		var tlsMountFound bool
+		for _, m := range mainMounts {
+			if m.Name == "postgres-tls-certs" {
+				tlsMountFound = true
+				assert.Equal(t, "/tls-certs", m.MountPath)
+				assert.True(t, m.ReadOnly)
+			}
+		}
+		assert.True(t, tlsMountFound, "expected postgres-tls-certs mount on main container")
+	})
+
+	t.Run("cleanup init container when TLS not enabled", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true},
+				},
+			},
+		}
+		dep := makePostgresDep("test-quay-database", "postgres")
+
+		applyPostgresTLS(quay, dep, v1.ComponentPostgres)
+
+		assert.Len(t, dep.Spec.Template.Spec.InitContainers, 1)
+		assert.Equal(t, "postgres-tls-init", dep.Spec.Template.Spec.InitContainers[0].Name)
+		assert.Contains(t, dep.Spec.Template.Spec.InitContainers[0].Command[2], "sed")
+		assert.Len(t, dep.Spec.Template.Spec.Volumes, 1) // only postgres-data, no TLS volume
+	})
+
+	t.Run("uses secretRef name when provided", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+						Enabled:   true,
+						SecretRef: &corev1.LocalObjectReference{Name: "my-custom-certs"},
+					}}},
+				},
+			},
+		}
+		dep := makePostgresDep("test-quay-database", "postgres")
+
+		applyPostgresTLS(quay, dep, v1.ComponentPostgres)
+
+		var secretName string
+		for _, vol := range dep.Spec.Template.Spec.Volumes {
+			if vol.Name == "postgres-tls-certs" && vol.Projected != nil {
+				secretName = vol.Projected.Sources[0].Secret.Name
+			}
+		}
+		assert.Equal(t, "my-custom-certs", secretName)
+	})
+
+	t.Run("works for clairpostgres component", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+				},
+			},
+		}
+		dep := makePostgresDep("test-clair-postgres", "clairpostgres")
+
+		applyPostgresTLS(quay, dep, v1.ComponentClairPostgres)
+
+		assert.Len(t, dep.Spec.Template.Spec.InitContainers, 1)
+
+		var secretName string
+		for _, vol := range dep.Spec.Template.Spec.Volumes {
+			if vol.Name == "postgres-tls-certs" && vol.Projected != nil {
+				secretName = vol.Projected.Sources[0].Secret.Name
+			}
+		}
+		assert.Equal(t, "test-clairpostgres-tls", secretName)
+	})
+}
+
+func TestProcessDatabaseDeploymentWithTLS(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+		},
+	}
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-quay-database",
+			Labels:      map[string]string{"quay-component": "postgres"},
+			Annotations: map[string]string{"quay-component": "postgres"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"quay-registry-hostname":         "should-be-removed",
+						"quay-buildmanager-hostname":     "should-be-removed",
+						"quay-operator-service-endpoint": "should-be-removed",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "postgres",
+							Image: "quay.io/sclorg/postgresql-13-c9s:latest",
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "postgres-data",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "quay-postgres-13",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	qctx := quaycontext.NewQuayRegistryContext()
+	result, err := Process(quay, qctx, dep, false)
+	assert.NoError(t, err)
+
+	processed := result.(*appsv1.Deployment)
+
+	// TLS init container injected
+	assert.Len(t, processed.Spec.Template.Spec.InitContainers, 1)
+	assert.Equal(t, "postgres-tls-init", processed.Spec.Template.Spec.InitContainers[0].Name)
+
+	// Projected volume added
+	var foundTLSVol bool
+	for _, vol := range processed.Spec.Template.Spec.Volumes {
+		if vol.Name == "postgres-tls-certs" {
+			foundTLSVol = true
+		}
+	}
+	assert.True(t, foundTLSVol, "expected postgres-tls-certs volume from Process()")
+
+	// DB-specific annotation cleanup still happens
+	_, hasHostname := processed.Spec.Template.Annotations["quay-registry-hostname"]
+	_, hasBuildMgr := processed.Spec.Template.Annotations["quay-buildmanager-hostname"]
+	_, hasEndpoint := processed.Spec.Template.Annotations["quay-operator-service-endpoint"]
+	assert.False(t, hasHostname, "quay-registry-hostname should be removed")
+	assert.False(t, hasBuildMgr, "quay-buildmanager-hostname should be removed")
+	assert.False(t, hasEndpoint, "quay-operator-service-endpoint should be removed")
+
+	// fieldGroupsAnnotation should NOT be present (DB deployments return early)
+	_, hasFieldGroups := processed.Spec.Template.Annotations[fieldGroupsAnnotation]
+	assert.False(t, hasFieldGroups, "database deployments should not have fieldGroupsAnnotation")
+}
+
+func TestApplyClairDBTLS(t *testing.T) {
+	makeClairDep := func() *appsv1.Deployment {
+		return &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-clair-app",
+				Labels:      map[string]string{"quay-component": "clair"},
+				Annotations: map[string]string{"quay-component": "clair"},
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{Name: "clair-app"},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("injects volume and mount when clairpostgres TLS enabled", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+					{Kind: "clair", Managed: true},
+				},
+			},
+		}
+		dep := makeClairDep()
+
+		applyClairDBTLS(quay, dep)
+
+		var foundVol bool
+		for _, vol := range dep.Spec.Template.Spec.Volumes {
+			if vol.Name == "clair-db-tls" {
+				foundVol = true
+				assert.NotNil(t, vol.Projected)
+				assert.Equal(t, "test-clairpostgres-ca", vol.Projected.Sources[0].Secret.Name)
+			}
+		}
+		assert.True(t, foundVol, "expected clair-db-tls volume")
+
+		var foundMount bool
+		for _, m := range dep.Spec.Template.Spec.Containers[0].VolumeMounts {
+			if m.Name == "clair-db-tls" {
+				foundMount = true
+				assert.Equal(t, "/clair-db-tls", m.MountPath)
+				assert.True(t, m.ReadOnly)
+			}
+		}
+		assert.True(t, foundMount, "expected clair-db-tls volume mount")
+	})
+
+	t.Run("no changes when clairpostgres TLS not enabled", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "clair", Managed: true},
+				},
+			},
+		}
+		dep := makeClairDep()
+
+		applyClairDBTLS(quay, dep)
+
+		assert.Len(t, dep.Spec.Template.Spec.Volumes, 0)
+		assert.Len(t, dep.Spec.Template.Spec.Containers[0].VolumeMounts, 0)
+	})
+
+	t.Run("uses secretRef for CA when provided", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+						Enabled:   true,
+						SecretRef: &corev1.LocalObjectReference{Name: "my-ca-secret"},
+					}}},
+					{Kind: "clair", Managed: true},
+				},
+			},
+		}
+		dep := makeClairDep()
+
+		applyClairDBTLS(quay, dep)
+
+		var secretName string
+		for _, vol := range dep.Spec.Template.Spec.Volumes {
+			if vol.Name == "clair-db-tls" && vol.Projected != nil {
+				secretName = vol.Projected.Sources[0].Secret.Name
+			}
+		}
+		assert.Equal(t, "my-ca-secret", secretName)
+	})
+}
