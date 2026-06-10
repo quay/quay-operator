@@ -8,6 +8,7 @@ import (
 	"time"
 
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -535,6 +536,117 @@ func Test_checkExternalTLSSecret(t *testing.T) {
 					t.Error("expected TLSSecretLabel to be applied to the secret")
 				}
 			}
+		})
+	}
+}
+
+func TestCheckDatabaseTLS(t *testing.T) {
+	tests := []struct {
+		name           string
+		quay           *v1.QuayRegistry
+		supportsRoutes bool
+		wantPgTLS      bool
+		wantClairTLS   bool
+		wantErr        bool
+		errContains    string
+	}{
+		{
+			name: "DatabaseTLSDisabledByDefault",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentPostgres, Managed: true},
+					},
+				},
+			},
+			wantPgTLS: false,
+		},
+		{
+			name: "DatabaseTLSEnabledWithServiceCA",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+							DatabaseTLS: &v1.DatabaseTLSConfig{Enabled: true},
+						}},
+					},
+				},
+			},
+			supportsRoutes: true,
+			wantPgTLS:      true,
+		},
+		{
+			name: "DatabaseTLSEnabledNoServiceCANoUserCert",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+							DatabaseTLS: &v1.DatabaseTLSConfig{Enabled: true},
+						}},
+					},
+				},
+			},
+			supportsRoutes: false,
+			wantErr:        true,
+			errContains:    "no TLS certificate source available",
+		},
+		{
+			name: "DatabaseTLSEnabledWithUserProvidedCert",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+							DatabaseTLS: &v1.DatabaseTLSConfig{
+								Enabled:     true,
+								SecretRef:   &corev1.LocalObjectReference{Name: "my-pg-tls"},
+								CASecretRef: &corev1.LocalObjectReference{Name: "my-pg-ca"},
+							},
+						}},
+					},
+				},
+			},
+			supportsRoutes: false,
+			wantPgTLS:      true,
+		},
+		{
+			name: "UserProvidedCertMissingCA",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+							DatabaseTLS: &v1.DatabaseTLSConfig{
+								Enabled:   true,
+								SecretRef: &corev1.LocalObjectReference{Name: "my-pg-tls"},
+							},
+						}},
+					},
+				},
+			},
+			wantErr:     true,
+			errContains: "caSecretRef is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qctx := quaycontext.NewQuayRegistryContext()
+			qctx.SupportsRoutes = tt.supportsRoutes
+			err := checkDatabaseTLS(qctx, tt.quay)
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantPgTLS, qctx.PostgresTLSEnabled)
+			assert.Equal(t, tt.wantClairTLS, qctx.ClairPostgresTLSEnabled)
 		})
 	}
 }

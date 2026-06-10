@@ -711,6 +711,17 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	r.checkManagedDatabaseReady(ctx, quayContext, updatedQuay)
 
+	if err := checkDatabaseTLS(quayContext, updatedQuay); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("database TLS configuration error: %s", err),
+		)
+	}
+
 	if err := r.checkBuildManagerAvailable(quayContext, cbundle); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
