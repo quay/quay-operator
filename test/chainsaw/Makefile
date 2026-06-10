@@ -20,10 +20,10 @@ $(CHAINSAW): $(LOCALBIN)
 	{ curl -sL "https://github.com/kyverno/chainsaw/releases/download/$(CHAINSAW_VERSION)/chainsaw_linux_amd64.tar.gz" | tar -xz -C $(LOCALBIN) chainsaw; }
 
 test-e2e: chainsaw ## Run Chainsaw e2e tests (excludes destructive tests)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/postgres.tls.lifecycle" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
 
-test-e2e-destructive: chainsaw ## Run destructive Chainsaw e2e tests (ca-rotation, OpenShift only)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --include-test-regex "/ca.rotation" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
+test-e2e-destructive: chainsaw ## Run destructive Chainsaw e2e tests (ca-rotation, postgres-tls-lifecycle, OpenShift only)
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --include-test-regex "/ca.rotation|/postgres.tls.lifecycle" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
 
 test-e2e-kind: chainsaw ## Run Chainsaw e2e tests (KinD)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_KIND) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/hpa|/tls.security.profile" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_KIND) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/hpa|/tls.security.profile|/postgres.tls.lifecycle" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)

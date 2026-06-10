@@ -1,0 +1,170 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: postgres-tls-secretref
+spec:
+  concurrent: false
+  steps:
+  - name: create-valid-secretref-registry
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          SVC_NAME="pgtls-ref-quay-database"
+
+          echo "Generating CA certificate..."
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/pg-ca-${NAMESPACE}.key -out /tmp/pg-ca-${NAMESPACE}.crt -days 1 \
+            -subj "/O=Quay E2E/CN=pg-tls-ca" 2>/dev/null
+
+          echo "Generating server certificate..."
+          openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/pg-server-${NAMESPACE}.key -out /tmp/pg-server-${NAMESPACE}.csr \
+            -subj "/O=Quay E2E/CN=${SVC_NAME}" \
+            -addext "subjectAltName=DNS:${SVC_NAME},DNS:${SVC_NAME}.${NAMESPACE},DNS:${SVC_NAME}.${NAMESPACE}.svc,DNS:${SVC_NAME}.${NAMESPACE}.svc.cluster.local,DNS:localhost" \
+            2>/dev/null
+
+          openssl x509 -req -in /tmp/pg-server-${NAMESPACE}.csr \
+            -CA /tmp/pg-ca-${NAMESPACE}.crt -CAkey /tmp/pg-ca-${NAMESPACE}.key \
+            -CAcreateserial -out /tmp/pg-server-${NAMESPACE}.crt -days 1 \
+            -extfile <(printf "subjectAltName=DNS:${SVC_NAME},DNS:${SVC_NAME}.${NAMESPACE},DNS:${SVC_NAME}.${NAMESPACE}.svc,DNS:${SVC_NAME}.${NAMESPACE}.svc.cluster.local,DNS:localhost") \
+            2>/dev/null
+
+          echo "Creating user-pg-tls secret..."
+          kubectl create secret generic user-pg-tls -n $NAMESPACE \
+            --from-file=ca.crt=/tmp/pg-ca-${NAMESPACE}.crt \
+            --from-file=tls.crt=/tmp/pg-server-${NAMESPACE}.crt \
+            --from-file=tls.key=/tmp/pg-server-${NAMESPACE}.key
+          echo "User-provided TLS secret created"
+
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, skipping config bundle setup"
+            exit 0
+          fi
+          echo "KinD detected, creating config bundle..."
+          ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+          SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+          BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+          ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          FEATURE_PROXY_STORAGE: true
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+            --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+  - name: assert-user-cert-used
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying user-provided TLS secret is used ==="
+
+          INIT=$(kubectl get deployment pgtls-ref-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="postgres-tls-init")].name}')
+          if [ "${INIT}" != "postgres-tls-init" ]; then
+            echo "FAIL: quay-database missing postgres-tls-init init container"
+            exit 1
+          fi
+          echo "PASS: quay-database has postgres-tls-init"
+
+          echo "Verifying pg_stat_ssl..."
+          PG_POD=$(kubectl get pods -n $NAMESPACE -l quay-component=postgres \
+            -o jsonpath='{.items[0].metadata.name}')
+          SSL_STATUS=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+            bash -c "psql -t -c 'SHOW ssl;'" 2>/dev/null | tr -d ' \n')
+          if [ "${SSL_STATUS}" != "on" ]; then
+            echo "FAIL: PostgreSQL SSL is not enabled (got: '${SSL_STATUS}')"
+            exit 1
+          fi
+          echo "PASS: PostgreSQL SSL is on with user-provided certs"
+  - name: create-invalid-secretref-registry
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Deleting valid registry..."
+          kubectl delete quayregistry pgtls-ref -n $NAMESPACE --timeout=300s
+          echo "Registry deleted"
+
+          echo "Waiting for resources to clean up..."
+          for i in $(seq 1 30); do
+            DEPS=$(kubectl get deployments -n $NAMESPACE -l quay-operator/quayregistry=pgtls-ref \
+              --no-headers 2>/dev/null | wc -l | tr -d ' ')
+            if [ "${DEPS}" -eq 0 ]; then
+              echo "All pgtls-ref resources cleaned up"
+              break
+            fi
+            [ "$i" -eq 30 ] && echo "WARNING: some resources still exist after 5m"
+            sleep 10
+          done
+    - apply:
+        file: 01-create-invalid-registry.yaml
+  - name: assert-rollout-blocked
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Waiting for RolloutBlocked condition ==="
+
+          for i in $(seq 1 36); do
+            STATUS=$(kubectl get quayregistry pgtls-bad -n $NAMESPACE \
+              -o jsonpath='{.status.conditions[?(@.type=="RolloutBlocked")].status}' 2>/dev/null || true)
+            REASON=$(kubectl get quayregistry pgtls-bad -n $NAMESPACE \
+              -o jsonpath='{.status.conditions[?(@.type=="RolloutBlocked")].reason}' 2>/dev/null || true)
+            MSG=$(kubectl get quayregistry pgtls-bad -n $NAMESPACE \
+              -o jsonpath='{.status.conditions[?(@.type=="RolloutBlocked")].message}' 2>/dev/null || true)
+
+            if [ "${STATUS}" = "True" ] && [ "${REASON}" = "ConfigInvalid" ]; then
+              echo "PASS: RolloutBlocked=True, reason=ConfigInvalid"
+              echo "Message: ${MSG}"
+              echo "${MSG}" | grep -qi "tls secret.*not found" || \
+                { echo "FAIL: message does not mention TLS secret not found"; exit 1; }
+              echo "PASS: error message correctly identifies missing secret"
+              exit 0
+            fi
+            [ "$i" -eq 36 ] && { echo "FAIL: RolloutBlocked not set after 3 minutes"; exit 1; }
+            sleep 5
+          done
