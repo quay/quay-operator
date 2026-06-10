@@ -1,6 +1,7 @@
 package kustomize
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
@@ -800,4 +802,76 @@ func TestInflate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClairConnstringWithTLS(t *testing.T) {
+	qctx := &quaycontext.QuayRegistryContext{
+		ClairPostgresTLSEnabled: true,
+		ClairPgTLSCAPath:        "/tls/clair-postgres/ca.crt",
+		ClairDbUser:             "testuser",
+		ClairDbPassword:         "testpass",
+		ClairDbName:             "testdb",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentHPA, Managed: false},
+			},
+		},
+	}
+	log := testlogr.NewTestLogger(t)
+	psk := base64.StdEncoding.EncodeToString([]byte("test-psk"))
+
+	cfgBytes, err := clairConfigFor(log, qctx, quay, "quay.example.com", psk)
+	assert.NoError(t, err)
+
+	var cfg map[string]interface{}
+	err = yaml.Unmarshal(cfgBytes, &cfg)
+	assert.NoError(t, err)
+
+	indexer := cfg["indexer"].(map[string]interface{})
+	connstring := indexer["connstring"].(string)
+
+	assert.Contains(t, connstring, "sslmode=verify-ca")
+	assert.Contains(t, connstring, "sslrootcert=/tls/clair-postgres/ca.crt")
+	assert.NotContains(t, connstring, "sslmode=disable")
+}
+
+func TestClairConnstringWithoutTLS(t *testing.T) {
+	qctx := &quaycontext.QuayRegistryContext{
+		ClairPostgresTLSEnabled: false,
+		ClairDbUser:             "testuser",
+		ClairDbPassword:         "testpass",
+		ClairDbName:             "testdb",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentHPA, Managed: false},
+			},
+		},
+	}
+	log := testlogr.NewTestLogger(t)
+	psk := base64.StdEncoding.EncodeToString([]byte("test-psk"))
+
+	cfgBytes, err := clairConfigFor(log, qctx, quay, "quay.example.com", psk)
+	assert.NoError(t, err)
+
+	var cfg map[string]interface{}
+	err = yaml.Unmarshal(cfgBytes, &cfg)
+	assert.NoError(t, err)
+
+	indexer := cfg["indexer"].(map[string]interface{})
+	connstring := indexer["connstring"].(string)
+
+	assert.Contains(t, connstring, "sslmode=disable")
+	assert.NotContains(t, connstring, "sslmode=verify-ca")
 }
