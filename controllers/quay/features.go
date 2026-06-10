@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
 	err "errors"
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -47,6 +49,13 @@ const (
 	clairDbPw     = "CLAIR_DB_PASSWORD"
 	clairDbRootPw = "CLAIR_DB_ROOT_PW"
 	clairDbName   = "CLAIR_DB_NAME"
+
+	postgresTLSCA        = "POSTGRES_TLS_CA"
+	postgresTLSCert      = "POSTGRES_TLS_CERT"
+	postgresTLSKey       = "POSTGRES_TLS_KEY"
+	clairPostgresTLSCA   = "CLAIRPOSTGRES_TLS_CA"
+	clairPostgresTLSCert = "CLAIRPOSTGRES_TLS_CERT"
+	clairPostgresTLSKey  = "CLAIRPOSTGRES_TLS_KEY"
 )
 
 // checkDeprecatedManagedKeys populates the provided quay context with information we
@@ -83,6 +92,12 @@ func (r *QuayRegistryReconciler) checkDeprecatedManagedKeys(
 		qctx.ClairDbPassword = string(secret.Data[clairDbPw])
 		qctx.ClairDbRootPw = string(secret.Data[clairDbRootPw])
 		qctx.ClairDbName = string(secret.Data[clairDbName])
+		qctx.PostgresTLSCA = string(secret.Data[postgresTLSCA])
+		qctx.PostgresTLSCert = string(secret.Data[postgresTLSCert])
+		qctx.PostgresTLSKey = string(secret.Data[postgresTLSKey])
+		qctx.ClairPostgresTLSCA = string(secret.Data[clairPostgresTLSCA])
+		qctx.ClairPostgresTLSCert = string(secret.Data[clairPostgresTLSCert])
+		qctx.ClairPostgresTLSKey = string(secret.Data[clairPostgresTLSKey])
 		break
 	}
 
@@ -117,6 +132,12 @@ func (r *QuayRegistryReconciler) checkManagedKeys(
 	qctx.ClairDbPassword = string(secret.Data[clairDbPw])
 	qctx.ClairDbRootPw = string(secret.Data[clairDbRootPw])
 	qctx.ClairDbName = string(secret.Data[clairDbName])
+	qctx.PostgresTLSCA = string(secret.Data[postgresTLSCA])
+	qctx.PostgresTLSCert = string(secret.Data[postgresTLSCert])
+	qctx.PostgresTLSKey = string(secret.Data[postgresTLSKey])
+	qctx.ClairPostgresTLSCA = string(secret.Data[clairPostgresTLSCA])
+	qctx.ClairPostgresTLSCert = string(secret.Data[clairPostgresTLSCert])
+	qctx.ClairPostgresTLSKey = string(secret.Data[clairPostgresTLSKey])
 	return nil
 }
 
@@ -671,4 +692,85 @@ func getCertificatesPEM(address string) ([]byte, error) {
 	}
 
 	return b.Bytes(), nil
+}
+
+// checkPostgresTLSSecrets validates user-provided TLS Secrets referenced by
+// secretRef on postgres and clairpostgres components. When valid, the cert
+// data is populated into the context for use by Inflate.
+func (r *QuayRegistryReconciler) checkPostgresTLSSecrets(
+	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) error {
+	checks := []struct {
+		kind   v1.ComponentKind
+		setCA  func(string)
+		setCrt func(string)
+		setKey func(string)
+	}{
+		{
+			kind:   v1.ComponentPostgres,
+			setCA:  func(s string) { qctx.PostgresTLSCA = s },
+			setCrt: func(s string) { qctx.PostgresTLSCert = s },
+			setKey: func(s string) { qctx.PostgresTLSKey = s },
+		},
+		{
+			kind:   v1.ComponentClairPostgres,
+			setCA:  func(s string) { qctx.ClairPostgresTLSCA = s },
+			setCrt: func(s string) { qctx.ClairPostgresTLSCert = s },
+			setKey: func(s string) { qctx.ClairPostgresTLSKey = s },
+		},
+	}
+
+	for _, c := range checks {
+		override := v1.GetTLSOverrideForComponent(quay, c.kind)
+		if override == nil || !override.Enabled || override.SecretRef == nil {
+			continue
+		}
+
+		name := override.SecretRef.Name
+		nsn := types.NamespacedName{Name: name, Namespace: quay.Namespace}
+
+		var secret corev1.Secret
+		if e := r.Get(ctx, nsn, &secret); e != nil {
+			if errors.IsNotFound(e) {
+				return fmt.Errorf("%s TLS secret %q not found", c.kind, name)
+			}
+			return fmt.Errorf("unable to get %s TLS secret %q: %w", c.kind, name, e)
+		}
+
+		ca, caOK := secret.Data["ca.crt"]
+		crt, crtOK := secret.Data["tls.crt"]
+		key, keyOK := secret.Data["tls.key"]
+
+		if !caOK || len(ca) == 0 {
+			return fmt.Errorf("%s TLS secret %q missing required key \"ca.crt\"", c.kind, name)
+		}
+		if !crtOK || len(crt) == 0 {
+			return fmt.Errorf("%s TLS secret %q missing required key \"tls.crt\"", c.kind, name)
+		}
+		if !keyOK || len(key) == 0 {
+			return fmt.Errorf("%s TLS secret %q missing required key \"tls.key\"", c.kind, name)
+		}
+
+		if _, e := tls.X509KeyPair(crt, key); e != nil {
+			return fmt.Errorf("%s TLS certificate and private key in secret %q do not match: %w", c.kind, name, e)
+		}
+
+		block, _ := pem.Decode(crt)
+		if block == nil {
+			return fmt.Errorf("%s TLS secret %q: tls.crt is not valid PEM", c.kind, name)
+		}
+		cert, e := x509.ParseCertificate(block.Bytes)
+		if e != nil {
+			return fmt.Errorf("%s TLS secret %q: failed to parse tls.crt: %w", c.kind, name, e)
+		}
+		if cert.NotAfter.Before(time.Now()) {
+			return fmt.Errorf("%s TLS certificate in secret %q expired on %s", c.kind, name, cert.NotAfter.Format(time.RFC3339))
+		}
+
+		c.setCA(string(ca))
+		c.setCrt(string(crt))
+		c.setKey(string(key))
+	}
+
+	return nil
 }
