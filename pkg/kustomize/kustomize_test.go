@@ -1,12 +1,15 @@
 package kustomize
 
 import (
+	"crypto/x509"
+	"encoding/pem"
 	"strings"
 	"testing"
 
 	"github.com/go-logr/logr"
 	testlogr "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -856,4 +859,245 @@ func TestInflate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInflateTLSCertGeneration(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+
+	newQuay := func(components []v1.Component) *v1.QuayRegistry {
+		return &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "test-ns",
+			},
+			Spec: v1.QuayRegistrySpec{
+				Components: components,
+			},
+		}
+	}
+
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+		},
+	}
+
+	findManagedKeys := func(t *testing.T, pieces []client.Object, quay *v1.QuayRegistry) *corev1.Secret {
+		t.Helper()
+		for _, obj := range pieces {
+			objectMeta, _ := meta.Accessor(obj)
+			if strings.Contains(objectMeta.GetName(), v1.ManagedKeysSecretNameFor(quay)) {
+				return obj.(*corev1.Secret)
+			}
+		}
+		t.Fatal("managed keys Secret not found in Inflate output")
+		return nil
+	}
+
+	t.Run("generates certs when TLS enabled on postgres", func(t *testing.T) {
+		ctx := quaycontext.QuayRegistryContext{
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+		}
+		quay := newQuay([]v1.Component{
+			{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			{Kind: "redis", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		})
+
+		pieces, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+
+		assert.NotEmpty(t, ctx.PostgresTLSCA)
+		assert.NotEmpty(t, ctx.PostgresTLSCert)
+		assert.NotEmpty(t, ctx.PostgresTLSKey)
+
+		// Verify cert has correct SANs
+		block, _ := pem.Decode([]byte(ctx.PostgresTLSCert))
+		require.NotNil(t, block)
+		cert, err := x509.ParseCertificate(block.Bytes)
+		require.NoError(t, err)
+		assert.Contains(t, cert.DNSNames, "test-quay-database")
+		assert.Contains(t, cert.DNSNames, "test-quay-database.test-ns.svc.cluster.local")
+
+		// Verify certs persisted in managed keys Secret
+		managedKeys := findManagedKeys(t, pieces, quay)
+		assert.Equal(t, ctx.PostgresTLSCA, string(managedKeys.Data["POSTGRES_TLS_CA"]))
+		assert.Equal(t, ctx.PostgresTLSCert, string(managedKeys.Data["POSTGRES_TLS_CERT"]))
+		assert.Equal(t, ctx.PostgresTLSKey, string(managedKeys.Data["POSTGRES_TLS_KEY"]))
+
+		// Verify DB_URI contains TLS params
+		assert.Contains(t, ctx.DbUri, "sslmode=verify-full")
+		assert.Contains(t, ctx.DbUri, "sslrootcert")
+		assert.Contains(t, string(managedKeys.Data["DB_URI"]), "sslmode=verify-full")
+	})
+
+	t.Run("generates certs when TLS enabled on clairpostgres", func(t *testing.T) {
+		ctx := quaycontext.QuayRegistryContext{
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+		}
+		quay := newQuay([]v1.Component{
+			{Kind: "postgres", Managed: true},
+			{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			{Kind: "clair", Managed: true},
+			{Kind: "redis", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		})
+
+		pieces, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+
+		assert.NotEmpty(t, ctx.ClairPostgresTLSCA)
+		assert.NotEmpty(t, ctx.ClairPostgresTLSCert)
+		assert.NotEmpty(t, ctx.ClairPostgresTLSKey)
+
+		// Verify cert has correct SANs for clair database
+		block, _ := pem.Decode([]byte(ctx.ClairPostgresTLSCert))
+		require.NotNil(t, block)
+		cert, err := x509.ParseCertificate(block.Bytes)
+		require.NoError(t, err)
+		assert.Contains(t, cert.DNSNames, "test-clair-postgres")
+		assert.Contains(t, cert.DNSNames, "test-clair-postgres.test-ns.svc.cluster.local")
+
+		// Verify persisted
+		managedKeys := findManagedKeys(t, pieces, quay)
+		assert.Equal(t, ctx.ClairPostgresTLSCA, string(managedKeys.Data["CLAIRPOSTGRES_TLS_CA"]))
+		assert.Equal(t, ctx.ClairPostgresTLSCert, string(managedKeys.Data["CLAIRPOSTGRES_TLS_CERT"]))
+		assert.Equal(t, ctx.ClairPostgresTLSKey, string(managedKeys.Data["CLAIRPOSTGRES_TLS_KEY"]))
+	})
+
+	t.Run("does not generate certs when secretRef is set", func(t *testing.T) {
+		ctx := quaycontext.QuayRegistryContext{
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+		}
+		quay := newQuay([]v1.Component{
+			{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+				Enabled:   true,
+				SecretRef: &corev1.LocalObjectReference{Name: "user-provided-certs"},
+			}}},
+			{Kind: "redis", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		})
+
+		_, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+
+		assert.Empty(t, ctx.PostgresTLSCA)
+		assert.Empty(t, ctx.PostgresTLSCert)
+		assert.Empty(t, ctx.PostgresTLSKey)
+	})
+
+	t.Run("does not generate certs when TLS not enabled", func(t *testing.T) {
+		ctx := quaycontext.QuayRegistryContext{
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+		}
+		quay := newQuay([]v1.Component{
+			{Kind: "postgres", Managed: true},
+			{Kind: "redis", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		})
+
+		_, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+
+		assert.Empty(t, ctx.PostgresTLSCA)
+		assert.Empty(t, ctx.PostgresTLSCert)
+		assert.Empty(t, ctx.PostgresTLSKey)
+		assert.NotContains(t, ctx.DbUri, "sslmode")
+	})
+
+	t.Run("preserves existing certs on re-run (idempotent)", func(t *testing.T) {
+		ctx := quaycontext.QuayRegistryContext{
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+		}
+		quay := newQuay([]v1.Component{
+			{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			{Kind: "redis", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		})
+
+		// First run: generates certs
+		_, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+		firstCA := ctx.PostgresTLSCA
+		firstCert := ctx.PostgresTLSCert
+		firstKey := ctx.PostgresTLSKey
+		require.NotEmpty(t, firstCA)
+
+		// Second run: should preserve, not regenerate
+		pieces, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+		assert.Equal(t, firstCA, ctx.PostgresTLSCA)
+		assert.Equal(t, firstCert, ctx.PostgresTLSCert)
+		assert.Equal(t, firstKey, ctx.PostgresTLSKey)
+
+		// Managed keys Secret should have the same certs
+		managedKeys := findManagedKeys(t, pieces, quay)
+		assert.Equal(t, firstCA, string(managedKeys.Data["POSTGRES_TLS_CA"]))
+	})
+
+	t.Run("creates postgres-tls and postgresql-ca Secrets in output", func(t *testing.T) {
+		ctx := quaycontext.QuayRegistryContext{
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+		}
+		quay := newQuay([]v1.Component{
+			{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			{Kind: "redis", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		})
+
+		pieces, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+
+		findSecret := func(nameSuffix string) *corev1.Secret {
+			for _, obj := range pieces {
+				objectMeta, _ := meta.Accessor(obj)
+				if strings.HasSuffix(objectMeta.GetName(), nameSuffix) {
+					if s, ok := obj.(*corev1.Secret); ok {
+						return s
+					}
+				}
+			}
+			return nil
+		}
+
+		tlsSecret := findSecret("postgres-tls")
+		require.NotNil(t, tlsSecret, "expected postgres-tls Secret in Inflate output")
+		assert.NotEmpty(t, tlsSecret.Data["tls.crt"])
+		assert.NotEmpty(t, tlsSecret.Data["tls.key"])
+
+		caSecret := findSecret("postgresql-ca")
+		require.NotNil(t, caSecret, "expected postgresql-ca Secret in Inflate output")
+		assert.NotEmpty(t, caSecret.Data["ca.crt"])
+	})
+
+	t.Run("does not create TLS Secrets when secretRef is set", func(t *testing.T) {
+		ctx := quaycontext.QuayRegistryContext{
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+		}
+		quay := newQuay([]v1.Component{
+			{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+				Enabled:   true,
+				SecretRef: &corev1.LocalObjectReference{Name: "user-certs"},
+			}}},
+			{Kind: "redis", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		})
+
+		pieces, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+
+		for _, obj := range pieces {
+			objectMeta, _ := meta.Accessor(obj)
+			name := objectMeta.GetName()
+			assert.False(t, strings.HasSuffix(name, "postgres-tls"), "should not create postgres-tls Secret when secretRef is set")
+			assert.False(t, strings.HasSuffix(name, "postgresql-ca"), "should not create postgresql-ca Secret when secretRef is set")
+		}
+	})
 }

@@ -571,3 +571,46 @@ func TestClairMarshal(t *testing.T) {
 		})
 	}
 }
+
+func TestClairConfigTLSConnectionString(t *testing.T) {
+	t.Run("sslmode=verify-full when clairpostgres TLS enabled", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+					{Kind: "clair", Managed: true},
+				},
+			},
+		}
+		qctx := &quaycontext.QuayRegistryContext{
+			ClairDbUser:     "clair",
+			ClairDbPassword: "pass",
+			ClairDbName:     "clair",
+		}
+
+		cfgBytes, err := clairConfigFor(logr.Discard(), qctx, quay, "quay.example.com", "dGVzdHBzaw==")
+		assert.NoError(t, err)
+
+		cfg := string(cfgBytes)
+		assert.Contains(t, cfg, "sslmode=verify-full")
+		assert.Contains(t, cfg, "sslrootcert=/clair-db-tls/ca.crt")
+		assert.NotContains(t, cfg, "sslmode=disable")
+	})
+
+	t.Run("sslmode=disable when clairpostgres TLS not enabled", func(t *testing.T) {
+		quay := quayRegistry("test")
+		qctx := &quaycontext.QuayRegistryContext{
+			ClairDbUser:     "clair",
+			ClairDbPassword: "pass",
+			ClairDbName:     "clair",
+		}
+
+		cfgBytes, err := clairConfigFor(logr.Discard(), qctx, quay, "quay.example.com", "dGVzdHBzaw==")
+		assert.NoError(t, err)
+
+		cfg := string(cfgBytes)
+		assert.Contains(t, cfg, "sslmode=disable")
+		assert.NotContains(t, cfg, "sslmode=verify-full")
+	})
+}
