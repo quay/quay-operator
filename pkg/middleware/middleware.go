@@ -213,10 +213,17 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 
 		if strings.HasSuffix(dep.Name, "clair-app") {
 			applyClairEphemeralVolumeOverrides(quay, dep)
+			applyClairDBTLS(quay, dep)
 		}
 
 		isQuayDB := strings.Contains(dep.GetName(), "quay-database")
 		isClairDB := strings.Contains(dep.GetName(), "clair-postgres")
+		if isQuayDB {
+			applyPostgresTLS(quay, dep, v1.ComponentPostgres)
+		}
+		if isClairDB {
+			applyPostgresTLS(quay, dep, v1.ComponentClairPostgres)
+		}
 		if isQuayDB || isClairDB {
 			delete(dep.Spec.Template.Annotations, "quay-registry-hostname")
 			delete(dep.Spec.Template.Annotations, "quay-buildmanager-hostname")
@@ -270,6 +277,11 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		}
 
 		return pvc, nil
+	}
+
+	if cm, ok := obj.(*corev1.ConfigMap); ok {
+		applyPostgresConfSampleTLS(quay, cm, quayComponentLabel)
+		return cm, nil
 	}
 
 	if _, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
@@ -436,4 +448,188 @@ func applyClairEphemeralVolumeOverrides(quay *v1.QuayRegistry, dep *appsv1.Deplo
 		}
 		return
 	}
+}
+
+const (
+	postgresTLSVolumeName  = "postgres-tls-certs"
+	postgresDataVolumeName = "postgres-data"
+	tlsCertsMountPath      = "/tls-certs"
+	pgDataMountPath        = "/var/lib/pgsql/data"
+)
+
+func applyPostgresTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment, kind v1.ComponentKind) {
+	override := v1.GetTLSOverrideForComponent(quay, kind)
+	if override == nil || !override.Enabled {
+		applyPostgresTLSCleanup(dep)
+		return
+	}
+
+	tlsSecretName := postgresTLSSecretName(quay, kind, override)
+
+	tlsVolumeMode := int32(0600)
+	dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+		Name: postgresTLSVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				DefaultMode: &tlsVolumeMode,
+				Sources: []corev1.VolumeProjection{
+					{
+						Secret: &corev1.SecretProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: tlsSecretName,
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	for i := range dep.Spec.Template.Spec.Containers {
+		dep.Spec.Template.Spec.Containers[i].VolumeMounts = append(
+			dep.Spec.Template.Spec.Containers[i].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      postgresTLSVolumeName,
+				MountPath: tlsCertsMountPath,
+				ReadOnly:  true,
+			},
+		)
+	}
+
+	initContainer := corev1.Container{
+		Name:  "postgres-tls-init",
+		Image: dep.Spec.Template.Spec.Containers[0].Image,
+		Command: []string{
+			"sh", "-c",
+			"if [ -f /var/lib/pgsql/data/userdata/postgresql.conf ]; then " +
+				"grep -q '^ssl = on' /var/lib/pgsql/data/userdata/postgresql.conf || " +
+				"printf '\\nssl = on\\nssl_cert_file = '\"'\"'" + tlsCertsMountPath + "/tls.crt'\"'\"'\\nssl_key_file = '\"'\"'" + tlsCertsMountPath + "/tls.key'\"'\"'\\n' >> /var/lib/pgsql/data/userdata/postgresql.conf; " +
+				"fi",
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      postgresDataVolumeName,
+				MountPath: pgDataMountPath,
+			},
+		},
+	}
+
+	dep.Spec.Template.Spec.InitContainers = append(dep.Spec.Template.Spec.InitContainers, initContainer)
+}
+
+func applyPostgresTLSCleanup(dep *appsv1.Deployment) {
+	cleanup := corev1.Container{
+		Name:  "postgres-tls-init",
+		Image: dep.Spec.Template.Spec.Containers[0].Image,
+		Command: []string{
+			"sh", "-c",
+			"if [ -f /var/lib/pgsql/data/userdata/postgresql.conf ] && grep -q '^ssl = on' /var/lib/pgsql/data/userdata/postgresql.conf; then " +
+				"sed -i '/^ssl = on$/d;/^ssl_cert_file/d;/^ssl_key_file/d' /var/lib/pgsql/data/userdata/postgresql.conf; " +
+				"echo 'Removed SSL directives from postgresql.conf'; " +
+				"fi",
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      postgresDataVolumeName,
+				MountPath: pgDataMountPath,
+			},
+		},
+	}
+
+	dep.Spec.Template.Spec.InitContainers = append(dep.Spec.Template.Spec.InitContainers, cleanup)
+}
+
+func postgresTLSSecretName(quay *v1.QuayRegistry, kind v1.ComponentKind, override *v1.TLSOverride) string {
+	if override.SecretRef != nil {
+		return override.SecretRef.Name
+	}
+	prefix := quay.GetName() + "-"
+	switch kind {
+	case v1.ComponentPostgres:
+		return prefix + "postgres-tls"
+	case v1.ComponentClairPostgres:
+		return prefix + "clairpostgres-tls"
+	default:
+		return prefix + "postgres-tls"
+	}
+}
+
+const (
+	clairDBTLSVolumeName = "clair-db-tls"
+	clairDBTLSMountPath  = "/clair-db-tls"
+)
+
+func applyClairDBTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment) {
+	override := v1.GetTLSOverrideForComponent(quay, v1.ComponentClairPostgres)
+	if override == nil || !override.Enabled {
+		return
+	}
+
+	caSecretName := clairPostgresCASecretName(quay, override)
+
+	dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+		Name: clairDBTLSVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{
+					{
+						Secret: &corev1.SecretProjection{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: caSecretName,
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	for i := range dep.Spec.Template.Spec.Containers {
+		dep.Spec.Template.Spec.Containers[i].VolumeMounts = append(
+			dep.Spec.Template.Spec.Containers[i].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      clairDBTLSVolumeName,
+				MountPath: clairDBTLSMountPath,
+				ReadOnly:  true,
+			},
+		)
+	}
+}
+
+const postgresTLSConfDirectives = "\nssl = on\nssl_cert_file = '" + tlsCertsMountPath + "/tls.crt'\nssl_key_file = '" + tlsCertsMountPath + "/tls.key'\n"
+
+func applyPostgresConfSampleTLS(quay *v1.QuayRegistry, cm *corev1.ConfigMap, _ string) {
+	var kind v1.ComponentKind
+	name := cm.GetName()
+	switch {
+	case strings.HasSuffix(name, "postgres-conf-sample") && !strings.Contains(name, "clair"):
+		kind = v1.ComponentPostgres
+	case strings.HasSuffix(name, "clair-postgres-conf-sample"):
+		kind = v1.ComponentClairPostgres
+	default:
+		return
+	}
+
+	override := v1.GetTLSOverrideForComponent(quay, kind)
+	if override == nil || !override.Enabled {
+		return
+	}
+
+	const key = "postgresql.conf.sample"
+	if cm.Data == nil || cm.Data[key] == "" {
+		return
+	}
+
+	if strings.Contains(cm.Data[key], "ssl = on") {
+		return
+	}
+
+	cm.Data[key] += postgresTLSConfDirectives
+}
+
+func clairPostgresCASecretName(quay *v1.QuayRegistry, override *v1.TLSOverride) string {
+	if override.SecretRef != nil {
+		return override.SecretRef.Name
+	}
+	return quay.GetName() + "-clairpostgres-ca"
 }
