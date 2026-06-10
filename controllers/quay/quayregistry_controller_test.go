@@ -1585,6 +1585,63 @@ func Test_findQuayRegistriesForSecret(t *testing.T) {
 			},
 			expected: 0,
 		},
+		{
+			name: "postgres TLS secretRef triggers reconcile",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg-tls-certs", Namespace: "ns"},
+			},
+			objs: []client.Object{
+				&v1.QuayRegistry{
+					ObjectMeta: metav1.ObjectMeta{Name: "reg1", Namespace: "ns"},
+					Spec: v1.QuayRegistrySpec{
+						Components: []v1.Component{
+							{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+								TLS: &v1.TLSOverride{Enabled: true, SecretRef: &corev1.LocalObjectReference{Name: "pg-tls-certs"}},
+							}},
+						},
+					},
+				},
+			},
+			expected: 1,
+		},
+		{
+			name: "clairpostgres TLS secretRef triggers reconcile",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "clair-tls-certs", Namespace: "ns"},
+			},
+			objs: []client.Object{
+				&v1.QuayRegistry{
+					ObjectMeta: metav1.ObjectMeta{Name: "reg1", Namespace: "ns"},
+					Spec: v1.QuayRegistrySpec{
+						Components: []v1.Component{
+							{Kind: v1.ComponentClairPostgres, Managed: true, Overrides: &v1.Override{
+								TLS: &v1.TLSOverride{Enabled: true, SecretRef: &corev1.LocalObjectReference{Name: "clair-tls-certs"}},
+							}},
+						},
+					},
+				},
+			},
+			expected: 1,
+		},
+		{
+			name: "non-matching postgres TLS secretRef",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "unrelated-secret", Namespace: "ns"},
+			},
+			objs: []client.Object{
+				&v1.QuayRegistry{
+					ObjectMeta: metav1.ObjectMeta{Name: "reg1", Namespace: "ns"},
+					Spec: v1.QuayRegistrySpec{
+						Components: []v1.Component{
+							{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+								TLS: &v1.TLSOverride{Enabled: true, SecretRef: &corev1.LocalObjectReference{Name: "pg-tls-certs"}},
+							}},
+						},
+					},
+				},
+			},
+			expected: 0,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			cli := fake.NewClientBuilder().WithScheme(s).WithObjects(tt.objs...).Build()
