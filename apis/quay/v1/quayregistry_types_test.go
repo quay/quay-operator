@@ -2,6 +2,7 @@ package v1
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -453,7 +454,7 @@ var validateOverridesTests = []struct {
 					{Kind: "clair", Managed: true},
 					{Kind: "objectstorage", Managed: true},
 					{Kind: "route", Managed: true},
-					{Kind: "tls", Managed: true, Overrides: &Override{Env: []corev1.EnvVar{corev1.EnvVar{Name: "foo", Value: "bar"}}}},
+					{Kind: "tls", Managed: true, Overrides: &Override{Env: []corev1.EnvVar{{Name: "foo", Value: "bar"}}}},
 					{Kind: "horizontalpodautoscaler", Managed: true},
 					{Kind: "mirror", Managed: true},
 					{Kind: "monitoring", Managed: true},
@@ -601,6 +602,45 @@ var validateOverridesTests = []struct {
 			},
 		},
 		errors.New("component redis does not support securityContext overrides"),
+	},
+	{
+		"DatabaseTLSOnPostgres",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: ComponentPostgres, Managed: true, Overrides: &Override{
+						DatabaseTLS: &DatabaseTLSConfig{Enabled: true},
+					}},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"DatabaseTLSOnClairPostgres",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: ComponentClairPostgres, Managed: true, Overrides: &Override{
+						DatabaseTLS: &DatabaseTLSConfig{Enabled: true},
+					}},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"DatabaseTLSOnQuayRejected",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: ComponentQuay, Managed: true, Overrides: &Override{
+						DatabaseTLS: &DatabaseTLSConfig{Enabled: true},
+					}},
+				},
+			},
+		},
+		fmt.Errorf("component quay does not support databaseTLS overrides"),
 	},
 }
 
