@@ -1179,6 +1179,27 @@ spec:
                           description: StorageClassName is the name of the StorageClass
                             to use for the PVC.
                           type: string
+                        tls:
+                          description: TLSOverride describes TLS configuration overrides
+                            for managed PostgreSQL components.
+                          properties:
+                            enabled:
+                              type: boolean
+                            secretRef:
+                              description: |-
+                                LocalObjectReference contains enough information to let you locate the
+                                referenced object inside the same namespace.
+                              properties:
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          required:
+                          - enabled
+                          type: object
                         volumeSize:
                           anyOf:
                           - type: integer
@@ -1211,6 +1232,9 @@ spec:
                     rule: '!self.managed || !has(self.secretRef)'
                   - message: secretRef.name must not be empty
                     rule: '!has(self.secretRef) || self.secretRef.name.size() != 0'
+                  - message: tls.secretRef requires tls.enabled to be true
+                    rule: '!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef)
+                      || self.overrides.tls.enabled'
                 type: array
               configBundleSecret:
                 description: |-

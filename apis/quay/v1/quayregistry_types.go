@@ -128,6 +128,11 @@ var supportsSecurityContextOverride = []ComponentKind{
 	ComponentMirror,
 }
 
+var supportsTLSOverride = []ComponentKind{
+	ComponentPostgres,
+	ComponentClairPostgres,
+}
+
 const (
 	ManagedKeysName             = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName     = "quay-config-tls"
@@ -153,6 +158,7 @@ type QuayRegistrySpec struct {
 // +kubebuilder:validation:XValidation:rule="self.managed || !has(self.overrides)",message="cannot set overrides on unmanaged component"
 // +kubebuilder:validation:XValidation:rule="!self.managed || !has(self.secretRef)",message="secretRef cannot be set on a managed component"
 // +kubebuilder:validation:XValidation:rule="!has(self.secretRef) || self.secretRef.name.size() != 0",message="secretRef.name must not be empty"
+// +kubebuilder:validation:XValidation:rule="!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef) || self.overrides.tls.enabled",message="tls.secretRef requires tls.enabled to be true"
 type Component struct {
 	// Kind is the unique name of this type of component.
 	Kind ComponentKind `json:"kind"`
@@ -182,6 +188,13 @@ type Override struct {
 	Annotations     map[string]string       `json:"annotations,omitempty"`
 	Resources       *Resources              `json:"resources,omitempty"`
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+	TLS             *TLSOverride            `json:"tls,omitempty"`
+}
+
+// TLSOverride describes TLS configuration overrides for managed PostgreSQL components.
+type TLSOverride struct {
+	Enabled   bool                         `json:"enabled"`
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
 // Resources describes the resource limits and requests for a component.
@@ -558,7 +571,8 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		hasresources := component.Overrides.Resources != nil
 		hassecuritycontext := component.Overrides.SecurityContext != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasaffinity || hasvolume || hasstorageclass || hasenvvar || hasreplicas || hasresources || hassecuritycontext
+		hastls := component.Overrides.TLS != nil
+		hasoverride := hasaffinity || hasvolume || hasstorageclass || hasenvvar || hasreplicas || hasresources || hassecuritycontext || hastls
 
 		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
@@ -620,6 +634,17 @@ func ValidateOverrides(quay *QuayRegistry) error {
 				"component %s does not support securityContext overrides",
 				component.Kind,
 			)
+		}
+
+		if hastls && !ComponentSupportsOverride(component.Kind, "tls") {
+			return fmt.Errorf(
+				"component %s does not support tls overrides",
+				component.Kind,
+			)
+		}
+
+		if hastls && component.Overrides.TLS.SecretRef != nil && !component.Overrides.TLS.Enabled {
+			return fmt.Errorf("tls.secretRef requires tls.enabled to be true")
 		}
 	}
 
@@ -806,6 +831,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 		components = supportsResourceOverrides
 	case "securityContext":
 		components = supportsSecurityContextOverride
+	case "tls":
+		components = supportsTLSOverride
 	}
 
 	for _, cmp := range components {
@@ -890,6 +917,20 @@ func GetSecurityContextOverrideForComponent(quay *QuayRegistry, kind ComponentKi
 			return nil
 		}
 		return cmp.Overrides.SecurityContext
+	}
+	return nil
+}
+
+// GetTLSOverrideForComponent returns the TLS override for a given component kind.
+func GetTLSOverrideForComponent(quay *QuayRegistry, kind ComponentKind) *TLSOverride {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+		if cmp.Overrides == nil {
+			return nil
+		}
+		return cmp.Overrides.TLS
 	}
 	return nil
 }
