@@ -428,6 +428,82 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 	return nil
 }
 
+const (
+	pgTLSSecretSuffix = "pg-tls"
+	serviceCACertPath = "/conf/stack/extra_ca_certs/service-ca.crt"
+)
+
+// checkDatabaseTLS evaluates the databaseTLS override for each managed database
+// component and populates the corresponding fields on the QuayRegistryContext.
+func checkDatabaseTLS(
+	qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
+) error {
+	type pgComponent struct {
+		kind       v1.ComponentKind
+		suffix     string
+		setEnabled func(bool)
+		setSecret  func(string)
+		setCAPath  func(string)
+	}
+
+	components := []pgComponent{
+		{
+			kind:       v1.ComponentPostgres,
+			suffix:     "quay-database",
+			setEnabled: func(b bool) { qctx.PostgresTLSEnabled = b },
+			setSecret:  func(s string) { qctx.PgTLSCertSecretName = s },
+			setCAPath:  func(s string) { qctx.PgTLSCAPath = s },
+		},
+		{
+			kind:       v1.ComponentClairPostgres,
+			suffix:     "clair-postgres",
+			setEnabled: func(b bool) { qctx.ClairPostgresTLSEnabled = b },
+			setSecret:  func(s string) { qctx.ClairPgTLSCertSecretName = s },
+			setCAPath:  func(s string) { qctx.ClairPgTLSCAPath = s },
+		},
+	}
+
+	for _, pg := range components {
+		if !v1.ComponentIsManaged(quay.Spec.Components, pg.kind) {
+			continue
+		}
+
+		cfg := v1.GetDatabaseTLSConfig(quay, pg.kind)
+		if cfg == nil || !cfg.Enabled {
+			continue
+		}
+
+		if cfg.SecretRef != nil {
+			if cfg.CASecretRef == nil {
+				return fmt.Errorf(
+					"component %s: databaseTLS.caSecretRef is required when secretRef is set",
+					pg.kind,
+				)
+			}
+			pg.setEnabled(true)
+			pg.setSecret(cfg.SecretRef.Name)
+			pg.setCAPath(fmt.Sprintf("/run/secrets/%s-pg-ca/ca.crt", pg.suffix))
+			continue
+		}
+
+		if qctx.SupportsRoutes {
+			secretName := fmt.Sprintf("%s-%s-%s", quay.GetName(), pg.suffix, pgTLSSecretSuffix)
+			pg.setEnabled(true)
+			pg.setSecret(secretName)
+			pg.setCAPath(serviceCACertPath)
+			continue
+		}
+
+		return fmt.Errorf(
+			"component %s: databaseTLS enabled but no TLS certificate source available "+
+				"(set databaseTLS.secretRef for vanilla Kubernetes or install on OpenShift for service CA)",
+			pg.kind,
+		)
+	}
+
+	return nil
+}
+
 // checkManagedDatabaseReady checks whether managed database deployments are
 // available. When a database component is unmanaged we cannot verify its
 // readiness so we optimistically mark it as initialized. When managed, the

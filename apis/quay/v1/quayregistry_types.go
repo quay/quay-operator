@@ -128,6 +128,11 @@ var supportsSecurityContextOverride = []ComponentKind{
 	ComponentMirror,
 }
 
+var supportsDatabaseTLSOverride = []ComponentKind{
+	ComponentPostgres,
+	ComponentClairPostgres,
+}
+
 const (
 	ManagedKeysName             = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName     = "quay-config-tls"
@@ -182,12 +187,26 @@ type Override struct {
 	Annotations     map[string]string       `json:"annotations,omitempty"`
 	Resources       *Resources              `json:"resources,omitempty"`
 	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+	DatabaseTLS     *DatabaseTLSConfig      `json:"databaseTLS,omitempty"`
 }
 
 // Resources describes the resource limits and requests for a component.
 type Resources struct {
 	Limits   corev1.ResourceList `json:"limits,omitempty"`
 	Requests corev1.ResourceList `json:"requests,omitempty"`
+}
+
+// DatabaseTLSConfig configures TLS encryption for managed PostgreSQL connections.
+type DatabaseTLSConfig struct {
+	// Enabled controls whether TLS is enabled for the managed PostgreSQL connection.
+	Enabled bool `json:"enabled"`
+	// SecretRef optionally references a kubernetes.io/tls Secret containing a custom
+	// PG server cert/key. If unset on OpenShift, the service CA operator provisions
+	// the cert automatically. On vanilla Kubernetes this field is required.
+	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
+	// CASecretRef optionally references a Secret containing a CA certificate (key: ca.crt)
+	// for client-side trust. Required when SecretRef is set. Ignored when using service CA.
+	CASecretRef *corev1.LocalObjectReference `json:"caSecretRef,omitempty"`
 }
 
 type ConditionType string
@@ -557,8 +576,9 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		hasreplicas := component.Overrides.Replicas != nil
 		hasresources := component.Overrides.Resources != nil
 		hassecuritycontext := component.Overrides.SecurityContext != nil
+		hasdatabasetls := component.Overrides.DatabaseTLS != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasaffinity || hasvolume || hasstorageclass || hasenvvar || hasreplicas || hasresources || hassecuritycontext
+		hasoverride := hasaffinity || hasvolume || hasstorageclass || hasenvvar || hasreplicas || hasresources || hassecuritycontext || hasdatabasetls
 
 		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)
@@ -618,6 +638,13 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		if hassecuritycontext && !ComponentSupportsOverride(component.Kind, "securityContext") {
 			return fmt.Errorf(
 				"component %s does not support securityContext overrides",
+				component.Kind,
+			)
+		}
+
+		if hasdatabasetls && !ComponentSupportsOverride(component.Kind, "databaseTLS") {
+			return fmt.Errorf(
+				"component %s does not support databaseTLS overrides",
 				component.Kind,
 			)
 		}
@@ -806,6 +833,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 		components = supportsResourceOverrides
 	case "securityContext":
 		components = supportsSecurityContextOverride
+	case "databaseTLS":
+		components = supportsDatabaseTLSOverride
 	}
 
 	for _, cmp := range components {
@@ -892,6 +921,26 @@ func GetSecurityContextOverrideForComponent(quay *QuayRegistry, kind ComponentKi
 		return cmp.Overrides.SecurityContext
 	}
 	return nil
+}
+
+// GetDatabaseTLSConfig returns the DatabaseTLS override for a given component kind.
+func GetDatabaseTLSConfig(quay *QuayRegistry, kind ComponentKind) *DatabaseTLSConfig {
+	for _, cmp := range quay.Spec.Components {
+		if cmp.Kind != kind {
+			continue
+		}
+		if cmp.Overrides == nil {
+			return nil
+		}
+		return cmp.Overrides.DatabaseTLS
+	}
+	return nil
+}
+
+// DatabaseTLSEnabled returns true if TLS is enabled for the given database component.
+func DatabaseTLSEnabled(quay *QuayRegistry, kind ComponentKind) bool {
+	cfg := GetDatabaseTLSConfig(quay, kind)
+	return cfg != nil && cfg.Enabled
 }
 
 // GetAffinityForComponent returns affinity overrides for the provided component

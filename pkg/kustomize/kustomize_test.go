@@ -1,6 +1,7 @@
 package kustomize
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
@@ -799,5 +801,174 @@ func TestInflate(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestClairConnstringWithTLS(t *testing.T) {
+	qctx := &quaycontext.QuayRegistryContext{
+		ClairPostgresTLSEnabled: true,
+		ClairPgTLSCAPath:        "/tls/clair-postgres/ca.crt",
+		ClairDbUser:             "testuser",
+		ClairDbPassword:         "testpass",
+		ClairDbName:             "testdb",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentHPA, Managed: false},
+			},
+		},
+	}
+	log := testlogr.NewTestLogger(t)
+	psk := base64.StdEncoding.EncodeToString([]byte("test-psk"))
+
+	cfgBytes, err := clairConfigFor(log, qctx, quay, "quay.example.com", psk)
+	assert.NoError(t, err)
+
+	var cfg map[string]interface{}
+	err = yaml.Unmarshal(cfgBytes, &cfg)
+	assert.NoError(t, err)
+
+	indexer := cfg["indexer"].(map[string]interface{})
+	connstring := indexer["connstring"].(string)
+
+	assert.Contains(t, connstring, "sslmode=verify-ca")
+	assert.Contains(t, connstring, "sslrootcert=/tls/clair-postgres/ca.crt")
+	assert.NotContains(t, connstring, "sslmode=disable")
+}
+
+func TestClairConnstringWithoutTLS(t *testing.T) {
+	qctx := &quaycontext.QuayRegistryContext{
+		ClairPostgresTLSEnabled: false,
+		ClairDbUser:             "testuser",
+		ClairDbPassword:         "testpass",
+		ClairDbName:             "testdb",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentHPA, Managed: false},
+			},
+		},
+	}
+	log := testlogr.NewTestLogger(t)
+	psk := base64.StdEncoding.EncodeToString([]byte("test-psk"))
+
+	cfgBytes, err := clairConfigFor(log, qctx, quay, "quay.example.com", psk)
+	assert.NoError(t, err)
+
+	var cfg map[string]interface{}
+	err = yaml.Unmarshal(cfgBytes, &cfg)
+	assert.NoError(t, err)
+
+	indexer := cfg["indexer"].(map[string]interface{})
+	connstring := indexer["connstring"].(string)
+
+	assert.Contains(t, connstring, "sslmode=disable")
+	assert.NotContains(t, connstring, "sslmode=verify-ca")
+}
+
+func TestInflateWithDatabaseTLS(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := &quaycontext.QuayRegistryContext{
+		PostgresTLSEnabled:       true,
+		PgTLSCertSecretName:      "test-quay-database-pg-tls",
+		PgTLSCAPath:              "/conf/stack/extra_ca_certs/service-ca.crt",
+		ClairPostgresTLSEnabled:  true,
+		ClairPgTLSCertSecretName: "test-clair-postgres-pg-tls",
+		ClairPgTLSCAPath:         "/conf/stack/extra_ca_certs/service-ca.crt",
+		SupportsRoutes:           true,
+		DatabaseSecretKey:        "test-db-secret-key",
+		SecretKey:                "test-secret-key",
+		SecurityScannerV4PSK:     base64.StdEncoding.EncodeToString([]byte("test-psk")),
+		ServerHostname:           "quay.example.com",
+		ClairDbName:              "clair",
+		ClairDbUser:              "clair",
+		ClairDbPassword:          "clairpass",
+	}
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+					DatabaseTLS: &v1.DatabaseTLSConfig{Enabled: true},
+				}},
+				{Kind: v1.ComponentClairPostgres, Managed: true, Overrides: &v1.Override{
+					DatabaseTLS: &v1.DatabaseTLSConfig{Enabled: true},
+				}},
+				{Kind: v1.ComponentClair, Managed: true},
+				{Kind: v1.ComponentQuay, Managed: true},
+				{Kind: v1.ComponentRedis, Managed: true},
+				{Kind: v1.ComponentHPA, Managed: false},
+				{Kind: v1.ComponentObjectStorage, Managed: false},
+				{Kind: v1.ComponentRoute, Managed: false},
+				{Kind: v1.ComponentMirror, Managed: false},
+				{Kind: v1.ComponentMonitoring, Managed: false},
+				{Kind: v1.ComponentTLS, Managed: false},
+			},
+			ConfigBundleSecret: "test-bundle",
+		},
+	}
+
+	bundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{
+				"DATABASE_SECRET_KEY": "test-db-secret-key",
+				"SECRET_KEY":          "test-secret-key",
+				"SERVER_HOSTNAME":     "quay.example.com",
+			}),
+		},
+	}
+
+	objects, err := Inflate(ctx, quay, bundle, log, false)
+	assert.NoError(t, err)
+	assert.NotNil(t, objects)
+
+	// Verify DB_URI has TLS params
+	assert.Contains(t, ctx.DbUri, "sslmode=verify-ca")
+	assert.Contains(t, ctx.DbUri, "sslrootcert=/conf/stack/extra_ca_certs/service-ca.crt")
+
+	// Process each object through middleware and verify PG-related transforms
+	for _, obj := range objects {
+		processed, err := middleware.Process(quay, ctx, obj, false)
+		assert.NoError(t, err)
+
+		accessor, _ := meta.Accessor(processed)
+		name := accessor.GetName()
+
+		// Check PG Service has service CA annotation
+		if svc, ok := processed.(*corev1.Service); ok {
+			if strings.HasSuffix(name, "quay-database") {
+				assert.Equal(t,
+					"test-quay-database-pg-tls",
+					svc.Annotations["service.beta.openshift.io/serving-cert-secret-name"],
+					"quay-database Service should have service CA annotation",
+				)
+			}
+		}
+
+		// Check PG Deployment has TLS volume
+		if dep, ok := processed.(*appsv1.Deployment); ok {
+			if strings.HasSuffix(name, "quay-database") {
+				var hasVol bool
+				for _, vol := range dep.Spec.Template.Spec.Volumes {
+					if vol.Name == "pg-tls-certs" {
+						hasVol = true
+						assert.Equal(t, "test-quay-database-pg-tls", vol.Secret.SecretName)
+						break
+					}
+				}
+				assert.True(t, hasVol, "quay-database Deployment should have pg-tls-certs volume")
+			}
+		}
 	}
 }

@@ -861,6 +861,42 @@ spec:
                           additionalProperties:
                             type: string
                           type: object
+                        databaseTLS:
+                          description: DatabaseTLSConfig configures TLS encryption
+                            for managed PostgreSQL connections.
+                          properties:
+                            caSecretRef:
+                              description: |-
+                                CASecretRef optionally references a Secret containing a CA certificate (key: ca.crt)
+                                for client-side trust. Required when SecretRef is set. Ignored when using service CA.
+                              properties:
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            enabled:
+                              description: Enabled controls whether TLS is enabled
+                                for the managed PostgreSQL connection.
+                              type: boolean
+                            secretRef:
+                              description: |-
+                                SecretRef optionally references a kubernetes.io/tls Secret containing a custom
+                                PG server cert/key. If unset on OpenShift, the service CA operator provisions
+                                the cert automatically. On vanilla Kubernetes this field is required.
+                              properties:
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          required:
+                          - enabled
+                          type: object
                         env:
                           items:
                             description: EnvVar represents an environment variable

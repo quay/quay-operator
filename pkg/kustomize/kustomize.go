@@ -671,6 +671,11 @@ func Inflate(
 		ctx.DbUri = fmt.Sprintf(
 			"postgresql://%s:%s@%s:%s/%s", user, password, host, port, name,
 		)
+
+		// Append TLS parameters when database TLS is enabled
+		if ctx.PostgresTLSEnabled && ctx.PgTLSCAPath != "" {
+			ctx.DbUri += fmt.Sprintf("?sslmode=verify-ca&sslrootcert=%s", ctx.PgTLSCAPath)
+		}
 	}
 	parsedUserConfig["DB_URI"] = ctx.DbUri
 

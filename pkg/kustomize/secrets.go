@@ -408,7 +408,11 @@ func clairConfigFor(log logr.Logger, qctx *quaycontext.QuayRegistryContext, quay
 	dbname := qctx.ClairDbName
 	user := qctx.ClairDbUser
 	password := qctx.ClairDbPassword
-	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=disable pool_max_conns=%d", host, dbname, user, password, poolsize)
+	sslmode := "sslmode=disable"
+	if qctx.ClairPostgresTLSEnabled && qctx.ClairPgTLSCAPath != "" {
+		sslmode = fmt.Sprintf("sslmode=verify-ca sslrootcert=%s", qctx.ClairPgTLSCAPath)
+	}
+	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s %s pool_max_conns=%d", host, dbname, user, password, sslmode, poolsize)
 
 	psk, err := base64.StdEncoding.DecodeString(preSharedKey)
 	if err != nil {

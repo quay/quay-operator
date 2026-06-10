@@ -80,6 +80,32 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		return configBundleSecret, nil
 	}
 
+	// Annotate PG Service for service CA cert generation when database TLS is enabled
+	if svc, ok := obj.(*corev1.Service); ok {
+		component := strings.ReplaceAll(labels.Set(objectMeta.GetAnnotations()).Get("quay-component"), "-", "")
+		kind := v1.ComponentKind(component)
+
+		if kind == v1.ComponentPostgres && qctx.PostgresTLSEnabled {
+			cfg := v1.GetDatabaseTLSConfig(quay, v1.ComponentPostgres)
+			if cfg != nil && cfg.SecretRef == nil && qctx.PgTLSCertSecretName != "" {
+				if svc.Annotations == nil {
+					svc.Annotations = map[string]string{}
+				}
+				svc.Annotations["service.beta.openshift.io/serving-cert-secret-name"] = qctx.PgTLSCertSecretName
+			}
+		}
+		if kind == v1.ComponentClairPostgres && qctx.ClairPostgresTLSEnabled {
+			cfg := v1.GetDatabaseTLSConfig(quay, v1.ComponentClairPostgres)
+			if cfg != nil && cfg.SecretRef == nil && qctx.ClairPgTLSCertSecretName != "" {
+				if svc.Annotations == nil {
+					svc.Annotations = map[string]string{}
+				}
+				svc.Annotations["service.beta.openshift.io/serving-cert-secret-name"] = qctx.ClairPgTLSCertSecretName
+			}
+		}
+		return svc, nil
+	}
+
 	// we need to remove
 	// all unused annotations from postgres deployment to avoid its redeployment.
 	if dep, ok := obj.(*appsv1.Deployment); ok {
@@ -213,6 +239,43 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 
 		if strings.HasSuffix(dep.Name, "clair-app") {
 			applyClairEphemeralVolumeOverrides(quay, dep)
+		}
+
+		// Mount PG TLS cert into postgres/clairpostgres Deployment when database TLS is enabled
+		pgTLSComponents := map[v1.ComponentKind]struct {
+			enabled    bool
+			secretName string
+		}{
+			v1.ComponentPostgres:      {qctx.PostgresTLSEnabled, qctx.PgTLSCertSecretName},
+			v1.ComponentClairPostgres: {qctx.ClairPostgresTLSEnabled, qctx.ClairPgTLSCertSecretName},
+		}
+
+		if pgTLS, ok := pgTLSComponents[kind]; ok && pgTLS.enabled && pgTLS.secretName != "" {
+			defaultMode := int32(0640)
+			dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: "pg-tls-certs",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName:  pgTLS.secretName,
+						DefaultMode: &defaultMode,
+					},
+				},
+			})
+
+			for i := range dep.Spec.Template.Spec.Containers {
+				ref := &dep.Spec.Template.Spec.Containers[i]
+				ref.VolumeMounts = append(ref.VolumeMounts, corev1.VolumeMount{
+					Name:      "pg-tls-certs",
+					MountPath: "/var/lib/pgsql/tls",
+					ReadOnly:  true,
+				})
+				UpsertContainerEnv(ref, corev1.EnvVar{
+					Name: "POSTGRESQL_TLS_CERT_FILE", Value: "/var/lib/pgsql/tls/tls.crt",
+				})
+				UpsertContainerEnv(ref, corev1.EnvVar{
+					Name: "POSTGRESQL_TLS_KEY_FILE", Value: "/var/lib/pgsql/tls/tls.key",
+				})
+			}
 		}
 
 		isQuayDB := strings.Contains(dep.GetName(), "quay-database")
