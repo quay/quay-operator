@@ -602,6 +602,159 @@ var validateOverridesTests = []struct {
 		},
 		errors.New("component redis does not support securityContext overrides"),
 	},
+	{
+		"ValidTLSOverrideOnPostgres",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true, Overrides: &Override{TLS: &TLSOverride{Enabled: true}}},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"ValidTLSOverrideOnClairPostgres",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "clairpostgres", Managed: true, Overrides: &Override{TLS: &TLSOverride{Enabled: true}}},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"ValidTLSOverrideWithSecretRef",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true, Overrides: &Override{TLS: &TLSOverride{Enabled: true, SecretRef: &corev1.LocalObjectReference{Name: "my-certs"}}}},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"InvalidTLSOverrideOnRedis",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true, Overrides: &Override{TLS: &TLSOverride{Enabled: true}}},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component redis does not support tls overrides"),
+	},
+	{
+		"InvalidTLSOverrideOnClair",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true, Overrides: &Override{TLS: &TLSOverride{Enabled: true}}},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("component clair does not support tls overrides"),
+	},
+	{
+		"InvalidTLSSecretRefWithoutEnabled",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true, Overrides: &Override{TLS: &TLSOverride{SecretRef: &corev1.LocalObjectReference{Name: "my-certs"}}}},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		errors.New("tls.secretRef requires tls.enabled to be true"),
+	},
+	{
+		"TLSDisabledExplicitly",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true, Overrides: &Override{TLS: &TLSOverride{Enabled: false}}},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"TLSEmptyOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true, Overrides: &Override{TLS: &TLSOverride{}}},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
 }
 
 func TestValidOverrides(t *testing.T) {
@@ -809,6 +962,83 @@ func TestGetSecurityContextOverrideForComponent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GetSecurityContextOverrideForComponent(tt.quay, tt.kind)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetTLSOverrideForComponent(t *testing.T) {
+	tests := []struct {
+		name     string
+		quay     *QuayRegistry
+		kind     ComponentKind
+		expected *TLSOverride
+	}{
+		{
+			name: "returns TLS override for postgres",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: "postgres", Managed: true, Overrides: &Override{TLS: &TLSOverride{Enabled: true}}},
+					},
+				},
+			},
+			kind:     ComponentPostgres,
+			expected: &TLSOverride{Enabled: true},
+		},
+		{
+			name: "returns nil when no overrides",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: "postgres", Managed: true},
+					},
+				},
+			},
+			kind:     ComponentPostgres,
+			expected: nil,
+		},
+		{
+			name: "returns nil when component not found",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: "redis", Managed: true},
+					},
+				},
+			},
+			kind:     ComponentPostgres,
+			expected: nil,
+		},
+		{
+			name: "returns TLS override with secretRef",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: "clairpostgres", Managed: true, Overrides: &Override{TLS: &TLSOverride{Enabled: true, SecretRef: &corev1.LocalObjectReference{Name: "my-certs"}}}},
+					},
+				},
+			},
+			kind:     ComponentClairPostgres,
+			expected: &TLSOverride{Enabled: true, SecretRef: &corev1.LocalObjectReference{Name: "my-certs"}},
+		},
+		{
+			name: "returns nil TLS when overrides exist but no TLS",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: "postgres", Managed: true, Overrides: &Override{Replicas: ptr.To[int32](2)}},
+					},
+				},
+			},
+			kind:     ComponentPostgres,
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetTLSOverrideForComponent(tt.quay, tt.kind)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
