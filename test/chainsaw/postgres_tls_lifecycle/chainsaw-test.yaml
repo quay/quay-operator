@@ -1,0 +1,203 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: postgres-tls-lifecycle
+spec:
+  concurrent: false
+  steps:
+  - name: create-registry-without-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, skipping config bundle setup"
+            exit 0
+          fi
+          echo "KinD detected, creating config bundle..."
+          ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+          SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+          BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+          ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          FEATURE_PROXY_STORAGE: true
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+            --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying no TLS on initial deployment ==="
+
+          VOL=$(kubectl get deployment pgtls-lc-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgres-tls-certs")].name}')
+          if [ -n "${VOL}" ]; then
+            echo "FAIL: quay-database has postgres-tls-certs volume before TLS is enabled"
+            exit 1
+          fi
+          echo "PASS: no TLS volume on initial deployment"
+
+          PG_POD=$(kubectl get pods -n $NAMESPACE -l quay-component=postgres \
+            -o jsonpath='{.items[0].metadata.name}')
+          SSL_STATUS=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+            bash -c "psql -t -c 'SHOW ssl;'" 2>/dev/null | tr -d ' \n')
+          if [ "${SSL_STATUS}" = "on" ]; then
+            echo "FAIL: PostgreSQL SSL is on before TLS is enabled"
+            exit 1
+          fi
+          echo "PASS: PostgreSQL SSL is off on initial deployment"
+  - name: enable-tls
+    try:
+    - apply:
+        file: 01-enable-tls.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "Waiting for postgres deployment to roll out with TLS..."
+          kubectl rollout status deployment/pgtls-lc-quay-database -n $NAMESPACE --timeout=300s
+          echo "Postgres rollout complete"
+
+          echo "Waiting for quay-app rollout..."
+          kubectl rollout status deployment/pgtls-lc-quay-app -n $NAMESPACE --timeout=300s
+          echo "quay-app rollout complete"
+    - assert:
+        file: 00-assert-status.yaml
+  - name: assert-tls-active
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying TLS is active after migration ==="
+
+          INIT=$(kubectl get deployment pgtls-lc-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="postgres-tls-init")].name}')
+          if [ "${INIT}" != "postgres-tls-init" ]; then
+            echo "FAIL: quay-database missing postgres-tls-init after TLS enable"
+            exit 1
+          fi
+          echo "PASS: quay-database has postgres-tls-init"
+
+          echo "Waiting for TLS secrets..."
+          for i in $(seq 1 30); do
+            if kubectl get secret pgtls-lc-postgres-tls -n $NAMESPACE >/dev/null 2>&1 && \
+               kubectl get secret pgtls-lc-postgresql-ca -n $NAMESPACE >/dev/null 2>&1; then
+              echo "PASS: postgres-tls and postgresql-ca secrets exist"
+              break
+            fi
+            [ "$i" -eq 30 ] && { echo "FAIL: TLS secrets not found after 5 minutes"; exit 1; }
+            sleep 10
+          done
+
+          echo "Waiting for postgres rollout after cert generation..."
+          kubectl rollout status deployment/pgtls-lc-quay-database -n $NAMESPACE --timeout=300s
+          echo "Postgres rollout complete"
+
+          PG_POD=$(kubectl get pods -n $NAMESPACE -l quay-component=postgres \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[0].metadata.name}')
+          echo "Postgres pod: ${PG_POD}"
+
+          echo "Checking SHOW ssl..."
+          for i in $(seq 1 12); do
+            SSL_STATUS=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+              bash -c "psql -t -c 'SHOW ssl;'" 2>/dev/null | tr -d ' \n')
+            if [ "${SSL_STATUS}" = "on" ]; then
+              echo "PASS: PostgreSQL SHOW ssl = on"
+              break
+            fi
+            [ "$i" -eq 12 ] && { echo "FAIL: PostgreSQL SSL is not enabled after migration (got: '${SSL_STATUS}')"; exit 1; }
+            sleep 5
+          done
+
+          echo "Checking for SSL-encrypted remote connections..."
+          SSL_COUNT=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+            bash -c "psql -t -c \"SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_activity a ON s.pid = a.pid WHERE s.ssl = true AND a.client_addr IS NOT NULL;\"" \
+            2>/dev/null | tr -d ' \n')
+          echo "SSL remote connections: ${SSL_COUNT:-0}"
+  - name: disable-tls
+    try:
+    - apply:
+        file: 02-disable-tls.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "Waiting for postgres deployment to roll out without TLS..."
+          kubectl rollout status deployment/pgtls-lc-quay-database -n $NAMESPACE --timeout=300s
+          echo "Postgres rollout complete"
+
+          echo "Waiting for quay-app rollout..."
+          kubectl rollout status deployment/pgtls-lc-quay-app -n $NAMESPACE --timeout=300s
+          echo "quay-app rollout complete"
+    - assert:
+        file: 00-assert-status.yaml
+  - name: assert-tls-removed
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying TLS is removed after downgrade ==="
+
+          VOL=$(kubectl get deployment pgtls-lc-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgres-tls-certs")].name}')
+          if [ -n "${VOL}" ]; then
+            echo "FAIL: quay-database still has postgres-tls-certs volume after TLS disable"
+            exit 1
+          fi
+          echo "PASS: no TLS volume after downgrade"
+
+          READY=$(kubectl get deployment pgtls-lc-quay-app -n $NAMESPACE \
+            -o jsonpath='{.status.readyReplicas}')
+          if [ "${READY:-0}" -lt 1 ]; then
+            echo "FAIL: quay-app has no ready replicas after downgrade"
+            exit 1
+          fi
+          echo "PASS: quay-app has ${READY} ready replicas after downgrade"

@@ -1,0 +1,161 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: postgres-tls-mixed
+spec:
+  concurrent: false
+  steps:
+  - name: create-registry-postgres-tls-only
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, skipping config bundle setup"
+            exit 0
+          fi
+          echo "KinD detected, creating config bundle..."
+          ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+          SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+          BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+          ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          FEATURE_PROXY_STORAGE: true
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+            --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+  - name: assert-postgres-has-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying postgres has TLS ==="
+
+          INIT=$(kubectl get deployment pgtls-mix-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="postgres-tls-init")].name}')
+          if [ "${INIT}" != "postgres-tls-init" ]; then
+            echo "FAIL: quay-database missing postgres-tls-init init container"
+            exit 1
+          fi
+          echo "PASS: quay-database has postgres-tls-init"
+
+          VOL=$(kubectl get deployment pgtls-mix-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgres-tls-certs")].name}')
+          if [ "${VOL}" != "postgres-tls-certs" ]; then
+            echo "FAIL: quay-database missing postgres-tls-certs volume"
+            exit 1
+          fi
+          echo "PASS: quay-database has postgres-tls-certs volume"
+
+          kubectl get secret pgtls-mix-postgres-tls -n $NAMESPACE >/dev/null || \
+            { echo "FAIL: postgres-tls secret not found"; exit 1; }
+          echo "PASS: postgres-tls secret exists"
+
+          kubectl get secret pgtls-mix-postgresql-ca -n $NAMESPACE >/dev/null || \
+            { echo "FAIL: postgresql-ca secret not found"; exit 1; }
+          echo "PASS: postgresql-ca secret exists"
+  - name: assert-clairpostgres-no-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying clairpostgres does NOT have TLS ==="
+
+          VOL_CLAIR=$(kubectl get deployment pgtls-mix-clair-postgres -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgres-tls-certs")].name}')
+          if [ -n "${VOL_CLAIR}" ]; then
+            echo "FAIL: clair-postgres has postgres-tls-certs volume but TLS is not enabled"
+            exit 1
+          fi
+          echo "PASS: clair-postgres has no TLS volume"
+
+          if kubectl get secret pgtls-mix-clairpostgres-tls -n $NAMESPACE 2>/dev/null; then
+            echo "FAIL: clairpostgres-tls secret exists but TLS is not enabled"
+            exit 1
+          fi
+          echo "PASS: no clairpostgres-tls secret"
+
+          if kubectl get secret pgtls-mix-clairpostgres-ca -n $NAMESPACE 2>/dev/null; then
+            echo "FAIL: clairpostgres-ca secret exists but TLS is not enabled"
+            exit 1
+          fi
+          echo "PASS: no clairpostgres-ca secret"
+
+          VOL=$(kubectl get deployment pgtls-mix-clair-app -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="clair-db-tls")].name}')
+          if [ -n "${VOL}" ]; then
+            echo "FAIL: clair-app has clair-db-tls volume but TLS is not enabled for clairpostgres"
+            exit 1
+          fi
+          echo "PASS: clair-app has no clair-db-tls volume"
+  - name: assert-clair-sslmode-disable
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying clair connstring uses sslmode=disable ==="
+
+          CONFIG_SECRET=$(kubectl get secret -n $NAMESPACE -o name \
+            | grep "pgtls-mix-clair-config-secret" | head -1)
+          if [ -z "${CONFIG_SECRET}" ]; then
+            echo "FAIL: clair config secret not found"
+            exit 1
+          fi
+
+          CLAIR_CFG=$(kubectl get ${CONFIG_SECRET} -n $NAMESPACE \
+            -o jsonpath='{.data.config\.yaml}' | base64 -d)
+
+          echo "${CLAIR_CFG}" | grep -q "sslmode=disable" || \
+            { echo "FAIL: clair config does not contain sslmode=disable"; exit 1; }
+          echo "PASS: clair connstring has sslmode=disable"
+
+          if echo "${CLAIR_CFG}" | grep -q "sslrootcert"; then
+            echo "FAIL: clair config contains sslrootcert but TLS is disabled for clairpostgres"
+            exit 1
+          fi
+          echo "PASS: no sslrootcert in clair config"

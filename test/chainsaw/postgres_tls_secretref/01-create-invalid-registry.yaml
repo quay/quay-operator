@@ -1,0 +1,33 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: pgtls-bad
+spec:
+  components:
+  - kind: quay
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: postgres
+    managed: true
+    overrides:
+      tls:
+        enabled: true
+        secretRef:
+          name: does-not-exist
+  - kind: redis
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: clairpostgres
+    managed: true
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: false
+  - kind: route
+    managed: false
+  - kind: monitoring
+    managed: false
+  - kind: tls
+    managed: false
