@@ -67,6 +67,13 @@ The operator manages Quay's backing services as discrete components. Each compon
     - `tls`: TLS cert/key pair via `ssl.cert`/`ssl.key` in the bundle or via `secretRef`
 23. Components that support user config even when managed: `route` (SERVER_HOSTNAME), `mirror` (REPO_MIRROR_*), `redis` (PULL_METRICS_REDIS and other Redis config keys). For these components, user-provided config is preserved alongside operator-generated values.
 
+### Database TLS [PLANNED: PROJQUAY-11215]
+
+24. Managed `postgres` and `clairpostgres` components support opt-in TLS encryption for database connections. This is controlled via a spec field on the component and is off by default.
+25. When database TLS is enabled on OpenShift, the operator annotates the PG Service to trigger service CA cert generation automatically. If a user-provided PG TLS secret is also specified, the user-provided cert takes precedence.
+26. When database TLS is enabled but no cert source is available (no service CA, no user-provided cert), the operator blocks reconciliation with a `RolloutBlocked` condition.
+27. Database TLS is independent of the `tls` component (Quay HTTPS endpoint). See `what/tls.md` for detailed behavioral rules.
+
 ## Constraints
 
 - Adding a new component requires changes in 5 places: ComponentKind constant, AllComponents slice, kustomize manifests, status checker, and kustomize inflation logic.

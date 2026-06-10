@@ -52,6 +52,12 @@ The config bundle secret contains Quay's `config.yaml` and optional certificates
     - `clair-ssl.key`, `clair-ssl.crt` — same for Clair TLS
     - `extra_ca_cert_*` — extra CA certs are mounted separately via the extra-ca-certs volume
 
+### Database TLS Connection Parameters [PLANNED: PROJQUAY-11215]
+
+18. When database TLS is enabled for managed postgres, the operator appends `?sslmode=verify-ca&sslrootcert=<ca-path>` to the generated `DB_URI`.
+19. When database TLS is enabled for managed clairpostgres, the Clair connection string changes from `sslmode=disable` to `sslmode=verify-ca sslrootcert=<ca-path>`.
+20. When database TLS is not enabled, the existing behavior is preserved: `DB_URI` has no sslmode parameter and the Clair connection string uses `sslmode=disable`.
+
 ## Constraints
 
 - Config secrets use `GenerateName`, so they cannot be predicted or referenced before creation.

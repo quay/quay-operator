@@ -1,6 +1,6 @@
 # TLS
 
-The operator manages TLS certificates for Quay's HTTPS endpoint. It supports three modes: managed (operator-generated), user-provided via config bundle, and user-provided via external secret reference.
+The operator manages TLS certificates for Quay's HTTPS endpoint and optionally for PostgreSQL database connections. Endpoint TLS supports three modes: managed (cluster wildcard), user-provided via config bundle, and user-provided via external secret reference. Database TLS is an independent opt-in feature for encrypting managed PostgreSQL connections.
 
 ## Behavioral Rules
 
@@ -44,7 +44,21 @@ The operator manages TLS certificates for Quay's HTTPS endpoint. It supports thr
 20. The operator tracks content hashes of both CA ConfigMaps via annotations. When the CA content changes (e.g., certificate rotation), the annotation update triggers a pod restart.
 21. The middleware also strips `clair-ssl.key` and `clair-ssl.crt` from the rendered config secret, as Clair TLS certs are handled separately.
 
+### Database TLS [PLANNED: PROJQUAY-11215]
+
+22. Database TLS encrypts connections from Quay app → managed postgres and Clair → managed clairpostgres. It is independent of the `tls` component (Quay HTTPS endpoint) — enabling one does not require or imply the other.
+23. Database TLS is opt-in via a spec field on the postgres/clairpostgres component. It is off by default. Enabling it does not affect unmanaged postgres components.
+24. When database TLS is enabled, the PostgreSQL server is configured with `ssl = on`, `ssl_cert_file`, and `ssl_key_file` directives. The TLS cert/key are mounted as a volume in the postgres Deployment.
+25. The PostgreSQL server cert Secret follows the naming pattern `<registry-name>-<component>-pg-tls` (e.g., `example-quay-database-pg-tls`).
+26. Cert provisioning has two paths, with user-provided taking precedence:
+    - **Service CA (OpenShift, default):** The operator annotates the PG Service with `service.beta.openshift.io/serving-cert-secret-name` to trigger auto-generation of a TLS Secret signed by the cluster's service CA.
+    - **User-provided:** The user supplies a `kubernetes.io/tls` Secret containing the PG server cert/key, plus the corresponding CA cert for client trust.
+27. When database TLS is enabled, clients connect with `sslmode=verify-ca`. The CA root cert is mounted into Quay app and Clair pods from the `cluster-service-ca` ConfigMap (service CA path) or a user-provided CA source.
+28. If database TLS is enabled but no cert source is available (no service CA operator, no user-provided cert), the operator blocks reconciliation with `RolloutBlocked` condition and reason `ConfigInvalid`.
+29. The CA trust chain for database TLS may differ from the Quay endpoint TLS CA. Service CA-signed PG certs are trusted via `service-ca.crt`, while the Quay endpoint may use a different CA.
+
 ## Constraints
 
 - TLS certificate rotation via `secretRef` depends on the controller-runtime informer cache. The TLS secret must be labeled with `quay.redhat.com/tls-secret: "true"` for the watch to work.
 - The probe Route for cluster hostname discovery creates and deletes a Route resource. If the Route lingers (e.g., API server is slow), subsequent reconciles wait for ingress status before proceeding.
+- Database TLS on KinD/vanilla Kubernetes requires a user-provided cert — the service CA operator is OpenShift-only.

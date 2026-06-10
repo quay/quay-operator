@@ -14,4 +14,6 @@
 | **Server-side apply** | The Kubernetes API mechanism used by the operator to apply manifests with `ForceOwnership`. The operator becomes the sole field manager of all managed resources. |
 | **ForceOwnership** | A server-side apply option that resolves field conflicts by making the operator the owner. External patches to managed fields are overwritten on next reconcile. |
 | **Probe Route** | A temporary Route resource created during feature detection to discover the cluster's canonical hostname and wildcard TLS certificate. Deleted after hostname extraction. |
+| **Database TLS** | [PLANNED: PROJQUAY-11215] Opt-in encryption of PostgreSQL connections between Quay/Clair and their managed database pods. Independent of the `tls` component (Quay HTTPS endpoint). Uses `sslmode=verify-ca` on the client side. |
+| **Service CA** | The OpenShift service serving certificate signer. When a Service is annotated with `service.beta.openshift.io/serving-cert-secret-name`, the service CA operator auto-generates a TLS Secret signed by the cluster's service CA. Clients trust these certs via the `service-ca.crt` bundle. Not available on vanilla Kubernetes. |
 | **UWM** | User Workload Monitoring — OpenShift's mechanism for scraping Prometheus metrics from user namespaces (as opposed to the platform monitoring stack). |

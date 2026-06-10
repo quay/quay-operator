@@ -48,6 +48,7 @@ The `Reconcile()` function processes steps sequentially. Each step can short-cir
 │    - checkClusterCAHash()                                       │
 │    - checkTLSSecurityProfile()                                  │
 │    - checkNeedsPostgresUpgradeForComponent() (both PG + Clair)  │
+│    - [PLANNED] checkDatabaseTLS() (PG TLS cert detection)      │
 ├─────────────────────────────────────────────────────────────────┤
 │ 5. COMPONENT VALIDATION                                         │
 │    EnsureDefaultComponents() — add missing components           │
