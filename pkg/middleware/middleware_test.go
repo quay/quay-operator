@@ -780,6 +780,116 @@ func TestProcessDeploymentSecurityContextOverride(t *testing.T) {
 	}
 }
 
+func TestProcessPgServiceAnnotation(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+					DatabaseTLS: &v1.DatabaseTLSConfig{Enabled: true},
+				}},
+			},
+		},
+	}
+
+	qctx := &quaycontext.QuayRegistryContext{
+		PostgresTLSEnabled:  true,
+		PgTLSCertSecretName: "test-quay-database-pg-tls",
+	}
+
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-quay-database",
+			Labels:      map[string]string{"quay-component": "postgres"},
+			Annotations: map[string]string{"quay-component": "postgres"},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{{Port: 5432, Protocol: "TCP"}},
+		},
+	}
+
+	result, err := Process(quay, qctx, svc, false)
+	assert.NoError(t, err)
+
+	resultSvc := result.(*corev1.Service)
+	assert.Equal(t,
+		"test-quay-database-pg-tls",
+		resultSvc.Annotations["service.beta.openshift.io/serving-cert-secret-name"],
+	)
+}
+
+func TestProcessPgDeploymentTLSVolume(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentPostgres, Managed: true, Overrides: &v1.Override{
+					DatabaseTLS: &v1.DatabaseTLSConfig{Enabled: true},
+				}},
+			},
+		},
+	}
+
+	qctx := &quaycontext.QuayRegistryContext{
+		PostgresTLSEnabled:  true,
+		PgTLSCertSecretName: "test-quay-database-pg-tls",
+	}
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-quay-database",
+			Labels:      map[string]string{"quay-component": "postgres"},
+			Annotations: map[string]string{"quay-component": "postgres"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "postgres"}},
+				},
+			},
+		},
+	}
+
+	result, err := Process(quay, qctx, dep, false)
+	assert.NoError(t, err)
+
+	resultDep := result.(*appsv1.Deployment)
+
+	// Check volume exists
+	var found bool
+	for _, vol := range resultDep.Spec.Template.Spec.Volumes {
+		if vol.Name == "pg-tls-certs" {
+			found = true
+			assert.Equal(t, "test-quay-database-pg-tls", vol.Secret.SecretName)
+			break
+		}
+	}
+	assert.True(t, found, "pg-tls-certs volume not found")
+
+	// Check volume mount
+	var mountFound bool
+	for _, mount := range resultDep.Spec.Template.Spec.Containers[0].VolumeMounts {
+		if mount.Name == "pg-tls-certs" {
+			mountFound = true
+			assert.Equal(t, "/var/lib/pgsql/tls", mount.MountPath)
+			assert.True(t, mount.ReadOnly)
+			break
+		}
+	}
+	assert.True(t, mountFound, "pg-tls-certs volume mount not found")
+
+	// Check env vars
+	envMap := map[string]string{}
+	for _, env := range resultDep.Spec.Template.Spec.Containers[0].Env {
+		envMap[env.Name] = env.Value
+	}
+	assert.Equal(t, "/var/lib/pgsql/tls/tls.crt", envMap["POSTGRESQL_TLS_CERT_FILE"])
+	assert.Equal(t, "/var/lib/pgsql/tls/tls.key", envMap["POSTGRESQL_TLS_KEY_FILE"])
+}
+
 func TestProcessJobSecurityContextOverride(t *testing.T) {
 	overrideSC := &corev1.SecurityContext{
 		RunAsNonRoot:             boolPtr(false),
