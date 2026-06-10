@@ -53,6 +53,16 @@ type QuayRegistryContext struct {
 
 	// Clair integration
 	SecurityScannerV4PSK string
+
+	// PostgreSQL TLS
+	PostgresTLSCA   string
+	PostgresTLSCert string
+	PostgresTLSKey  string
+
+	// Clair PostgreSQL TLS
+	ClairPostgresTLSCA   string
+	ClairPostgresTLSCert string
+	ClairPostgresTLSKey  string
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.
