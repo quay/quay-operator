@@ -755,6 +755,14 @@ func (r *QuayRegistryReconciler) checkPostgresTLSSecrets(
 			return fmt.Errorf("%s TLS certificate and private key in secret %q do not match: %w", c.kind, name, e)
 		}
 
+		caBlock, _ := pem.Decode(ca)
+		if caBlock == nil {
+			return fmt.Errorf("%s TLS secret %q: ca.crt is not valid PEM", c.kind, name)
+		}
+		if _, e := x509.ParseCertificate(caBlock.Bytes); e != nil {
+			return fmt.Errorf("%s TLS secret %q: failed to parse ca.crt: %w", c.kind, name, e)
+		}
+
 		block, _ := pem.Decode(crt)
 		if block == nil {
 			return fmt.Errorf("%s TLS secret %q: tls.crt is not valid PEM", c.kind, name)
