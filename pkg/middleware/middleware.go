@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	route "github.com/openshift/api/route/v1"
@@ -523,8 +524,8 @@ func applyPostgresTLSCleanup(dep *appsv1.Deployment) {
 		Image: dep.Spec.Template.Spec.Containers[0].Image,
 		Command: []string{
 			"sh", "-c",
-			"if [ -f /var/lib/pgsql/data/userdata/postgresql.conf ] && grep -q '^ssl = on' /var/lib/pgsql/data/userdata/postgresql.conf; then " +
-				"sed -i '/^ssl = on$/d;/^ssl_cert_file/d;/^ssl_key_file/d' /var/lib/pgsql/data/userdata/postgresql.conf; " +
+			"if [ -f /var/lib/pgsql/data/userdata/postgresql.conf ] && grep -qE '^[[:space:]]*ssl[[:space:]]*=[[:space:]]*on' /var/lib/pgsql/data/userdata/postgresql.conf; then " +
+				"sed -i '/^[[:space:]]*ssl[[:space:]]*=[[:space:]]*on$/d;/^[[:space:]]*ssl_cert_file/d;/^[[:space:]]*ssl_key_file/d' /var/lib/pgsql/data/userdata/postgresql.conf; " +
 				"echo 'Removed SSL directives from postgresql.conf'; " +
 				"fi",
 		},
@@ -598,6 +599,8 @@ func applyClairDBTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment) {
 
 const postgresTLSConfDirectives = "\nssl = on\nssl_cert_file = '" + tlsCertsMountPath + "/tls.crt'\nssl_key_file = '" + tlsCertsMountPath + "/tls.key'\n"
 
+var sslDirectivePattern = regexp.MustCompile(`(?m)^\s*ssl\s*=\s*on\s*$`)
+
 func applyPostgresConfSampleTLS(quay *v1.QuayRegistry, cm *corev1.ConfigMap, _ string) {
 	var kind v1.ComponentKind
 	name := cm.GetName()
@@ -620,7 +623,7 @@ func applyPostgresConfSampleTLS(quay *v1.QuayRegistry, cm *corev1.ConfigMap, _ s
 		return
 	}
 
-	if strings.Contains(cm.Data[key], "ssl = on") {
+	if sslDirectivePattern.MatchString(cm.Data[key]) {
 		return
 	}
 
