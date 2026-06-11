@@ -1235,6 +1235,9 @@ spec:
                   - message: tls.secretRef requires tls.enabled to be true
                     rule: '!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef)
                       || self.overrides.tls.enabled'
+                  - message: tls.secretRef.name must not be empty
+                    rule: '!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef)
+                      || self.overrides.tls.secretRef.name.size() != 0'
                 type: array
               configBundleSecret:
                 description: |-

@@ -159,6 +159,7 @@ type QuayRegistrySpec struct {
 // +kubebuilder:validation:XValidation:rule="!self.managed || !has(self.secretRef)",message="secretRef cannot be set on a managed component"
 // +kubebuilder:validation:XValidation:rule="!has(self.secretRef) || self.secretRef.name.size() != 0",message="secretRef.name must not be empty"
 // +kubebuilder:validation:XValidation:rule="!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef) || self.overrides.tls.enabled",message="tls.secretRef requires tls.enabled to be true"
+// +kubebuilder:validation:XValidation:rule="!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef) || self.overrides.tls.secretRef.name.size() != 0",message="tls.secretRef.name must not be empty"
 type Component struct {
 	// Kind is the unique name of this type of component.
 	Kind ComponentKind `json:"kind"`
@@ -645,6 +646,10 @@ func ValidateOverrides(quay *QuayRegistry) error {
 
 		if hastls && component.Overrides.TLS.SecretRef != nil && !component.Overrides.TLS.Enabled {
 			return fmt.Errorf("tls.secretRef requires tls.enabled to be true")
+		}
+
+		if hastls && component.Overrides.TLS.SecretRef != nil && component.Overrides.TLS.SecretRef.Name == "" {
+			return fmt.Errorf("tls.secretRef.name must not be empty")
 		}
 	}
 
