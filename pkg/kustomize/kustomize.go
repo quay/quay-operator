@@ -798,7 +798,7 @@ func Inflate(
 		u.RawQuery = q.Encode()
 		ctx.DbUri = u.String()
 		parsedUserConfig["DB_URI"] = ctx.DbUri
-	} else {
+	} else if override != nil && v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) {
 		u, err := url.Parse(ctx.DbUri)
 		if err == nil {
 			q := u.Query()
