@@ -467,7 +467,15 @@ func applyPostgresTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment, kind v1.Com
 
 	tlsSecretName := postgresTLSSecretName(quay, kind, override)
 
-	tlsVolumeMode := int32(0600)
+	pgGroup := int64(26)
+	if dep.Spec.Template.Spec.SecurityContext == nil {
+		dep.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{}
+	}
+	if dep.Spec.Template.Spec.SecurityContext.FSGroup == nil {
+		dep.Spec.Template.Spec.SecurityContext.FSGroup = &pgGroup
+	}
+
+	tlsVolumeMode := int32(0640)
 	dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
 		Name: postgresTLSVolumeName,
 		VolumeSource: corev1.VolumeSource{

@@ -927,7 +927,7 @@ func TestApplyPostgresTLS(t *testing.T) {
 				assert.NotNil(t, vol.Projected)
 				assert.Equal(t, "test-postgres-tls", vol.Projected.Sources[0].Secret.Name)
 				assert.NotNil(t, vol.Projected.DefaultMode)
-				assert.Equal(t, int32(0600), *vol.Projected.DefaultMode)
+				assert.Equal(t, int32(0640), *vol.Projected.DefaultMode)
 			}
 		}
 		assert.True(t, found, "expected postgres-tls-certs volume")
