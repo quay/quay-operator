@@ -898,3 +898,220 @@ func TestCheckPostgresTLSSecrets(t *testing.T) {
 		})
 	}
 }
+
+func TestResolvePostgresTLSSource(t *testing.T) {
+	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	for _, tt := range []struct {
+		name                       string
+		supportsRoutes             bool
+		components                 []v1.Component
+		expectPostgresUseServiceCA bool
+		expectClairUseServiceCA    bool
+		expectPostgresSSLRoot      string
+		expectClairSSLRoot         string
+	}{
+		{
+			name:           "OpenShift + TLS enabled no secretRef uses service CA",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+			expectPostgresUseServiceCA: true,
+			expectPostgresSSLRoot:      "/conf/stack/extra_ca_certs/service-ca.crt",
+		},
+		{
+			name:           "OpenShift + TLS enabled with secretRef does not use service CA",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+					Enabled:   true,
+					SecretRef: &corev1.LocalObjectReference{Name: "my-certs"},
+				}}},
+			},
+			expectPostgresUseServiceCA: false,
+			expectPostgresSSLRoot:      "/run/secrets/postgresql/ca.crt",
+		},
+		{
+			name:           "non-OpenShift + TLS enabled does not use service CA",
+			supportsRoutes: false,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+			expectPostgresUseServiceCA: false,
+			expectPostgresSSLRoot:      "/run/secrets/postgresql/ca.crt",
+		},
+		{
+			name:           "TLS not enabled sets no service CA or sslrootcert",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true},
+			},
+			expectPostgresUseServiceCA: false,
+			expectPostgresSSLRoot:      "",
+		},
+		{
+			name:           "OpenShift + both components TLS enabled uses service CA for both",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+				{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+			expectPostgresUseServiceCA: true,
+			expectClairUseServiceCA:    true,
+			expectPostgresSSLRoot:      "/conf/stack/extra_ca_certs/service-ca.crt",
+			expectClairSSLRoot:         "/var/run/certs/service-ca.crt",
+		},
+		{
+			name:           "OpenShift + mixed: postgres secretRef, clair no secretRef",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+					Enabled:   true,
+					SecretRef: &corev1.LocalObjectReference{Name: "my-certs"},
+				}}},
+				{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+			expectPostgresUseServiceCA: false,
+			expectClairUseServiceCA:    true,
+			expectPostgresSSLRoot:      "/run/secrets/postgresql/ca.crt",
+			expectClairSSLRoot:         "/var/run/certs/service-ca.crt",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			quay := &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+				Spec:       v1.QuayRegistrySpec{Components: tt.components},
+			}
+			qctx := quaycontext.NewQuayRegistryContext()
+			qctx.SupportsRoutes = tt.supportsRoutes
+
+			resolvePostgresTLSSource(qctx, quay)
+
+			if qctx.PostgresUseServiceCA != tt.expectPostgresUseServiceCA {
+				t.Errorf("PostgresUseServiceCA = %v, want %v", qctx.PostgresUseServiceCA, tt.expectPostgresUseServiceCA)
+			}
+			if qctx.ClairPostgresUseServiceCA != tt.expectClairUseServiceCA {
+				t.Errorf("ClairPostgresUseServiceCA = %v, want %v", qctx.ClairPostgresUseServiceCA, tt.expectClairUseServiceCA)
+			}
+			if qctx.PostgresSSLRootCert != tt.expectPostgresSSLRoot {
+				t.Errorf("PostgresSSLRootCert = %q, want %q", qctx.PostgresSSLRootCert, tt.expectPostgresSSLRoot)
+			}
+			if qctx.ClairPostgresSSLRootCert != tt.expectClairSSLRoot {
+				t.Errorf("ClairPostgresSSLRootCert = %q, want %q", qctx.ClairPostgresSSLRootCert, tt.expectClairSSLRoot)
+			}
+		})
+	}
+}
+
+func TestEnsurePostgresServiceCAAnnotation(t *testing.T) {
+	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+		},
+	}
+
+	postgresService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-quay-database",
+			Namespace: "test-ns",
+			Labels:    map[string]string{"quay-component": "postgres"},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{{Port: 5432}},
+		},
+	}
+
+	for _, tt := range []struct {
+		name                string
+		useServiceCA        bool
+		existingAnnotation  string
+		servingSecretExists bool
+		expectAnnotation    string
+		expectErr           string
+	}{
+		{
+			name:                "adds annotation when useServiceCA is true",
+			useServiceCA:        true,
+			servingSecretExists: true,
+			expectAnnotation:    "test-postgres-tls",
+		},
+		{
+			name:                "returns error when serving cert secret not found",
+			useServiceCA:        true,
+			servingSecretExists: false,
+			expectErr:           "serving certificate secret",
+		},
+		{
+			name:               "removes annotation when useServiceCA is false",
+			useServiceCA:       false,
+			existingAnnotation: "test-postgres-tls",
+			expectAnnotation:   "",
+		},
+		{
+			name:             "no-op when useServiceCA is false and no annotation exists",
+			useServiceCA:     false,
+			expectAnnotation: "",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := postgresService.DeepCopy()
+			if tt.existingAnnotation != "" {
+				svc.Annotations = map[string]string{
+					"service.beta.openshift.io/serving-cert-secret-name": tt.existingAnnotation,
+				}
+			}
+
+			objs := []client.Object{svc}
+			if tt.servingSecretExists {
+				objs = append(objs, &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-postgres-tls",
+						Namespace: "test-ns",
+					},
+					Data: map[string][]byte{
+						"tls.crt": []byte("cert-data"),
+						"tls.key": []byte("key-data"),
+					},
+				})
+			}
+
+			cli := fake.NewClientBuilder().WithObjects(objs...).Build()
+			r := newReconcilerWithClient(cli)
+
+			qctx := quaycontext.NewQuayRegistryContext()
+			qctx.PostgresUseServiceCA = tt.useServiceCA
+
+			ctx := context.Background()
+			err := r.ensurePostgresServiceCAAnnotation(ctx, qctx, quay, v1.ComponentPostgres)
+
+			if tt.expectErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.expectErr)
+				}
+				if !strings.Contains(err.Error(), tt.expectErr) {
+					t.Fatalf("expected error containing %q, got %q", tt.expectErr, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			var updatedSvc corev1.Service
+			if e := cli.Get(ctx, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}, &updatedSvc); e != nil {
+				t.Fatalf("failed to get updated service: %v", e)
+			}
+
+			got := updatedSvc.Annotations["service.beta.openshift.io/serving-cert-secret-name"]
+			if got != tt.expectAnnotation {
+				t.Errorf("annotation = %q, want %q", got, tt.expectAnnotation)
+			}
+		})
+	}
+}

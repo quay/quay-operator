@@ -63,6 +63,12 @@ type QuayRegistryContext struct {
 	ClairPostgresTLSCA   string
 	ClairPostgresTLSCert string
 	ClairPostgresTLSKey  string
+
+	// Service CA (OpenShift)
+	PostgresUseServiceCA      bool
+	ClairPostgresUseServiceCA bool
+	PostgresSSLRootCert       string
+	ClairPostgresSSLRootCert  string
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.

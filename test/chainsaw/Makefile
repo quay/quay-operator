@@ -26,4 +26,4 @@ test-e2e-destructive: chainsaw ## Run destructive Chainsaw e2e tests (ca-rotatio
 	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --include-test-regex "/ca.rotation|/postgres.tls.lifecycle" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
 
 test-e2e-kind: chainsaw ## Run Chainsaw e2e tests (KinD)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_KIND) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/hpa|/tls.security.profile|/postgres.tls.lifecycle" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_KIND) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/hpa|/tls.security.profile|/postgres.tls.lifecycle|/postgres.tls.service.ca" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)

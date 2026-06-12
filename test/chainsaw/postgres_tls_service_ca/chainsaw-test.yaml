@@ -1,0 +1,144 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: postgres-tls-service-ca
+spec:
+  concurrent: false
+  steps:
+  - name: create-registry-with-postgres-tls-service-ca
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          if ! kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "SKIP: this test requires OpenShift (service CA operator)"
+            exit 0
+          fi
+          echo "OpenShift detected, proceeding with service CA test"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+  - name: assert-service-ca-annotations
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Checking service CA annotations on postgres Services ==="
+
+          ANNOTATION="service.beta.openshift.io/serving-cert-secret-name"
+
+          PG_ANNOT=$(kubectl get service pgsca-quay-database -n $NAMESPACE \
+            -o jsonpath="{.metadata.annotations['service\.beta\.openshift\.io/serving-cert-secret-name']}")
+          if [ "${PG_ANNOT}" != "pgsca-postgres-tls" ]; then
+            echo "FAIL: quay-database service annotation ${ANNOTATION} = '${PG_ANNOT}', expected 'pgsca-postgres-tls'"
+            exit 1
+          fi
+          echo "PASS: quay-database service has correct serving-cert-secret-name annotation"
+
+          CLAIR_ANNOT=$(kubectl get service pgsca-clair-postgres -n $NAMESPACE \
+            -o jsonpath="{.metadata.annotations['service\.beta\.openshift\.io/serving-cert-secret-name']}")
+          if [ "${CLAIR_ANNOT}" != "pgsca-clairpostgres-tls" ]; then
+            echo "FAIL: clair-postgres service annotation ${ANNOTATION} = '${CLAIR_ANNOT}', expected 'pgsca-clairpostgres-tls'"
+            exit 1
+          fi
+          echo "PASS: clair-postgres service has correct serving-cert-secret-name annotation"
+  - name: assert-serving-cert-secrets
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Checking serving cert secrets created by service CA operator ==="
+
+          for SECRET in pgsca-postgres-tls pgsca-clairpostgres-tls; do
+            for KEY in tls.crt tls.key; do
+              VAL=$(kubectl get secret "${SECRET}" -n $NAMESPACE \
+                -o go-template="{{index .data \"${KEY}\"}}" 2>/dev/null || true)
+              if [ -z "${VAL}" ]; then
+                echo "FAIL: ${SECRET} missing key ${KEY}"
+                exit 1
+              fi
+              echo "PASS: ${SECRET} has key ${KEY}"
+            done
+          done
+
+          echo "=== Verifying no operator-generated CA secrets (service CA uses cluster-service-ca ConfigMap) ==="
+
+          for SECRET in pgsca-postgresql-ca pgsca-clairpostgres-ca; do
+            if kubectl get secret "${SECRET}" -n $NAMESPACE >/dev/null 2>&1; then
+              echo "FAIL: ${SECRET} should not exist when using service CA"
+              exit 1
+            fi
+            echo "PASS: ${SECRET} does not exist (using cluster-service-ca instead)"
+          done
+  - name: assert-deployment-tls-config
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Checking postgres deployment TLS configuration ==="
+
+          INIT=$(kubectl get deployment pgsca-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="postgres-tls-init")].name}')
+          if [ "${INIT}" != "postgres-tls-init" ]; then
+            echo "FAIL: quay-database missing postgres-tls-init init container"
+            exit 1
+          fi
+          echo "PASS: quay-database has postgres-tls-init init container"
+
+          VOL=$(kubectl get deployment pgsca-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgres-tls-certs")].name}')
+          if [ "${VOL}" != "postgres-tls-certs" ]; then
+            echo "FAIL: quay-database missing postgres-tls-certs volume"
+            exit 1
+          fi
+          echo "PASS: quay-database has postgres-tls-certs volume"
+
+          echo "=== Checking clair-app does NOT have clair-db-tls volume (service CA uses existing certificates volume) ==="
+
+          CLAIR_VOL=$(kubectl get deployment pgsca-clair-app -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="clair-db-tls")].name}' 2>/dev/null || true)
+          if [ -n "${CLAIR_VOL}" ]; then
+            echo "FAIL: clair-app should not have clair-db-tls volume when using service CA"
+            exit 1
+          fi
+          echo "PASS: clair-app does not have clair-db-tls volume (using cluster-service-ca)"
+  - name: verify-pg-stat-ssl
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying SSL connections via pg_stat_ssl ==="
+
+          kubectl rollout status deployment/pgsca-quay-app -n $NAMESPACE --timeout=300s
+          echo "quay-app rollout complete"
+
+          PG_POD=$(kubectl get pods -n $NAMESPACE -l quay-component=postgres \
+            -o jsonpath='{.items[0].metadata.name}')
+          echo "Postgres pod: ${PG_POD}"
+
+          echo "Checking SHOW ssl..."
+          SSL_STATUS=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+            bash -c "psql -t -c 'SHOW ssl;'" 2>/dev/null | tr -d ' \n')
+          if [ "${SSL_STATUS}" != "on" ]; then
+            echo "FAIL: PostgreSQL SSL is not enabled (got: '${SSL_STATUS}')"
+            exit 1
+          fi
+          echo "PASS: PostgreSQL SHOW ssl = on"
+
+          echo "Checking for SSL-encrypted remote connections..."
+          SSL_COUNT=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+            bash -c "psql -t -c \"SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_activity a ON s.pid = a.pid WHERE s.ssl = true AND a.client_addr IS NOT NULL;\"" \
+            2>/dev/null | tr -d ' \n')
+          echo "SSL remote connections: ${SSL_COUNT:-0}"

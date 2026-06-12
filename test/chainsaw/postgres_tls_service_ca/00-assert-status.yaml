@@ -1,0 +1,16 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: pgsca
+status:
+  conditions:
+  - type: ComponentPostgresReady
+    status: "True"
+  - type: ComponentClairPostgresReady
+    status: "True"
+  - type: ComponentQuayReady
+    status: "True"
+  - type: Available
+    status: "True"
+  - type: RolloutBlocked
+    status: "False"

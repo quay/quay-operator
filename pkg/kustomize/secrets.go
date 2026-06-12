@@ -408,6 +408,9 @@ func clairConfigFor(log logr.Logger, qctx *quaycontext.QuayRegistryContext, quay
 	}
 
 	host := strings.Join([]string{quay.GetName(), "clair-postgres"}, "-")
+	if qctx.ClairPostgresUseServiceCA {
+		host = host + "." + quay.GetNamespace() + ".svc"
+	}
 	dbname := qctx.ClairDbName
 	user := qctx.ClairDbUser
 	password := qctx.ClairDbPassword
@@ -416,7 +419,11 @@ func clairConfigFor(log logr.Logger, qctx *quaycontext.QuayRegistryContext, quay
 	sslrootcert := ""
 	if override := v1.GetTLSOverrideForComponent(quay, v1.ComponentClairPostgres); override != nil && override.Enabled {
 		sslmode = "verify-full"
-		sslrootcert = " sslrootcert=/clair-db-tls/ca.crt"
+		root := qctx.ClairPostgresSSLRootCert
+		if root == "" {
+			root = "/clair-db-tls/ca.crt"
+		}
+		sslrootcert = " sslrootcert=" + root
 	}
 	dbConn := fmt.Sprintf("host=%s port=5432 dbname=%s user=%s password=%s sslmode=%s%s pool_max_conns=%d", host, dbname, user, password, sslmode, sslrootcert, poolsize)
 

@@ -694,6 +694,152 @@ func getCertificatesPEM(address string) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+const (
+	quayPostgresSSLRootCert    = "/run/secrets/postgresql/ca.crt"
+	quayPostgresServiceCARoot  = "/conf/stack/extra_ca_certs/service-ca.crt"
+	clairPostgresSSLRootCert   = "/clair-db-tls/ca.crt"
+	clairPostgresServiceCARoot = "/var/run/certs/service-ca.crt"
+	serviceCAAnnotationKey     = "service.beta.openshift.io/serving-cert-secret-name"
+)
+
+func resolvePostgresTLSSource(qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry) {
+	type check struct {
+		kind           v1.ComponentKind
+		setUseCA       func(bool)
+		setSSLRoot     func(string)
+		selfSignedRoot string
+		serviceCARoot  string
+	}
+
+	checks := []check{
+		{
+			kind:           v1.ComponentPostgres,
+			setUseCA:       func(b bool) { qctx.PostgresUseServiceCA = b },
+			setSSLRoot:     func(s string) { qctx.PostgresSSLRootCert = s },
+			selfSignedRoot: quayPostgresSSLRootCert,
+			serviceCARoot:  quayPostgresServiceCARoot,
+		},
+		{
+			kind:           v1.ComponentClairPostgres,
+			setUseCA:       func(b bool) { qctx.ClairPostgresUseServiceCA = b },
+			setSSLRoot:     func(s string) { qctx.ClairPostgresSSLRootCert = s },
+			selfSignedRoot: clairPostgresSSLRootCert,
+			serviceCARoot:  clairPostgresServiceCARoot,
+		},
+	}
+
+	for _, c := range checks {
+		override := v1.GetTLSOverrideForComponent(quay, c.kind)
+		if override == nil || !override.Enabled {
+			c.setUseCA(false)
+			c.setSSLRoot("")
+			continue
+		}
+
+		if override.SecretRef == nil && qctx.SupportsRoutes {
+			c.setUseCA(true)
+			c.setSSLRoot(c.serviceCARoot)
+		} else {
+			c.setUseCA(false)
+			c.setSSLRoot(c.selfSignedRoot)
+		}
+	}
+}
+
+func postgresServiceName(quay *v1.QuayRegistry, kind v1.ComponentKind) string {
+	switch kind {
+	case v1.ComponentPostgres:
+		return quay.GetName() + "-quay-database"
+	case v1.ComponentClairPostgres:
+		return quay.GetName() + "-clair-postgres"
+	default:
+		return quay.GetName() + "-quay-database"
+	}
+}
+
+func postgresTLSSecretNameForServiceCA(quay *v1.QuayRegistry, kind v1.ComponentKind) string {
+	prefix := quay.GetName() + "-"
+	switch kind {
+	case v1.ComponentPostgres:
+		return prefix + "postgres-tls"
+	case v1.ComponentClairPostgres:
+		return prefix + "clairpostgres-tls"
+	default:
+		return prefix + "postgres-tls"
+	}
+}
+
+func useServiceCAForComponent(qctx *quaycontext.QuayRegistryContext, kind v1.ComponentKind) bool {
+	switch kind {
+	case v1.ComponentPostgres:
+		return qctx.PostgresUseServiceCA
+	case v1.ComponentClairPostgres:
+		return qctx.ClairPostgresUseServiceCA
+	default:
+		return false
+	}
+}
+
+func (r *QuayRegistryReconciler) ensurePostgresServiceCAAnnotation(
+	ctx context.Context,
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+	kind v1.ComponentKind,
+) error {
+	svcName := postgresServiceName(quay, kind)
+	nsn := types.NamespacedName{Name: svcName, Namespace: quay.Namespace}
+
+	var svc corev1.Service
+	if e := r.Get(ctx, nsn, &svc); e != nil {
+		if errors.IsNotFound(e) {
+			return nil
+		}
+		return fmt.Errorf("unable to get postgres service %q: %w", svcName, e)
+	}
+
+	useServiceCA := useServiceCAForComponent(qctx, kind)
+	secretName := postgresTLSSecretNameForServiceCA(quay, kind)
+	currentAnnotation := ""
+	if svc.Annotations != nil {
+		currentAnnotation = svc.Annotations[serviceCAAnnotationKey]
+	}
+
+	if useServiceCA {
+		if currentAnnotation != secretName {
+			if svc.Annotations == nil {
+				svc.Annotations = map[string]string{}
+			}
+			svc.Annotations[serviceCAAnnotationKey] = secretName
+			if e := r.Update(ctx, &svc); e != nil {
+				return fmt.Errorf("unable to annotate postgres service %q: %w", svcName, e)
+			}
+			r.Log.Info("annotated postgres service for service CA", "service", svcName, "secret", secretName)
+		}
+
+		var servingSecret corev1.Secret
+		secretNSN := types.NamespacedName{Name: secretName, Namespace: quay.Namespace}
+		if e := r.Get(ctx, secretNSN, &servingSecret); e != nil {
+			if errors.IsNotFound(e) {
+				return fmt.Errorf(
+					"serving certificate secret %q for %s not yet created by service CA operator — will retry",
+					secretName, kind,
+				)
+			}
+			return fmt.Errorf("unable to check serving cert secret %q: %w", secretName, e)
+		}
+	} else {
+		if currentAnnotation != "" {
+			delete(svc.Annotations, serviceCAAnnotationKey)
+			if e := r.Update(ctx, &svc); e != nil {
+				return fmt.Errorf("unable to remove service CA annotation from %q: %w", svcName, e)
+			}
+			r.Log.Info("removed service CA annotation from postgres service", "service", svcName)
+		}
+	}
+
+	return nil
+}
+
 // checkPostgresTLSSecrets validates user-provided TLS Secrets referenced by
 // secretRef on postgres and clairpostgres components. When valid, the cert
 // data is populated into the context for use by Inflate.

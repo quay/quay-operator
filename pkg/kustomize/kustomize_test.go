@@ -1100,4 +1100,40 @@ func TestInflateTLSCertGeneration(t *testing.T) {
 			assert.False(t, strings.HasSuffix(name, "postgresql-ca"), "should not create postgresql-ca Secret when secretRef is set")
 		}
 	})
+
+	t.Run("skips cert generation when UseServiceCA is true for postgres", func(t *testing.T) {
+		ctx := quaycontext.QuayRegistryContext{
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+			SupportsRoutes:           true,
+			PostgresUseServiceCA:     true,
+			PostgresSSLRootCert:      "/conf/stack/extra_ca_certs/service-ca.crt",
+		}
+		quay := newQuay([]v1.Component{
+			{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			{Kind: "redis", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+		})
+
+		pieces, err := Inflate(&ctx, quay, configBundle.DeepCopy(), log, true)
+		require.NoError(t, err)
+
+		assert.Empty(t, ctx.PostgresTLSCA, "should not generate CA when using service CA")
+		assert.Empty(t, ctx.PostgresTLSCert, "should not generate cert when using service CA")
+		assert.Empty(t, ctx.PostgresTLSKey, "should not generate key when using service CA")
+
+		for _, obj := range pieces {
+			objectMeta, _ := meta.Accessor(obj)
+			name := objectMeta.GetName()
+			if strings.Contains(name, "postgres-tls") && obj.GetObjectKind().GroupVersionKind().Kind == "Secret" {
+				t.Errorf("should not generate postgres-tls secret when using service CA, found %q", name)
+			}
+			if strings.Contains(name, "postgresql-ca") {
+				t.Errorf("should not generate postgresql-ca secret when using service CA, found %q", name)
+			}
+		}
+
+		assert.Contains(t, ctx.DbUri, "sslmode=verify-full")
+		assert.Contains(t, ctx.DbUri, "sslrootcert=%2Fconf%2Fstack%2Fextra_ca_certs%2Fservice-ca.crt")
+	})
 }
