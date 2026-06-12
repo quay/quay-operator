@@ -214,7 +214,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 
 		if strings.HasSuffix(dep.Name, "clair-app") {
 			applyClairEphemeralVolumeOverrides(quay, dep)
-			applyClairDBTLS(quay, dep)
+			applyClairDBTLS(quay, dep, qctx)
 		}
 
 		isQuayDB := strings.Contains(dep.GetName(), "quay-database")
@@ -568,9 +568,13 @@ const (
 	clairDBTLSMountPath  = "/clair-db-tls"
 )
 
-func applyClairDBTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment) {
+func applyClairDBTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment, qctx *quaycontext.QuayRegistryContext) {
 	override := v1.GetTLSOverrideForComponent(quay, v1.ComponentClairPostgres)
 	if override == nil || !override.Enabled {
+		return
+	}
+
+	if qctx.ClairPostgresUseServiceCA {
 		return
 	}
 

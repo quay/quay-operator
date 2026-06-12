@@ -1131,7 +1131,7 @@ func TestApplyClairDBTLS(t *testing.T) {
 		}
 		dep := makeClairDep()
 
-		applyClairDBTLS(quay, dep)
+		applyClairDBTLS(quay, dep, &quaycontext.QuayRegistryContext{})
 
 		var foundVol bool
 		for _, vol := range dep.Spec.Template.Spec.Volumes {
@@ -1166,7 +1166,7 @@ func TestApplyClairDBTLS(t *testing.T) {
 		}
 		dep := makeClairDep()
 
-		applyClairDBTLS(quay, dep)
+		applyClairDBTLS(quay, dep, &quaycontext.QuayRegistryContext{})
 
 		assert.Len(t, dep.Spec.Template.Spec.Volumes, 0)
 		assert.Len(t, dep.Spec.Template.Spec.Containers[0].VolumeMounts, 0)
@@ -1187,7 +1187,7 @@ func TestApplyClairDBTLS(t *testing.T) {
 		}
 		dep := makeClairDep()
 
-		applyClairDBTLS(quay, dep)
+		applyClairDBTLS(quay, dep, &quaycontext.QuayRegistryContext{})
 
 		var secretName string
 		for _, vol := range dep.Spec.Template.Spec.Volumes {
@@ -1196,5 +1196,98 @@ func TestApplyClairDBTLS(t *testing.T) {
 			}
 		}
 		assert.Equal(t, "my-ca-secret", secretName)
+	})
+}
+
+func TestApplyClairDBTLSSkipsWhenServiceCA(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+		},
+	}
+
+	dep := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "clair-app"}},
+				},
+			},
+		},
+	}
+
+	qctx := &quaycontext.QuayRegistryContext{
+		ClairPostgresUseServiceCA: true,
+	}
+
+	applyClairDBTLS(quay, dep, qctx)
+
+	for _, vol := range dep.Spec.Template.Spec.Volumes {
+		if vol.Name == "clair-db-tls" {
+			t.Error("clair-db-tls volume should not be added when using service CA")
+		}
+	}
+	for _, vm := range dep.Spec.Template.Spec.Containers[0].VolumeMounts {
+		if vm.Name == "clair-db-tls" {
+			t.Error("clair-db-tls volume mount should not be added when using service CA")
+		}
+	}
+}
+
+func TestProcessPostgresDeploymentCAHashAnnotation(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+		},
+	}
+
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-quay-database",
+			Annotations: map[string]string{"quay-component": "postgres"},
+			Labels:      map[string]string{"quay-component": "postgres"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"quay-registry-hostname":         "quay.example.com",
+						"quay-buildmanager-hostname":     "build.example.com",
+						"quay-operator-service-endpoint": "endpoint",
+					},
+					Labels: map[string]string{"quay-component": "postgres"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "postgres",
+						Image: "postgres:13",
+					}},
+				},
+			},
+		},
+	}
+
+	t.Run("CA hash annotation is present on postgres deployment from generic block", func(t *testing.T) {
+		qctx := &quaycontext.QuayRegistryContext{
+			PostgresUseServiceCA: true,
+			ClusterServiceCAHash: "abc12345",
+		}
+
+		result, err := Process(quay, qctx, dep.DeepCopy(), true)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		resultDep := result.(*appsv1.Deployment)
+		got := resultDep.Spec.Template.Annotations[v1.ClusterServiceCAName]
+		if got != "abc12345" {
+			t.Errorf("template annotation %s = %q, want %q", v1.ClusterServiceCAName, got, "abc12345")
+		}
 	})
 }
