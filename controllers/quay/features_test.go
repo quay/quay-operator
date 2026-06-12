@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/cert"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -534,6 +536,581 @@ func Test_checkExternalTLSSecret(t *testing.T) {
 				if updated.Labels[v1.TLSSecretLabel] != "true" {
 					t.Error("expected TLSSecretLabel to be applied to the secret")
 				}
+			}
+		})
+	}
+}
+
+func TestCheckManagedKeys_TLSFields(t *testing.T) {
+	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "test-ns",
+		},
+	}
+
+	secretName := fmt.Sprintf("%s-%s", quay.Name, v1.ManagedKeysName)
+
+	for _, tt := range []struct {
+		name                  string
+		secretData            map[string][]byte
+		expectPostgresTLSCA   string
+		expectPostgresTLSCert string
+		expectPostgresTLSKey  string
+		expectClairPgTLSCA    string
+		expectClairPgTLSCert  string
+		expectClairPgTLSKey   string
+	}{
+		{
+			name: "reads all TLS fields from managed keys",
+			secretData: map[string][]byte{
+				"DATABASE_SECRET_KEY":     []byte("dbsecret"),
+				"SECRET_KEY":              []byte("secret"),
+				"DB_URI":                  []byte("postgresql://user:pass@host:5432/db"),
+				"DB_ROOT_PW":              []byte("rootpw"),
+				"SECURITY_SCANNER_V4_PSK": []byte("psk"),
+				"CLAIR_DB_USER":           []byte("clair"),
+				"CLAIR_DB_PASSWORD":       []byte("clairpw"),
+				"CLAIR_DB_ROOT_PW":        []byte("clairrootpw"),
+				"CLAIR_DB_NAME":           []byte("clair"),
+				"POSTGRES_TLS_CA":         []byte("-----BEGIN CERTIFICATE-----\nfakeca\n-----END CERTIFICATE-----\n"),
+				"POSTGRES_TLS_CERT":       []byte("-----BEGIN CERTIFICATE-----\nfakecert\n-----END CERTIFICATE-----\n"),
+				"POSTGRES_TLS_KEY":        []byte("fake-postgres-key"),
+				"CLAIRPOSTGRES_TLS_CA":    []byte("-----BEGIN CERTIFICATE-----\nclairca\n-----END CERTIFICATE-----\n"),
+				"CLAIRPOSTGRES_TLS_CERT":  []byte("-----BEGIN CERTIFICATE-----\nclaircert\n-----END CERTIFICATE-----\n"),
+				"CLAIRPOSTGRES_TLS_KEY":   []byte("fake-clairpostgres-key"),
+			},
+			expectPostgresTLSCA:   "-----BEGIN CERTIFICATE-----\nfakeca\n-----END CERTIFICATE-----\n",
+			expectPostgresTLSCert: "-----BEGIN CERTIFICATE-----\nfakecert\n-----END CERTIFICATE-----\n",
+			expectPostgresTLSKey:  "fake-postgres-key",
+			expectClairPgTLSCA:    "-----BEGIN CERTIFICATE-----\nclairca\n-----END CERTIFICATE-----\n",
+			expectClairPgTLSCert:  "-----BEGIN CERTIFICATE-----\nclaircert\n-----END CERTIFICATE-----\n",
+			expectClairPgTLSKey:   "fake-clairpostgres-key",
+		},
+		{
+			name: "empty TLS fields when not present in secret",
+			secretData: map[string][]byte{
+				"DATABASE_SECRET_KEY":     []byte("dbsecret"),
+				"SECRET_KEY":              []byte("secret"),
+				"DB_URI":                  []byte("postgresql://user:pass@host:5432/db"),
+				"DB_ROOT_PW":              []byte("rootpw"),
+				"SECURITY_SCANNER_V4_PSK": []byte("psk"),
+				"CLAIR_DB_USER":           []byte("clair"),
+				"CLAIR_DB_PASSWORD":       []byte("clairpw"),
+				"CLAIR_DB_ROOT_PW":        []byte("clairrootpw"),
+				"CLAIR_DB_NAME":           []byte("clair"),
+			},
+			expectPostgresTLSCA:   "",
+			expectPostgresTLSCert: "",
+			expectPostgresTLSKey:  "",
+			expectClairPgTLSCA:    "",
+			expectClairPgTLSCert:  "",
+			expectClairPgTLSKey:   "",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: quay.Namespace,
+				},
+				Data: tt.secretData,
+			}
+
+			cli := fake.NewClientBuilder().WithObjects(secret).Build()
+			r := newReconcilerWithClient(cli)
+			qctx := quaycontext.NewQuayRegistryContext()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			err := r.checkManagedKeys(ctx, qctx, quay)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if qctx.PostgresTLSCA != tt.expectPostgresTLSCA {
+				t.Errorf("PostgresTLSCA = %q, want %q", qctx.PostgresTLSCA, tt.expectPostgresTLSCA)
+			}
+			if qctx.PostgresTLSCert != tt.expectPostgresTLSCert {
+				t.Errorf("PostgresTLSCert = %q, want %q", qctx.PostgresTLSCert, tt.expectPostgresTLSCert)
+			}
+			if qctx.PostgresTLSKey != tt.expectPostgresTLSKey {
+				t.Errorf("PostgresTLSKey = %q, want %q", qctx.PostgresTLSKey, tt.expectPostgresTLSKey)
+			}
+			if qctx.ClairPostgresTLSCA != tt.expectClairPgTLSCA {
+				t.Errorf("ClairPostgresTLSCA = %q, want %q", qctx.ClairPostgresTLSCA, tt.expectClairPgTLSCA)
+			}
+			if qctx.ClairPostgresTLSCert != tt.expectClairPgTLSCert {
+				t.Errorf("ClairPostgresTLSCert = %q, want %q", qctx.ClairPostgresTLSCert, tt.expectClairPgTLSCert)
+			}
+			if qctx.ClairPostgresTLSKey != tt.expectClairPgTLSKey {
+				t.Errorf("ClairPostgresTLSKey = %q, want %q", qctx.ClairPostgresTLSKey, tt.expectClairPgTLSKey)
+			}
+		})
+	}
+}
+
+func TestCheckPostgresTLSSecrets(t *testing.T) {
+	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	// Generate valid test certificates
+	certPEM, keyPEM, err := cert.GenerateSelfSignedCertKey("test-db", nil, nil)
+	if err != nil {
+		t.Fatalf("failed to generate test certs: %v", err)
+	}
+	caPEM := certPEM // self-signed, CA is the same cert
+
+	quayWithSecretRef := func(secretName string) *v1.QuayRegistry {
+		return &v1.QuayRegistry{
+			ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+						Enabled:   true,
+						SecretRef: &corev1.LocalObjectReference{Name: secretName},
+					}}},
+				},
+			},
+		}
+	}
+
+	for _, tt := range []struct {
+		name          string
+		quay          *v1.QuayRegistry
+		objs          []client.Object
+		expectErr     string
+		expectCA      bool
+		expectClairCA bool
+	}{
+		{
+			name: "valid secret populates context",
+			quay: quayWithSecretRef("pg-tls"),
+			objs: []client.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-tls", Namespace: "test-ns"},
+					Data: map[string][]byte{
+						"ca.crt":  caPEM,
+						"tls.crt": certPEM,
+						"tls.key": keyPEM,
+					},
+				},
+			},
+			expectCA: true,
+		},
+		{
+			name:      "secret not found",
+			quay:      quayWithSecretRef("missing-secret"),
+			objs:      []client.Object{},
+			expectErr: "not found",
+		},
+		{
+			name: "missing ca.crt key",
+			quay: quayWithSecretRef("pg-tls"),
+			objs: []client.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-tls", Namespace: "test-ns"},
+					Data: map[string][]byte{
+						"tls.crt": certPEM,
+						"tls.key": keyPEM,
+					},
+				},
+			},
+			expectErr: "missing required key \"ca.crt\"",
+		},
+		{
+			name: "missing tls.crt key",
+			quay: quayWithSecretRef("pg-tls"),
+			objs: []client.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-tls", Namespace: "test-ns"},
+					Data: map[string][]byte{
+						"ca.crt":  caPEM,
+						"tls.key": keyPEM,
+					},
+				},
+			},
+			expectErr: "missing required key \"tls.crt\"",
+		},
+		{
+			name: "missing tls.key key",
+			quay: quayWithSecretRef("pg-tls"),
+			objs: []client.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-tls", Namespace: "test-ns"},
+					Data: map[string][]byte{
+						"ca.crt":  caPEM,
+						"tls.crt": certPEM,
+					},
+				},
+			},
+			expectErr: "missing required key \"tls.key\"",
+		},
+		{
+			name: "cert/key mismatch",
+			quay: quayWithSecretRef("pg-tls"),
+			objs: []client.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-tls", Namespace: "test-ns"},
+					Data: map[string][]byte{
+						"ca.crt":  caPEM,
+						"tls.crt": certPEM,
+						"tls.key": []byte("-----BEGIN RSA PRIVATE KEY-----\nMIIBogIBAAJBALRiMLAH\n-----END RSA PRIVATE KEY-----\n"),
+					},
+				},
+			},
+			expectErr: "do not match",
+		},
+		{
+			name: "no secretRef configured is a no-op",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+					},
+				},
+			},
+			objs: []client.Object{},
+		},
+		{
+			name: "TLS not enabled is a no-op",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: "postgres", Managed: true},
+					},
+				},
+			},
+			objs: []client.Object{},
+		},
+		{
+			name: "clairpostgres valid secret populates clair context fields",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+							Enabled:   true,
+							SecretRef: &corev1.LocalObjectReference{Name: "clair-pg-tls"},
+						}}},
+					},
+				},
+			},
+			objs: []client.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "clair-pg-tls", Namespace: "test-ns"},
+					Data: map[string][]byte{
+						"ca.crt":  caPEM,
+						"tls.crt": certPEM,
+						"tls.key": keyPEM,
+					},
+				},
+			},
+			expectClairCA: true,
+		},
+		{
+			name: "both postgres and clairpostgres configured simultaneously",
+			quay: &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+							Enabled:   true,
+							SecretRef: &corev1.LocalObjectReference{Name: "pg-tls"},
+						}}},
+						{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+							Enabled:   true,
+							SecretRef: &corev1.LocalObjectReference{Name: "clair-pg-tls"},
+						}}},
+					},
+				},
+			},
+			objs: []client.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg-tls", Namespace: "test-ns"},
+					Data: map[string][]byte{
+						"ca.crt":  caPEM,
+						"tls.crt": certPEM,
+						"tls.key": keyPEM,
+					},
+				},
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{Name: "clair-pg-tls", Namespace: "test-ns"},
+					Data: map[string][]byte{
+						"ca.crt":  caPEM,
+						"tls.crt": certPEM,
+						"tls.key": keyPEM,
+					},
+				},
+			},
+			expectCA:      true,
+			expectClairCA: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cli := fake.NewClientBuilder().WithObjects(tt.objs...).Build()
+			r := newReconcilerWithClient(cli)
+			qctx := quaycontext.NewQuayRegistryContext()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			err := r.checkPostgresTLSSecrets(ctx, qctx, tt.quay)
+
+			if tt.expectErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.expectErr)
+				}
+				if !strings.Contains(err.Error(), tt.expectErr) {
+					t.Errorf("error = %q, want to contain %q", err.Error(), tt.expectErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.expectCA {
+				if qctx.PostgresTLSCA == "" {
+					t.Error("expected PostgresTLSCA to be populated")
+				}
+				if qctx.PostgresTLSCert == "" {
+					t.Error("expected PostgresTLSCert to be populated")
+				}
+				if qctx.PostgresTLSKey == "" {
+					t.Error("expected PostgresTLSKey to be populated")
+				}
+			}
+			if tt.expectClairCA {
+				if qctx.ClairPostgresTLSCA == "" {
+					t.Error("expected ClairPostgresTLSCA to be populated")
+				}
+				if qctx.ClairPostgresTLSCert == "" {
+					t.Error("expected ClairPostgresTLSCert to be populated")
+				}
+				if qctx.ClairPostgresTLSKey == "" {
+					t.Error("expected ClairPostgresTLSKey to be populated")
+				}
+			}
+		})
+	}
+}
+
+func TestResolvePostgresTLSSource(t *testing.T) {
+	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	for _, tt := range []struct {
+		name                       string
+		supportsRoutes             bool
+		components                 []v1.Component
+		expectPostgresUseServiceCA bool
+		expectClairUseServiceCA    bool
+		expectPostgresSSLRoot      string
+		expectClairSSLRoot         string
+	}{
+		{
+			name:           "OpenShift + TLS enabled no secretRef uses service CA",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+			expectPostgresUseServiceCA: true,
+			expectPostgresSSLRoot:      "/conf/stack/extra_ca_certs/service-ca.crt",
+		},
+		{
+			name:           "OpenShift + TLS enabled with secretRef does not use service CA",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+					Enabled:   true,
+					SecretRef: &corev1.LocalObjectReference{Name: "my-certs"},
+				}}},
+			},
+			expectPostgresUseServiceCA: false,
+			expectPostgresSSLRoot:      "/run/secrets/postgresql/ca.crt",
+		},
+		{
+			name:           "non-OpenShift + TLS enabled does not use service CA",
+			supportsRoutes: false,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+			expectPostgresUseServiceCA: false,
+			expectPostgresSSLRoot:      "/run/secrets/postgresql/ca.crt",
+		},
+		{
+			name:           "TLS not enabled sets no service CA or sslrootcert",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true},
+			},
+			expectPostgresUseServiceCA: false,
+			expectPostgresSSLRoot:      "",
+		},
+		{
+			name:           "OpenShift + both components TLS enabled uses service CA for both",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+				{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+			expectPostgresUseServiceCA: true,
+			expectClairUseServiceCA:    true,
+			expectPostgresSSLRoot:      "/conf/stack/extra_ca_certs/service-ca.crt",
+			expectClairSSLRoot:         "/var/run/certs/service-ca.crt",
+		},
+		{
+			name:           "OpenShift + mixed: postgres secretRef, clair no secretRef",
+			supportsRoutes: true,
+			components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{
+					Enabled:   true,
+					SecretRef: &corev1.LocalObjectReference{Name: "my-certs"},
+				}}},
+				{Kind: "clairpostgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+			expectPostgresUseServiceCA: false,
+			expectClairUseServiceCA:    true,
+			expectPostgresSSLRoot:      "/run/secrets/postgresql/ca.crt",
+			expectClairSSLRoot:         "/var/run/certs/service-ca.crt",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			quay := &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+				Spec:       v1.QuayRegistrySpec{Components: tt.components},
+			}
+			qctx := quaycontext.NewQuayRegistryContext()
+			qctx.SupportsRoutes = tt.supportsRoutes
+
+			resolvePostgresTLSSource(qctx, quay)
+
+			if qctx.PostgresUseServiceCA != tt.expectPostgresUseServiceCA {
+				t.Errorf("PostgresUseServiceCA = %v, want %v", qctx.PostgresUseServiceCA, tt.expectPostgresUseServiceCA)
+			}
+			if qctx.ClairPostgresUseServiceCA != tt.expectClairUseServiceCA {
+				t.Errorf("ClairPostgresUseServiceCA = %v, want %v", qctx.ClairPostgresUseServiceCA, tt.expectClairUseServiceCA)
+			}
+			if qctx.PostgresSSLRootCert != tt.expectPostgresSSLRoot {
+				t.Errorf("PostgresSSLRootCert = %q, want %q", qctx.PostgresSSLRootCert, tt.expectPostgresSSLRoot)
+			}
+			if qctx.ClairPostgresSSLRootCert != tt.expectClairSSLRoot {
+				t.Errorf("ClairPostgresSSLRootCert = %q, want %q", qctx.ClairPostgresSSLRootCert, tt.expectClairSSLRoot)
+			}
+		})
+	}
+}
+
+func TestEnsurePostgresServiceCAAnnotation(t *testing.T) {
+	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true, Overrides: &v1.Override{TLS: &v1.TLSOverride{Enabled: true}}},
+			},
+		},
+	}
+
+	postgresService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-quay-database",
+			Namespace: "test-ns",
+			Labels:    map[string]string{"quay-component": "postgres"},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{{Port: 5432}},
+		},
+	}
+
+	for _, tt := range []struct {
+		name                string
+		useServiceCA        bool
+		existingAnnotation  string
+		servingSecretExists bool
+		expectAnnotation    string
+		expectErr           string
+	}{
+		{
+			name:                "adds annotation when useServiceCA is true",
+			useServiceCA:        true,
+			servingSecretExists: true,
+			expectAnnotation:    "test-postgres-tls",
+		},
+		{
+			name:                "returns error when serving cert secret not found",
+			useServiceCA:        true,
+			servingSecretExists: false,
+			expectErr:           "serving certificate secret",
+		},
+		{
+			name:               "removes annotation when useServiceCA is false",
+			useServiceCA:       false,
+			existingAnnotation: "test-postgres-tls",
+			expectAnnotation:   "",
+		},
+		{
+			name:             "no-op when useServiceCA is false and no annotation exists",
+			useServiceCA:     false,
+			expectAnnotation: "",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := postgresService.DeepCopy()
+			if tt.existingAnnotation != "" {
+				svc.Annotations = map[string]string{
+					"service.beta.openshift.io/serving-cert-secret-name": tt.existingAnnotation,
+				}
+			}
+
+			objs := []client.Object{svc}
+			if tt.servingSecretExists {
+				objs = append(objs, &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-postgres-tls",
+						Namespace: "test-ns",
+					},
+					Data: map[string][]byte{
+						"tls.crt": []byte("cert-data"),
+						"tls.key": []byte("key-data"),
+					},
+				})
+			}
+
+			cli := fake.NewClientBuilder().WithObjects(objs...).Build()
+			r := newReconcilerWithClient(cli)
+
+			qctx := quaycontext.NewQuayRegistryContext()
+			qctx.PostgresUseServiceCA = tt.useServiceCA
+
+			ctx := context.Background()
+			err := r.ensurePostgresServiceCAAnnotation(ctx, qctx, quay, v1.ComponentPostgres)
+
+			if tt.expectErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.expectErr)
+				}
+				if !strings.Contains(err.Error(), tt.expectErr) {
+					t.Fatalf("expected error containing %q, got %q", tt.expectErr, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			var updatedSvc corev1.Service
+			if e := cli.Get(ctx, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}, &updatedSvc); e != nil {
+				t.Fatalf("failed to get updated service: %v", e)
+			}
+
+			got := updatedSvc.Annotations["service.beta.openshift.io/serving-cert-secret-name"]
+			if got != tt.expectAnnotation {
+				t.Errorf("annotation = %q, want %q", got, tt.expectAnnotation)
 			}
 		})
 	}

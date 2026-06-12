@@ -584,6 +584,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	quayContext := quaycontext.NewQuayRegistryContext()
+	quayContext.SupportsRoutes = r.supportsRoutes
 
 	if err := r.checkExternalTLSSecret(ctx, quayContext, updatedQuay, cbundle); err != nil {
 		return r.reconcileWithCondition(
@@ -609,6 +610,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	resolvePostgresTLSSource(quayContext, updatedQuay)
+
 	if err := r.checkManagedKeys(ctx, quayContext, updatedQuay); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
@@ -618,6 +621,30 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			v1.ConditionReasonConfigInvalid,
 			fmt.Sprintf("unable to retrieve managed keys `Secret`: %s", err),
 		)
+	}
+
+	if err := r.checkPostgresTLSSecrets(ctx, quayContext, updatedQuay); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			fmt.Sprintf("PostgreSQL TLS secret error: %s", err),
+		)
+	}
+
+	for _, pgKind := range []v1.ComponentKind{v1.ComponentPostgres, v1.ComponentClairPostgres} {
+		if err := r.ensurePostgresServiceCAAnnotation(ctx, quayContext, updatedQuay, pgKind); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonComponentCreationFailed,
+				fmt.Sprintf("PostgreSQL service CA error: %s", err),
+			)
+		}
 	}
 
 	if err := parseServerHostname(quayContext, cbundle); err != nil {
@@ -1431,19 +1458,26 @@ func (r *QuayRegistryReconciler) findQuayRegistriesForSecret(
 
 	var requests []reconcile.Request
 	for _, reg := range registries.Items {
-		secretRef := v1.GetTLSSecretRef(reg.Spec.Components)
-		if secretRef == nil {
-			continue
-		}
-		if secretRef.Name != secret.GetName() {
-			continue
-		}
-		requests = append(requests, reconcile.Request{
+		req := reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name:      reg.GetName(),
 				Namespace: reg.GetNamespace(),
 			},
-		})
+		}
+
+		if secretRef := v1.GetTLSSecretRef(reg.Spec.Components); secretRef != nil && secretRef.Name == secret.GetName() {
+			requests = append(requests, req)
+			continue
+		}
+
+		for _, component := range reg.Spec.Components {
+			if component.Overrides != nil && component.Overrides.TLS != nil &&
+				component.Overrides.TLS.SecretRef != nil &&
+				component.Overrides.TLS.SecretRef.Name == secret.GetName() {
+				requests = append(requests, req)
+				break
+			}
+		}
 	}
 	return requests
 }

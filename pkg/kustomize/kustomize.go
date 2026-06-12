@@ -3,6 +3,7 @@ package kustomize
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -420,6 +421,42 @@ func KustomizationFor(
 		addrs = append(addrs, noproxy...)
 	}
 
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) {
+		if override := v1.GetTLSOverrideForComponent(quay, v1.ComponentPostgres); override != nil && override.Enabled && override.SecretRef == nil {
+			if ctx.PostgresUseServiceCA {
+				log.Info("using OpenShift service CA for managed postgres TLS, skipping self-signed cert generation")
+			} else if ctx.PostgresTLSCA == "" {
+				log.Info("generating self-signed TLS certificates for managed postgres")
+				serviceName := quay.GetName() + "-quay-database"
+				ca, cert, key, err := generatePostgresTLSCerts(serviceName, quay.GetNamespace())
+				if err != nil {
+					return nil, err
+				}
+				ctx.PostgresTLSCA = ca
+				ctx.PostgresTLSCert = cert
+				ctx.PostgresTLSKey = key
+			}
+		}
+	}
+
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentClairPostgres) {
+		if override := v1.GetTLSOverrideForComponent(quay, v1.ComponentClairPostgres); override != nil && override.Enabled && override.SecretRef == nil {
+			if ctx.ClairPostgresUseServiceCA {
+				log.Info("using OpenShift service CA for managed clairpostgres TLS, skipping self-signed cert generation")
+			} else if ctx.ClairPostgresTLSCA == "" {
+				log.Info("generating self-signed TLS certificates for managed clairpostgres")
+				serviceName := quay.GetName() + "-clair-postgres"
+				ca, cert, key, err := generatePostgresTLSCerts(serviceName, quay.GetNamespace())
+				if err != nil {
+					return nil, err
+				}
+				ctx.ClairPostgresTLSCA = ca
+				ctx.ClairPostgresTLSCert = cert
+				ctx.ClairPostgresTLSKey = key
+			}
+		}
+	}
+
 	generatedSecrets := []types.SecretArgs{
 		{
 			GeneratorArgs: types.GeneratorArgs{
@@ -466,6 +503,12 @@ func KustomizationFor(
 						"CLAIR_DB_PASSWORD=" + ctx.ClairDbPassword,
 						"CLAIR_DB_ROOT_PW=" + ctx.ClairDbRootPw,
 						"CLAIR_DB_NAME=" + ctx.ClairDbName,
+						"POSTGRES_TLS_CA=" + ctx.PostgresTLSCA,
+						"POSTGRES_TLS_CERT=" + ctx.PostgresTLSCert,
+						"POSTGRES_TLS_KEY=" + ctx.PostgresTLSKey,
+						"CLAIRPOSTGRES_TLS_CA=" + ctx.ClairPostgresTLSCA,
+						"CLAIRPOSTGRES_TLS_CERT=" + ctx.ClairPostgresTLSCert,
+						"CLAIRPOSTGRES_TLS_KEY=" + ctx.ClairPostgresTLSKey,
 					},
 				},
 			},
@@ -478,6 +521,74 @@ func KustomizationFor(
 				},
 			},
 		},
+	}
+
+	if override := v1.GetTLSOverrideForComponent(quay, v1.ComponentPostgres); override != nil && override.Enabled {
+		if override.SecretRef == nil && !ctx.PostgresUseServiceCA {
+			generatedSecrets = append(generatedSecrets,
+				types.SecretArgs{
+					GeneratorArgs: types.GeneratorArgs{
+						Name:    "postgres-tls",
+						Options: &types.GeneratorOptions{DisableNameSuffixHash: true},
+						KvPairSources: types.KvPairSources{
+							LiteralSources: []string{
+								"tls.crt=" + ctx.PostgresTLSCert,
+								"tls.key=" + ctx.PostgresTLSKey,
+							},
+						},
+					},
+				},
+			)
+		}
+		if ctx.PostgresTLSCA != "" && !ctx.PostgresUseServiceCA {
+			generatedSecrets = append(generatedSecrets,
+				types.SecretArgs{
+					GeneratorArgs: types.GeneratorArgs{
+						Name:    "postgresql-ca",
+						Options: &types.GeneratorOptions{DisableNameSuffixHash: true},
+						KvPairSources: types.KvPairSources{
+							LiteralSources: []string{
+								"ca.crt=" + ctx.PostgresTLSCA,
+							},
+						},
+					},
+				},
+			)
+		}
+	}
+
+	if override := v1.GetTLSOverrideForComponent(quay, v1.ComponentClairPostgres); override != nil && override.Enabled {
+		if override.SecretRef == nil && !ctx.ClairPostgresUseServiceCA {
+			generatedSecrets = append(generatedSecrets,
+				types.SecretArgs{
+					GeneratorArgs: types.GeneratorArgs{
+						Name:    "clairpostgres-tls",
+						Options: &types.GeneratorOptions{DisableNameSuffixHash: true},
+						KvPairSources: types.KvPairSources{
+							LiteralSources: []string{
+								"tls.crt=" + ctx.ClairPostgresTLSCert,
+								"tls.key=" + ctx.ClairPostgresTLSKey,
+							},
+						},
+					},
+				},
+			)
+		}
+		if ctx.ClairPostgresTLSCA != "" && !ctx.ClairPostgresUseServiceCA {
+			generatedSecrets = append(generatedSecrets,
+				types.SecretArgs{
+					GeneratorArgs: types.GeneratorArgs{
+						Name:    "clairpostgres-ca",
+						Options: &types.GeneratorOptions{DisableNameSuffixHash: true},
+						KvPairSources: types.KvPairSources{
+							LiteralSources: []string{
+								"ca.crt=" + ctx.ClairPostgresTLSCA,
+							},
+						},
+					},
+				},
+			)
+		}
 	}
 
 	componentPaths := []string{}
@@ -673,6 +784,46 @@ func Inflate(
 		)
 	}
 	parsedUserConfig["DB_URI"] = ctx.DbUri
+
+	if ctx.PostgresUseServiceCA {
+		u, err := url.Parse(ctx.DbUri)
+		if err == nil {
+			shortHost := quay.GetName() + "-quay-database"
+			fqdn := shortHost + "." + quay.GetNamespace() + ".svc"
+			if u.Hostname() == shortHost {
+				u.Host = fqdn + ":" + u.Port()
+				ctx.DbUri = u.String()
+				parsedUserConfig["DB_URI"] = ctx.DbUri
+			}
+		}
+	}
+
+	if override := v1.GetTLSOverrideForComponent(quay, v1.ComponentPostgres); override != nil && override.Enabled {
+		u, err := url.Parse(ctx.DbUri)
+		if err != nil {
+			return nil, fmt.Errorf("parsing DB_URI for TLS: %w", err)
+		}
+		q := u.Query()
+		q.Set("sslmode", "verify-full")
+		sslroot := ctx.PostgresSSLRootCert
+		if sslroot == "" {
+			sslroot = "/run/secrets/postgresql/ca.crt"
+		}
+		q.Set("sslrootcert", sslroot)
+		u.RawQuery = q.Encode()
+		ctx.DbUri = u.String()
+		parsedUserConfig["DB_URI"] = ctx.DbUri
+	} else if override != nil && v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentPostgres) {
+		u, err := url.Parse(ctx.DbUri)
+		if err == nil {
+			q := u.Query()
+			q.Del("sslmode")
+			q.Del("sslrootcert")
+			u.RawQuery = q.Encode()
+			ctx.DbUri = u.String()
+			parsedUserConfig["DB_URI"] = ctx.DbUri
+		}
+	}
 
 	for field, value := range BaseQuayConfig() {
 		if _, ok := parsedUserConfig[field]; !ok {

@@ -1,0 +1,273 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: postgres-tls
+spec:
+  concurrent: false
+  steps:
+  - name: create-registry-with-postgres-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, skipping config bundle setup"
+            exit 0
+          fi
+          echo "KinD detected, creating config bundle..."
+          ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+          SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+          BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+          ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          FEATURE_PROXY_STORAGE: true
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+            --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+  - name: assert-deployment-tls-config
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Checking postgres deployment TLS configuration ==="
+
+          INIT=$(kubectl get deployment pgtls-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="postgres-tls-init")].name}')
+          if [ "${INIT}" != "postgres-tls-init" ]; then
+            echo "FAIL: quay-database missing postgres-tls-init init container"
+            exit 1
+          fi
+          echo "PASS: quay-database has postgres-tls-init init container"
+
+          VOL=$(kubectl get deployment pgtls-quay-database -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgres-tls-certs")].name}')
+          if [ "${VOL}" != "postgres-tls-certs" ]; then
+            echo "FAIL: quay-database missing postgres-tls-certs volume"
+            exit 1
+          fi
+          echo "PASS: quay-database has postgres-tls-certs volume"
+
+          echo "=== Checking clair-postgres deployment TLS configuration ==="
+
+          INIT_CLAIR=$(kubectl get deployment pgtls-clair-postgres -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="postgres-tls-init")].name}')
+          if [ "${INIT_CLAIR}" != "postgres-tls-init" ]; then
+            echo "FAIL: clair-postgres missing postgres-tls-init init container"
+            exit 1
+          fi
+          echo "PASS: clair-postgres has postgres-tls-init init container"
+
+          VOL_CLAIR=$(kubectl get deployment pgtls-clair-postgres -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgres-tls-certs")].name}')
+          if [ "${VOL_CLAIR}" != "postgres-tls-certs" ]; then
+            echo "FAIL: clair-postgres missing postgres-tls-certs volume"
+            exit 1
+          fi
+          echo "PASS: clair-postgres has postgres-tls-certs volume"
+  - name: assert-tls-secrets
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Checking TLS secrets ==="
+
+          for SECRET in pgtls-postgres-tls pgtls-clairpostgres-tls; do
+            for KEY in tls.crt tls.key; do
+              VAL=$(kubectl get secret "${SECRET}" -n $NAMESPACE \
+                -o jsonpath="{.data.${KEY//./_}}" 2>/dev/null || true)
+              if [ -z "${VAL}" ]; then
+                VAL=$(kubectl get secret "${SECRET}" -n $NAMESPACE \
+                  -o go-template="{{index .data \"${KEY}\"}}" 2>/dev/null || true)
+              fi
+              if [ -z "${VAL}" ]; then
+                echo "FAIL: ${SECRET} missing key ${KEY}"
+                exit 1
+              fi
+              echo "PASS: ${SECRET} has key ${KEY}"
+            done
+          done
+
+          for SECRET in pgtls-postgresql-ca pgtls-clairpostgres-ca; do
+            VAL=$(kubectl get secret "${SECRET}" -n $NAMESPACE \
+              -o go-template='{{index .data "ca.crt"}}' 2>/dev/null || true)
+            if [ -z "${VAL}" ]; then
+              echo "FAIL: ${SECRET} missing key ca.crt"
+              exit 1
+            fi
+            DECODED=$(echo "${VAL}" | base64 -d)
+            echo "${DECODED}" | head -1 | grep -q "BEGIN CERTIFICATE" || \
+              { echo "FAIL: ${SECRET} ca.crt is not valid PEM"; exit 1; }
+            echo "PASS: ${SECRET} has valid ca.crt"
+          done
+
+          echo "=== Checking managed keys secret ==="
+
+          MANAGED_SECRET="pgtls-quay-registry-managed-secret-keys"
+          for KEY in POSTGRES_TLS_CA POSTGRES_TLS_CERT POSTGRES_TLS_KEY \
+                     CLAIRPOSTGRES_TLS_CA CLAIRPOSTGRES_TLS_CERT CLAIRPOSTGRES_TLS_KEY; do
+            VAL=$(kubectl get secret "${MANAGED_SECRET}" -n $NAMESPACE \
+              -o jsonpath="{.data.${KEY}}" 2>/dev/null || true)
+            if [ -z "${VAL}" ]; then
+              echo "FAIL: managed keys secret missing ${KEY}"
+              exit 1
+            fi
+            echo "PASS: managed keys has ${KEY}"
+          done
+  - name: assert-cert-sans-and-chain
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Checking postgres certificate SANs and chain ==="
+
+          CERT=$(kubectl get secret pgtls-postgres-tls -n $NAMESPACE \
+            -o go-template='{{index .data "tls.crt"}}' | base64 -d)
+          CA=$(kubectl get secret pgtls-postgresql-ca -n $NAMESPACE \
+            -o go-template='{{index .data "ca.crt"}}' | base64 -d)
+
+          CERT_TEXT=$(echo "${CERT}" | openssl x509 -noout -text)
+
+          echo "${CERT_TEXT}" | grep -q "DNS:pgtls-quay-database" || \
+            { echo "FAIL: cert missing SAN pgtls-quay-database"; exit 1; }
+          echo "PASS: cert has SAN pgtls-quay-database"
+
+          echo "${CERT_TEXT}" | grep -q "DNS:localhost" || \
+            { echo "FAIL: cert missing SAN localhost"; exit 1; }
+          echo "PASS: cert has SAN localhost"
+
+          echo "${CERT_TEXT}" | grep -q "DNS:pgtls-quay-database.${NAMESPACE}.svc.cluster.local" || \
+            { echo "FAIL: cert missing SAN pgtls-quay-database.${NAMESPACE}.svc.cluster.local"; exit 1; }
+          echo "PASS: cert has SAN pgtls-quay-database.${NAMESPACE}.svc.cluster.local"
+
+          echo "${CERT}" > /tmp/pg-server-${NAMESPACE}.crt
+          echo "${CA}" > /tmp/pg-ca-${NAMESPACE}.crt
+          openssl verify -CAfile /tmp/pg-ca-${NAMESPACE}.crt /tmp/pg-server-${NAMESPACE}.crt || \
+            { echo "FAIL: postgres cert chain verification failed"; exit 1; }
+          echo "PASS: postgres cert chain is valid"
+
+          echo "=== Checking clairpostgres certificate SANs and chain ==="
+
+          CLAIR_CERT=$(kubectl get secret pgtls-clairpostgres-tls -n $NAMESPACE \
+            -o go-template='{{index .data "tls.crt"}}' | base64 -d)
+          CLAIR_CA=$(kubectl get secret pgtls-clairpostgres-ca -n $NAMESPACE \
+            -o go-template='{{index .data "ca.crt"}}' | base64 -d)
+
+          CLAIR_CERT_TEXT=$(echo "${CLAIR_CERT}" | openssl x509 -noout -text)
+
+          echo "${CLAIR_CERT_TEXT}" | grep -q "DNS:pgtls-clair-postgres" || \
+            { echo "FAIL: clair cert missing SAN pgtls-clair-postgres"; exit 1; }
+          echo "PASS: clair cert has SAN pgtls-clair-postgres"
+
+          echo "${CLAIR_CERT_TEXT}" | grep -q "DNS:pgtls-clair-postgres.${NAMESPACE}.svc.cluster.local" || \
+            { echo "FAIL: clair cert missing SAN pgtls-clair-postgres.${NAMESPACE}.svc.cluster.local"; exit 1; }
+          echo "PASS: clair cert has SAN pgtls-clair-postgres.${NAMESPACE}.svc.cluster.local"
+
+          echo "${CLAIR_CERT}" > /tmp/clair-server-${NAMESPACE}.crt
+          echo "${CLAIR_CA}" > /tmp/clair-ca-${NAMESPACE}.crt
+          openssl verify -CAfile /tmp/clair-ca-${NAMESPACE}.crt /tmp/clair-server-${NAMESPACE}.crt || \
+            { echo "FAIL: clair cert chain verification failed"; exit 1; }
+          echo "PASS: clair cert chain is valid"
+  - name: assert-clair-db-tls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Checking clair-app deployment for clair-db-tls volume ==="
+
+          VOL=$(kubectl get deployment pgtls-clair-app -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="clair-db-tls")].name}')
+          if [ "${VOL}" != "clair-db-tls" ]; then
+            echo "FAIL: clair-app missing clair-db-tls volume"
+            exit 1
+          fi
+          echo "PASS: clair-app has clair-db-tls volume"
+
+          MOUNT=$(kubectl get deployment pgtls-clair-app -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[?(@.name=="clair-db-tls")].mountPath}')
+          if [ "${MOUNT}" != "/clair-db-tls" ]; then
+            echo "FAIL: clair-app clair-db-tls not mounted at /clair-db-tls (got: ${MOUNT})"
+            exit 1
+          fi
+          echo "PASS: clair-app clair-db-tls mounted at /clair-db-tls"
+  - name: verify-pg-stat-ssl
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          echo "=== Verifying SSL connections via pg_stat_ssl ==="
+
+          kubectl rollout status deployment/pgtls-quay-app -n $NAMESPACE --timeout=300s
+          echo "quay-app rollout complete"
+
+          PG_POD=$(kubectl get pods -n $NAMESPACE -l quay-component=postgres \
+            -o jsonpath='{.items[0].metadata.name}')
+          echo "Postgres pod: ${PG_POD}"
+
+          echo "Checking SHOW ssl..."
+          SSL_STATUS=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+            bash -c "psql -t -c 'SHOW ssl;'" 2>/dev/null | tr -d ' \n')
+          if [ "${SSL_STATUS}" != "on" ]; then
+            echo "FAIL: PostgreSQL SSL is not enabled (got: '${SSL_STATUS}')"
+            exit 1
+          fi
+          echo "PASS: PostgreSQL SHOW ssl = on"
+
+          echo "Checking for SSL-encrypted remote connections..."
+          SSL_COUNT=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+            bash -c "psql -t -c \"SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_activity a ON s.pid = a.pid WHERE s.ssl = true AND a.client_addr IS NOT NULL;\"" \
+            2>/dev/null | tr -d ' \n')
+          echo "SSL remote connections: ${SSL_COUNT:-0}"
+
+          NON_SSL=$(kubectl exec -n $NAMESPACE "${PG_POD}" -- \
+            bash -c "psql -t -c \"SELECT count(*) FROM pg_stat_ssl s JOIN pg_stat_activity a ON s.pid = a.pid WHERE s.ssl = false AND a.client_addr IS NOT NULL;\"" \
+            2>/dev/null | tr -d ' \n')
+          echo "Non-SSL remote connections: ${NON_SSL:-0}"

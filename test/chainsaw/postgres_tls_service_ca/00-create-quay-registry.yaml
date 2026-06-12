@@ -1,0 +1,34 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: pgsca
+spec:
+  configBundleSecret: ($values.configBundle) # gitleaks:allow
+  components:
+  - kind: quay
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: postgres
+    managed: true
+    overrides:
+      tls:
+        enabled: true
+  - kind: redis
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: clairpostgres
+    managed: true
+    overrides:
+      tls:
+        enabled: true
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: ($values.managedObjectStorage)
+  - ($values.routeComponent)
+  - kind: monitoring
+    managed: ($values.managedMonitoring)
+  - kind: tls
+    managed: ($values.managedTLS)
