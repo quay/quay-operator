@@ -913,7 +913,7 @@ func TestApplyPostgresTLS(t *testing.T) {
 		}
 		dep := makePostgresDep("test-quay-database", "postgres")
 
-		applyPostgresTLS(quay, dep, v1.ComponentPostgres)
+		applyPostgresTLS(quay, dep, v1.ComponentPostgres, &quaycontext.QuayRegistryContext{})
 
 		assert.Len(t, dep.Spec.Template.Spec.InitContainers, 1)
 		assert.Equal(t, "postgres-tls-init", dep.Spec.Template.Spec.InitContainers[0].Name)
@@ -962,7 +962,7 @@ func TestApplyPostgresTLS(t *testing.T) {
 		}
 		dep := makePostgresDep("test-quay-database", "postgres")
 
-		applyPostgresTLS(quay, dep, v1.ComponentPostgres)
+		applyPostgresTLS(quay, dep, v1.ComponentPostgres, &quaycontext.QuayRegistryContext{})
 
 		assert.Len(t, dep.Spec.Template.Spec.InitContainers, 1)
 		assert.Equal(t, "postgres-tls-init", dep.Spec.Template.Spec.InitContainers[0].Name)
@@ -984,7 +984,7 @@ func TestApplyPostgresTLS(t *testing.T) {
 		}
 		dep := makePostgresDep("test-quay-database", "postgres")
 
-		applyPostgresTLS(quay, dep, v1.ComponentPostgres)
+		applyPostgresTLS(quay, dep, v1.ComponentPostgres, &quaycontext.QuayRegistryContext{})
 
 		var secretName string
 		for _, vol := range dep.Spec.Template.Spec.Volumes {
@@ -1006,7 +1006,7 @@ func TestApplyPostgresTLS(t *testing.T) {
 		}
 		dep := makePostgresDep("test-clair-postgres", "clairpostgres")
 
-		applyPostgresTLS(quay, dep, v1.ComponentClairPostgres)
+		applyPostgresTLS(quay, dep, v1.ComponentClairPostgres, &quaycontext.QuayRegistryContext{})
 
 		assert.Len(t, dep.Spec.Template.Spec.InitContainers, 1)
 

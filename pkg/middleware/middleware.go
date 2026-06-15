@@ -220,10 +220,10 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		isQuayDB := strings.Contains(dep.GetName(), "quay-database")
 		isClairDB := strings.Contains(dep.GetName(), "clair-postgres")
 		if isQuayDB {
-			applyPostgresTLS(quay, dep, v1.ComponentPostgres)
+			applyPostgresTLS(quay, dep, v1.ComponentPostgres, qctx)
 		}
 		if isClairDB {
-			applyPostgresTLS(quay, dep, v1.ComponentClairPostgres)
+			applyPostgresTLS(quay, dep, v1.ComponentClairPostgres, qctx)
 		}
 		if isQuayDB || isClairDB {
 			delete(dep.Spec.Template.Annotations, "quay-registry-hostname")
@@ -458,7 +458,7 @@ const (
 	pgDataMountPath        = "/var/lib/pgsql/data"
 )
 
-func applyPostgresTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment, kind v1.ComponentKind) {
+func applyPostgresTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment, kind v1.ComponentKind, qctx *quaycontext.QuayRegistryContext) {
 	override := v1.GetTLSOverrideForComponent(quay, kind)
 	if override == nil || !override.Enabled {
 		applyPostgresTLSCleanup(dep)
@@ -467,12 +467,14 @@ func applyPostgresTLS(quay *v1.QuayRegistry, dep *appsv1.Deployment, kind v1.Com
 
 	tlsSecretName := postgresTLSSecretName(quay, kind, override)
 
-	pgGroup := int64(26)
-	if dep.Spec.Template.Spec.SecurityContext == nil {
-		dep.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{}
-	}
-	if dep.Spec.Template.Spec.SecurityContext.FSGroup == nil {
-		dep.Spec.Template.Spec.SecurityContext.FSGroup = &pgGroup
+	if !qctx.SupportsRoutes {
+		pgGroup := int64(26)
+		if dep.Spec.Template.Spec.SecurityContext == nil {
+			dep.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{}
+		}
+		if dep.Spec.Template.Spec.SecurityContext.FSGroup == nil {
+			dep.Spec.Template.Spec.SecurityContext.FSGroup = &pgGroup
+		}
 	}
 
 	tlsVolumeMode := int32(0640)
