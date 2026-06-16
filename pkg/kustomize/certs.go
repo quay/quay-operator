@@ -9,7 +9,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"math/big"
 	"time"
 )
 
@@ -26,14 +25,8 @@ func generatePostgresTLSCerts(serviceName, namespace string) (caCert, serverCert
 		return "", "", "", fmt.Errorf("generating CA key: %w", err)
 	}
 
-	caSerial, err := randomSerial()
-	if err != nil {
-		return "", "", "", err
-	}
-
 	now := time.Now()
 	caTemplate := &x509.Certificate{
-		SerialNumber: caSerial,
 		Subject: pkix.Name{
 			CommonName: serviceName + "-ca",
 		},
@@ -59,13 +52,7 @@ func generatePostgresTLSCerts(serviceName, namespace string) (caCert, serverCert
 		return "", "", "", fmt.Errorf("generating server key: %w", err)
 	}
 
-	serverSerial, err := randomSerial()
-	if err != nil {
-		return "", "", "", err
-	}
-
 	serverTemplate := &x509.Certificate{
-		SerialNumber: serverSerial,
 		Subject: pkix.Name{
 			CommonName: serviceName,
 		},
@@ -111,14 +98,6 @@ func postgresSANs(serviceName, namespace string) []string {
 		serviceName + "." + namespace + ".svc.cluster.local",
 		"localhost",
 	}
-}
-
-func randomSerial() (*big.Int, error) {
-	serial, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		return nil, fmt.Errorf("generating serial number: %w", err)
-	}
-	return serial, nil
 }
 
 func encodeCertPEM(derBytes []byte) (string, error) {

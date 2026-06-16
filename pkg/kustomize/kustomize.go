@@ -797,7 +797,11 @@ func Inflate(
 			shortHost := quay.GetName() + "-quay-database"
 			fqdn := shortHost + "." + quay.GetNamespace() + ".svc"
 			if u.Hostname() == shortHost {
-				u.Host = fqdn + ":" + u.Port()
+				port := u.Port()
+				if port == "" {
+					port = "5432"
+				}
+				u.Host = fqdn + ":" + port
 				ctx.DbUri = u.String()
 				parsedUserConfig["DB_URI"] = ctx.DbUri
 			}
