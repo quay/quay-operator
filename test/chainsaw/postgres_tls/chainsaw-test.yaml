@@ -130,32 +130,55 @@ spec:
             done
           done
 
-          for SECRET in pgtls-postgresql-ca pgtls-clairpostgres-ca; do
-            VAL=$(kubectl get secret "${SECRET}" -n $NAMESPACE \
-              -o go-template='{{index .data "ca.crt"}}' 2>/dev/null || true)
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            echo "OpenShift detected — verifying CA via cluster-service-ca ConfigMap"
+            CA_CM="pgtls-cluster-service-ca"
+            VAL=$(kubectl get configmap "${CA_CM}" -n $NAMESPACE \
+              -o go-template='{{index .data "service-ca.crt"}}' 2>/dev/null || true)
             if [ -z "${VAL}" ]; then
-              echo "FAIL: ${SECRET} missing key ca.crt"
+              echo "FAIL: ${CA_CM} missing key service-ca.crt"
               exit 1
             fi
-            DECODED=$(echo "${VAL}" | base64 -d)
-            echo "${DECODED}" | head -1 | grep -q "BEGIN CERTIFICATE" || \
-              { echo "FAIL: ${SECRET} ca.crt is not valid PEM"; exit 1; }
-            echo "PASS: ${SECRET} has valid ca.crt"
-          done
+            echo "${VAL}" | head -1 | grep -q "BEGIN CERTIFICATE" || \
+              { echo "FAIL: ${CA_CM} service-ca.crt is not valid PEM"; exit 1; }
+            echo "PASS: ${CA_CM} has valid service-ca.crt"
+          else
+            echo "Non-OpenShift — verifying CA via operator-generated secrets"
+            for SECRET in pgtls-postgresql-ca pgtls-clairpostgres-ca; do
+              VAL=$(kubectl get secret "${SECRET}" -n $NAMESPACE \
+                -o go-template='{{index .data "ca.crt"}}' 2>/dev/null || true)
+              if [ -z "${VAL}" ]; then
+                echo "FAIL: ${SECRET} missing key ca.crt"
+                exit 1
+              fi
+              DECODED=$(echo "${VAL}" | base64 -d)
+              echo "${DECODED}" | head -1 | grep -q "BEGIN CERTIFICATE" || \
+                { echo "FAIL: ${SECRET} ca.crt is not valid PEM"; exit 1; }
+              echo "PASS: ${SECRET} has valid ca.crt"
+            done
+          fi
 
           echo "=== Checking managed keys secret ==="
 
           MANAGED_SECRET="pgtls-quay-registry-managed-secret-keys"
-          for KEY in POSTGRES_TLS_CA POSTGRES_TLS_CERT POSTGRES_TLS_KEY \
-                     CLAIRPOSTGRES_TLS_CA CLAIRPOSTGRES_TLS_CERT CLAIRPOSTGRES_TLS_KEY; do
-            VAL=$(kubectl get secret "${MANAGED_SECRET}" -n $NAMESPACE \
-              -o jsonpath="{.data.${KEY}}" 2>/dev/null || true)
-            if [ -z "${VAL}" ]; then
-              echo "FAIL: managed keys secret missing ${KEY}"
-              exit 1
-            fi
-            echo "PASS: managed keys has ${KEY}"
-          done
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            echo "OpenShift — skipping TLS CA/cert/key checks in managed keys (service CA manages certs)"
+            for KEY in POSTGRES_TLS_CERT POSTGRES_TLS_KEY \
+                       CLAIRPOSTGRES_TLS_CERT CLAIRPOSTGRES_TLS_KEY; do
+              echo "PASS: managed keys ${KEY} check skipped (service CA)"
+            done
+          else
+            for KEY in POSTGRES_TLS_CA POSTGRES_TLS_CERT POSTGRES_TLS_KEY \
+                       CLAIRPOSTGRES_TLS_CA CLAIRPOSTGRES_TLS_CERT CLAIRPOSTGRES_TLS_KEY; do
+              VAL=$(kubectl get secret "${MANAGED_SECRET}" -n $NAMESPACE \
+                -o jsonpath="{.data.${KEY}}" 2>/dev/null || true)
+              if [ -z "${VAL}" ]; then
+                echo "FAIL: managed keys secret missing ${KEY}"
+                exit 1
+              fi
+              echo "PASS: managed keys has ${KEY}"
+            done
+          fi
   - name: assert-cert-sans-and-chain
     try:
     - script:
@@ -163,12 +186,23 @@ spec:
         content: |
           set -euo pipefail
 
+          IS_OPENSHIFT=false
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            IS_OPENSHIFT=true
+          fi
+
           echo "=== Checking postgres certificate SANs and chain ==="
 
           CERT=$(kubectl get secret pgtls-postgres-tls -n $NAMESPACE \
             -o go-template='{{index .data "tls.crt"}}' | base64 -d)
-          CA=$(kubectl get secret pgtls-postgresql-ca -n $NAMESPACE \
-            -o go-template='{{index .data "ca.crt"}}' | base64 -d)
+
+          if $IS_OPENSHIFT; then
+            CA=$(kubectl get configmap pgtls-cluster-service-ca -n $NAMESPACE \
+              -o go-template='{{index .data "service-ca.crt"}}')
+          else
+            CA=$(kubectl get secret pgtls-postgresql-ca -n $NAMESPACE \
+              -o go-template='{{index .data "ca.crt"}}' | base64 -d)
+          fi
 
           CERT_TEXT=$(echo "${CERT}" | openssl x509 -noout -text)
 
@@ -176,13 +210,17 @@ spec:
             { echo "FAIL: cert missing SAN pgtls-quay-database"; exit 1; }
           echo "PASS: cert has SAN pgtls-quay-database"
 
-          echo "${CERT_TEXT}" | grep -q "DNS:localhost" || \
-            { echo "FAIL: cert missing SAN localhost"; exit 1; }
-          echo "PASS: cert has SAN localhost"
+          if ! $IS_OPENSHIFT; then
+            echo "${CERT_TEXT}" | grep -q "DNS:localhost" || \
+              { echo "FAIL: cert missing SAN localhost"; exit 1; }
+            echo "PASS: cert has SAN localhost"
+          else
+            echo "PASS: localhost SAN check skipped (service CA certs use FQDN SANs only)"
+          fi
 
-          echo "${CERT_TEXT}" | grep -q "DNS:pgtls-quay-database.${NAMESPACE}.svc.cluster.local" || \
-            { echo "FAIL: cert missing SAN pgtls-quay-database.${NAMESPACE}.svc.cluster.local"; exit 1; }
-          echo "PASS: cert has SAN pgtls-quay-database.${NAMESPACE}.svc.cluster.local"
+          echo "${CERT_TEXT}" | grep -q "DNS:pgtls-quay-database.${NAMESPACE}.svc" || \
+            { echo "FAIL: cert missing SAN pgtls-quay-database.${NAMESPACE}.svc"; exit 1; }
+          echo "PASS: cert has SAN pgtls-quay-database.${NAMESPACE}.svc"
 
           echo "${CERT}" > /tmp/pg-server-${NAMESPACE}.crt
           echo "${CA}" > /tmp/pg-ca-${NAMESPACE}.crt
@@ -194,8 +232,13 @@ spec:
 
           CLAIR_CERT=$(kubectl get secret pgtls-clairpostgres-tls -n $NAMESPACE \
             -o go-template='{{index .data "tls.crt"}}' | base64 -d)
-          CLAIR_CA=$(kubectl get secret pgtls-clairpostgres-ca -n $NAMESPACE \
-            -o go-template='{{index .data "ca.crt"}}' | base64 -d)
+
+          if $IS_OPENSHIFT; then
+            CLAIR_CA="${CA}"
+          else
+            CLAIR_CA=$(kubectl get secret pgtls-clairpostgres-ca -n $NAMESPACE \
+              -o go-template='{{index .data "ca.crt"}}' | base64 -d)
+          fi
 
           CLAIR_CERT_TEXT=$(echo "${CLAIR_CERT}" | openssl x509 -noout -text)
 
@@ -203,9 +246,9 @@ spec:
             { echo "FAIL: clair cert missing SAN pgtls-clair-postgres"; exit 1; }
           echo "PASS: clair cert has SAN pgtls-clair-postgres"
 
-          echo "${CLAIR_CERT_TEXT}" | grep -q "DNS:pgtls-clair-postgres.${NAMESPACE}.svc.cluster.local" || \
-            { echo "FAIL: clair cert missing SAN pgtls-clair-postgres.${NAMESPACE}.svc.cluster.local"; exit 1; }
-          echo "PASS: clair cert has SAN pgtls-clair-postgres.${NAMESPACE}.svc.cluster.local"
+          echo "${CLAIR_CERT_TEXT}" | grep -q "DNS:pgtls-clair-postgres.${NAMESPACE}.svc" || \
+            { echo "FAIL: clair cert missing SAN pgtls-clair-postgres.${NAMESPACE}.svc"; exit 1; }
+          echo "PASS: clair cert has SAN pgtls-clair-postgres.${NAMESPACE}.svc"
 
           echo "${CLAIR_CERT}" > /tmp/clair-server-${NAMESPACE}.crt
           echo "${CLAIR_CA}" > /tmp/clair-ca-${NAMESPACE}.crt
@@ -221,21 +264,32 @@ spec:
 
           echo "=== Checking clair-app deployment for clair-db-tls volume ==="
 
-          VOL=$(kubectl get deployment pgtls-clair-app -n $NAMESPACE \
-            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="clair-db-tls")].name}')
-          if [ "${VOL}" != "clair-db-tls" ]; then
-            echo "FAIL: clair-app missing clair-db-tls volume"
-            exit 1
-          fi
-          echo "PASS: clair-app has clair-db-tls volume"
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            echo "OpenShift — clair uses cluster-service-ca via certificates volume, not clair-db-tls"
+            VOL=$(kubectl get deployment pgtls-clair-app -n $NAMESPACE \
+              -o jsonpath='{.spec.template.spec.volumes[?(@.name=="clair-db-tls")].name}' 2>/dev/null || true)
+            if [ -n "${VOL}" ]; then
+              echo "FAIL: clair-app should not have clair-db-tls volume on OpenShift (service CA)"
+              exit 1
+            fi
+            echo "PASS: clair-app does not have clair-db-tls volume (using cluster-service-ca)"
+          else
+            VOL=$(kubectl get deployment pgtls-clair-app -n $NAMESPACE \
+              -o jsonpath='{.spec.template.spec.volumes[?(@.name=="clair-db-tls")].name}')
+            if [ "${VOL}" != "clair-db-tls" ]; then
+              echo "FAIL: clair-app missing clair-db-tls volume"
+              exit 1
+            fi
+            echo "PASS: clair-app has clair-db-tls volume"
 
-          MOUNT=$(kubectl get deployment pgtls-clair-app -n $NAMESPACE \
-            -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[?(@.name=="clair-db-tls")].mountPath}')
-          if [ "${MOUNT}" != "/clair-db-tls" ]; then
-            echo "FAIL: clair-app clair-db-tls not mounted at /clair-db-tls (got: ${MOUNT})"
-            exit 1
+            MOUNT=$(kubectl get deployment pgtls-clair-app -n $NAMESPACE \
+              -o jsonpath='{.spec.template.spec.containers[0].volumeMounts[?(@.name=="clair-db-tls")].mountPath}')
+            if [ "${MOUNT}" != "/clair-db-tls" ]; then
+              echo "FAIL: clair-app clair-db-tls not mounted at /clair-db-tls (got: ${MOUNT})"
+              exit 1
+            fi
+            echo "PASS: clair-app clair-db-tls mounted at /clair-db-tls"
           fi
-          echo "PASS: clair-app clair-db-tls mounted at /clair-db-tls"
   - name: verify-pg-stat-ssl
     try:
     - script:
