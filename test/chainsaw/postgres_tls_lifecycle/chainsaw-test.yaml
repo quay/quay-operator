@@ -124,10 +124,18 @@ spec:
 
           echo "Waiting for TLS secrets..."
           for i in $(seq 1 30); do
-            if kubectl get secret pgtls-lc-postgres-tls -n $NAMESPACE >/dev/null 2>&1 && \
-               kubectl get secret pgtls-lc-postgresql-ca -n $NAMESPACE >/dev/null 2>&1; then
-              echo "PASS: postgres-tls and postgresql-ca secrets exist"
-              break
+            if kubectl get secret pgtls-lc-postgres-tls -n $NAMESPACE >/dev/null 2>&1; then
+              if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+                CA_VAL=$(kubectl get configmap pgtls-lc-cluster-service-ca -n $NAMESPACE \
+                  -o go-template='{{index .data "service-ca.crt"}}' 2>/dev/null || true)
+                if [ -n "${CA_VAL}" ]; then
+                  echo "PASS: postgres-tls secret and cluster-service-ca ConfigMap exist"
+                  break
+                fi
+              elif kubectl get secret pgtls-lc-postgresql-ca -n $NAMESPACE >/dev/null 2>&1; then
+                echo "PASS: postgres-tls and postgresql-ca secrets exist"
+                break
+              fi
             fi
             [ "$i" -eq 30 ] && { echo "FAIL: TLS secrets not found after 5 minutes"; exit 1; }
             sleep 10

@@ -92,9 +92,23 @@ spec:
             { echo "FAIL: postgres-tls secret not found"; exit 1; }
           echo "PASS: postgres-tls secret exists"
 
-          kubectl get secret pgtls-mix-postgresql-ca -n $NAMESPACE >/dev/null || \
-            { echo "FAIL: postgresql-ca secret not found"; exit 1; }
-          echo "PASS: postgresql-ca secret exists"
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift — verifying CA via cluster-service-ca ConfigMap"
+            CA_CM="pgtls-mix-cluster-service-ca"
+            VAL=$(kubectl get configmap "${CA_CM}" -n $NAMESPACE \
+              -o go-template='{{index .data "service-ca.crt"}}' 2>/dev/null || true)
+            if [ -z "${VAL}" ]; then
+              echo "FAIL: ${CA_CM} missing key service-ca.crt"
+              exit 1
+            fi
+            echo "${VAL}" | head -1 | grep "BEGIN CERTIFICATE" >/dev/null || \
+              { echo "FAIL: ${CA_CM} service-ca.crt is not valid PEM"; exit 1; }
+            echo "PASS: ${CA_CM} has valid service-ca.crt"
+          else
+            kubectl get secret pgtls-mix-postgresql-ca -n $NAMESPACE >/dev/null || \
+              { echo "FAIL: postgresql-ca secret not found"; exit 1; }
+            echo "PASS: postgresql-ca secret exists"
+          fi
   - name: assert-clairpostgres-no-tls
     try:
     - script:
