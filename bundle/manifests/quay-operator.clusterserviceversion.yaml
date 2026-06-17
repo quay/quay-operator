@@ -169,6 +169,15 @@ spec:
                       - name: RELATED_IMAGE_COMPONENT_REDIS
                         value: quay.io/sclorg/redis-7-c9s:latest
                 serviceAccountName: quay-operator
+      clusterPermissions:
+        - rules:
+            - apiGroups:
+                - config.openshift.io
+              resources:
+                - apiservers
+              verbs:
+                - get
+          serviceAccountName: quay-operator
       permissions:
         - rules:
             - apiGroups:
@@ -245,12 +254,6 @@ spec:
                 - jobs
               verbs:
                 - '*'
-            - apiGroups:
-                - config.openshift.io
-              resources:
-                - apiservers
-              verbs:
-                - get
           serviceAccountName: quay-operator
     strategy: deployment
   installModes:
