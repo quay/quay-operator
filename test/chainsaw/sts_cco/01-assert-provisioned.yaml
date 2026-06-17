@@ -1,0 +1,6 @@
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: test-quay-app
+status:
+  provisioned: true

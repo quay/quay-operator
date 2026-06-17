@@ -10,7 +10,9 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -534,6 +536,238 @@ func Test_checkExternalTLSSecret(t *testing.T) {
 				if updated.Labels[v1.TLSSecretLabel] != "true" {
 					t.Error("expected TLSSecretLabel to be applied to the secret")
 				}
+			}
+		})
+	}
+}
+
+func TestCheckSTSCapability(t *testing.T) {
+	makeInfra := func(platform string) *unstructured.Unstructured {
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "config.openshift.io",
+			Version: "v1",
+			Kind:    "Infrastructure",
+		})
+		obj.SetName("cluster")
+		_ = unstructured.SetNestedField(obj.Object, platform, "status", "platformStatus", "type")
+		return obj
+	}
+
+	makeCCO := func(mode string) *unstructured.Unstructured {
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "operator.openshift.io",
+			Version: "v1",
+			Kind:    "CloudCredential",
+		})
+		obj.SetName("cluster")
+		if mode != "" {
+			_ = unstructured.SetNestedField(obj.Object, mode, "spec", "credentialsMode")
+		}
+		return obj
+	}
+
+	makeCRDScheme := func() *runtime.Scheme {
+		s := runtime.NewScheme()
+		_ = v1.AddToScheme(s)
+
+		infraGVK := schema.GroupVersionKind{Group: "config.openshift.io", Version: "v1", Kind: "Infrastructure"}
+		ccoGVK := schema.GroupVersionKind{Group: "operator.openshift.io", Version: "v1", Kind: "CloudCredential"}
+		crGVK := schema.GroupVersionKind{Group: "cloudcredential.openshift.io", Version: "v1", Kind: "CredentialsRequest"}
+
+		s.AddKnownTypeWithName(infraGVK, &unstructured.Unstructured{})
+		s.AddKnownTypeWithName(ccoGVK, &unstructured.Unstructured{})
+		s.AddKnownTypeWithName(crGVK, &unstructured.Unstructured{})
+		s.AddKnownTypeWithName(schema.GroupVersionKind{Group: "cloudcredential.openshift.io", Version: "v1", Kind: "CredentialsRequestList"}, &unstructured.UnstructuredList{})
+
+		return s
+	}
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "ns",
+		},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentObjectStorage, Managed: false},
+			},
+		},
+	}
+
+	quayManaged := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			Namespace: "ns",
+		},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentObjectStorage, Managed: true},
+			},
+		},
+	}
+
+	for _, tt := range []struct {
+		name          string
+		roleARN       string
+		quay          *v1.QuayRegistry
+		objects       []client.Object
+		expectEnabled bool
+		expectErr     bool
+	}{
+		{
+			name:          "ROLEARN empty",
+			roleARN:       "",
+			quay:          quay,
+			expectEnabled: false,
+		},
+		{
+			name:          "ObjectStorage managed",
+			roleARN:       "arn:aws:iam::123456789012:role/test",
+			quay:          quayManaged,
+			expectEnabled: false,
+		},
+		{
+			name:    "non-AWS platform",
+			roleARN: "arn:aws:iam::123456789012:role/test",
+			quay:    quay,
+			objects: []client.Object{
+				makeInfra("GCP"),
+				makeCCO(""),
+			},
+			expectEnabled: false,
+		},
+		{
+			name:    "CCO Mint mode",
+			roleARN: "arn:aws:iam::123456789012:role/test",
+			quay:    quay,
+			objects: []client.Object{
+				makeInfra("AWS"),
+				makeCCO("Mint"),
+			},
+			expectEnabled: false,
+		},
+		{
+			name:    "CCO Passthrough mode",
+			roleARN: "arn:aws:iam::123456789012:role/test",
+			quay:    quay,
+			objects: []client.Object{
+				makeInfra("AWS"),
+				makeCCO("Passthrough"),
+			},
+			expectEnabled: false,
+		},
+		{
+			name:    "STS capable cluster",
+			roleARN: "arn:aws:iam::123456789012:role/test",
+			quay:    quay,
+			objects: []client.Object{
+				makeInfra("AWS"),
+				makeCCO(""),
+			},
+			expectEnabled: true,
+		},
+		{
+			name:          "Infrastructure API unavailable",
+			roleARN:       "arn:aws:iam::123456789012:role/test",
+			quay:          quay,
+			objects:       []client.Object{},
+			expectEnabled: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			s := makeCRDScheme()
+			cli := fake.NewClientBuilder().WithScheme(s).WithObjects(tt.objects...).Build()
+
+			r := &QuayRegistryReconciler{
+				Client:     cli,
+				Log:        logf.Log.WithName("test"),
+				STSRoleARN: tt.roleARN,
+			}
+
+			qctx := quaycontext.NewQuayRegistryContext()
+			err := r.checkSTSCapability(context.Background(), qctx, tt.quay)
+
+			if tt.expectErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if qctx.STSEnabled != tt.expectEnabled {
+				t.Errorf("STSEnabled = %v, want %v", qctx.STSEnabled, tt.expectEnabled)
+			}
+			if tt.expectEnabled {
+				if qctx.STSRoleARN != tt.roleARN {
+					t.Errorf("STSRoleARN = %q, want %q", qctx.STSRoleARN, tt.roleARN)
+				}
+				if qctx.STSCredentialRequestName != "test-quay-app" {
+					t.Errorf("STSCredentialRequestName = %q, want %q", qctx.STSCredentialRequestName, "test-quay-app")
+				}
+				if qctx.STSCredentialSecretName != "test-quay-app-aws" {
+					t.Errorf("STSCredentialSecretName = %q, want %q", qctx.STSCredentialSecretName, "test-quay-app-aws")
+				}
+			}
+		})
+	}
+}
+
+func TestCheckSTSCredentialConflict(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		usercfg   map[string]interface{}
+		expectErr bool
+	}{
+		{
+			name:      "no DISTRIBUTED_STORAGE_CONFIG",
+			usercfg:   map[string]interface{}{},
+			expectErr: false,
+		},
+		{
+			name: "storage without static keys",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"S3Storage",
+						map[string]interface{}{
+							"s3_bucket":    "my-bucket",
+							"storage_path": "/datastorage/registry",
+							"s3_region":    "us-east-1",
+							"host":         "s3.amazonaws.com",
+						},
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			name: "storage with s3_access_key",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"S3Storage",
+						map[string]interface{}{
+							"s3_access_key": "AKIAIOSFODNN7EXAMPLE",
+							"s3_secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+							"s3_bucket":     "my-bucket",
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkSTSCredentialConflict(tt.usercfg)
+			if tt.expectErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tt.expectErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}

@@ -224,6 +224,33 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			return dep, nil
 		}
 
+		if qctx.STSEnabled && qctx.STSCredentialProvisioned && strings.HasSuffix(dep.Name, "quay-app") {
+			volName := "sts-credentials"
+			dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+				Name: volName,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: qctx.STSCredentialSecretName,
+					},
+				},
+			})
+			for i := range dep.Spec.Template.Spec.Containers {
+				if dep.Spec.Template.Spec.Containers[i].Name != "quay-app" {
+					continue
+				}
+				ref := &dep.Spec.Template.Spec.Containers[i]
+				ref.VolumeMounts = append(ref.VolumeMounts, corev1.VolumeMount{
+					Name:      volName,
+					MountPath: "/var/run/secrets/cloud",
+					ReadOnly:  true,
+				})
+				UpsertContainerEnv(ref, corev1.EnvVar{
+					Name:  "AWS_SHARED_CREDENTIALS_FILE",
+					Value: "/var/run/secrets/cloud/credentials",
+				})
+			}
+		}
+
 		fgns, err := v1.FieldGroupNamesForManagedComponents(quay)
 		if err != nil {
 			return nil, err

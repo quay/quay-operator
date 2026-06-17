@@ -153,6 +153,7 @@ func main() {
 		WatchNamespace:       namespace,
 		Requeue:              ctrl.Result{RequeueAfter: 10 * time.Second},
 		SkipResourceRequests: skipres,
+		STSRoleARN:           os.Getenv("ROLEARN"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "QuayRegistry")
 		os.Exit(1)

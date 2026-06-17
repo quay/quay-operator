@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: sts-cco
+spec:
+  concurrent: false
+  description: >
+    Validates the STS/CCO credential flow for unmanaged S3 storage on an
+    STS-enabled OpenShift cluster (ROSA). Requires ROLEARN and STS_S3_BUCKET
+    environment variables set on the operator Deployment. Not run on KinD.
+  steps:
+  - name: create-registry-with-sts
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          STS_S3_BUCKET="${STS_S3_BUCKET:?STS_S3_BUCKET must be set}"
+          STS_S3_REGION="${STS_S3_REGION:-us-east-1}"
+
+          cat <<CFGEOF | kubectl create secret generic quay-config-bundle \
+            --namespace="${NAMESPACE}" \
+            --from-file=config.yaml=/dev/stdin --dry-run=client -o yaml | kubectl apply -f -
+          FEATURE_MAILING: false
+          PREFERRED_URL_SCHEME: https
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - S3Storage
+              - s3_bucket: "${STS_S3_BUCKET}"
+                storage_path: /datastorage/registry
+                s3_region: "${STS_S3_REGION}"
+                host: s3.${STS_S3_REGION}.amazonaws.com
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-credential-request.yaml
+  - name: wait-for-provisioning
+    try:
+    - assert:
+        file: 01-assert-provisioned.yaml
+        timeout: 5m
+  - name: assert-deployment
+    try:
+    - assert:
+        file: 02-assert-deployment.yaml
+  - name: assert-status
+    try:
+    - assert:
+        file: 03-assert-status.yaml

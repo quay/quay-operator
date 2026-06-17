@@ -238,6 +238,8 @@ const (
 	ConditionReasonComponentOverrideInvalid              ConditionReason = "ComponentOverrideInvalid"
 	ConditionReasonPVCPending                            ConditionReason = "PVCPending"
 	ConditionReasonPVCProvisioningFailed                 ConditionReason = "PVCProvisioningFailed"
+	ConditionReasonCredentialRequestNotProvisioned       ConditionReason = "CredentialRequestNotProvisioned"
+	ConditionReasonConflictingCredentials                ConditionReason = "ConflictingCredentials"
 )
 
 // Condition is a single condition of a QuayRegistry.

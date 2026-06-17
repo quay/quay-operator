@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-quay-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: quay-app
+          env:
+            - name: AWS_SHARED_CREDENTIALS_FILE
+              value: /var/run/secrets/cloud/credentials
+          volumeMounts:
+            - name: sts-credentials
+              mountPath: /var/run/secrets/cloud
+              readOnly: true
+      volumes:
+        - name: sts-credentials
+          secret:
+            secretName: test-quay-app-aws

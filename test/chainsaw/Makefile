@@ -11,7 +11,7 @@ CHAINSAW_REPORT_PATH ?=
 CHAINSAW_REPORT_NAME ?= chainsaw-report
 CHAINSAW_REPORT_FLAGS := $(if $(CHAINSAW_REPORT_FORMAT),--report-format $(CHAINSAW_REPORT_FORMAT) --report-name $(CHAINSAW_REPORT_NAME) --report-path $(or $(CHAINSAW_REPORT_PATH),.))
 
-.PHONY: chainsaw test-e2e test-e2e-destructive test-e2e-hpa test-e2e-kind
+.PHONY: chainsaw test-e2e test-e2e-destructive test-e2e-hpa test-e2e-kind test-e2e-sts
 
 chainsaw: $(CHAINSAW) ## Download chainsaw locally if necessary.
 $(CHAINSAW): $(LOCALBIN)
@@ -19,11 +19,14 @@ $(CHAINSAW): $(LOCALBIN)
 	@test -s $(LOCALBIN)/chainsaw && $(LOCALBIN)/chainsaw version 2>/dev/null | grep -q $(CHAINSAW_VERSION) || \
 	{ curl -sL "https://github.com/kyverno/chainsaw/releases/download/$(CHAINSAW_VERSION)/chainsaw_linux_amd64.tar.gz" | tar -xz -C $(LOCALBIN) chainsaw; }
 
-test-e2e: chainsaw ## Run Chainsaw e2e tests (excludes destructive tests)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
+test-e2e: chainsaw ## Run Chainsaw e2e tests (excludes destructive and STS tests)
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/sts.cco" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
 
 test-e2e-destructive: chainsaw ## Run destructive Chainsaw e2e tests (ca-rotation, OpenShift only)
 	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel $(CHAINSAW_PARALLEL) --include-test-regex "/ca.rotation" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
 
 test-e2e-kind: chainsaw ## Run Chainsaw e2e tests (KinD)
-	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_KIND) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/hpa|/tls.security.profile" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_KIND) --parallel $(CHAINSAW_PARALLEL) --exclude-test-regex "/ca.rotation|/hpa|/tls.security.profile|/sts.cco" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
+
+test-e2e-sts: chainsaw ## Run STS/CCO e2e tests (ROSA only, requires ROLEARN + STS_S3_BUCKET)
+	$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --parallel 1 --include-test-regex "/sts.cco" $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)
