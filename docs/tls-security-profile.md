@@ -65,7 +65,7 @@ Mirror workers inherit the same settings automatically via the shared `config.ya
 
 ### Error Handling
 
-If the operator cannot read the `APIServer` resource for a reason other than "not found", "API not registered", or "forbidden" (RBAC denial), reconciliation sets a `RolloutBlocked` condition with reason `ConfigInvalid`. This prevents deploying Quay with an unknown TLS posture. A forbidden error is treated as non-blocking so that a missing RBAC binding (e.g. OLM failing to apply the ClusterRole) does not prevent deployment; the operator logs a warning and falls back to Quay's built-in TLS defaults.
+If the operator cannot read the `APIServer` resource for a reason other than "not found" or "API not registered", reconciliation sets a `RolloutBlocked` condition with reason `ConfigInvalid`. This prevents deploying Quay with an unknown TLS posture.
 
 ## Testing Guide
 
@@ -84,7 +84,6 @@ This covers:
 - `TestCheckTLSSecurityProfile_UserOverride` — User-set SSL_PROTOCOLS/SSL_CIPHERS blocks inheritance
 - `TestCheckTLSSecurityProfile_VanillaK8s` — Graceful no-op when configv1 API is absent
 - `TestCheckTLSSecurityProfile_WithAPIServer` — Modern profile populates context correctly
-- `TestCheckTLSSecurityProfile_Forbidden` — RBAC denial is non-blocking, falls back to defaults
 - `TestCheckTLSSecurityProfile_NilProfile` — Nil profile defaults to Intermediate
 
 ### E2E Testing on OpenShift (CRC or cluster)

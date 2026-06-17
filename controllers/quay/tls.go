@@ -52,15 +52,6 @@ func (r *QuayRegistryReconciler) checkTLSSecurityProfile(
 		if meta.IsNoMatchError(err) || runtime.IsNotRegisteredError(err) {
 			return nil
 		}
-		// Forbidden means the APIServer resource exists but the operator lacks
-		// permission to read it (e.g. OLM did not apply the ClusterRole). Log
-		// and continue so that a missing RBAC binding does not block the entire
-		// QuayRegistry deployment — the operator falls back to Quay's built-in
-		// TLS defaults.
-		if errors.IsForbidden(err) {
-			r.Log.Info("unable to read cluster TLS security profile due to missing RBAC, falling back to default", "error", err)
-			return nil
-		}
 		return fmt.Errorf("fetching APIServer: %w", err)
 	}
 
