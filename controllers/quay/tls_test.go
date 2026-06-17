@@ -2,12 +2,17 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	quaycontext "github.com/quay/quay-operator/pkg/context"
@@ -244,6 +249,51 @@ func TestCheckTLSSecurityProfile_WithAPIServer(t *testing.T) {
 	}
 	if qctx.SSLCiphers == "" {
 		t.Error("expected non-empty SSLCiphers for Modern profile")
+	}
+}
+
+func TestCheckTLSSecurityProfile_Forbidden(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = configv1.Install(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithInterceptorFuncs(interceptor.Funcs{
+			Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+				if _, ok := obj.(*configv1.APIServer); ok {
+					return errors.NewForbidden(
+						schema.GroupResource{Group: "config.openshift.io", Resource: "apiservers"},
+						"cluster",
+						fmt.Errorf("User \"system:serviceaccount:quay-enterprise:quay-operator\" cannot get resource"),
+					)
+				}
+				return c.Get(ctx, key, obj, opts...)
+			},
+		}).
+		Build()
+
+	r := &QuayRegistryReconciler{
+		Client: fakeClient,
+		Log:    zap.New(zap.UseDevMode(true)),
+	}
+
+	qctx := quaycontext.NewQuayRegistryContext()
+	bundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": []byte("FEATURE_USER_INITIALIZE: true"),
+		},
+	}
+
+	err := r.checkTLSSecurityProfile(context.Background(), qctx, bundle)
+	if err != nil {
+		t.Fatalf("expected no error for Forbidden, got: %v", err)
+	}
+	if qctx.SSLProtocols != "" {
+		t.Errorf("SSLProtocols should be empty on Forbidden, got %q", qctx.SSLProtocols)
+	}
+	if qctx.SSLCiphers != "" {
+		t.Errorf("SSLCiphers should be empty on Forbidden, got %q", qctx.SSLCiphers)
 	}
 }
 
