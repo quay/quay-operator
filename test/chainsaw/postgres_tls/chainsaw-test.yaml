@@ -130,7 +130,7 @@ spec:
             done
           done
 
-          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
             echo "OpenShift detected — verifying CA via cluster-service-ca ConfigMap"
             CA_CM="pgtls-cluster-service-ca"
             VAL=$(kubectl get configmap "${CA_CM}" -n $NAMESPACE \
@@ -161,7 +161,7 @@ spec:
           echo "=== Checking managed keys secret ==="
 
           MANAGED_SECRET="pgtls-quay-registry-managed-secret-keys"
-          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
             echo "OpenShift — skipping TLS CA/cert/key checks in managed keys (service CA manages certs)"
             for KEY in POSTGRES_TLS_CERT POSTGRES_TLS_KEY \
                        CLAIRPOSTGRES_TLS_CERT CLAIRPOSTGRES_TLS_KEY; do
@@ -187,7 +187,7 @@ spec:
           set -euo pipefail
 
           IS_OPENSHIFT=false
-          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
             IS_OPENSHIFT=true
           fi
 
@@ -264,7 +264,7 @@ spec:
 
           echo "=== Checking clair-app deployment for clair-db-tls volume ==="
 
-          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
             echo "OpenShift — clair uses cluster-service-ca via certificates volume, not clair-db-tls"
             VOL=$(kubectl get deployment pgtls-clair-app -n $NAMESPACE \
               -o jsonpath='{.spec.template.spec.volumes[?(@.name=="clair-db-tls")].name}' 2>/dev/null || true)
