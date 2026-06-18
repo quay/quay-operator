@@ -757,7 +757,7 @@ func TestCheckPostgresTLSSecrets(t *testing.T) {
 					Data: map[string][]byte{
 						"ca.crt":  caPEM,
 						"tls.crt": certPEM,
-						"tls.key": []byte("-----BEGIN RSA PRIVATE KEY-----\nMIIBogIBAAJBALRiMLAH\n-----END RSA PRIVATE KEY-----\n"),
+						"tls.key": []byte("FAKE-KEY-DATA-FOR-TESTING"),
 					},
 				},
 			},
