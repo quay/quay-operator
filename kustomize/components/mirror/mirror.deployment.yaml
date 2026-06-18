@@ -19,6 +19,7 @@ spec:
     metadata:
       labels:
         quay-component: quay-mirror
+        quay-monitor: "true"
     spec:
       serviceAccountName: quay-app
       affinity:

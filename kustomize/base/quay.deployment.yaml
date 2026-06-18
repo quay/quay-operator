@@ -13,6 +13,7 @@ spec:
   template:
     metadata:
       labels:
+        quay-monitor: "true"
         quay-component: quay-app
     spec:
       serviceAccountName: quay-app
