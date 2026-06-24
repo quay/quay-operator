@@ -133,6 +133,10 @@ var supportsTLSOverride = []ComponentKind{
 	ComponentClairPostgres,
 }
 
+var supportsSecretRef = []ComponentKind{
+	ComponentTLS,
+}
+
 const (
 	ManagedKeysName             = "quay-registry-managed-secret-keys"
 	QuayConfigTLSSecretName     = "quay-config-tls"
@@ -160,6 +164,7 @@ type QuayRegistrySpec struct {
 // +kubebuilder:validation:XValidation:rule="!has(self.secretRef) || self.secretRef.name.size() != 0",message="secretRef.name must not be empty"
 // +kubebuilder:validation:XValidation:rule="!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef) || self.overrides.tls.enabled",message="tls.secretRef requires tls.enabled to be true"
 // +kubebuilder:validation:XValidation:rule="!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef) || self.overrides.tls.secretRef.name.size() != 0",message="tls.secretRef.name must not be empty"
+// +kubebuilder:validation:XValidation:rule="!has(self.secretRef) || self.kind == 'tls'",message="secretRef is only supported for the tls component"
 type Component struct {
 	// Kind is the unique name of this type of component.
 	Kind ComponentKind `json:"kind"`
@@ -560,6 +565,14 @@ func hasAffinity(component Component) bool {
 func ValidateOverrides(quay *QuayRegistry) error {
 	for _, component := range quay.Spec.Components {
 
+		// secretRef is independent of Overrides; check it for every component.
+		if component.SecretRef != nil && !ComponentSupportsOverride(component.Kind, "secretRef") {
+			return fmt.Errorf(
+				"component %s does not support secretRef",
+				component.Kind,
+			)
+		}
+
 		// No overrides provided
 		if component.Overrides == nil {
 			continue
@@ -838,6 +851,8 @@ func ComponentSupportsOverride(component ComponentKind, override string) bool {
 		components = supportsSecurityContextOverride
 	case "tls":
 		components = supportsTLSOverride
+	case "secretRef":
+		components = supportsSecretRef
 	}
 
 	for _, cmp := range components {

@@ -755,6 +755,63 @@ var validateOverridesTests = []struct {
 		},
 		nil,
 	},
+	{
+		"SecretRefOnTLSComponentUnmanaged",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "tls", Managed: false, SecretRef: &corev1.LocalObjectReference{Name: "my-tls-secret"}},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"SecretRefOnPostgresRejected",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: false, SecretRef: &corev1.LocalObjectReference{Name: "pg-secret"}},
+				},
+			},
+		},
+		errors.New("component postgres does not support secretRef"),
+	},
+	{
+		"SecretRefOnRedisRejected",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "redis", Managed: false, SecretRef: &corev1.LocalObjectReference{Name: "redis-secret"}},
+				},
+			},
+		},
+		errors.New("component redis does not support secretRef"),
+	},
+	{
+		"SecretRefOnClairRejected",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "clair", Managed: false, SecretRef: &corev1.LocalObjectReference{Name: "clair-secret"}},
+				},
+			},
+		},
+		errors.New("component clair does not support secretRef"),
+	},
+	{
+		"NoSecretRefNoError",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "tls", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
 }
 
 func TestValidOverrides(t *testing.T) {
@@ -1040,6 +1097,27 @@ func TestGetTLSOverrideForComponent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GetTLSOverrideForComponent(tt.quay, tt.kind)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestComponentSupportsSecretRefOverride(t *testing.T) {
+	tests := []struct {
+		kind     ComponentKind
+		expected bool
+	}{
+		{ComponentTLS, true},
+		{ComponentPostgres, false},
+		{ComponentRedis, false},
+		{ComponentClair, false},
+		{ComponentQuay, false},
+		{ComponentMirror, false},
+		{ComponentObjectStorage, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.kind), func(t *testing.T) {
+			assert.Equal(t, tt.expected, ComponentSupportsOverride(tt.kind, "secretRef"))
 		})
 	}
 }

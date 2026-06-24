@@ -1238,6 +1238,8 @@ spec:
                   - message: tls.secretRef.name must not be empty
                     rule: '!has(self.overrides) || !has(self.overrides.tls) || !has(self.overrides.tls.secretRef)
                       || self.overrides.tls.secretRef.name.size() != 0'
+                  - message: secretRef is only supported for the tls component
+                    rule: '!has(self.secretRef) || self.kind == ''tls'''
                 type: array
               configBundleSecret:
                 description: |-
