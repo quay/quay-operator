@@ -8,7 +8,7 @@ require (
 	github.com/onsi/gomega v1.39.1
 	github.com/openshift/api v0.0.0-20240729140855-0a58f8c30a8c
 	github.com/quay/clair/config v1.4.3
-	github.com/quay/quay/config-tool v0.0.0-20260416161710-3023784a1174
+	github.com/quay/quay/config-tool v0.0.0-20260625221800-948603acd63a
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/sjson v1.2.5
 	go.uber.org/zap v1.27.1
@@ -45,7 +45,7 @@ require (
 	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/go-errors/errors v1.0.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.11 // indirect
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
