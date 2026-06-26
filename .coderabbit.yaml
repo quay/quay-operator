@@ -54,7 +54,6 @@ reviews:
   path_filters:
     - "!vendor/**"
     - "!**/zz_generated*.go"
-    - "!config/crd/bases/**"
     - "!go.sum"
     - "!bundle/**"
     - "!.tekton/**"
