@@ -1,0 +1,311 @@
+# =============================================================================
+# CodeRabbit Configuration for quay/quay-operator
+# =============================================================================
+# Kubernetes operator (Kubebuilder / controller-runtime) for deploying
+# Red Hat Quay container registry on OpenShift.
+#
+# CRD: QuayRegistry in quay.redhat.com/v1
+# Language: Go 1.23+
+# Default branch: master
+# Commit format: <subsystem>: <what changed> (PROJQUAY-####)
+# =============================================================================
+
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: en-US
+
+# "chill" avoids nitpicky style comments and focuses on substantive issues.
+tone_instructions: >
+  Be concise and technical. This is a Kubernetes operator codebase — assume
+  the reader understands controller-runtime, Kubebuilder, and Kustomize.
+  Focus on correctness, safety, and backward compatibility rather than style.
+
+# Disable early access features to keep reviews stable.
+early_access: false
+
+# -----------------------------------------------------------------------------
+# Review profile & presentation
+# -----------------------------------------------------------------------------
+reviews:
+  profile: chill
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: true
+  poem: false
+  sequence_diagrams: false
+
+  # Automatically review PRs targeting master.
+  auto_review:
+    enabled: true
+    base_branches:
+      - master
+    # Skip work-in-progress PRs.
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+      - "DRAFT"
+    drafts: false
+
+  # ---------------------------------------------------------------------------
+  # Path filters — exclude generated / vendored / non-reviewable files
+  # ---------------------------------------------------------------------------
+  # NOTE: kustomize/** and config/rbac/** are intentionally NOT excluded —
+  # RBAC and Kustomize manifests carry security and operational significance.
+  path_filters:
+    - "!vendor/**"
+    - "!**/zz_generated*.go"
+    - "!config/crd/bases/**"
+    - "!go.sum"
+    - "!bundle/**"
+    - "!.tekton/**"
+    - "!**/*.log"
+    - "!hack/**"
+
+  # ---------------------------------------------------------------------------
+  # Path instructions — repo-specific review guidance per directory
+  # ---------------------------------------------------------------------------
+  # These tell CodeRabbit what to focus on when reviewing files in each area.
+  path_instructions:
+    # CRD type definitions
+    - path: "apis/quay/v1/**/*.go"
+      instructions: >
+        CRD type definitions for QuayRegistry (quay.redhat.com/v1).
+
+        Review checklist:
+        - Backward compatibility: flag any removal or renaming of existing
+          fields, type changes on existing fields, or removal of enum values
+          from ComponentKind. These are breaking changes.
+        - Kubebuilder markers: verify +kubebuilder:validation, +kubebuilder:default,
+          +kubebuilder:printcolumn, and +kubebuilder:subresource markers are correct
+          and consistent.
+        - XValidation CEL rules: check that CEL expressions on Component struct
+          are syntactically correct and match the intended semantics.
+        - Defaulting: ensure new fields have sensible zero-value behavior or
+          explicit defaults.
+        - If API types changed, remind the author to run `make generate && make manifests`
+          to regenerate deepcopy and CRD YAML.
+
+    # Reconciliation logic
+    - path: "controllers/quay/**/*.go"
+      instructions: >
+        Main reconciliation controllers for QuayRegistry.
+
+        Review checklist:
+        - Idempotency: every reconcile pass must be safe to re-run. Flag any
+          operations that create resources without checking existence first.
+        - Error handling: errors should be wrapped with fmt.Errorf("...: %w", err)
+          for proper error chain propagation. Check for swallowed errors.
+        - Status conditions: verify that status conditions (Available,
+          RolloutBlocked, ComponentsCreated, Component*Ready) are updated
+          correctly using SetCondition/RemoveCondition helpers from the v1 types.
+        - No blocking operations: reconcile loops must not block on long-running
+          I/O. Flag any synchronous HTTP calls, shell execs, or unbounded waits.
+        - controller-runtime patterns: check correct use of ctrl.Result (requeue
+          vs. requeue-after), proper use of controllerutil.SetControllerReference
+          or EnsureOwnerReference, and predicate filters.
+        - Component overrides: verify that override handling (replicas, env,
+          affinity, volumeSize, resources, securityContext, TLS) respects the
+          supported-component lists defined in quayregistry_types.go.
+
+    # Kustomize / manifest generation
+    - path: "pkg/kustomize/**/*.go"
+      instructions: >
+        Manifest generation using Kustomize programmatic API.
+
+        Review checklist:
+        - Overlay correctness: verify Kustomize component overlays are applied
+          in the right order and that patches target the correct GVK.
+        - Resource naming: names must follow the <registry-name>-<component>
+          pattern for proper owner-reference tracking.
+        - Label/annotation propagation: ensure quay-operator labels (app,
+          quay-component, quay-operator/quayregistry) are consistently applied.
+        - No hardcoded values: flag image tags, namespace names, or resource
+          limits that should come from the QuayRegistry CR spec or environment.
+        - Secret handling: verify that config bundle secrets and TLS secrets
+          are referenced correctly and not logged.
+
+    # Component health evaluation
+    - path: "pkg/cmpstatus/**/*.go"
+      instructions: >
+        Per-component health evaluation (one checker per component kind).
+
+        Review checklist:
+        - Non-blocking: health checks must not make blocking calls or have
+          unbounded timeouts. They run in the status controller reconcile loop.
+        - Failure modes: verify that all error paths set an appropriate
+          condition (ComponentNotReady with descriptive message) rather than
+          silently succeeding.
+        - Condition surfacing: status must be reported through the QuayRegistry
+          .status.conditions using the correct ConditionType constant
+          (e.g. ComponentPostgresReady, ComponentClairReady).
+        - Deployment readiness: for Deployment-backed components, check that
+          the health evaluator inspects .status.readyReplicas, not just
+          .status.replicas.
+
+    # TLS handling
+    - path: "pkg/tls/**/*.go"
+      instructions: >
+        TLS certificate handling and rotation.
+
+        Review checklist:
+        - Certificate rotation: verify that certificate changes trigger proper
+          rolling restarts via annotation hashing (TLSSecretHashAnnotation).
+        - No hardcoded TLS versions: TLS min version should come from cluster
+          config or be set to TLS 1.2+ minimum.
+        - Secret mounting: verify TLS secrets are projected correctly into
+          container volumes and that file permissions are restrictive (0640 or
+          tighter).
+        - OpenShift service CA: check integration with service-ca operator
+          for automatic cert provisioning on OpenShift clusters.
+
+    # Runtime context
+    - path: "pkg/context/**/*.go"
+      instructions: >
+        Runtime context for cluster capability detection.
+
+        Review checklist:
+        - Capability detection: verify that API group discovery (Routes,
+          ObjectBucketClaims, PrometheusRules) is done via discovery client,
+          not hardcoded assumptions.
+        - Non-OpenShift fallback: ensure the operator degrades gracefully when
+          OpenShift-specific APIs (Routes, monitoring) are not available.
+        - Context propagation: verify the QuayRegistryContext is populated
+          early in reconciliation and consistently threaded through to
+          component handlers.
+
+    # Test files
+    - path: "**/*_test.go"
+      instructions: >
+        Unit and integration tests.
+
+        Review checklist:
+        - Test framework: this project uses Ginkgo v2 with Gomega matchers
+          for controller tests, and standard testing package elsewhere. Verify
+          correct framework usage.
+        - envtest: controller tests use envtest (sigs.k8s.io/controller-runtime/pkg/envtest).
+          Verify proper test environment setup and teardown.
+        - Cleanup: resources created in tests must be cleaned up via defer or
+          AfterEach. Flag leaked resources.
+        - No time.Sleep: use gomega.Eventually/Consistently with timeout and
+          polling interval instead of time.Sleep for async assertions.
+        - Assertion messages: Gomega assertions should include meaningful
+          context via .WithOffset() or descriptive wrappers.
+        - Table-driven tests: for functions with many input/output combinations,
+          prefer table-driven patterns (DescribeTable in Ginkgo, or
+          []struct{} loops in standard tests).
+
+    # RBAC manifests
+    - path: "config/rbac/**/*.yaml"
+      instructions: >
+        Operator RBAC manifests (Roles, ClusterRoles, Bindings).
+
+        Review checklist:
+        - Least privilege: flag wildcard verbs ("*") or wildcard apiGroups ("*").
+          Each rule should specify only the verbs and resources actually needed.
+        - Scope: verify that ClusterRole is used only for cluster-scoped
+          resources or cross-namespace access; namespace-scoped resources
+          should use Role where possible.
+        - New permissions: if new API groups or resources are added, verify
+          the corresponding controller code actually needs them.
+        - Service account binding: verify RoleBindings reference the correct
+          ServiceAccount (controller-manager).
+
+    # Kustomize YAML manifests
+    - path: "kustomize/**/*.yaml"
+      instructions: >
+        Base Kustomize manifests for Quay components (Deployments, Services,
+        Routes, ConfigMaps, Jobs, monitoring resources).
+
+        Review checklist:
+        - Resource requests/limits: every container should have CPU and memory
+          requests defined. Flag missing resource specifications.
+        - Security context: containers should run as non-root with
+          readOnlyRootFilesystem where possible. Flag privileged: true or
+          runAsUser: 0.
+        - Service account: verify pods reference the correct ServiceAccount.
+        - Label consistency: all resources should carry the standard labels
+          (app, quay-component, quay-operator/quayregistry).
+        - Image references: images should use digest references or come from
+          environment variables, not mutable tags like :latest.
+
+  # ---------------------------------------------------------------------------
+  # Pre-merge checks — automated validation rules
+  # ---------------------------------------------------------------------------
+  pre_merge_checks:
+    # PR title must reference a PROJQUAY Jira ticket or be explicitly no-issue.
+    title:
+      mode: "warning"
+      requirements: |
+        PR title must start with a PROJQUAY Jira ticket reference (e.g.
+        PROJQUAY-1234: fix postgres connection) or NO-ISSUE: for non-functional
+        changes. Revert and Merge commits are also acceptable.
+
+    custom_checks:
+      # Flag breaking CRD changes.
+      - name: "CRD Backward Compatibility"
+        mode: "warning"
+        instructions: |
+          If any files in apis/quay/v1/ are modified, check for breaking changes:
+          - Removal or renaming of existing CRD fields
+          - Type changes on existing fields
+          - Removal of enum values from ComponentKind
+          If CRD types changed, verify that `make generate && make manifests`
+          was run to regenerate deepcopy and CRD YAML.
+          Pass if: no files in apis/quay/v1/ are changed, or changes are
+          additive only (new fields, new enum values).
+
+      # Security: weak cryptography
+      - name: "No Weak Cryptographic Algorithms"
+        mode: "warning"
+        instructions: |
+          Flag usage of MD5, SHA-1, DES, RC4, or 3DES in new or modified code.
+          Flag InsecureSkipVerify: true in production code.
+          Use SHA-256+ for hashing and AES-GCM or ChaCha20 for encryption.
+
+      # Security: container privileges
+      - name: "No Privileged Containers"
+        mode: "warning"
+        instructions: |
+          Flag privileged: true, hostPID: true, hostNetwork: true,
+          hostIPC: true, or SYS_ADMIN capability in container or
+          Kubernetes manifests. Containers should run with minimal privileges.
+
+      # Security: no sensitive data in logs
+      - name: "No Sensitive Data in Logs"
+        mode: "warning"
+        instructions: |
+          Flag logging statements (log.Info, log.Error, klog.*, fmt.Print*)
+          that may expose passwords, tokens, API keys, secrets, credentials,
+          or other sensitive data. Log resource names or redacted references
+          instead of actual secret values.
+
+# -----------------------------------------------------------------------------
+# Knowledge base — project guidelines and learnings
+# -----------------------------------------------------------------------------
+knowledge_base:
+  # Load project conventions from the AI agent guide files.
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "GEMINI.md"
+  learnings:
+    scope: local
+
+# -----------------------------------------------------------------------------
+# Tools — static analysis integrations
+# -----------------------------------------------------------------------------
+tools:
+  # golangci-lint — no project-level config file; uses pre-commit default settings.
+  golangci-lint:
+    enabled: true
+  # gitleaks — scan for leaked secrets/credentials in diffs.
+  gitleaks:
+    enabled: true
+
+# -----------------------------------------------------------------------------
+# Chat — auto-reply to @coderabbitai mentions
+# -----------------------------------------------------------------------------
+chat:
+  auto_reply: true
