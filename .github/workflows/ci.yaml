@@ -2,8 +2,20 @@ name: CI
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.gitignore'
+      - 'OWNERS'
+      - 'LICENSE'
   pull_request:
     branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.gitignore'
+      - 'OWNERS'
+      - 'LICENSE'
 jobs:
   lint:
     name: Lint

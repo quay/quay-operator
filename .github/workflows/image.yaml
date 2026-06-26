@@ -4,6 +4,12 @@ on:
   pull_request_target:
     branches:
       - '*'
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.gitignore'
+      - 'OWNERS'
+      - 'LICENSE'
   workflow_dispatch:
     inputs:
       tag:

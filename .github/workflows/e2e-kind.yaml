@@ -3,6 +3,12 @@ name: E2E KinD
 
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.gitignore'
+      - 'OWNERS'
+      - 'LICENSE'
   workflow_dispatch:
 
 concurrency:
