@@ -38,6 +38,31 @@ Or run the steps one by one.
 $ kubectl create -n openshift-marketplace -f ./bundle/quay-operator.catalogsource.yaml
 ```
 
+## Contextification Addendum
+
+```mermaid
+flowchart TB
+    cr[QuayRegistry CR]
+    operator[quay-operator]
+    config[generated config Secret]
+    components[managed components]
+    quay[Quay app]
+    status[status]
+
+    cr --> operator
+    operator --> config
+    operator --> components
+    operator --> quay
+    components --> status
+    quay --> status
+```
+
+Key paths: `apis/quay/v1/`, `controllers/quay/`, `pkg/kustomize/`, `pkg/cmpstatus/`, `pkg/context/`, `config/`, `kustomize/`, `bundle/`, and `test/chainsaw/`.
+
+Use `make manager`, `make run`, `SKIP_RESOURCE_REQUESTS=true make run`, `make test`, `make fmt && make vet`, and `make generate && make manifests`.
+
+Related repos: [quay](https://github.com/quay/quay), [quay-fbcs](https://github.com/quay/quay-fbcs), [quay-konflux-components](https://github.com/quay/quay-konflux-components), and [quay-tests](https://github.com/quay/quay-tests).
+
 **Wait a few seconds for the package to become available**:
 ```sh
 $ kubectl get packagemanifest --all-namespaces | grep quay
