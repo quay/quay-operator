@@ -853,14 +853,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if !kustomize.ProgrammaticBootstrapEnabled(usercfg) {
 		if err := r.cleanupProgrammaticBootstrapTokenResources(ctx, updatedQuay, log); err != nil {
-			return r.reconcileWithCondition(
-				ctx,
-				&quay,
-				v1.ConditionTypeRolloutBlocked,
-				metav1.ConditionTrue,
-				v1.ConditionReasonComponentCreationFailed,
-				fmt.Sprintf("could not clean up stale programmatic bootstrap token resources: %s", err),
-			)
+			log.Error(err, "could not clean up stale programmatic bootstrap token resources, continuing reconciliation")
 		}
 	}
 
