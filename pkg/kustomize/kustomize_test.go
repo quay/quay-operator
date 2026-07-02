@@ -952,6 +952,254 @@ func TestInflate(t *testing.T) {
 	}
 }
 
+func TestProgrammaticBootstrapEnabledStrictBool(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		config map[string]interface{}
+		want   bool
+	}{
+		{
+			name:   "boolean true enables programmatic bootstrap",
+			config: map[string]interface{}{ProgrammaticBootstrapFeatureConfigField: true},
+			want:   true,
+		},
+		{
+			name:   "string true does not enable programmatic bootstrap",
+			config: map[string]interface{}{ProgrammaticBootstrapFeatureConfigField: "true"},
+			want:   false,
+		},
+		{
+			name:   "nil value does not enable programmatic bootstrap",
+			config: map[string]interface{}{ProgrammaticBootstrapFeatureConfigField: nil},
+			want:   false,
+		},
+		{
+			name:   "missing key does not enable programmatic bootstrap",
+			config: map[string]interface{}{},
+			want:   false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ProgrammaticBootstrapEnabled(tt.config))
+		})
+	}
+}
+
+func TestInflateProgrammaticBootstrapTokenEnabled(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{
+		DbUri: "postgresql://user:pass@db:5432/db",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec:       v1.QuayRegistrySpec{},
+		Status:     v1.QuayRegistryStatus{CurrentVersion: v1.QuayVersionCurrent},
+	}
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{
+				"SERVER_HOSTNAME":                       "quay.io",
+				"DB_URI":                                ctx.DbUri,
+				ProgrammaticBootstrapFeatureConfigField: true,
+			}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quay, configBundle, log, false)
+	require.NoError(t, err)
+
+	secretName := BootstrapTokenSecretName(quay)
+	config := renderedQuayConfig(t, pieces)
+	assert.Equal(t, secretName, config[ProgrammaticTokenK8sSecretConfigField])
+	assert.Equal(t, BootstrapTokenSecretKey, config[ProgrammaticTokenK8sKeyConfigField])
+	assert.Equal(t, BootstrapTokenConfigPath, config[ProgrammaticTokenPathConfigField])
+	assert.NotContains(t, config, "PROGRAMMATIC_TOKEN_K8S_NAMESPACE")
+
+	bootstrapSecret := findSecretByName(pieces, secretName)
+	require.NotNil(t, bootstrapSecret)
+	assert.Equal(t, corev1.SecretTypeOpaque, bootstrapSecret.Type)
+	assert.NotContains(t, bootstrapSecret.Data, BootstrapTokenSecretKey)
+
+	role := findRoleByName(pieces, secretName)
+	require.NotNil(t, role)
+	require.Len(t, role.Rules, 1)
+	assert.Equal(t, []string{""}, role.Rules[0].APIGroups)
+	assert.Equal(t, []string{"secrets"}, role.Rules[0].Resources)
+	assert.Equal(t, []string{secretName}, role.Rules[0].ResourceNames)
+	assert.ElementsMatch(t, []string{"get", "update"}, role.Rules[0].Verbs)
+
+	roleBinding := findRoleBindingByName(pieces, secretName)
+	require.NotNil(t, roleBinding)
+	assert.Equal(t, rbac.GroupName, roleBinding.RoleRef.APIGroup)
+	assert.Equal(t, "Role", roleBinding.RoleRef.Kind)
+	assert.Equal(t, secretName, roleBinding.RoleRef.Name)
+	require.Len(t, roleBinding.Subjects, 1)
+	assert.Equal(t, rbac.ServiceAccountKind, roleBinding.Subjects[0].Kind)
+	assert.Equal(t, "test-quay-app", roleBinding.Subjects[0].Name)
+	assert.Equal(t, "test-ns", roleBinding.Subjects[0].Namespace)
+
+	deployment := findDeploymentByName(pieces, "test-quay-app")
+	require.NotNil(t, deployment)
+	volume := findVolumeByName(deployment, bootstrapTokenVolumeName)
+	require.NotNil(t, volume)
+	require.NotNil(t, volume.Secret)
+	assert.Equal(t, secretName, volume.Secret.SecretName)
+
+	mount := findVolumeMountByName(deployment, "quay-app", bootstrapTokenVolumeName)
+	require.NotNil(t, mount)
+	assert.Equal(t, BootstrapTokenMountPath, mount.MountPath)
+	assert.True(t, mount.ReadOnly)
+	assert.Empty(t, mount.SubPath)
+}
+
+func TestInflateProgrammaticBootstrapTokenDisabled(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{
+		DbUri: "postgresql://user:pass@db:5432/db",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec:       v1.QuayRegistrySpec{},
+		Status:     v1.QuayRegistryStatus{CurrentVersion: v1.QuayVersionCurrent},
+	}
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{
+				"SERVER_HOSTNAME":                       "quay.io",
+				"DB_URI":                                ctx.DbUri,
+				ProgrammaticBootstrapFeatureConfigField: false,
+			}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quay, configBundle, log, false)
+	require.NoError(t, err)
+
+	secretName := BootstrapTokenSecretName(quay)
+	config := renderedQuayConfig(t, pieces)
+	assert.NotContains(t, config, ProgrammaticTokenK8sSecretConfigField)
+	assert.NotContains(t, config, ProgrammaticTokenK8sKeyConfigField)
+	assert.NotContains(t, config, ProgrammaticTokenPathConfigField)
+
+	assert.Nil(t, findSecretByName(pieces, secretName))
+	assert.Nil(t, findRoleByName(pieces, secretName))
+	assert.Nil(t, findRoleBindingByName(pieces, secretName))
+
+	deployment := findDeploymentByName(pieces, "test-quay-app")
+	require.NotNil(t, deployment)
+	assert.Nil(t, findVolumeByName(deployment, bootstrapTokenVolumeName))
+	assert.Nil(t, findVolumeMountByName(deployment, "quay-app", bootstrapTokenVolumeName))
+}
+
+func TestInflateProgrammaticBootstrapTokenOverridesConflictingConfig(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{
+		DbUri: "postgresql://user:pass@db:5432/db",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec:       v1.QuayRegistrySpec{},
+		Status:     v1.QuayRegistryStatus{CurrentVersion: v1.QuayVersionCurrent},
+	}
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{
+				"SERVER_HOSTNAME":                       "quay.io",
+				"DB_URI":                                ctx.DbUri,
+				ProgrammaticBootstrapFeatureConfigField: true,
+				ProgrammaticTokenK8sSecretConfigField:   "user-secret",
+				ProgrammaticTokenK8sKeyConfigField:      "user-key.json",
+				ProgrammaticTokenPathConfigField:        "/tmp/user-token.json",
+			}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quay, configBundle, log, false)
+	require.NoError(t, err)
+
+	config := renderedQuayConfig(t, pieces)
+	assert.Equal(t, BootstrapTokenSecretName(quay), config[ProgrammaticTokenK8sSecretConfigField])
+	assert.Equal(t, BootstrapTokenSecretKey, config[ProgrammaticTokenK8sKeyConfigField])
+	assert.Equal(t, BootstrapTokenConfigPath, config[ProgrammaticTokenPathConfigField])
+}
+
+func renderedQuayConfig(t *testing.T, pieces []client.Object) map[string]interface{} {
+	t.Helper()
+	for _, obj := range pieces {
+		secret, ok := obj.(*corev1.Secret)
+		if !ok || !strings.Contains(secret.GetName(), configSecretPrefix) {
+			continue
+		}
+		return decode(secret.Data["config.yaml"]).(map[string]interface{})
+	}
+	t.Fatal("rendered Quay config Secret not found")
+	return nil
+}
+
+func findSecretByName(pieces []client.Object, name string) *corev1.Secret {
+	for _, obj := range pieces {
+		secret, ok := obj.(*corev1.Secret)
+		if ok && secret.GetName() == name {
+			return secret
+		}
+	}
+	return nil
+}
+
+func findRoleByName(pieces []client.Object, name string) *rbac.Role {
+	for _, obj := range pieces {
+		role, ok := obj.(*rbac.Role)
+		if ok && role.GetName() == name {
+			return role
+		}
+	}
+	return nil
+}
+
+func findRoleBindingByName(pieces []client.Object, name string) *rbac.RoleBinding {
+	for _, obj := range pieces {
+		roleBinding, ok := obj.(*rbac.RoleBinding)
+		if ok && roleBinding.GetName() == name {
+			return roleBinding
+		}
+	}
+	return nil
+}
+
+func findDeploymentByName(pieces []client.Object, name string) *appsv1.Deployment {
+	for _, obj := range pieces {
+		deployment, ok := obj.(*appsv1.Deployment)
+		if ok && deployment.GetName() == name {
+			return deployment
+		}
+	}
+	return nil
+}
+
+func findVolumeByName(deployment *appsv1.Deployment, name string) *corev1.Volume {
+	for index := range deployment.Spec.Template.Spec.Volumes {
+		if deployment.Spec.Template.Spec.Volumes[index].Name == name {
+			return &deployment.Spec.Template.Spec.Volumes[index]
+		}
+	}
+	return nil
+}
+
+func findVolumeMountByName(deployment *appsv1.Deployment, containerName, name string) *corev1.VolumeMount {
+	for containerIndex := range deployment.Spec.Template.Spec.Containers {
+		container := &deployment.Spec.Template.Spec.Containers[containerIndex]
+		if container.Name != containerName {
+			continue
+		}
+		for mountIndex := range container.VolumeMounts {
+			if container.VolumeMounts[mountIndex].Name == name {
+				return &container.VolumeMounts[mountIndex]
+			}
+		}
+	}
+	return nil
+}
+
 func TestInflateTLSCertGeneration(t *testing.T) {
 	log := testlogr.NewTestLogger(t)
 

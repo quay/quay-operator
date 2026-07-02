@@ -34,6 +34,7 @@ import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -482,6 +483,29 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 	return oldConfigBundleSecrets, nil
 }
 
+func (r *QuayRegistryReconciler) cleanupProgrammaticBootstrapTokenResources(
+	ctx context.Context, quay *v1.QuayRegistry, log logr.Logger,
+) error {
+	name := kustomize.BootstrapTokenSecretName(quay)
+	objects := []struct {
+		kind string
+		obj  client.Object
+	}{
+		{kind: "Secret", obj: &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}}},
+		{kind: "Role", obj: &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}}},
+		{kind: "RoleBinding", obj: &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}}},
+	}
+
+	for _, object := range objects {
+		if err := r.Delete(ctx, object.obj); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "could not delete stale programmatic bootstrap token resource", "kind", object.kind, "name", object.obj.GetName())
+			return err
+		}
+	}
+
+	return nil
+}
+
 // quayAppDeploymentRolledOut returns true when the quay-app Deployment has fully
 // rolled out — that is, every desired replica is both updated and available. It is
 // used to gate the deletion of old rendered config secrets so that no running pod
@@ -825,6 +849,19 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if usercfg == nil {
 		usercfg = make(map[string]interface{})
+	}
+
+	if !kustomize.ProgrammaticBootstrapEnabled(usercfg) {
+		if err := r.cleanupProgrammaticBootstrapTokenResources(ctx, updatedQuay, log); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonComponentCreationFailed,
+				fmt.Sprintf("could not clean up stale programmatic bootstrap token resources: %s", err),
+			)
+		}
 	}
 
 	updatedQuay.Status.Conditions = v1.RemoveCondition(

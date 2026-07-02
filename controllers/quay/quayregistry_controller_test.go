@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -26,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
@@ -169,6 +171,29 @@ func TestCreateOrUpdateObject_Job(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCleanupProgrammaticBootstrapTokenResources(t *testing.T) {
+	quay := newQuayRegistry("test-registry", "default")
+	name := kustomize.BootstrapTokenSecretName(quay)
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}},
+		&rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}},
+		&rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}},
+	).Build()
+	reconciler := &QuayRegistryReconciler{Client: fakeClient}
+
+	if err := reconciler.cleanupProgrammaticBootstrapTokenResources(context.Background(), quay, testLogger); err != nil {
+		t.Fatalf("cleanupProgrammaticBootstrapTokenResources returned error: %v", err)
+	}
+
+	for _, obj := range []client.Object{&corev1.Secret{}, &rbacv1.Role{}, &rbacv1.RoleBinding{}} {
+		err := fakeClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: quay.GetNamespace()}, obj)
+		if !k8serrors.IsNotFound(err) {
+			t.Fatalf("expected %T to be deleted, got error: %v", obj, err)
+		}
 	}
 }
 
@@ -474,6 +499,109 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 			}
 
 			Expect(found).To(BeTrue())
+		})
+	})
+
+	When("programmatic bootstrap is disabled", func() {
+		var bootstrapTokenResourceName string
+
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace, true)
+			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+			bootstrapTokenResourceName = kustomize.BootstrapTokenSecretName(quayRegistry)
+
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: bootstrapTokenResourceName, Namespace: namespace},
+				Data:       map[string][]byte{kustomize.BootstrapTokenSecretKey: []byte(`{"access_token":"stale"}`)},
+				Type:       corev1.SecretTypeOpaque,
+			})).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{Name: bootstrapTokenResourceName, Namespace: namespace},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{""},
+						Resources:     []string{"secrets"},
+						ResourceNames: []string{bootstrapTokenResourceName},
+						Verbs:         []string{"get", "update"},
+					},
+				},
+			})).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), &rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: bootstrapTokenResourceName, Namespace: namespace},
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: rbacv1.GroupName,
+					Kind:     "Role",
+					Name:     bootstrapTokenResourceName,
+				},
+				Subjects: []rbacv1.Subject{
+					{Kind: rbacv1.ServiceAccountKind, Name: quayRegistry.GetName() + "-quay-app", Namespace: namespace},
+				},
+			})).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("does not return an error", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+		})
+
+		It("deletes stale bootstrap-token Secret and RBAC resources", func() {
+			getErr := k8sClient.Get(context.Background(), types.NamespacedName{Name: bootstrapTokenResourceName, Namespace: namespace}, &corev1.Secret{})
+			Expect(k8serrors.IsNotFound(getErr)).To(BeTrue())
+			getErr = k8sClient.Get(context.Background(), types.NamespacedName{Name: bootstrapTokenResourceName, Namespace: namespace}, &rbacv1.Role{})
+			Expect(k8serrors.IsNotFound(getErr)).To(BeTrue())
+			getErr = k8sClient.Get(context.Background(), types.NamespacedName{Name: bootstrapTokenResourceName, Namespace: namespace}, &rbacv1.RoleBinding{})
+			Expect(k8serrors.IsNotFound(getErr)).To(BeTrue())
+		})
+	})
+
+	When("programmatic bootstrap is enabled", func() {
+		var bootstrapTokenResourceName string
+		var existingTokenData []byte
+
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace, true)
+			config := map[string]interface{}{}
+			Expect(yaml.Unmarshal(configBundle.Data["config.yaml"], &config)).To(Succeed())
+			config[kustomize.ProgrammaticBootstrapFeatureConfigField] = true
+			configBundle.Data["config.yaml"] = encode(config)
+			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+			bootstrapTokenResourceName = kustomize.BootstrapTokenSecretName(quayRegistry)
+			existingTokenData = []byte(`{"access_token":"preserve-me"}`)
+
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: bootstrapTokenResourceName, Namespace: namespace},
+				Data:       map[string][]byte{kustomize.BootstrapTokenSecretKey: existingTokenData},
+				Type:       corev1.SecretTypeOpaque,
+			})).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("does not return an error", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+		})
+
+		It("preserves existing bootstrap-token Secret data", func() {
+			var bootstrapTokenSecret corev1.Secret
+			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: bootstrapTokenResourceName, Namespace: namespace}, &bootstrapTokenSecret)).To(Succeed())
+			Expect(bootstrapTokenSecret.Data).To(HaveKeyWithValue(kustomize.BootstrapTokenSecretKey, existingTokenData))
 		})
 	})
 

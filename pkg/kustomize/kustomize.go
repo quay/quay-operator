@@ -18,6 +18,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -43,6 +44,17 @@ const (
 	operatorServiceEndpointAnnotation = "quay-operator-service-endpoint"
 
 	podNamespaceKey = "MY_POD_NAMESPACE"
+
+	ProgrammaticBootstrapFeatureConfigField = "FEATURE_PROGRAMMATIC_BOOTSTRAP"
+	ProgrammaticTokenK8sSecretConfigField   = "PROGRAMMATIC_TOKEN_K8S_SECRET"
+	ProgrammaticTokenK8sKeyConfigField      = "PROGRAMMATIC_TOKEN_K8S_KEY"
+	ProgrammaticTokenPathConfigField        = "PROGRAMMATIC_TOKEN_PATH"
+	BootstrapTokenSecretKey                 = "token.json"
+	BootstrapTokenMountPath                 = "/var/lib/quay/bootstrap-token"
+	BootstrapTokenConfigPath                = BootstrapTokenMountPath + "/" + BootstrapTokenSecretKey
+
+	bootstrapTokenResourceSuffix = "bootstrap-token"
+	bootstrapTokenVolumeName     = "bootstrap-token"
 
 	componentImagePrefix = "RELATED_IMAGE_COMPONENT_"
 )
@@ -172,6 +184,143 @@ func decode(bytes []byte) interface{} {
 	var value interface{}
 	_ = yaml.Unmarshal(bytes, &value)
 	return value
+}
+
+// BootstrapTokenSecretName returns the deterministic Secret name used for programmatic bootstrap token storage.
+func BootstrapTokenSecretName(quay *v1.QuayRegistry) string {
+	return quay.GetName() + "-" + bootstrapTokenResourceSuffix
+}
+
+// ProgrammaticBootstrapEnabled returns true only when FEATURE_PROGRAMMATIC_BOOTSTRAP is boolean true.
+func ProgrammaticBootstrapEnabled(config map[string]interface{}) bool {
+	enabled, ok := config[ProgrammaticBootstrapFeatureConfigField].(bool)
+	return ok && enabled
+}
+
+func injectProgrammaticBootstrapTokenConfig(quay *v1.QuayRegistry, config map[string]interface{}) {
+	config[ProgrammaticTokenK8sSecretConfigField] = BootstrapTokenSecretName(quay)
+	config[ProgrammaticTokenK8sKeyConfigField] = BootstrapTokenSecretKey
+	config[ProgrammaticTokenPathConfigField] = BootstrapTokenConfigPath
+}
+
+func bootstrapTokenLabels(quay *v1.QuayRegistry) map[string]string {
+	return map[string]string{
+		QuayRegistryNameLabel: quay.GetName(),
+	}
+}
+
+func addProgrammaticBootstrapTokenResources(quay *v1.QuayRegistry, resources []client.Object) []client.Object {
+	secretName := BootstrapTokenSecretName(quay)
+
+	for _, resource := range resources {
+		deployment, ok := resource.(*apps.Deployment)
+		if !ok || deployment.GetName() != quay.GetName()+"-quay-app" {
+			continue
+		}
+		ensureBootstrapTokenDeploymentMount(deployment, secretName)
+	}
+
+	labels := bootstrapTokenLabels(quay)
+	resources = append(resources,
+		&corev1.Secret{
+			TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Secret"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: quay.GetNamespace(),
+				Labels:    labels,
+			},
+			Type: corev1.SecretTypeOpaque,
+		},
+		&rbac.Role{
+			TypeMeta: metav1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: quay.GetNamespace(),
+				Labels:    labels,
+			},
+			Rules: []rbac.PolicyRule{
+				{
+					APIGroups:     []string{""},
+					Resources:     []string{"secrets"},
+					ResourceNames: []string{secretName},
+					Verbs:         []string{"get", "update"},
+				},
+			},
+		},
+		&rbac.RoleBinding{
+			TypeMeta: metav1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "RoleBinding"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: quay.GetNamespace(),
+				Labels:    labels,
+			},
+			RoleRef: rbac.RoleRef{
+				APIGroup: rbac.GroupName,
+				Kind:     "Role",
+				Name:     secretName,
+			},
+			Subjects: []rbac.Subject{
+				{
+					Kind:      rbac.ServiceAccountKind,
+					Name:      quay.GetName() + "-quay-app",
+					Namespace: quay.GetNamespace(),
+				},
+			},
+		},
+	)
+
+	return resources
+}
+
+func ensureBootstrapTokenDeploymentMount(deployment *apps.Deployment, secretName string) {
+	volumeFound := false
+	for index := range deployment.Spec.Template.Spec.Volumes {
+		if deployment.Spec.Template.Spec.Volumes[index].Name != bootstrapTokenVolumeName {
+			continue
+		}
+		deployment.Spec.Template.Spec.Volumes[index].VolumeSource = corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: secretName},
+		}
+		volumeFound = true
+		break
+	}
+	if !volumeFound {
+		deployment.Spec.Template.Spec.Volumes = append(
+			deployment.Spec.Template.Spec.Volumes,
+			corev1.Volume{
+				Name: bootstrapTokenVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{SecretName: secretName},
+				},
+			},
+		)
+	}
+
+	for containerIndex := range deployment.Spec.Template.Spec.Containers {
+		container := &deployment.Spec.Template.Spec.Containers[containerIndex]
+		if container.Name != "quay-app" {
+			continue
+		}
+
+		mountFound := false
+		for mountIndex := range container.VolumeMounts {
+			if container.VolumeMounts[mountIndex].Name != bootstrapTokenVolumeName {
+				continue
+			}
+			container.VolumeMounts[mountIndex].MountPath = BootstrapTokenMountPath
+			container.VolumeMounts[mountIndex].ReadOnly = true
+			container.VolumeMounts[mountIndex].SubPath = ""
+			mountFound = true
+			break
+		}
+		if !mountFound {
+			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+				Name:      bootstrapTokenVolumeName,
+				MountPath: BootstrapTokenMountPath,
+				ReadOnly:  true,
+			})
+		}
+	}
 }
 
 // EnsureCreationOrder sorts the given slice of Kubernetes objects so that when created in order,
@@ -854,6 +1003,11 @@ func Inflate(
 		}
 	}
 
+	programmaticBootstrapEnabled := ProgrammaticBootstrapEnabled(parsedUserConfig)
+	if programmaticBootstrapEnabled {
+		injectProgrammaticBootstrapTokenConfig(quay, parsedUserConfig)
+	}
+
 	componentConfigFiles["config.yaml"] = encode(parsedUserConfig)
 
 	for _, component := range quay.Spec.Components {
@@ -915,6 +1069,10 @@ func Inflate(
 			continue
 		}
 		filteredResources = append(filteredResources, resource)
+	}
+
+	if programmaticBootstrapEnabled {
+		filteredResources = addProgrammaticBootstrapTokenResources(quay, filteredResources)
 	}
 
 	for index, resource := range filteredResources {
