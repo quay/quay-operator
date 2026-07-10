@@ -487,6 +487,7 @@ var quayComponents = map[string][]client.Object{
 	},
 	"mirror": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror"}},
+		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror-pushgateway"}},
 	},
 	"horizontalpodautoscaler": {
 		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
@@ -950,6 +951,91 @@ func TestInflate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInflatePushgatewayURLInjected(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{}
+
+	quayRegistry := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true},
+				{Kind: "clair", Managed: false},
+				{Kind: "clairpostgres", Managed: false},
+				{Kind: "redis", Managed: true},
+				{Kind: "objectstorage", Managed: false},
+				{Kind: "mirror", Managed: true},
+				{Kind: "horizontalpodautoscaler", Managed: false},
+			},
+		},
+	}
+
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quayRegistry, configBundle, log, false)
+	assert.Nil(t, err)
+	assert.NotNil(t, pieces)
+
+	for _, obj := range pieces {
+		objectMeta, _ := meta.Accessor(obj)
+		if strings.Contains(objectMeta.GetName(), configSecretPrefix) {
+			secret := obj.(*corev1.Secret)
+			config := decode(secret.Data["config.yaml"]).(map[string]interface{})
+			assert.Equal(t, "http://test-quay-mirror-pushgateway:9091", config["PROMETHEUS_PUSHGATEWAY_URL"])
+			return
+		}
+	}
+	t.Fatal("config secret not found in inflated objects")
+}
+
+func TestInflatePushgatewayURLNotOverridden(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{}
+
+	quayRegistry := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true},
+				{Kind: "clair", Managed: false},
+				{Kind: "clairpostgres", Managed: false},
+				{Kind: "redis", Managed: true},
+				{Kind: "objectstorage", Managed: false},
+				{Kind: "mirror", Managed: true},
+				{Kind: "horizontalpodautoscaler", Managed: false},
+			},
+		},
+	}
+
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{
+				"SERVER_HOSTNAME":            "quay.io",
+				"PROMETHEUS_PUSHGATEWAY_URL": "http://custom-pushgateway:9091",
+			}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quayRegistry, configBundle, log, false)
+	assert.Nil(t, err)
+	assert.NotNil(t, pieces)
+
+	for _, obj := range pieces {
+		objectMeta, _ := meta.Accessor(obj)
+		if strings.Contains(objectMeta.GetName(), configSecretPrefix) {
+			secret := obj.(*corev1.Secret)
+			config := decode(secret.Data["config.yaml"]).(map[string]interface{})
+			assert.Equal(t, "http://custom-pushgateway:9091", config["PROMETHEUS_PUSHGATEWAY_URL"])
+			return
+		}
+	}
+	t.Fatal("config secret not found in inflated objects")
 }
 
 func TestProgrammaticBootstrapEnabledStrictBool(t *testing.T) {
