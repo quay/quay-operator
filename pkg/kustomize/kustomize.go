@@ -1008,6 +1008,14 @@ func Inflate(
 		injectProgrammaticBootstrapTokenConfig(quay, parsedUserConfig)
 	}
 
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentMirror) {
+		if _, ok := parsedUserConfig["PROMETHEUS_PUSHGATEWAY_URL"]; !ok {
+			parsedUserConfig["PROMETHEUS_PUSHGATEWAY_URL"] = fmt.Sprintf(
+				"http://%s-quay-mirror-pushgateway:9091", quay.GetName(),
+			)
+		}
+	}
+
 	componentConfigFiles["config.yaml"] = encode(parsedUserConfig)
 
 	for _, component := range quay.Spec.Components {
