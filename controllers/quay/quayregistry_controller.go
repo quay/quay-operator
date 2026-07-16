@@ -857,6 +857,17 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
+	if err := kustomize.ValidateProgrammaticBootstrapConfig(usercfg); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			err.Error(),
+		)
+	}
+
 	updatedQuay.Status.Conditions = v1.RemoveCondition(
 		updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked,
 	)

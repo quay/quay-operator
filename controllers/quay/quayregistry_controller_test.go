@@ -605,6 +605,40 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 		})
 	})
 
+	When("programmatic bootstrap is enabled but BOOTSTRAP_TOKEN_OWNER is missing", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace, true)
+			config := map[string]interface{}{}
+			Expect(yaml.Unmarshal(configBundle.Data["config.yaml"], &config)).To(Succeed())
+			config[kustomize.ProgrammaticBootstrapFeatureConfigField] = true
+			configBundle.Data["config.yaml"] = encode(config)
+			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("does not return an error", func() {
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("sets a RolloutBlocked condition with ConfigInvalid reason", func() {
+			var updatedQuay v1.QuayRegistry
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuay)).To(Succeed())
+			cond := v1.GetCondition(updatedQuay.Status.Conditions, v1.ConditionTypeRolloutBlocked)
+			Expect(cond).NotTo(BeNil())
+			Expect(string(cond.Reason)).To(Equal(string(v1.ConditionReasonConfigInvalid)))
+			Expect(cond.Message).To(ContainSubstring(kustomize.BootstrapTokenOwnerConfigField))
+		})
+	})
+
 	When("the current version in the `status` block is the same as the Operator", func() {
 		BeforeEach(func() {
 			quayRegistry = newQuayRegistry("test-registry", namespace)

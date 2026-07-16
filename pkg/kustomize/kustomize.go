@@ -49,6 +49,7 @@ const (
 	ProgrammaticTokenK8sSecretConfigField   = "PROGRAMMATIC_TOKEN_K8S_SECRET"
 	ProgrammaticTokenK8sKeyConfigField      = "PROGRAMMATIC_TOKEN_K8S_KEY"
 	ProgrammaticTokenPathConfigField        = "PROGRAMMATIC_TOKEN_PATH"
+	BootstrapTokenOwnerConfigField          = "BOOTSTRAP_TOKEN_OWNER"
 	BootstrapTokenSecretKey                 = "token.json"
 	BootstrapTokenMountPath                 = "/var/lib/quay/bootstrap-token"
 	BootstrapTokenConfigPath                = BootstrapTokenMountPath + "/" + BootstrapTokenSecretKey
@@ -195,6 +196,23 @@ func BootstrapTokenSecretName(quay *v1.QuayRegistry) string {
 func ProgrammaticBootstrapEnabled(config map[string]interface{}) bool {
 	enabled, ok := config[ProgrammaticBootstrapFeatureConfigField].(bool)
 	return ok && enabled
+}
+
+// ValidateProgrammaticBootstrapConfig checks that required configuration keys
+// are present when FEATURE_PROGRAMMATIC_BOOTSTRAP is enabled.
+func ValidateProgrammaticBootstrapConfig(config map[string]interface{}) error {
+	if !ProgrammaticBootstrapEnabled(config) {
+		return nil
+	}
+	owner, ok := config[BootstrapTokenOwnerConfigField]
+	if !ok {
+		return fmt.Errorf("%s must be set when %s is enabled", BootstrapTokenOwnerConfigField, ProgrammaticBootstrapFeatureConfigField)
+	}
+	ownerStr, ok := owner.(string)
+	if !ok || ownerStr == "" {
+		return fmt.Errorf("%s must be a non-empty string", BootstrapTokenOwnerConfigField)
+	}
+	return nil
 }
 
 func injectProgrammaticBootstrapTokenConfig(quay *v1.QuayRegistry, config map[string]interface{}) {
