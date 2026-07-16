@@ -39,6 +39,9 @@ func (r *QuayRegistryReconciler) checkTLSSecurityProfile(
 	if _, ok := config["SSL_CIPHERS"]; ok {
 		return nil
 	}
+	if _, ok := config["SSL_CIPHERSUITES"]; ok {
+		return nil
+	}
 
 	// Try to read the APIServer "cluster" resource.
 	var apiServer configv1.APIServer
@@ -56,38 +59,38 @@ func (r *QuayRegistryReconciler) checkTLSSecurityProfile(
 	}
 
 	// Translate the profile into nginx/OpenSSL formatted strings.
-	protocols, ciphers := translateTLSProfile(apiServer.Spec.TLSSecurityProfile)
+	protocols, ciphers, ciphersuites := translateTLSProfile(apiServer.Spec.TLSSecurityProfile)
 	qctx.SSLProtocols = protocols
 	qctx.SSLCiphers = ciphers
+	qctx.SSLCiphersuites = ciphersuites
 	return nil
 }
 
 // translateTLSProfile converts an OpenShift TLSSecurityProfile into
 // space-separated protocol versions (nginx format) and colon-separated cipher
 // names (OpenSSL format).
-func translateTLSProfile(profile *configv1.TLSSecurityProfile) (protocols string, ciphers string) {
-	// A nil profile means the cluster default, which is Intermediate.
+func translateTLSProfile(profile *configv1.TLSSecurityProfile) (protocols, ciphers, ciphersuites string) {
+	translate := func(spec *configv1.TLSProfileSpec) (string, string, string) {
+		tls12, tls13 := splitCiphers(spec.Ciphers)
+		return tlsVersionToProtocols(spec.MinTLSVersion), joinCiphers(tls12), joinCiphers(tls13)
+	}
+
 	if profile == nil {
-		spec := configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
-		return tlsVersionToProtocols(spec.MinTLSVersion), tlsCiphersToString(spec.Ciphers)
+		return translate(configv1.TLSProfiles[configv1.TLSProfileIntermediateType])
 	}
 
 	switch profile.Type {
 	case configv1.TLSProfileCustomType:
 		if profile.Custom != nil {
-			return tlsVersionToProtocols(profile.Custom.MinTLSVersion),
-				tlsCiphersToString(profile.Custom.Ciphers)
+			return translate(&profile.Custom.TLSProfileSpec)
 		}
-		// Custom type without custom spec — fall through to Intermediate.
-		spec := configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
-		return tlsVersionToProtocols(spec.MinTLSVersion), tlsCiphersToString(spec.Ciphers)
+		return translate(configv1.TLSProfiles[configv1.TLSProfileIntermediateType])
 	default:
 		spec, ok := configv1.TLSProfiles[profile.Type]
 		if !ok {
-			// Unknown profile type — default to Intermediate.
 			spec = configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
 		}
-		return tlsVersionToProtocols(spec.MinTLSVersion), tlsCiphersToString(spec.Ciphers)
+		return translate(spec)
 	}
 }
 
@@ -110,8 +113,17 @@ func tlsVersionToProtocols(minVersion configv1.TLSProtocolVersion) string {
 	}
 }
 
-// tlsCiphersToString joins cipher suite names with colons, producing the
-// format expected by OpenSSL (and therefore nginx's ssl_ciphers directive).
-func tlsCiphersToString(ciphers []string) string {
+func splitCiphers(ciphers []string) (tls12, tls13 []string) {
+	for _, c := range ciphers {
+		if strings.HasPrefix(c, "TLS_") {
+			tls13 = append(tls13, c)
+		} else {
+			tls12 = append(tls12, c)
+		}
+	}
+	return
+}
+
+func joinCiphers(ciphers []string) string {
 	return strings.Join(ciphers, ":")
 }

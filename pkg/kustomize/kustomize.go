@@ -1002,6 +1002,11 @@ func Inflate(
 			parsedUserConfig["SSL_CIPHERS"] = strings.Split(ctx.SSLCiphers, ":")
 		}
 	}
+	if ctx.SSLCiphersuites != "" {
+		if _, ok := parsedUserConfig["SSL_CIPHERSUITES"]; !ok {
+			parsedUserConfig["SSL_CIPHERSUITES"] = strings.Split(ctx.SSLCiphersuites, ":")
+		}
+	}
 
 	programmaticBootstrapEnabled := ProgrammaticBootstrapEnabled(parsedUserConfig)
 	if programmaticBootstrapEnabled {
