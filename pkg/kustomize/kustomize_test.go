@@ -1209,6 +1209,98 @@ func TestInflateProgrammaticBootstrapTokenOverridesConflictingConfig(t *testing.
 	assert.Equal(t, BootstrapTokenConfigPath, config[ProgrammaticTokenPathConfigField])
 }
 
+func TestValidateProgrammaticBootstrapConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  map[string]interface{}
+		wantErr bool
+	}{
+		{
+			name:    "feature disabled",
+			config:  map[string]interface{}{ProgrammaticBootstrapFeatureConfigField: false},
+			wantErr: false,
+		},
+		{
+			name:    "feature absent",
+			config:  map[string]interface{}{},
+			wantErr: false,
+		},
+		{
+			name: "feature enabled with owner set",
+			config: map[string]interface{}{
+				ProgrammaticBootstrapFeatureConfigField: true,
+				BootstrapTokenOwnerConfigField:          "admin",
+			},
+			wantErr: false,
+		},
+		{
+			name: "feature enabled without owner",
+			config: map[string]interface{}{
+				ProgrammaticBootstrapFeatureConfigField: true,
+			},
+			wantErr: true,
+		},
+		{
+			name: "feature enabled with empty owner",
+			config: map[string]interface{}{
+				ProgrammaticBootstrapFeatureConfigField: true,
+				BootstrapTokenOwnerConfigField:          "",
+			},
+			wantErr: true,
+		},
+		{
+			name: "feature enabled with non-string owner",
+			config: map[string]interface{}{
+				ProgrammaticBootstrapFeatureConfigField: true,
+				BootstrapTokenOwnerConfigField:          42,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateProgrammaticBootstrapConfig(tt.config)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestInflateProgrammaticBootstrapTokenPreservesUserConfig(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{
+		DbUri: "postgresql://user:pass@db:5432/db",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec:       v1.QuayRegistrySpec{},
+		Status:     v1.QuayRegistryStatus{CurrentVersion: v1.QuayVersionCurrent},
+	}
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{
+				"SERVER_HOSTNAME":                       "quay.io",
+				"DB_URI":                                ctx.DbUri,
+				ProgrammaticBootstrapFeatureConfigField: true,
+				BootstrapTokenOwnerConfigField:          "bootstrap-admin",
+				"BOOTSTRAP_TOKEN_EXPIRATION":            3600,
+				"BOOTSTRAP_TOKEN_SCOPE":                 "org:admin",
+			}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quay, configBundle, log, false)
+	require.NoError(t, err)
+
+	config := renderedQuayConfig(t, pieces)
+	assert.Equal(t, "bootstrap-admin", config[BootstrapTokenOwnerConfigField])
+	assert.Equal(t, 3600, int(config["BOOTSTRAP_TOKEN_EXPIRATION"].(float64)))
+	assert.Equal(t, "org:admin", config["BOOTSTRAP_TOKEN_SCOPE"])
+}
+
 func renderedQuayConfig(t *testing.T, pieces []client.Object) map[string]interface{} {
 	t.Helper()
 	for _, obj := range pieces {
