@@ -15,39 +15,49 @@ import (
 
 func TestTranslateTLSProfile(t *testing.T) {
 	for _, tt := range []struct {
-		name              string
-		profile           *configv1.TLSSecurityProfile
-		expectedProtocols string
-		expectedCiphers   string
+		name                 string
+		profile              *configv1.TLSSecurityProfile
+		expectedProtocols    string
+		expectedCiphers      string
+		expectedCiphersuites string
+		ciphersEmpty         bool
+		ciphersuitesEmpty    bool
 	}{
 		{
-			name:              "nil profile defaults to Intermediate",
-			profile:           nil,
-			expectedProtocols: "TLSv1.2 TLSv1.3",
+			name:                 "nil profile defaults to Intermediate",
+			profile:              nil,
+			expectedProtocols:    "TLSv1.2 TLSv1.3",
+			expectedCiphers:      "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384",
+			expectedCiphersuites: "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256",
 		},
 		{
 			name: "Old profile",
 			profile: &configv1.TLSSecurityProfile{
 				Type: configv1.TLSProfileOldType,
 			},
-			expectedProtocols: "TLSv1 TLSv1.1 TLSv1.2 TLSv1.3",
+			expectedProtocols:    "TLSv1 TLSv1.1 TLSv1.2 TLSv1.3",
+			expectedCiphersuites: "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256",
 		},
 		{
 			name: "Intermediate profile",
 			profile: &configv1.TLSSecurityProfile{
 				Type: configv1.TLSProfileIntermediateType,
 			},
-			expectedProtocols: "TLSv1.2 TLSv1.3",
+			expectedProtocols:    "TLSv1.2 TLSv1.3",
+			expectedCiphers:      "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384",
+			expectedCiphersuites: "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256",
 		},
 		{
-			name: "Modern profile",
+			name: "Modern profile has empty ciphers and non-empty ciphersuites",
 			profile: &configv1.TLSSecurityProfile{
 				Type: configv1.TLSProfileModernType,
 			},
-			expectedProtocols: "TLSv1.3",
+			expectedProtocols:    "TLSv1.3",
+			ciphersEmpty:         true,
+			expectedCiphersuites: "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256",
 		},
 		{
-			name: "Custom profile with TLS 1.2",
+			name: "Custom profile with TLS 1.2 ciphers only",
 			profile: &configv1.TLSSecurityProfile{
 				Type: configv1.TLSProfileCustomType,
 				Custom: &configv1.CustomTLSProfile{
@@ -59,6 +69,25 @@ func TestTranslateTLSProfile(t *testing.T) {
 			},
 			expectedProtocols: "TLSv1.2 TLSv1.3",
 			expectedCiphers:   "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384",
+			ciphersuitesEmpty: true,
+		},
+		{
+			name: "Custom profile with mixed TLS 1.2 and 1.3 ciphers",
+			profile: &configv1.TLSSecurityProfile{
+				Type: configv1.TLSProfileCustomType,
+				Custom: &configv1.CustomTLSProfile{
+					TLSProfileSpec: configv1.TLSProfileSpec{
+						MinTLSVersion: configv1.VersionTLS12,
+						Ciphers: []string{
+							"TLS_AES_128_GCM_SHA256",
+							"ECDHE-RSA-AES128-GCM-SHA256",
+						},
+					},
+				},
+			},
+			expectedProtocols:    "TLSv1.2 TLSv1.3",
+			expectedCiphers:      "ECDHE-RSA-AES128-GCM-SHA256",
+			expectedCiphersuites: "TLS_AES_128_GCM_SHA256",
 		},
 		{
 			name: "Custom profile with empty minTLSVersion defaults to TLS 1.2",
@@ -73,6 +102,7 @@ func TestTranslateTLSProfile(t *testing.T) {
 			},
 			expectedProtocols: "TLSv1.2 TLSv1.3",
 			expectedCiphers:   "ECDHE-RSA-AES128-GCM-SHA256",
+			ciphersuitesEmpty: true,
 		},
 		{
 			name: "Custom type with nil Custom spec defaults to Intermediate",
@@ -83,19 +113,21 @@ func TestTranslateTLSProfile(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			protocols, ciphers := translateTLSProfile(tt.profile)
+			protocols, ciphers, ciphersuites := translateTLSProfile(tt.profile)
 			if protocols != tt.expectedProtocols {
 				t.Errorf("protocols = %q, want %q", protocols, tt.expectedProtocols)
 			}
 			if tt.expectedCiphers != "" && ciphers != tt.expectedCiphers {
 				t.Errorf("ciphers = %q, want %q", ciphers, tt.expectedCiphers)
 			}
-			// For named profiles, just verify ciphers are non-empty.
-			if tt.expectedCiphers == "" && tt.profile != nil &&
-				tt.profile.Type != configv1.TLSProfileCustomType {
-				if ciphers == "" {
-					t.Error("expected non-empty ciphers for named profile")
-				}
+			if tt.ciphersEmpty && ciphers != "" {
+				t.Errorf("ciphers should be empty, got %q", ciphers)
+			}
+			if tt.expectedCiphersuites != "" && ciphersuites != tt.expectedCiphersuites {
+				t.Errorf("ciphersuites = %q, want %q", ciphersuites, tt.expectedCiphersuites)
+			}
+			if tt.ciphersuitesEmpty && ciphersuites != "" {
+				t.Errorf("ciphersuites should be empty, got %q", ciphersuites)
 			}
 		})
 	}
@@ -121,15 +153,35 @@ func TestTlsVersionToProtocols(t *testing.T) {
 	}
 }
 
-func TestTlsCiphersToString(t *testing.T) {
-	result := tlsCiphersToString([]string{"A", "B", "C"})
-	if result != "A:B:C" {
-		t.Errorf("tlsCiphersToString = %q, want %q", result, "A:B:C")
+func TestSplitCiphers(t *testing.T) {
+	tls12, tls13 := splitCiphers([]string{
+		"TLS_AES_128_GCM_SHA256",
+		"ECDHE-RSA-AES128-GCM-SHA256",
+		"TLS_CHACHA20_POLY1305_SHA256",
+		"ECDHE-RSA-AES256-GCM-SHA384",
+	})
+	if len(tls12) != 2 {
+		t.Errorf("expected 2 TLS 1.2 ciphers, got %d: %v", len(tls12), tls12)
+	}
+	if len(tls13) != 2 {
+		t.Errorf("expected 2 TLS 1.3 ciphers, got %d: %v", len(tls13), tls13)
 	}
 
-	result = tlsCiphersToString(nil)
+	tls12, tls13 = splitCiphers(nil)
+	if len(tls12) != 0 || len(tls13) != 0 {
+		t.Errorf("expected empty slices for nil input, got tls12=%v tls13=%v", tls12, tls13)
+	}
+}
+
+func TestJoinCiphers(t *testing.T) {
+	result := joinCiphers([]string{"A", "B", "C"})
+	if result != "A:B:C" {
+		t.Errorf("joinCiphers = %q, want %q", result, "A:B:C")
+	}
+
+	result = joinCiphers(nil)
 	if result != "" {
-		t.Errorf("tlsCiphersToString(nil) = %q, want empty", result)
+		t.Errorf("joinCiphers(nil) = %q, want empty", result)
 	}
 }
 
@@ -155,6 +207,10 @@ func TestCheckTLSSecurityProfile_UserOverride(t *testing.T) {
 		{
 			name:       "user set SSL_CIPHERS",
 			configYAML: "SSL_CIPHERS:\n- ECDHE-RSA-AES128-GCM-SHA256",
+		},
+		{
+			name:       "user set SSL_CIPHERSUITES",
+			configYAML: "SSL_CIPHERSUITES:\n- TLS_AES_128_GCM_SHA256",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -242,8 +298,11 @@ func TestCheckTLSSecurityProfile_WithAPIServer(t *testing.T) {
 	if qctx.SSLProtocols != "TLSv1.3" {
 		t.Errorf("SSLProtocols = %q, want %q", qctx.SSLProtocols, "TLSv1.3")
 	}
-	if qctx.SSLCiphers == "" {
-		t.Error("expected non-empty SSLCiphers for Modern profile")
+	if qctx.SSLCiphers != "" {
+		t.Errorf("SSLCiphers should be empty for Modern profile (TLS 1.3 only), got %q", qctx.SSLCiphers)
+	}
+	if qctx.SSLCiphersuites == "" {
+		t.Error("expected non-empty SSLCiphersuites for Modern profile")
 	}
 }
 
