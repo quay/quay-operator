@@ -953,6 +953,26 @@ func TestInflate(t *testing.T) {
 	}
 }
 
+func TestInflateInjectsSSLECDHCurves(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	test := inflateTests[0]
+	test.ctx.SSLECDHCurves = "X25519MLKEM768:X25519:prime256v1"
+
+	pieces, err := Inflate(&test.ctx, test.quayRegistry, test.configBundle, log, false)
+	assert.NoError(t, err)
+
+	for _, obj := range pieces {
+		objectMeta, _ := meta.Accessor(obj)
+		if strings.Contains(objectMeta.GetName(), configSecretPrefix) {
+			configBundle := obj.(*corev1.Secret)
+			config := decode(configBundle.Data["config.yaml"]).(map[string]interface{})
+			assert.Equal(t, []interface{}{"X25519MLKEM768", "X25519", "prime256v1"}, config["SSL_ECDH_CURVES"])
+			return
+		}
+	}
+	t.Fatal("generated Quay config secret not found")
+}
+
 func TestInflatePushgatewayURLInjected(t *testing.T) {
 	log := testlogr.NewTestLogger(t)
 	ctx := quaycontext.QuayRegistryContext{}
