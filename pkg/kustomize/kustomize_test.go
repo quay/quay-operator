@@ -959,7 +959,7 @@ func TestInflateInjectsSSLECDHCurves(t *testing.T) {
 	test.ctx.SSLECDHCurves = "X25519MLKEM768:X25519:prime256v1"
 
 	pieces, err := Inflate(&test.ctx, test.quayRegistry, test.configBundle, log, false)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for _, obj := range pieces {
 		objectMeta, _ := meta.Accessor(obj)
