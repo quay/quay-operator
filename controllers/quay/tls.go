@@ -18,8 +18,9 @@ import (
 
 // checkTLSSecurityProfile reads the cluster-wide TLS security profile from the
 // OpenShift APIServer resource and populates the QuayRegistryContext with the
-// corresponding SSL_PROTOCOLS and SSL_CIPHERS values. If the user has already
-// set these values in config.yaml, this function is a no-op.
+// corresponding SSL_PROTOCOLS, SSL_CIPHERS, SSL_CIPHERSUITES, and
+// SSL_ECDH_CURVES values. If the user has already set any TLS values in
+// config.yaml, this function is a no-op.
 func (r *QuayRegistryReconciler) checkTLSSecurityProfile(
 	ctx context.Context,
 	qctx *quaycontext.QuayRegistryContext,
@@ -63,12 +64,22 @@ func (r *QuayRegistryReconciler) checkTLSSecurityProfile(
 	qctx.SSLProtocols = protocols
 	qctx.SSLCiphers = ciphers
 	qctx.SSLCiphersuites = ciphersuites
+	qctx.SSLECDHCurves = tlsECDHCurves(apiServer.Spec.TLSSecurityProfile)
 	return nil
 }
 
 // translateTLSProfile converts an OpenShift TLSSecurityProfile into
 // space-separated protocol versions (nginx format) and colon-separated cipher
 // names (OpenSSL format).
+const modernSSLECDHCurves = "X25519MLKEM768:X25519:prime256v1"
+
+func tlsECDHCurves(profile *configv1.TLSSecurityProfile) string {
+	if profile != nil && profile.Type == configv1.TLSProfileModernType {
+		return modernSSLECDHCurves
+	}
+	return ""
+}
+
 func translateTLSProfile(profile *configv1.TLSSecurityProfile) (protocols, ciphers, ciphersuites string) {
 	translate := func(spec *configv1.TLSProfileSpec) (string, string, string) {
 		tls12, tls13 := splitCiphers(spec.Ciphers)

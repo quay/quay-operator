@@ -212,6 +212,10 @@ func TestCheckTLSSecurityProfile_UserOverride(t *testing.T) {
 			name:       "user set SSL_CIPHERSUITES",
 			configYAML: "SSL_CIPHERSUITES:\n- TLS_AES_128_GCM_SHA256",
 		},
+		{
+			name:       "user set SSL_ECDH_CURVES",
+			configYAML: "SSL_ECDH_CURVES:\n- X25519",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			qctx := quaycontext.NewQuayRegistryContext()
@@ -231,6 +235,9 @@ func TestCheckTLSSecurityProfile_UserOverride(t *testing.T) {
 			}
 			if qctx.SSLCiphers != "" {
 				t.Errorf("SSLCiphers should be empty, got %q", qctx.SSLCiphers)
+			}
+			if qctx.SSLECDHCurves != "" {
+				t.Errorf("SSLECDHCurves should be empty, got %q", qctx.SSLECDHCurves)
 			}
 		})
 	}
@@ -304,6 +311,9 @@ func TestCheckTLSSecurityProfile_WithAPIServer(t *testing.T) {
 	if qctx.SSLCiphersuites == "" {
 		t.Error("expected non-empty SSLCiphersuites for Modern profile")
 	}
+	if qctx.SSLECDHCurves != modernSSLECDHCurves {
+		t.Errorf("SSLECDHCurves = %q, want %q", qctx.SSLECDHCurves, modernSSLECDHCurves)
+	}
 }
 
 func TestCheckTLSSecurityProfile_NilProfile(t *testing.T) {
@@ -338,5 +348,8 @@ func TestCheckTLSSecurityProfile_NilProfile(t *testing.T) {
 	}
 	if qctx.SSLProtocols != "TLSv1.2 TLSv1.3" {
 		t.Errorf("SSLProtocols = %q, want %q", qctx.SSLProtocols, "TLSv1.2 TLSv1.3")
+	}
+	if qctx.SSLECDHCurves != "" {
+		t.Errorf("SSLECDHCurves should be empty for Intermediate profile, got %q", qctx.SSLECDHCurves)
 	}
 }
