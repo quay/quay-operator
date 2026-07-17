@@ -86,7 +86,11 @@ spec:
             exit 1
           fi
 
-          PROFILE_TYPE=$(kubectl get apiserver cluster -o jsonpath='{.spec.tlsSecurityProfile.type}' 2>/dev/null || echo "")
+          if ! PROFILE_TYPE=$(kubectl get apiserver cluster \
+            -o jsonpath='{.spec.tlsSecurityProfile.type}'); then
+            echo "FAIL: unable to read apiserver cluster TLS profile"
+            exit 1
+          fi
           if [ "$PROFILE_TYPE" = "Modern" ]; then
             echo "$CONFIG" | grep -q "SSL_ECDH_CURVES" || {
               echo "FAIL: SSL_ECDH_CURVES not found for Modern profile"

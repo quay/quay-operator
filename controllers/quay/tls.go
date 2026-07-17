@@ -43,6 +43,9 @@ func (r *QuayRegistryReconciler) checkTLSSecurityProfile(
 	if _, ok := config["SSL_CIPHERSUITES"]; ok {
 		return nil
 	}
+	if _, ok := config["SSL_ECDH_CURVES"]; ok {
+		return nil
+	}
 
 	// Try to read the APIServer "cluster" resource.
 	var apiServer configv1.APIServer
