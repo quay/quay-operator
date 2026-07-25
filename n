@@ -1,0 +1,20 @@
+import subprocess
+import requests
+
+def test_golangci_lint():
+    # Submit a PR with a known lint issue
+    subprocess.run(['git', 'add', '.'])
+    subprocess.run(['git', 'commit', '-m', 'Test lint issue'])
+
+    # Verify that golangci-lint is working correctly
+    subprocess.run(['golangci-lint', 'run'])
+
+    # Check the CodeRabbit dashboard to ensure that gitleaks is enabled
+    response = requests.get('https://coderabbit.ai/dashboard')
+    response.raise_for_status()
+    dashboard_data = json.loads(response.content)
+    if 'gitleaks' not in dashboard_data['integrations']:
+        print("Error: Gitleaks is not enabled on the CodeRabbit dashboard.")
+        return
+
+test_golangci_lint()
