@@ -199,12 +199,17 @@ reviews:
           up an API server.
         - Cleanup: resources created in tests must be cleaned up via defer,
           t.Cleanup, or AfterEach. Flag leaked resources.
-        - No time.Sleep: for async assertions in the Ginkgo suite use
-          Eventually/Consistently with an explicit timeout and polling
-          interval. Flag time.Sleep anywhere.
-        - Assertion quality: Gomega assertions should include meaningful
-          context via .WithOffset() or descriptive wrappers; testing.T
-          failures should name the case and report got vs. want.
+        - No time.Sleep for asynchronous assertions: in the Ginkgo controller
+          suite use Eventually/Consistently with an explicit timeout and
+          polling interval. Flag time.Sleep that waits for asynchronous
+          behaviour; do not raise it against standard testing.T utility or
+          fake-client tests, which have nothing to wait on.
+        - Assertion quality: Gomega assertions should carry meaningful context
+          through descriptive failure messages or wrappers. .WithOffset() (and
+          the *WithOffset variants) does not add context — it only attributes
+          a failure to the caller of a shared helper, so only ask for it on
+          that basis. testing.T failures should name the case and report got
+          vs. want.
         - Table-driven tests: for functions with many input/output combinations,
           prefer table-driven patterns ([]struct{} loops in standard tests,
           DescribeTable in Ginkgo).
