@@ -27,6 +27,14 @@ early_access: false
 # Review profile & presentation
 # -----------------------------------------------------------------------------
 reviews:
+  tools:
+    # golangci-lint — no project-level config file; uses pre-commit default settings.
+    golangci-lint:
+      enabled: true
+    # gitleaks — scan for leaked secrets/credentials in diffs.
+    gitleaks:
+      enabled: true
+
   profile: chill
   high_level_summary: true
   review_status: true
@@ -295,14 +303,6 @@ knowledge_base:
 # -----------------------------------------------------------------------------
 # Tools — static analysis integrations
 # -----------------------------------------------------------------------------
-tools:
-  # golangci-lint — no project-level config file; uses pre-commit default settings.
-  golangci-lint:
-    enabled: true
-  # gitleaks — scan for leaked secrets/credentials in diffs.
-  gitleaks:
-    enabled: true
-
 # -----------------------------------------------------------------------------
 # Chat — auto-reply to @coderabbitai mentions
 # -----------------------------------------------------------------------------
