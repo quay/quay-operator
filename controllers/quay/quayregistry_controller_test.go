@@ -1067,8 +1067,9 @@ func Test_hasNecessaryConfig(t *testing.T) {
 			quay: quayWithUnmanagedComponents(v1.ComponentCache),
 		},
 		{
+			// managed cache supports user config: operator overwrites infra fields anyway
 			name:   "managed cache and redis but with provided config",
-			experr: true,
+			experr: false,
 			cfg: map[string][]byte{
 				"config.yaml": []byte("DATA_MODEL_CACHE_CONFIG:\n  engine: redis\n  redis_config:\n    host: somehost\n    port: 12345\n  repository_blob_cache_ttl: 120s\n  catalog_page_cache_ttl: 120s\n  active_repo_tags_cache_ttl: 120s\n  value_size_limit: 5MiB\n")},
 			quay: quayWithUnmanagedComponents(),
