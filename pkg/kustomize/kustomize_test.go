@@ -444,6 +444,16 @@ var quayComponents = map[string][]client.Object{
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cluster-service-ca"}},
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "extra-ca-certs"}},
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "quay-proxy-config"}},
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("quay-app-allow-all")
+			return obj
+		}(),
 	},
 	"clair": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clair-config-secret"}},
@@ -455,6 +465,16 @@ var quayComponents = map[string][]client.Object{
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "clair-app"}},
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "clair-postgres-conf-sample"}},
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("clair-allow-egress-with-limited-igress")
+			return obj
+		}(),
 	},
 	"postgres": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "postgres-bootstrap"}},
@@ -464,11 +484,31 @@ var quayComponents = map[string][]client.Object{
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-database"}},
 		&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "postgres-conf-sample"}},
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("postgres-allow-access-only-from-quay-and-upgrade")
+			return obj
+		}(),
 	},
 	"redis": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
 		&corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "quay-redis"}},
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("redis-allow-only-from-quay-pods")
+			return obj
+		}(),
 	},
 	"objectstorage": {
 		func() *unstructured.Unstructured {
@@ -488,6 +528,16 @@ var quayComponents = map[string][]client.Object{
 	"mirror": {
 		&appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror"}},
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-mirror-pushgateway"}},
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("quay-mirror-allow-all")
+			return obj
+		}(),
 	},
 	"horizontalpodautoscaler": {
 		&autoscaling.HorizontalPodAutoscaler{ObjectMeta: metav1.ObjectMeta{Name: "quay-app"}},
@@ -496,6 +546,16 @@ var quayComponents = map[string][]client.Object{
 	},
 	"clairpostgres": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clairpostgres-config-secret"}},
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("clair-postgres-allow-only-from-clair")
+			return obj
+		}(),
 	},
 	"monitoring": {
 		&corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "quay-metrics"}},
@@ -519,6 +579,16 @@ var quayComponents = map[string][]client.Object{
 	},
 	"job": {
 		&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "quay-app-upgrade"}},
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("quay-app-upgrade-allow-egress")
+			return obj
+		}(),
 	},
 }
 

@@ -407,6 +407,14 @@ func ModelFor(gvk schema.GroupVersionKind) client.Object {
 			Kind:    "PrometheusRule",
 		})
 		return obj
+	case schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}.String():
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "networking.k8s.io",
+			Version: "v1",
+			Kind:    "NetworkPolicy",
+		})
+		return obj
 	default:
 		return nil
 	}

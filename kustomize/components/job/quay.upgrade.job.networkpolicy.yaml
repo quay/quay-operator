@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-app-upgrade-allow-egress
+  labels:
+    quay-component: quay-app-upgrade
+  annotations:
+    quay-component: base
+    quay-operator/network-policy: open-egress
+    quay-operator/network-policy-reason: "Upgrade job requires unlimited egress because of potential unmanaged components."
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: quay-app-upgrade
+  policyTypes:
+  - Egress
+  egress:
+  - {}

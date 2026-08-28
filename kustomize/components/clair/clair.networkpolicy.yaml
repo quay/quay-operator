@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clair-allow-egress-with-limited-igress
+  labels:
+    quay-component: clair-app
+  annotations:
+    quay-component: clair-app
+    quay-operator/network-policy: open-egress
+    quay-operator/network-policy-reason: "Clair needs free egress to the internet to download CVE updates and potentially to connect to object storage for image processing."
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: clair-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: quay-app
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8089
+  egress:
+  - {}

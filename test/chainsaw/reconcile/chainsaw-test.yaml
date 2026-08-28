@@ -117,6 +117,8 @@ spec:
     - assert:
         file: 00-assert-overrides.yaml
     - assert:
+        file: 00-assert-networkpolicies.yaml
+    - assert:
         file: 00-assert-status.yaml
     - script:
         shell: /bin/bash

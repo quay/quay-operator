@@ -9,3 +9,5 @@ resources:
   - ./quay.service.yaml
   - ./cluster-service-ca.configmap.yaml
   - ./cluster-trusted-ca.configmap.yaml
+  - ./quay.networkpolicy.yaml
+
