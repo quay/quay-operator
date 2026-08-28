@@ -2,3 +2,5 @@ apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 resources:
   - ./quay.upgrade.job.yaml
+  - ./quay.upgrade.job.networkpolicy.yaml
+  

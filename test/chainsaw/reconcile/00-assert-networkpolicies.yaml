@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reconcile-quay-app-allow-all
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reconcile-clair-allow-egress-with-limited-igress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reconcile-clair-postgres-allow-only-from-clair
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reconcile-quay-app-upgrade-allow-egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reconcile-quay-mirror-allow-all
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reconcile-postgres-allow-access-only-from-quay-and-upgrade
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: reconcile-redis-allow-only-from-quay-pods
+

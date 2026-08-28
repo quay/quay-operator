@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-mirror-allow-all
+  labels:
+    quay-component: quay-mirror
+  annotations:
+    quay-component: quay-mirror
+    quay-operator/network-policy: open
+    quay-operator/network-policy-reason: "Mirror workers require unrestricted egress and ingress to connect to upstream registries and to post metrics."
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: quay-mirror
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - {}
+  egress:
+  - {}
