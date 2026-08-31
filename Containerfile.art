@@ -16,7 +16,7 @@ RUN GOEXPERIMENT=strictfipsruntime CGO_ENABLED=1 go build -tags strictfipsruntim
 FROM registry.redhat.io/ubi9/ubi-minimal:latest
 
 LABEL com.redhat.component="quay-operator-container"
-LABEL name="quay/quay-operator-rhel9"
+LABEL name="quay/quay-rhel9-operator"
 LABEL io.k8s.display-name="Red Hat Quay Operator"
 LABEL io.k8s.description="Red Hat Quay Operator image"
 LABEL io.openshift.tags="quay"

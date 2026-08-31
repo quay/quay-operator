@@ -23,11 +23,3 @@ spec:
     from:
       kind: DockerImage
       name: registry.redhat.io/quay/quay-builder-qemu-rhcos-rhel8
-  - name: quay-container-security-rhel9-operator
-    from:
-      kind: DockerImage
-      name: registry.redhat.io/quay/quay-container-security-rhel9-operator
-  - name: quay-bridge-rhel9-operator
-    from:
-      kind: DockerImage
-      name: registry.redhat.io/quay/quay-bridge-rhel9-operator
