@@ -232,6 +232,12 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			return dep, nil
 		}
 
+		if qctx.StorageSTSEnabled && qctx.STSCredentialProvisioned {
+			if strings.HasSuffix(dep.Name, "quay-app") || strings.HasSuffix(dep.Name, "quay-mirror") {
+				applySTSCredentials(dep, qctx)
+			}
+		}
+
 		fgns, err := v1.FieldGroupNamesForManagedComponents(quay)
 		if err != nil {
 			return nil, err
@@ -649,4 +655,76 @@ func clairPostgresCASecretName(quay *v1.QuayRegistry, override *v1.TLSOverride) 
 		return override.SecretRef.Name
 	}
 	return quay.GetName() + "-clairpostgres-ca"
+}
+
+func applySTSCredentials(dep *appsv1.Deployment, qctx *quaycontext.QuayRegistryContext) {
+	credVolume := corev1.Volume{
+		Name: "aws-sts-credentials",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: qctx.STSCredentialSecretName,
+			},
+		},
+	}
+
+	tokenVolume := corev1.Volume{
+		Name: "bound-sa-token",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{
+					{
+						ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+							Path:     "token",
+							Audience: "openshift",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	credMount := corev1.VolumeMount{
+		Name:      "aws-sts-credentials",
+		MountPath: "/aws-sts",
+		ReadOnly:  true,
+	}
+
+	tokenMount := corev1.VolumeMount{
+		Name:      "bound-sa-token",
+		MountPath: "/var/run/secrets/openshift/serviceaccount",
+		ReadOnly:  true,
+	}
+
+	envVar := corev1.EnvVar{
+		Name:  "AWS_SHARED_CREDENTIALS_FILE",
+		Value: "/aws-sts/credentials",
+	}
+
+	dep.Spec.Template.Spec.Volumes = appendVolumeIfAbsent(dep.Spec.Template.Spec.Volumes, credVolume)
+	dep.Spec.Template.Spec.Volumes = appendVolumeIfAbsent(dep.Spec.Template.Spec.Volumes, tokenVolume)
+
+	for i := range dep.Spec.Template.Spec.Containers {
+		ref := &dep.Spec.Template.Spec.Containers[i]
+		ref.VolumeMounts = appendVolumeMountIfAbsent(ref.VolumeMounts, credMount)
+		ref.VolumeMounts = appendVolumeMountIfAbsent(ref.VolumeMounts, tokenMount)
+		UpsertContainerEnv(ref, envVar)
+	}
+}
+
+func appendVolumeIfAbsent(volumes []corev1.Volume, vol corev1.Volume) []corev1.Volume {
+	for _, v := range volumes {
+		if v.Name == vol.Name {
+			return volumes
+		}
+	}
+	return append(volumes, vol)
+}
+
+func appendVolumeMountIfAbsent(mounts []corev1.VolumeMount, mount corev1.VolumeMount) []corev1.VolumeMount {
+	for _, m := range mounts {
+		if m.Name == mount.Name {
+			return mounts
+		}
+	}
+	return append(mounts, mount)
 }

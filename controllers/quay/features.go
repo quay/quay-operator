@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	err "errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -927,4 +928,86 @@ func (r *QuayRegistryReconciler) checkPostgresTLSSecrets(
 	}
 
 	return nil
+}
+
+// checkSTSCapability detects whether the operator is configured for AWS STS
+// authentication via the ROLEARN env var. When STS is active, it validates
+// that objectstorage is unmanaged and that the user's config bundle does not
+// contain static AWS credentials (which would conflict with STS).
+func (r *QuayRegistryReconciler) checkSTSCapability(
+	ctx context.Context,
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+	usercfg map[string]interface{},
+) error {
+	roleARN := os.Getenv("ROLEARN")
+	if roleARN == "" {
+		return nil
+	}
+
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentObjectStorage) {
+		r.Log.Info("ROLEARN is set but objectstorage is managed; STS only applies to unmanaged objectstorage pointing at AWS S3")
+		return nil
+	}
+
+	if hasStaticAWSStorageKeys(usercfg) {
+		return fmt.Errorf(
+			"ROLEARN is set but configBundleSecret contains static AWS credentials " +
+				"(s3_access_key/s3_secret_key or access_key/secret_key in DISTRIBUTED_STORAGE_CONFIG). " +
+				"Remove static credentials from your storage config to enable STS authentication",
+		)
+	}
+
+	if !r.supportsCredentialsRequest {
+		return fmt.Errorf(
+			"ROLEARN is set but CredentialsRequest CRD is not available. " +
+				"STS authentication requires OpenShift 4.14+ with Cloud Credential Operator",
+		)
+	}
+
+	qctx.StorageSTSEnabled = true
+	qctx.STSRoleARN = roleARN
+	r.Log.Info("STS authentication enabled", "roleARN", roleARN)
+	return nil
+}
+
+// hasStaticAWSStorageKeys checks the parsed config.yaml for static AWS
+// credentials in DISTRIBUTED_STORAGE_CONFIG entries.
+func hasStaticAWSStorageKeys(usercfg map[string]interface{}) bool {
+	dsc, ok := usercfg["DISTRIBUTED_STORAGE_CONFIG"]
+	if !ok {
+		return false
+	}
+
+	storageMap, ok := dsc.(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	staticKeyFields := []string{
+		"s3_access_key", "s3_secret_key",
+		"access_key", "secret_key",
+	}
+
+	for _, entry := range storageMap {
+		entryList, ok := entry.([]interface{})
+		if !ok || len(entryList) < 2 {
+			continue
+		}
+
+		args, ok := entryList[1].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, key := range staticKeyFields {
+			if val, exists := args[key]; exists {
+				if str, ok := val.(string); ok && str != "" {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
