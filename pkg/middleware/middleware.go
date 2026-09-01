@@ -700,29 +700,31 @@ func applySTSCredentials(dep *appsv1.Deployment, qctx *quaycontext.QuayRegistryC
 		Value: "/aws-sts/credentials",
 	}
 
-	dep.Spec.Template.Spec.Volumes = appendVolumeIfAbsent(dep.Spec.Template.Spec.Volumes, credVolume)
-	dep.Spec.Template.Spec.Volumes = appendVolumeIfAbsent(dep.Spec.Template.Spec.Volumes, tokenVolume)
+	dep.Spec.Template.Spec.Volumes = upsertVolume(dep.Spec.Template.Spec.Volumes, credVolume)
+	dep.Spec.Template.Spec.Volumes = upsertVolume(dep.Spec.Template.Spec.Volumes, tokenVolume)
 
 	for i := range dep.Spec.Template.Spec.Containers {
 		ref := &dep.Spec.Template.Spec.Containers[i]
-		ref.VolumeMounts = appendVolumeMountIfAbsent(ref.VolumeMounts, credMount)
-		ref.VolumeMounts = appendVolumeMountIfAbsent(ref.VolumeMounts, tokenMount)
+		ref.VolumeMounts = upsertVolumeMount(ref.VolumeMounts, credMount)
+		ref.VolumeMounts = upsertVolumeMount(ref.VolumeMounts, tokenMount)
 		UpsertContainerEnv(ref, envVar)
 	}
 }
 
-func appendVolumeIfAbsent(volumes []corev1.Volume, vol corev1.Volume) []corev1.Volume {
-	for _, v := range volumes {
+func upsertVolume(volumes []corev1.Volume, vol corev1.Volume) []corev1.Volume {
+	for i, v := range volumes {
 		if v.Name == vol.Name {
+			volumes[i] = vol
 			return volumes
 		}
 	}
 	return append(volumes, vol)
 }
 
-func appendVolumeMountIfAbsent(mounts []corev1.VolumeMount, mount corev1.VolumeMount) []corev1.VolumeMount {
-	for _, m := range mounts {
+func upsertVolumeMount(mounts []corev1.VolumeMount, mount corev1.VolumeMount) []corev1.VolumeMount {
+	for i, m := range mounts {
 		if m.Name == mount.Name {
+			mounts[i] = mount
 			return mounts
 		}
 	}

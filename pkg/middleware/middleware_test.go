@@ -1375,4 +1375,54 @@ func TestApplySTSCredentials(t *testing.T) {
 		assert.Equal(t, volCountBefore, len(dep.Spec.Template.Spec.Volumes))
 		assert.Equal(t, mountCountBefore, len(dep.Spec.Template.Spec.Containers[0].VolumeMounts))
 	})
+
+	t.Run("replaces conflicting volume definition", func(t *testing.T) {
+		staleSecret := "old-stale-secret"
+		conflictDep := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app"},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Volumes: []corev1.Volume{
+							{
+								Name: "aws-sts-credentials",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName: staleSecret,
+									},
+								},
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name: "quay-app",
+								VolumeMounts: []corev1.VolumeMount{
+									{Name: "aws-sts-credentials", MountPath: "/old-path"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		applySTSCredentials(conflictDep, qctx)
+
+		for _, v := range conflictDep.Spec.Template.Spec.Volumes {
+			if v.Name == "aws-sts-credentials" {
+				assert.Equal(t, "test-aws-sts-credentials", v.Secret.SecretName,
+					"stale Secret name should be replaced")
+			}
+		}
+
+		for _, m := range conflictDep.Spec.Template.Spec.Containers[0].VolumeMounts {
+			if m.Name == "aws-sts-credentials" {
+				assert.Equal(t, "/aws-sts", m.MountPath,
+					"stale mount path should be replaced")
+			}
+		}
+
+		assert.Equal(t, 2, len(conflictDep.Spec.Template.Spec.Volumes),
+			"should have exactly 2 volumes (replaced + new)")
+	})
 }
