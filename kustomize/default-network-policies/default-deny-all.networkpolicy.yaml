@@ -3,7 +3,7 @@ kind: NetworkPolicy
 metadata:
   name: default-deny-all
   labels:
-    quay-oerator/quayregistry: ""
+    quay-operator/quayregistry: ""
   annotations:
     quay-operator/quayregistry: ""
     quay-operator/network-policy: "restrictive"
