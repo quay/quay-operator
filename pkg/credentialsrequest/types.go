@@ -56,8 +56,17 @@ func NewCredentialsRequest(
 ) (*unstructured.Unstructured, error) {
 	providerSpec, err := NewAWSProviderSpec(roleARN, []StatementEntry{
 		{
-			Effect:   "Allow",
-			Action:   []string{"s3:*"},
+			Effect: "Allow",
+			Action: []string{
+				"s3:GetObject",
+				"s3:PutObject",
+				"s3:DeleteObject",
+				"s3:ListBucket",
+				"s3:GetBucketLocation",
+				"s3:ListBucketMultipartUploads",
+				"s3:AbortMultipartUpload",
+				"s3:ListMultipartUploadParts",
+			},
 			Resource: "arn:aws:s3:*:*:*",
 		},
 	})

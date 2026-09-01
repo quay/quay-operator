@@ -1148,18 +1148,21 @@ func TestCheckSTSCapability(t *testing.T) {
 		{
 			name:             "ROLEARN not set",
 			rolearn:          "",
+			supportsCredReq:  true,
 			expectSTSEnabled: false,
 		},
 		{
 			name:                 "ROLEARN set, objectstorage managed",
 			rolearn:              "arn:aws:iam::123:role/test",
+			supportsCredReq:      true,
 			objectStorageManaged: true,
 			usercfg:              map[string]interface{}{},
 			expectSTSEnabled:     false,
 		},
 		{
-			name:    "ROLEARN set, static keys present",
-			rolearn: "arn:aws:iam::123:role/test",
+			name:            "ROLEARN set, static keys present",
+			rolearn:         "arn:aws:iam::123:role/test",
+			supportsCredReq: true,
 			usercfg: map[string]interface{}{
 				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
 					"default": []interface{}{
@@ -1185,6 +1188,7 @@ func TestCheckSTSCapability(t *testing.T) {
 		{
 			name:             "ROLEARN set, all good",
 			rolearn:          "arn:aws:iam::123:role/test",
+			supportsCredReq:  true,
 			usercfg:          map[string]interface{}{},
 			expectSTSEnabled: true,
 		},
@@ -1197,11 +1201,7 @@ func TestCheckSTSCapability(t *testing.T) {
 			}
 
 			r := newReconciler()
-			if tt.supportsCredReq || tt.name == "ROLEARN set, all good" || tt.name == "ROLEARN set, objectstorage managed" || tt.name == "ROLEARN set, static keys present" {
-				r.supportsCredentialsRequest = true
-			} else {
-				r.supportsCredentialsRequest = false
-			}
+			r.supportsCredentialsRequest = tt.supportsCredReq
 
 			qctx := quaycontext.NewQuayRegistryContext()
 			quay := &v1.QuayRegistry{

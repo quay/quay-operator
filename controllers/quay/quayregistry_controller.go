@@ -1007,12 +1007,16 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if err := r.checkSTSCapability(ctx, quayContext, updatedQuay, usercfg); err != nil {
+		reason := v1.ConditionReasonConfigInvalid
+		if goerrors.Is(err, errSTSConflictingCredentials) {
+			reason = v1.ConditionReasonConflictingCredentials
+		}
 		return r.reconcileWithCondition(
 			ctx,
 			&quay,
 			v1.ConditionTypeRolloutBlocked,
 			metav1.ConditionTrue,
-			v1.ConditionReasonConflictingCredentials,
+			reason,
 			err.Error(),
 		)
 	}
