@@ -17,6 +17,7 @@ package controllers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	goerrors "errors"
 	"fmt"
 	"maps"
@@ -55,6 +56,7 @@ import (
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
+	"github.com/quay/quay-operator/pkg/credentialsrequest"
 	"github.com/quay/quay-operator/pkg/kustomize"
 )
 
@@ -84,10 +86,11 @@ type QuayRegistryReconciler struct {
 	Requeue              ctrl.Result
 	SkipResourceRequests bool
 
-	// Cached route discovery results (write-once, read-many)
-	supportsRoutes      bool
-	clusterHostname     atomic.Pointer[string]
-	clusterWildcardCert atomic.Pointer[[]byte]
+	// Cached API discovery results (write-once, read-many)
+	supportsRoutes             bool
+	supportsCredentialsRequest bool
+	clusterHostname            atomic.Pointer[string]
+	clusterWildcardCert        atomic.Pointer[[]byte]
 }
 
 // manageQuayDeletion makes sure that we process a QuayRegistry once it is flagged for
@@ -506,6 +509,127 @@ func (r *QuayRegistryReconciler) cleanupProgrammaticBootstrapTokenResources(
 	return nil
 }
 
+const (
+	stsCredentialRequestSuffix = "aws-credentials"
+	stsCredentialSecretSuffix  = "aws-sts-credentials"
+	stsCloudTokenPath          = "/var/run/secrets/openshift/serviceaccount/token"
+	stsProvisionTimeout        = 5 * time.Minute
+)
+
+// ensureCredentialsRequest creates or updates the CredentialsRequest for STS
+// authentication and checks whether CCO has provisioned the resulting Secret.
+func (r *QuayRegistryReconciler) ensureCredentialsRequest(
+	ctx context.Context,
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+) (ctrl.Result, error) {
+	if !qctx.StorageSTSEnabled {
+		return ctrl.Result{}, nil
+	}
+
+	crName := fmt.Sprintf("%s-%s", quay.GetName(), stsCredentialRequestSuffix)
+	secretName := fmt.Sprintf("%s-%s", quay.GetName(), stsCredentialSecretSuffix)
+	saName := fmt.Sprintf("%s-quay-app", quay.GetName())
+
+	desired, err := credentialsrequest.NewCredentialsRequest(
+		crName, quay.GetNamespace(),
+		secretName, quay.GetNamespace(),
+		qctx.STSRoleARN, stsCloudTokenPath,
+		[]string{saName},
+	)
+	if err != nil {
+		return r.Requeue, fmt.Errorf("unable to build CredentialsRequest: %w", err)
+	}
+
+	desired.SetOwnerReferences([]metav1.OwnerReference{
+		{
+			APIVersion: v1.GroupVersion.String(),
+			Kind:       "QuayRegistry",
+			Name:       quay.GetName(),
+			UID:        quay.GetUID(),
+		},
+	})
+
+	var existing unstructured.Unstructured
+	existing.SetGroupVersionKind(credentialsrequest.CredentialsRequestGVK)
+	err = r.Get(ctx, types.NamespacedName{Name: crName, Namespace: quay.GetNamespace()}, &existing)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return r.Requeue, fmt.Errorf("unable to get CredentialsRequest: %w", err)
+		}
+
+		r.Log.Info("creating CredentialsRequest for STS", "name", crName)
+		if err := r.Create(ctx, desired); err != nil {
+			return r.Requeue, fmt.Errorf("unable to create CredentialsRequest: %w", err)
+		}
+
+		qctx.STSCredentialProvisioned = false
+		return r.Requeue, nil
+	}
+
+	// Update the CredentialsRequest if the spec has changed (e.g., role ARN changed).
+	existingSpec, _, _ := unstructured.NestedMap(existing.Object, "spec")
+	desiredSpec, _, _ := unstructured.NestedMap(desired.Object, "spec")
+	if existingSpec != nil && desiredSpec != nil {
+		existingJSON, _ := json.Marshal(existingSpec)
+		desiredJSON, _ := json.Marshal(desiredSpec)
+		if string(existingJSON) != string(desiredJSON) {
+			r.Log.Info("updating CredentialsRequest spec", "name", crName)
+			existing.Object["spec"] = desired.Object["spec"]
+			if err := r.Update(ctx, &existing); err != nil {
+				return r.Requeue, fmt.Errorf("unable to update CredentialsRequest: %w", err)
+			}
+			return r.Requeue, nil
+		}
+	}
+
+	// Check if CCO has provisioned the Secret.
+	var ccoSecret corev1.Secret
+	err = r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: quay.GetNamespace()}, &ccoSecret)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return r.Requeue, fmt.Errorf("unable to check CCO Secret: %w", err)
+		}
+
+		elapsed := time.Since(existing.GetCreationTimestamp().Time)
+		if elapsed > stsProvisionTimeout {
+			return r.reconcileWithCondition(
+				ctx, quay,
+				v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
+				v1.ConditionReasonCredentialRequestNotProvisioned,
+				"Cloud Credential Operator has not provisioned AWS credentials. "+
+					"Verify CCO is running and the cluster is OpenShift 4.14+. "+
+					"See operator logs for details.",
+			)
+		}
+
+		r.Log.Info("waiting for CCO to provision STS credentials", "elapsed", elapsed.Round(time.Second))
+		if err := r.updateWithCondition(
+			ctx, quay,
+			v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
+			v1.ConditionReasonCredentialRequestPending,
+			"Waiting for Cloud Credential Operator to provision AWS credentials for STS authentication",
+		); err != nil {
+			r.Log.Error(err, "failed to update conditions")
+		}
+		return r.Requeue, nil
+	}
+
+	if _, ok := ccoSecret.Data["credentials"]; !ok {
+		return r.reconcileWithCondition(
+			ctx, quay,
+			v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
+			v1.ConditionReasonCredentialRequestNotProvisioned,
+			"CCO Secret exists but does not contain a 'credentials' key",
+		)
+	}
+
+	qctx.STSCredentialSecretName = secretName
+	qctx.STSCredentialProvisioned = true
+	r.Log.Info("STS credentials provisioned by CCO", "secret", secretName)
+	return ctrl.Result{}, nil
+}
+
 // quayAppDeploymentRolledOut returns true when the quay-app Deployment has fully
 // rolled out — that is, every desired replica is both updated and available. It is
 // used to gate the deletion of old rendered config secrets so that no running pod
@@ -557,6 +681,7 @@ func (r *QuayRegistryReconciler) quayAppDeploymentRolledOut(
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get
+// +kubebuilder:rbac:groups=cloudcredential.openshift.io,resources=credentialsrequests,verbs=create;delete;get;list;patch;update;watch
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
@@ -879,6 +1004,34 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			v1.ConditionReasonConfigInvalid,
 			err.Error(),
 		)
+	}
+
+	if err := r.checkSTSCapability(ctx, quayContext, updatedQuay, usercfg); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConflictingCredentials,
+			err.Error(),
+		)
+	}
+
+	if quayContext.StorageSTSEnabled {
+		result, err := r.ensureCredentialsRequest(ctx, quayContext, updatedQuay)
+		if err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonCredentialRequestNotProvisioned,
+				fmt.Sprintf("STS credential request error: %s", err),
+			)
+		}
+		if !quayContext.STSCredentialProvisioned {
+			return result, nil
+		}
 	}
 
 	updatedQuay.Status.Conditions = v1.RemoveCondition(
@@ -1490,6 +1643,16 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.Log.Info("Route API detected at startup")
 	} else {
 		r.Log.Info("Route API not available, running in non-OpenShift mode")
+	}
+
+	_, err = mgr.GetRESTMapper().RESTMapping(
+		schema.GroupKind{Group: "cloudcredential.openshift.io", Kind: "CredentialsRequest"},
+	)
+	r.supportsCredentialsRequest = (err == nil)
+	if r.supportsCredentialsRequest {
+		r.Log.Info("CredentialsRequest API detected at startup")
+	} else {
+		r.Log.Info("CredentialsRequest API not available, STS support disabled")
 	}
 
 	genChanged := builder.WithPredicates(predicate.GenerationChangedPredicate{})

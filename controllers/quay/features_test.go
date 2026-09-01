@@ -1115,3 +1115,237 @@ func TestEnsurePostgresServiceCAAnnotation(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckSTSCapability(t *testing.T) {
+	logf.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = v1.AddToScheme(scheme)
+
+	newReconciler := func(objs ...client.Object) *QuayRegistryReconciler {
+		cb := fake.NewClientBuilder().WithScheme(scheme)
+		for _, obj := range objs {
+			cb = cb.WithObjects(obj)
+		}
+		return &QuayRegistryReconciler{
+			Client:                     cb.Build(),
+			Log:                        logf.Log.WithName("test"),
+			supportsCredentialsRequest: true,
+		}
+	}
+
+	for _, tt := range []struct {
+		name                 string
+		rolearn              string
+		supportsCredReq      bool
+		objectStorageManaged bool
+		usercfg              map[string]interface{}
+		expectSTSEnabled     bool
+		expectError          bool
+		expectErrorContains  string
+	}{
+		{
+			name:             "ROLEARN not set",
+			rolearn:          "",
+			expectSTSEnabled: false,
+		},
+		{
+			name:                 "ROLEARN set, objectstorage managed",
+			rolearn:              "arn:aws:iam::123:role/test",
+			objectStorageManaged: true,
+			usercfg:              map[string]interface{}{},
+			expectSTSEnabled:     false,
+		},
+		{
+			name:    "ROLEARN set, static keys present",
+			rolearn: "arn:aws:iam::123:role/test",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"S3Storage",
+						map[string]interface{}{
+							"s3_access_key": "AKIA...",
+							"s3_secret_key": "secret",
+						},
+					},
+				},
+			},
+			expectError:         true,
+			expectErrorContains: "static AWS credentials",
+		},
+		{
+			name:                "ROLEARN set, CRD not available",
+			rolearn:             "arn:aws:iam::123:role/test",
+			supportsCredReq:     false,
+			usercfg:             map[string]interface{}{},
+			expectError:         true,
+			expectErrorContains: "CredentialsRequest CRD is not available",
+		},
+		{
+			name:             "ROLEARN set, all good",
+			rolearn:          "arn:aws:iam::123:role/test",
+			usercfg:          map[string]interface{}{},
+			expectSTSEnabled: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.rolearn != "" {
+				t.Setenv("ROLEARN", tt.rolearn)
+			} else {
+				t.Setenv("ROLEARN", "")
+			}
+
+			r := newReconciler()
+			if tt.supportsCredReq || tt.name == "ROLEARN set, all good" || tt.name == "ROLEARN set, objectstorage managed" || tt.name == "ROLEARN set, static keys present" {
+				r.supportsCredentialsRequest = true
+			} else {
+				r.supportsCredentialsRequest = false
+			}
+
+			qctx := quaycontext.NewQuayRegistryContext()
+			quay := &v1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "test-ns",
+				},
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentObjectStorage, Managed: tt.objectStorageManaged},
+					},
+				},
+			}
+
+			usercfg := tt.usercfg
+			if usercfg == nil {
+				usercfg = map[string]interface{}{}
+			}
+
+			err := r.checkSTSCapability(context.Background(), qctx, quay, usercfg)
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				if tt.expectErrorContains != "" && !strings.Contains(err.Error(), tt.expectErrorContains) {
+					t.Errorf("error %q does not contain %q", err.Error(), tt.expectErrorContains)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if qctx.StorageSTSEnabled != tt.expectSTSEnabled {
+				t.Errorf("StorageSTSEnabled = %v, want %v", qctx.StorageSTSEnabled, tt.expectSTSEnabled)
+			}
+		})
+	}
+}
+
+func TestHasStaticAWSStorageKeys(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		usercfg  map[string]interface{}
+		expected bool
+	}{
+		{
+			name:     "empty config",
+			usercfg:  map[string]interface{}{},
+			expected: false,
+		},
+		{
+			name: "no DISTRIBUTED_STORAGE_CONFIG",
+			usercfg: map[string]interface{}{
+				"SERVER_HOSTNAME": "registry.example.com",
+			},
+			expected: false,
+		},
+		{
+			name: "S3Storage with static keys",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"S3Storage",
+						map[string]interface{}{
+							"s3_access_key": "AKIAIOSFODNN7EXAMPLE",
+							"s3_secret_key": "wJalrXUtnFEMI",
+							"s3_bucket":     "my-bucket",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "RadosGWStorage with static keys",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"RadosGWStorage",
+						map[string]interface{}{
+							"access_key":  "myaccesskey",
+							"secret_key":  "mysecretkey",
+							"bucket_name": "my-bucket",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "S3Storage with empty keys",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"S3Storage",
+						map[string]interface{}{
+							"s3_access_key": "",
+							"s3_secret_key": "",
+							"s3_bucket":     "my-bucket",
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "STSS3Storage without static keys",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"STSS3Storage",
+						map[string]interface{}{
+							"s3_bucket":    "my-bucket",
+							"sts_role_arn": "arn:aws:iam::123456789:role/quay",
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "S3Storage without credential keys at all",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"S3Storage",
+						map[string]interface{}{
+							"s3_bucket": "my-bucket",
+							"host":      "s3.amazonaws.com",
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasStaticAWSStorageKeys(tt.usercfg)
+			if result != tt.expected {
+				t.Errorf("hasStaticAWSStorageKeys() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}

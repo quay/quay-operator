@@ -1291,3 +1291,88 @@ func TestProcessPostgresDeploymentCAHashAnnotation(t *testing.T) {
 		}
 	})
 }
+
+func TestApplySTSCredentials(t *testing.T) {
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app"},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "quay-app"},
+					},
+				},
+			},
+		},
+	}
+
+	qctx := &quaycontext.QuayRegistryContext{
+		StorageSTSEnabled:        true,
+		STSCredentialProvisioned: true,
+		STSCredentialSecretName:  "test-aws-sts-credentials",
+	}
+
+	applySTSCredentials(dep, qctx)
+
+	t.Run("adds CCO Secret volume", func(t *testing.T) {
+		found := false
+		for _, v := range dep.Spec.Template.Spec.Volumes {
+			if v.Name == "aws-sts-credentials" {
+				found = true
+				assert.Equal(t, "test-aws-sts-credentials", v.Secret.SecretName)
+			}
+		}
+		assert.True(t, found, "aws-sts-credentials volume not found")
+	})
+
+	t.Run("adds bound-sa-token volume", func(t *testing.T) {
+		found := false
+		for _, v := range dep.Spec.Template.Spec.Volumes {
+			if v.Name == "bound-sa-token" {
+				found = true
+				assert.NotNil(t, v.Projected)
+				assert.Equal(t, "token", v.Projected.Sources[0].ServiceAccountToken.Path)
+				assert.Equal(t, "openshift", v.Projected.Sources[0].ServiceAccountToken.Audience)
+			}
+		}
+		assert.True(t, found, "bound-sa-token volume not found")
+	})
+
+	t.Run("adds volume mounts to container", func(t *testing.T) {
+		container := dep.Spec.Template.Spec.Containers[0]
+		credMountFound := false
+		tokenMountFound := false
+		for _, m := range container.VolumeMounts {
+			if m.Name == "aws-sts-credentials" && m.MountPath == "/aws-sts" {
+				credMountFound = true
+			}
+			if m.Name == "bound-sa-token" && m.MountPath == "/var/run/secrets/openshift/serviceaccount" {
+				tokenMountFound = true
+			}
+		}
+		assert.True(t, credMountFound, "aws-sts-credentials mount not found")
+		assert.True(t, tokenMountFound, "bound-sa-token mount not found")
+	})
+
+	t.Run("sets AWS_SHARED_CREDENTIALS_FILE env var", func(t *testing.T) {
+		container := dep.Spec.Template.Spec.Containers[0]
+		found := false
+		for _, e := range container.Env {
+			if e.Name == "AWS_SHARED_CREDENTIALS_FILE" {
+				found = true
+				assert.Equal(t, "/aws-sts/credentials", e.Value)
+			}
+		}
+		assert.True(t, found, "AWS_SHARED_CREDENTIALS_FILE env not found")
+	})
+
+	t.Run("idempotent on second call", func(t *testing.T) {
+		volCountBefore := len(dep.Spec.Template.Spec.Volumes)
+		mountCountBefore := len(dep.Spec.Template.Spec.Containers[0].VolumeMounts)
+
+		applySTSCredentials(dep, qctx)
+
+		assert.Equal(t, volCountBefore, len(dep.Spec.Template.Spec.Volumes))
+		assert.Equal(t, mountCountBefore, len(dep.Spec.Template.Spec.Containers[0].VolumeMounts))
+	})
+}
