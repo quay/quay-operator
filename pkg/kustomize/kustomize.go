@@ -865,7 +865,7 @@ func KustomizationFor(
 		},
 		Namespace:       quay.GetNamespace(),
 		NamePrefix:      quay.GetName() + "-",
-		Resources:       []string{"../base"},
+		Resources:       []string{"../base", "../default-network-policies"},
 		Images:          images,
 		Components:      componentPaths,
 		SecretGenerator: generatedSecrets,

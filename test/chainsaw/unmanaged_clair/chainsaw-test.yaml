@@ -111,6 +111,20 @@ spec:
           fi
           echo "PASS: No operator managed network policy for clair-postgres component found"
 
+          # Explicitly verify that even though we marked a component as unmanaged, default network
+          # policies are still in place
+          if ! kubectl get networkpolicy unmanaged-clair-default-allow-dns-egress -n $NAMESPACE >/dev/null 2>&1; then
+            echo "Error: default-allow-dns-egress network policy not found, expected to be present"
+            exit 1
+          fi
+          echo "PASS: default-allow-dns-egress network policy present"
+
+          if ! kubectl get networkpolicy unmanaged-clair-default-deny-all -n $NAMESPACE  >/dev/null 2>&1; then
+            echo "Error: default-deny-all network policy not found, expected to be present"
+            exit 1
+          fi
+          echo "PASS: default-deny-all network policy present"
+
           # Verify quay-app pods are running (poll for readiness)
           echo "Waiting for quay-app to have ready replicas..."
           for i in $(seq 1 60); do

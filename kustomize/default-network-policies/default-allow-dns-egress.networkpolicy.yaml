@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-allow-dns-egress
+  labels:
+    quay-oerator/quayregistry: ""
+  annotations:
+    quay-operator/quayregistry: ""
+    quay-operator/network-policy: restrictive
+    quay-operator/network-policy-reason: "Allow DNS egress traffic so that DNS resolution works properly for all pods"
+spec:
+  podSelector:
+    matchLabels:
+      quay-operator/quayregistry: ""
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
