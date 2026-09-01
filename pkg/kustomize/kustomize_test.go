@@ -454,6 +454,26 @@ var quayComponents = map[string][]client.Object{
 			obj.SetName("quay-app-allow-all")
 			return obj
 		}(),
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("default-deny-all")
+			return obj
+		}(),
+		func() *unstructured.Unstructured {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "networking.k8s.io",
+				Version: "v1",
+				Kind:    "NetworkPolicy",
+			})
+			obj.SetName("default-allow-dns-egress")
+			return obj
+		}(),
 	},
 	"clair": {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "clair-config-secret"}},

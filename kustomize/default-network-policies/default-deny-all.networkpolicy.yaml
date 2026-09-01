@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  labels:
+    quay-oerator/quayregistry: ""
+  annotations:
+    quay-operator/quayregistry: ""
+    quay-operator/network-policy: "restrictive"
+    quay-operator/network-policy-reason: "Default deny all: denies all ingress and egress traffic to all pods created by the operator"
+spec:
+  podSelector:
+    matchLabels:
+      quay-operator/quayregistry: ""
+  policyTypes:
+  - Ingress
+  - Egress

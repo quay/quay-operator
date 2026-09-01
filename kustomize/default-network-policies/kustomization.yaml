@@ -1,0 +1,7 @@
+# Default network policies to be applied to all pods that are 
+# deployed by the Quay operator
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ./default-deny-all.networkpolicy.yaml
+  - ./default-allow-dns-egress.networkpolicy.yaml
