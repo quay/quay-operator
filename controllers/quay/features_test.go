@@ -1279,7 +1279,7 @@ func TestHasStaticAWSStorageKeys(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "RadosGWStorage with static keys",
+			name: "RadosGWStorage with keys is not flagged",
 			usercfg: map[string]interface{}{
 				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
 					"default": []interface{}{
@@ -1292,7 +1292,23 @@ func TestHasStaticAWSStorageKeys(t *testing.T) {
 					},
 				},
 			},
-			expected: true,
+			expected: false,
+		},
+		{
+			name: "RHOCSStorage with keys is not flagged",
+			usercfg: map[string]interface{}{
+				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+					"default": []interface{}{
+						"RHOCSStorage",
+						map[string]interface{}{
+							"access_key":  "myaccesskey",
+							"secret_key":  "mysecretkey",
+							"bucket_name": "my-bucket",
+						},
+					},
+				},
+			},
+			expected: false,
 		},
 		{
 			name: "S3Storage with empty keys",
