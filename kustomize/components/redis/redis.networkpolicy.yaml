@@ -5,6 +5,7 @@ metadata:
   labels:
     quay-component: redis
   annotations:
+    quay-component: redis
     quay-operator/network-policy: restrictive
     quay-operator/network-policy-reason: "Allow access to Redis only from Quay pods"
 spec:

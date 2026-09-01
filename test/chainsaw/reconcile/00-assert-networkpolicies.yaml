@@ -6,7 +6,7 @@ metadata:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: reconcile-clair-allow-egress-with-limited-igress
+  name: reconcile-clair-allow-egress-with-limited-ingress
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
