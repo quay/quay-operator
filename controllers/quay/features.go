@@ -989,9 +989,9 @@ func hasStaticAWSStorageKeys(usercfg map[string]interface{}) bool {
 		return false
 	}
 
-	staticKeyFields := []string{
-		"s3_access_key", "s3_secret_key",
-		"access_key", "secret_key",
+	s3KeyFields := map[string][]string{
+		"S3Storage":    {"s3_access_key", "s3_secret_key"},
+		"STSS3Storage": {"sts_user_access_key", "sts_user_secret_key"},
 	}
 
 	for _, entry := range storageMap {
@@ -1000,12 +1000,22 @@ func hasStaticAWSStorageKeys(usercfg map[string]interface{}) bool {
 			continue
 		}
 
+		storageType, ok := entryList[0].(string)
+		if !ok {
+			continue
+		}
+
+		keyFields, isS3 := s3KeyFields[storageType]
+		if !isS3 {
+			continue
+		}
+
 		args, ok := entryList[1].(map[string]interface{})
 		if !ok {
 			continue
 		}
 
-		for _, key := range staticKeyFields {
+		for _, key := range keyFields {
 			if val, exists := args[key]; exists {
 				if str, ok := val.(string); ok && str != "" {
 					return true
