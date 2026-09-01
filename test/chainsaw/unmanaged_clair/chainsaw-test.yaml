@@ -93,6 +93,24 @@ spec:
           fi
           echo "PASS: No operator-managed clair-postgres deployment found"
 
+          # Verify no clair network policy is applied to the namespace
+          if kubectl get networkpolicy -n $NAMESPACE -l quay-component=clair-app \
+            -o name 2>/dev/null | grep -q .; then
+            echo "Error: Found operator managed clair-app network policy, expected none"
+            kubectl get networkpolicy -n $NAMESPACE -l quay-component=clair-app
+            exit 1
+          fi
+          echo "PASS: No operator managed network policy for clair-app component found"
+
+          # Verify no clair-postgres network policy is applied to the namespace
+          if kubectl get networkpolicy -n $NAMESPACE -l quay-component=clair-postgres \
+            -o name 2>/dev/null | grep -q .; then
+            echo "Error: Found operator managed clair-postgres network policy, expected none"
+            kubectl get networkpolicy -n $NAMESPACE -l quay-component=clair-postgres
+            exit 1
+          fi
+          echo "PASS: No operator managed network policy for clair-postgres component found"
+
           # Verify quay-app pods are running (poll for readiness)
           echo "Waiting for quay-app to have ready replicas..."
           for i in $(seq 1 60); do

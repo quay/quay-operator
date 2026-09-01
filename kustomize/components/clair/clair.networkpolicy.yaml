@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: clair-allow-egress-with-limited-igress
+  name: clair-allow-egress-with-limited-ingress
   labels:
     quay-component: clair-app
   annotations:

@@ -5,7 +5,7 @@ metadata:
   labels:
     quay-component: quay-app-upgrade
   annotations:
-    quay-component: base
+    quay-component: quay-app-upgrade
     quay-operator/network-policy: open-egress
     quay-operator/network-policy-reason: "Upgrade job requires unlimited egress because of potential unmanaged components."
 spec:

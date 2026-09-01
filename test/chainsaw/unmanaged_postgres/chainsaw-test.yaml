@@ -121,6 +121,15 @@ spec:
           fi
           echo "PASS: No operator-managed postgres deployment found"
 
+          # Verify no postgres network policy is applied to the namespace
+          if kubectl get networkpolicy -n $NAMESPACE -l quay-component=postgres \
+            -o name 2>/dev/null | grep -q .; then
+            echo "Error: Found operator managed postgres network policy, expected none"
+            kubectl get networkpolicy -n $NAMESPACE -l quay-component=postgres
+            exit 1
+          fi
+          echo "PASS: No operator managed network policy for postgres component found"
+
           # Verify quay-app pods are running
           echo "Waiting for quay-app to have ready replicas..."
           for i in $(seq 1 60); do

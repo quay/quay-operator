@@ -121,6 +121,15 @@ spec:
           fi
           echo "PASS: No operator-managed redis deployment found"
 
+          # Verify no redis network policy is applied to the namespace
+          if kubectl get networkpolicy -n $NAMESPACE -l quay-component=redis \
+            -o name 2>/dev/null | grep -q .; then
+            echo "Error: Found operator managed redis network policy, expected none"
+            kubectl get networkpolicy -n $NAMESPACE -l quay-component=redis
+            exit 1
+          fi
+          echo "PASS: No operator managed network policy for redis component found"
+
           # Verify quay-app pods are running (poll for readiness)
           echo "Waiting for quay-app to have ready replicas..."
           for i in $(seq 1 60); do
