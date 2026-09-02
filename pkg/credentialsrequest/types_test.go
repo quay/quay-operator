@@ -11,7 +11,7 @@ func TestNewCredentialsRequest(t *testing.T) {
 		"test-aws-sts-credentials", "test-namespace",
 		"arn:aws:iam::123456789012:role/quay-role",
 		"/var/run/secrets/openshift/serviceaccount/token",
-		[]string{"test-quay-app"},
+		[]string{"test-quay-app"}, []string{"quay-bucket"},
 	)
 	if err != nil {
 		t.Fatalf("NewCredentialsRequest() error = %v", err)
@@ -88,11 +88,75 @@ func TestNewCredentialsRequest(t *testing.T) {
 		if ps.Kind != "AWSProviderSpec" {
 			t.Errorf("Kind = %q, want %q", ps.Kind, "AWSProviderSpec")
 		}
-		if len(ps.StatementEntries) == 0 {
-			t.Fatal("StatementEntries is empty")
+		if len(ps.StatementEntries) != 2 {
+			t.Fatalf("len(StatementEntries) = %d, want 2", len(ps.StatementEntries))
 		}
 		if ps.StatementEntries[0].Effect != "Allow" {
 			t.Errorf("Effect = %q, want %q", ps.StatementEntries[0].Effect, "Allow")
 		}
+		if ps.StatementEntries[0].Resource != "arn:aws:s3:::quay-bucket" {
+			t.Errorf("bucket Resource = %q", ps.StatementEntries[0].Resource)
+		}
+		if ps.StatementEntries[1].Resource != "arn:aws:s3:::quay-bucket/*" {
+			t.Errorf("object Resource = %q", ps.StatementEntries[1].Resource)
+		}
 	})
+}
+
+func TestNewCredentialsRequestRequiresBucket(t *testing.T) {
+	_, err := NewCredentialsRequest(
+		"test", "test-ns", "secret", "test-ns",
+		"arn:aws:iam::123456789012:role/quay-role",
+		"/var/run/secrets/openshift/serviceaccount/token",
+		[]string{"test-quay-app"}, nil,
+	)
+	if err == nil {
+		t.Fatal("expected an error when no S3 bucket is supplied")
+	}
+}
+
+func TestNewCredentialsRequestRejectsInvalidScope(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		roleARN string
+		bucket  string
+	}{
+		{name: "malformed role ARN", roleARN: "not-an-arn", bucket: "quay-bucket"},
+		{name: "non-IAM ARN", roleARN: "arn:aws:s3:::bucket", bucket: "quay-bucket"},
+		{name: "bucket wildcard", roleARN: "arn:aws:iam::123456789012:role/quay-role", bucket: "quay-*"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewCredentialsRequest(
+				"test", "test-ns", "secret", "test-ns",
+				tt.roleARN, "/var/run/token", []string{"test-quay-app"}, []string{tt.bucket},
+			)
+			if err == nil {
+				t.Fatal("expected invalid scope to be rejected")
+			}
+		})
+	}
+}
+
+func TestNewCredentialsRequestUsesRolePartition(t *testing.T) {
+	cr, err := NewCredentialsRequest(
+		"test", "test-ns", "secret", "test-ns",
+		"arn:aws-us-gov:iam::123456789012:role/quay-role",
+		"/var/run/secrets/openshift/serviceaccount/token",
+		[]string{"test-quay-app"}, []string{"quay-bucket"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := cr.Object["spec"].(map[string]interface{})
+	providerJSON, err := json.Marshal(spec["providerSpec"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var provider AWSProviderSpec
+	if err := json.Unmarshal(providerJSON, &provider); err != nil {
+		t.Fatal(err)
+	}
+	if got := provider.StatementEntries[0].Resource; got != "arn:aws-us-gov:s3:::quay-bucket" {
+		t.Fatalf("Resource = %q, want GovCloud partition", got)
+	}
 }
