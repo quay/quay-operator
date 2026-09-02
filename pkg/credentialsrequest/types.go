@@ -2,11 +2,16 @@ package credentialsrequest
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// These wire types intentionally mirror cloudcredential.openshift.io/v1 in
+// OpenShift 4.14+, without importing CCO's dependency-heavy internal API.
+// Source: github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1
 var CredentialsRequestGVK = schema.GroupVersionKind{
 	Group:   "cloudcredential.openshift.io",
 	Version: "v1",
@@ -52,24 +57,52 @@ func NewCredentialsRequest(
 	name, namespace string,
 	secretRefName, secretRefNamespace string,
 	roleARN, cloudTokenPath string,
-	serviceAccountNames []string,
+	serviceAccountNames, buckets []string,
 ) (*unstructured.Unstructured, error) {
-	providerSpec, err := NewAWSProviderSpec(roleARN, []StatementEntry{
-		{
-			Effect: "Allow",
-			Action: []string{
-				"s3:GetObject",
-				"s3:PutObject",
-				"s3:DeleteObject",
-				"s3:ListBucket",
-				"s3:GetBucketLocation",
-				"s3:ListBucketMultipartUploads",
-				"s3:AbortMultipartUpload",
-				"s3:ListMultipartUploadParts",
+	if len(buckets) == 0 {
+		return nil, fmt.Errorf("at least one S3 bucket is required")
+	}
+
+	partition, err := awsPartitionFromRoleARN(roleARN)
+	if err != nil {
+		return nil, err
+	}
+
+	statements := make([]StatementEntry, 0, len(buckets)*2)
+	for _, bucket := range buckets {
+		bucket = strings.TrimSpace(bucket)
+		if bucket == "" {
+			return nil, fmt.Errorf("S3 bucket must not be empty")
+		}
+		if strings.ContainsAny(bucket, "*?") {
+			return nil, fmt.Errorf("S3 bucket %q contains wildcard characters", bucket)
+		}
+		bucketARN := fmt.Sprintf("arn:%s:s3:::%s", partition, bucket)
+		statements = append(statements,
+			StatementEntry{
+				Effect: "Allow",
+				Action: []string{
+					"s3:ListBucket",
+					"s3:GetBucketLocation",
+					"s3:ListBucketMultipartUploads",
+				},
+				Resource: bucketARN,
 			},
-			Resource: "arn:aws:s3:*:*:*",
-		},
-	})
+			StatementEntry{
+				Effect: "Allow",
+				Action: []string{
+					"s3:GetObject",
+					"s3:PutObject",
+					"s3:DeleteObject",
+					"s3:AbortMultipartUpload",
+					"s3:ListMultipartUploadParts",
+				},
+				Resource: bucketARN + "/*",
+			},
+		)
+	}
+
+	providerSpec, err := NewAWSProviderSpec(roleARN, statements)
 	if err != nil {
 		return nil, err
 	}
@@ -107,4 +140,13 @@ func NewCredentialsRequest(
 	}
 
 	return cr, nil
+}
+
+func awsPartitionFromRoleARN(roleARN string) (string, error) {
+	parts := strings.SplitN(strings.TrimSpace(roleARN), ":", 6)
+	if len(parts) != 6 || parts[0] != "arn" || parts[1] == "" || parts[2] != "iam" ||
+		parts[3] != "" || parts[4] == "" || !strings.HasPrefix(parts[5], "role/") || len(parts[5]) == len("role/") {
+		return "", fmt.Errorf("ROLEARN must be a valid AWS IAM role ARN")
+	}
+	return parts[1], nil
 }

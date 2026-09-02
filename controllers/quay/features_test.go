@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/cert"
@@ -1122,123 +1125,106 @@ func TestCheckSTSCapability(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 	_ = v1.AddToScheme(scheme)
+	_ = configv1.Install(scheme)
 
-	newReconciler := func(objs ...client.Object) *QuayRegistryReconciler {
-		cb := fake.NewClientBuilder().WithScheme(scheme)
-		for _, obj := range objs {
-			cb = cb.WithObjects(obj)
+	s3Config := func(args map[string]interface{}) map[string]interface{} {
+		if args == nil {
+			args = map[string]interface{}{}
 		}
-		return &QuayRegistryReconciler{
-			Client:                     cb.Build(),
-			Log:                        logf.Log.WithName("test"),
-			supportsCredentialsRequest: true,
+		if _, ok := args["s3_bucket"]; !ok {
+			args["s3_bucket"] = "quay-bucket"
+		}
+		return map[string]interface{}{
+			"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+				"default": []interface{}{"S3Storage", args},
+			},
+		}
+	}
+	storageConfig := func(driver string, args map[string]interface{}) map[string]interface{} {
+		return map[string]interface{}{
+			"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+				"default": []interface{}{driver, args},
+			},
 		}
 	}
 
 	for _, tt := range []struct {
 		name                 string
-		rolearn              string
+		roleARN              string
 		supportsCredReq      bool
 		objectStorageManaged bool
+		platform             configv1.PlatformType
+		ccoMode              string
+		issuer               string
 		usercfg              map[string]interface{}
 		expectSTSEnabled     bool
-		expectError          bool
 		expectErrorContains  string
 	}{
-		{
-			name:             "ROLEARN not set",
-			rolearn:          "",
-			supportsCredReq:  true,
-			expectSTSEnabled: false,
-		},
-		{
-			name:                 "ROLEARN set, objectstorage managed",
-			rolearn:              "arn:aws:iam::123:role/test",
-			supportsCredReq:      true,
-			objectStorageManaged: true,
-			usercfg:              map[string]interface{}{},
-			expectSTSEnabled:     false,
-		},
-		{
-			name:            "ROLEARN set, static keys present",
-			rolearn:         "arn:aws:iam::123:role/test",
-			supportsCredReq: true,
-			usercfg: map[string]interface{}{
-				"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
-					"default": []interface{}{
-						"S3Storage",
-						map[string]interface{}{
-							"s3_access_key": "AKIA...",
-							"s3_secret_key": "secret",
-						},
-					},
-				},
-			},
-			expectError:         true,
-			expectErrorContains: "static AWS credentials",
-		},
-		{
-			name:                "ROLEARN set, CRD not available",
-			rolearn:             "arn:aws:iam::123:role/test",
-			supportsCredReq:     false,
-			usercfg:             map[string]interface{}{},
-			expectError:         true,
-			expectErrorContains: "CredentialsRequest CRD is not available",
-		},
-		{
-			name:             "ROLEARN set, all good",
-			rolearn:          "arn:aws:iam::123:role/test",
-			supportsCredReq:  true,
-			usercfg:          map[string]interface{}{},
-			expectSTSEnabled: true,
-		},
+		{name: "ROLEARN not set", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: s3Config(nil)},
+		{name: "managed objectstorage", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, objectStorageManaged: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: s3Config(nil)},
+		{name: "RadosGWStorage is ignored", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: storageConfig("RadosGWStorage", map[string]interface{}{"access_key": "ceph", "secret_key": "secret"})},
+		{name: "RHOCSStorage is ignored", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: storageConfig("RHOCSStorage", map[string]interface{}{"access_key": "ocs", "secret_key": "secret"})},
+		{name: "SwiftStorage is ignored", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: storageConfig("SwiftStorage", map[string]interface{}{"swift_user": "user", "swift_password": "secret"})},
+		{name: "legacy STSS3Storage is ignored", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: storageConfig("STSS3Storage", map[string]interface{}{"s3_bucket": "legacy"})},
+		{name: "missing storage config is ignored", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: map[string]interface{}{}},
+		{name: "static keys conflict", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: s3Config(map[string]interface{}{"s3_access_key": "AKIA...", "s3_secret_key": "secret"}), expectErrorContains: "static AWS credentials"},
+		{name: "CRD unavailable", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: false, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: s3Config(nil), expectErrorContains: "CredentialsRequest CRD is not available"},
+		{name: "non-AWS platform", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.GCPPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: s3Config(nil), expectErrorContains: "requires an AWS cluster"},
+		{name: "Mint mode", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Mint", issuer: "https://issuer.example.com", usercfg: s3Config(nil), expectErrorContains: "requires Manual mode"},
+		{name: "Passthrough mode", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Passthrough", issuer: "https://issuer.example.com", usercfg: s3Config(nil), expectErrorContains: "requires Manual mode"},
+		{name: "issuer missing", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", usercfg: s3Config(nil), expectErrorContains: "OIDC issuer"},
+		{name: "AWS timed-token cluster", roleARN: "arn:aws:iam::123:role/test", supportsCredReq: true, platform: configv1.AWSPlatformType, ccoMode: "Manual", issuer: "https://issuer.example.com", usercfg: s3Config(nil), expectSTSEnabled: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.rolearn != "" {
-				t.Setenv("ROLEARN", tt.rolearn)
-			} else {
-				t.Setenv("ROLEARN", "")
-			}
+			t.Setenv("ROLEARN", tt.roleARN)
 
-			r := newReconciler()
-			r.supportsCredentialsRequest = tt.supportsCredReq
+			infrastructure := &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{Type: tt.platform},
+				},
+			}
+			authentication := &configv1.Authentication{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
+				Spec:       configv1.AuthenticationSpec{ServiceAccountIssuer: tt.issuer},
+			}
+			cloudCredential := &unstructured.Unstructured{Object: map[string]interface{}{
+				"apiVersion": "operator.openshift.io/v1",
+				"kind":       "CloudCredential",
+				"metadata":   map[string]interface{}{"name": "cluster"},
+				"spec":       map[string]interface{}{"credentialsMode": tt.ccoMode},
+			}}
+			cli := fake.NewClientBuilder().WithScheme(scheme).
+				WithObjects(infrastructure, authentication, cloudCredential).Build()
+			r := &QuayRegistryReconciler{
+				Client:                     cli,
+				Log:                        logf.Log.WithName("test"),
+				supportsCredentialsRequest: tt.supportsCredReq,
+			}
 
 			qctx := quaycontext.NewQuayRegistryContext()
 			quay := &v1.QuayRegistry{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
-					Namespace: "test-ns",
-				},
-				Spec: v1.QuayRegistrySpec{
-					Components: []v1.Component{
-						{Kind: v1.ComponentObjectStorage, Managed: tt.objectStorageManaged},
-					},
-				},
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+				Spec: v1.QuayRegistrySpec{Components: []v1.Component{
+					{Kind: v1.ComponentObjectStorage, Managed: tt.objectStorageManaged},
+				}},
 			}
 
-			usercfg := tt.usercfg
-			if usercfg == nil {
-				usercfg = map[string]interface{}{}
-			}
-
-			err := r.checkSTSCapability(context.Background(), qctx, quay, usercfg)
-
-			if tt.expectError {
-				if err == nil {
-					t.Fatal("expected error but got nil")
-				}
-				if tt.expectErrorContains != "" && !strings.Contains(err.Error(), tt.expectErrorContains) {
-					t.Errorf("error %q does not contain %q", err.Error(), tt.expectErrorContains)
+			err := r.checkSTSCapability(context.Background(), qctx, quay, tt.usercfg)
+			if tt.expectErrorContains != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.expectErrorContains) {
+					t.Fatalf("error = %v, want error containing %q", err, tt.expectErrorContains)
 				}
 				return
 			}
-
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-
 			if qctx.StorageSTSEnabled != tt.expectSTSEnabled {
 				t.Errorf("StorageSTSEnabled = %v, want %v", qctx.StorageSTSEnabled, tt.expectSTSEnabled)
+			}
+			if tt.expectSTSEnabled && !reflect.DeepEqual(qctx.STSStorageBuckets, []string{"quay-bucket"}) {
+				t.Errorf("STSStorageBuckets = %v, want [quay-bucket]", qctx.STSStorageBuckets)
 			}
 		})
 	}
@@ -1269,8 +1255,8 @@ func TestHasStaticAWSStorageKeys(t *testing.T) {
 					"default": []interface{}{
 						"S3Storage",
 						map[string]interface{}{
-							"s3_access_key": "AKIAIOSFODNN7EXAMPLE",
-							"s3_secret_key": "wJalrXUtnFEMI",
+							"s3_access_key": "test-access-key",
+							"s3_secret_key": "test-secret-key",
 							"s3_bucket":     "my-bucket",
 						},
 					},
@@ -1363,5 +1349,28 @@ func TestHasStaticAWSStorageKeys(t *testing.T) {
 				t.Errorf("hasStaticAWSStorageKeys() = %v, want %v", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestS3StorageConfiguration(t *testing.T) {
+	config := map[string]interface{}{
+		"DISTRIBUTED_STORAGE_CONFIG": map[string]interface{}{
+			"secondary": []interface{}{"S3Storage", map[string]interface{}{"s3_bucket": "z-bucket"}},
+			"primary":   []interface{}{"S3Storage", map[string]interface{}{"s3_bucket": "a-bucket"}},
+			"duplicate": []interface{}{"S3Storage", map[string]interface{}{"s3_bucket": "a-bucket"}},
+			"rados":     []interface{}{"RadosGWStorage", map[string]interface{}{"access_key": "ceph", "secret_key": "secret"}},
+			"legacy":    []interface{}{"STSS3Storage", map[string]interface{}{"s3_bucket": "legacy", "sts_user_access_key": "old"}},
+		},
+	}
+
+	buckets, hasStatic, err := s3StorageConfiguration(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasStatic {
+		t.Fatal("non-S3Storage credentials must not be treated as a static AWS conflict")
+	}
+	if !reflect.DeepEqual(buckets, []string{"a-bucket", "z-bucket"}) {
+		t.Fatalf("buckets = %v, want sorted unique S3Storage buckets", buckets)
 	}
 }
