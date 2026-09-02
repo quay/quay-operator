@@ -20,6 +20,12 @@ The Quay Operator is capable of managing the lifecycle of many of Quay's depende
 
 ## Configuring Quay
 
+### AWS STS for unmanaged S3
+
+On AWS STS-enabled OpenShift clusters, Quay can authenticate to unmanaged S3 storage with short-lived credentials brokered by the Cloud Credential Operator. The storage configuration must use `S3Storage` without static access keys, and the Operator Subscription must provide `ROLEARN`.
+
+See [AWS STS authentication for unmanaged S3 storage](sts-iam-setup.md) for IAM permissions, trust-policy creation, installation, troubleshooting, and standalone RHEL instructions.
+
 ### Zero-Config, Batteries-Included
 
 If you opt to have all components of Quay fully managed by the Operator and desire no additional configuration changes, you can omit the `spec.configBundleSecret` field of the `QuayRegistry` (in fact, all fields of the `spec` are optional). The Operator will generate a `Secret` for you containing a bundle of `config.yaml` (with all component fields) and TLS key/cert pair (self-signed). The `spec.configBundleSecret` field will then be auto-populated by the Operator during reconciliation.
