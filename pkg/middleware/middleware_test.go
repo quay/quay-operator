@@ -1292,6 +1292,61 @@ func TestProcessPostgresDeploymentCAHashAnnotation(t *testing.T) {
 	})
 }
 
+func TestProcessSTSCredentialsTargetsOnlyQuayWorkloads(t *testing.T) {
+	quay := &v1.QuayRegistry{Spec: v1.QuayRegistrySpec{Components: []v1.Component{
+		{Kind: v1.ComponentQuay, Managed: true},
+		{Kind: v1.ComponentMirror, Managed: true},
+		{Kind: v1.ComponentClair, Managed: true},
+	}}}
+	qctx := &quaycontext.QuayRegistryContext{
+		StorageSTSEnabled:        true,
+		STSCredentialProvisioned: true,
+		STSCredentialSecretName:  "test-aws-sts-credentials",
+	}
+
+	for _, tt := range []struct {
+		name      string
+		component string
+		wantSTS   bool
+		withInit  bool
+	}{
+		{name: "test-quay-app", component: "quay", wantSTS: true},
+		{name: "test-quay-mirror", component: "mirror", wantSTS: true, withInit: true},
+		{name: "test-clair-app", component: "clair"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: tt.name, Labels: map[string]string{"quay-component": tt.component},
+					Annotations: map[string]string{"quay-component": tt.component},
+				},
+				Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+					Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: tt.name}}},
+				}},
+			}
+			if tt.withInit {
+				dep.Spec.Template.Spec.InitContainers = []corev1.Container{{Name: "init"}}
+			}
+
+			processed, err := Process(quay, qctx, dep, false)
+			assert.NoError(t, err)
+			result := processed.(*appsv1.Deployment)
+			found := false
+			for _, env := range result.Spec.Template.Spec.Containers[0].Env {
+				if env.Name == "AWS_SHARED_CREDENTIALS_FILE" {
+					found = true
+				}
+			}
+			assert.Equal(t, tt.wantSTS, found)
+			if tt.withInit {
+				assert.Empty(t, result.Spec.Template.Spec.InitContainers[0].Env)
+				assert.Empty(t, result.Spec.Template.Spec.InitContainers[0].VolumeMounts)
+			}
+		})
+	}
+}
+
 func TestApplySTSCredentials(t *testing.T) {
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app"},

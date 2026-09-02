@@ -175,6 +175,14 @@ spec:
                 - config.openshift.io
               resources:
                 - apiservers
+                - authentications
+                - infrastructures
+              verbs:
+                - get
+            - apiGroups:
+                - operator.openshift.io
+              resources:
+                - cloudcredentials
               verbs:
                 - get
             - apiGroups:
