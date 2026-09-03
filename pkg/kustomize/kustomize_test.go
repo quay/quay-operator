@@ -492,7 +492,7 @@ var quayComponents = map[string][]client.Object{
 				Version: "v1",
 				Kind:    "NetworkPolicy",
 			})
-			obj.SetName("clair-allow-egress-with-limited-igress")
+			obj.SetName("clair-allow-egress-with-limited-ingress")
 			return obj
 		}(),
 	},
