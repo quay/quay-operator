@@ -996,7 +996,7 @@ func (r *QuayRegistryReconciler) checkAWSTimedTokenCluster(ctx context.Context) 
 		return fmt.Errorf("unable to determine infrastructure platform for STS: %w", err)
 	}
 
-	platform := infrastructure.Status.Platform
+	var platform configv1.PlatformType
 	if infrastructure.Status.PlatformStatus != nil {
 		platform = infrastructure.Status.PlatformStatus.Type
 	}

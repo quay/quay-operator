@@ -1134,7 +1134,8 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				fmt.Sprintf("unable to inspect flattened config for STS: %s", err),
 			)
 		}
-		if err := yaml.Unmarshal(stsBundle.Data["config.yaml"], &stsUserConfig); err != nil {
+		var flattenedCfg map[string]interface{}
+		if err := yaml.Unmarshal(stsBundle.Data["config.yaml"], &flattenedCfg); err != nil {
 			return r.reconcileWithCondition(
 				ctx,
 				&quay,
@@ -1144,9 +1145,10 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				fmt.Sprintf("unable to parse flattened config for STS: %s", err),
 			)
 		}
-		if stsUserConfig == nil {
-			stsUserConfig = make(map[string]interface{})
+		if flattenedCfg == nil {
+			flattenedCfg = make(map[string]interface{})
 		}
+		stsUserConfig = flattenedCfg
 	}
 
 	stsErr := r.checkSTSCapability(ctx, quayContext, updatedQuay, stsUserConfig)
