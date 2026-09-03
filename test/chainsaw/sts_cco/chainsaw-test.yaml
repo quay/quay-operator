@@ -1,0 +1,321 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: sts-cco
+spec:
+  concurrent: false
+  steps:
+  - name: validate-cluster-and-create-config
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          for command in kubectl jq curl crane base64; do
+            command -v "${command}" >/dev/null || {
+              echo "ERROR: ${command} is required for the STS E2E test"
+              exit 1
+            }
+          done
+
+          [ "$(kubectl get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')" = "AWS" ] || {
+            echo "ERROR: the STS E2E test requires an AWS OpenShift cluster"
+            exit 1
+          }
+          [ "$(kubectl get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}')" = "Manual" ] || {
+            echo "ERROR: Cloud Credential Operator must use Manual credentials mode"
+            exit 1
+          }
+          kubectl get crd credentialsrequests.cloudcredential.openshift.io >/dev/null
+          [ -n "$(kubectl get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')" ] || {
+            echo "ERROR: the cluster service-account issuer is empty"
+            exit 1
+          }
+
+          CONFIG_FILE="/tmp/sts-cco-config-${NAMESPACE}"
+          trap 'rm -f "${CONFIG_FILE}"' EXIT
+          cat >"${CONFIG_FILE}" <<EOF
+          FEATURE_MAILING: false
+          FEATURE_USER_INITIALIZE: true
+          CREATE_NAMESPACE_ON_PUSH: true
+          FEATURE_REPO_MIRROR: true
+          REPO_MIRROR_INTERVAL: 30
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - S3Storage
+              - s3_bucket: ${STS_S3_BUCKET}
+                s3_region: ${STS_S3_REGION}
+                storage_path: /quay-operator-e2e/${NAMESPACE}
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          EOF
+
+          kubectl create secret generic sts-cco-config -n "${NAMESPACE}" \
+            --from-file=config.yaml="${CONFIG_FILE}"
+    - apply:
+        file: 01-create-registry.yaml
+
+  - name: verify-cco-provisioning
+    try:
+    - script:
+        shell: /bin/bash
+        timeout: 12m0s
+        content: |
+          set -euo pipefail
+
+          REQUEST=sts-cco-aws-credentials
+          SECRET=sts-cco-aws-sts-credentials
+
+          echo "Waiting for the CredentialsRequest to be provisioned..."
+          for attempt in $(seq 1 72); do
+            if kubectl get credentialsrequest "${REQUEST}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+              GENERATION=$(kubectl get credentialsrequest "${REQUEST}" -n "${NAMESPACE}" -o jsonpath='{.metadata.generation}')
+              SYNC_GENERATION=$(kubectl get credentialsrequest "${REQUEST}" -n "${NAMESPACE}" -o jsonpath='{.status.lastSyncGeneration}')
+              PROVISIONED=$(kubectl get credentialsrequest "${REQUEST}" -n "${NAMESPACE}" -o jsonpath='{.status.provisioned}')
+              if [ "${PROVISIONED}" = "true" ] && [ "${SYNC_GENERATION}" = "${GENERATION}" ] && \
+                kubectl get secret "${SECRET}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+                break
+              fi
+            fi
+            [ "${attempt}" -lt 72 ] || {
+              echo "ERROR: CCO did not provision the current CredentialsRequest generation"
+              exit 1
+            }
+            sleep 10
+          done
+
+          PARTITION=$(printf '%s' "${STS_ROLE_ARN}" | cut -d: -f2)
+          BUCKET_ARN="arn:${PARTITION}:s3:::${STS_S3_BUCKET}"
+          OBJECT_ARN="${BUCKET_ARN}/*"
+          QUAY_UID=$(kubectl get quayregistry sts-cco -n "${NAMESPACE}" -o jsonpath='{.metadata.uid}')
+
+          kubectl get credentialsrequest "${REQUEST}" -n "${NAMESPACE}" -o json | jq -e \
+            --arg namespace "${NAMESPACE}" --arg role "${STS_ROLE_ARN}" \
+            --arg bucket "${BUCKET_ARN}" --arg objects "${OBJECT_ARN}" --arg ownerUID "${QUAY_UID}" '
+              .spec.providerSpec.stsIAMRoleARN == $role and
+              .spec.cloudTokenPath == "/var/run/secrets/openshift/serviceaccount/token" and
+              .spec.secretRef == {"name":"sts-cco-aws-sts-credentials","namespace":$namespace} and
+              .spec.serviceAccountNames == ["sts-cco-quay-app"] and
+              any(.metadata.ownerReferences[]?;
+                .apiVersion == "quay.redhat.com/v1" and .kind == "QuayRegistry" and
+                .name == "sts-cco" and .uid == $ownerUID) and
+              any(.spec.providerSpec.statementEntries[]?;
+                .resource == $bucket and
+                (.action | sort) == (["s3:GetBucketLocation","s3:ListBucket","s3:ListBucketMultipartUploads"] | sort)) and
+              any(.spec.providerSpec.statementEntries[]?;
+                .resource == $objects and
+                (.action | sort) == (["s3:AbortMultipartUpload","s3:DeleteObject","s3:GetObject","s3:ListMultipartUploadParts","s3:PutObject"] | sort))
+            ' >/dev/null
+
+          CREDENTIALS=$(kubectl get secret "${SECRET}" -n "${NAMESPACE}" -o jsonpath='{.data.credentials}' | base64 -d)
+          FILE_ROLE=$(printf '%s\n' "${CREDENTIALS}" | awk -F= '
+            /^[[:space:]]*role_arn[[:space:]]*=/ {
+              value=$0; sub(/^[^=]*=[[:space:]]*/, "", value); print value
+            }')
+          TOKEN_PATH=$(printf '%s\n' "${CREDENTIALS}" | awk -F= '
+            /^[[:space:]]*web_identity_token_file[[:space:]]*=/ {
+              value=$0; sub(/^[^=]*=[[:space:]]*/, "", value); print value
+            }')
+          [ "${FILE_ROLE}" = "${STS_ROLE_ARN}" ] || {
+            echo "ERROR: CCO credentials role does not match STS_ROLE_ARN"
+            exit 1
+          }
+          [ "${TOKEN_PATH}" = "/var/run/secrets/openshift/serviceaccount/token" ] || {
+            echo "ERROR: CCO credentials reference the wrong token path"
+            exit 1
+          }
+          if printf '%s\n' "${CREDENTIALS}" | grep -Eq '^[[:space:]]*aws_(access_key_id|secret_access_key)[[:space:]]*='; then
+            echo "ERROR: CCO credentials contain static AWS access keys"
+            exit 1
+          fi
+
+  - name: verify-workloads
+    try:
+    - script:
+        shell: /bin/bash
+        timeout: 20m0s
+        content: |
+          set -euo pipefail
+
+          for deployment in sts-cco-quay-app sts-cco-quay-mirror; do
+            echo "Waiting for ${deployment} rollout..."
+            kubectl rollout status deployment/"${deployment}" -n "${NAMESPACE}" --timeout=15m
+
+            kubectl get deployment "${deployment}" -n "${NAMESPACE}" -o json | jq -e '
+              .spec.template.spec.serviceAccountName == "sts-cco-quay-app" and
+              any(.spec.template.spec.volumes[]?;
+                .name == "aws-sts-credentials" and
+                .secret.secretName == "sts-cco-aws-sts-credentials") and
+              any(.spec.template.spec.volumes[]?;
+                .name == "bound-sa-token" and
+                any(.projected.sources[]?;
+                  .serviceAccountToken.path == "token" and .serviceAccountToken.audience == "openshift")) and
+              all(.spec.template.spec.containers[];
+                any(.env[]?;
+                  .name == "AWS_SHARED_CREDENTIALS_FILE" and .value == "/aws-sts/credentials")) and
+              all(.spec.template.spec.containers[];
+                any(.volumeMounts[]?;
+                  .name == "aws-sts-credentials" and .mountPath == "/aws-sts" and .readOnly == true)) and
+              all(.spec.template.spec.containers[];
+                any(.volumeMounts[]?;
+                  .name == "bound-sa-token" and
+                  .mountPath == "/var/run/secrets/openshift/serviceaccount" and .readOnly == true))
+            ' >/dev/null
+          done
+
+          kubectl get deployments -n "${NAMESPACE}" \
+            -l quay-operator/quayregistry=sts-cco -o json | jq -e '
+              all(.items[] | select(
+                .metadata.name != "sts-cco-quay-app" and
+                .metadata.name != "sts-cco-quay-mirror");
+                all(.spec.template.spec.containers[]?;
+                  all(.env[]?; .name != "AWS_SHARED_CREDENTIALS_FILE")) and
+                all(.spec.template.spec.volumes[]?;
+                  .name != "aws-sts-credentials" and .name != "bound-sa-token"))
+            ' >/dev/null
+
+          CONFIG_SECRET=$(kubectl get deployment sts-cco-quay-app -n "${NAMESPACE}" -o json | jq -r '
+            .spec.template.spec.volumes[]
+            | select(.name == "config").projected.sources[]?.secret.name
+            | select(startswith("sts-cco-quay-config-secret"))
+          ' | head -1)
+          [ -n "${CONFIG_SECRET}" ] || {
+            echo "ERROR: could not find the rendered Quay config Secret"
+            exit 1
+          }
+          RENDERED_CONFIG=$(kubectl get secret "${CONFIG_SECRET}" -n "${NAMESPACE}" -o jsonpath='{.data.config\.yaml}' | base64 -d)
+          printf '%s\n' "${RENDERED_CONFIG}" | grep -q 'S3Storage'
+          printf '%s\n' "${RENDERED_CONFIG}" | grep -Fq "${STS_S3_BUCKET}"
+          if printf '%s\n' "${RENDERED_CONFIG}" | grep -Eq 's3_(access_key|secret_key):'; then
+            echo "ERROR: rendered Quay config contains static S3 credentials"
+            exit 1
+          fi
+
+  - name: verify-s3-push-pull-and-mirroring
+    try:
+    - script:
+        shell: /bin/bash
+        timeout: 20m0s
+        content: |
+          set -euo pipefail
+
+          ENDPOINT="https://$(kubectl get route sts-cco-quay -n "${NAMESPACE}" -o jsonpath='{.spec.host}')"
+          REGISTRY=${ENDPOINT#https://}
+          USERNAME=admin
+          PASSWORD=$(printf 'sts-e2e-%s-%s' "${NAMESPACE}" "$(date +%s)")
+          API_RESPONSE="/tmp/sts-cco-api-${NAMESPACE}.json"
+          PULLED_IMAGE="/tmp/sts-cco-image-${NAMESPACE}.tar"
+          DOCKER_CONFIG="/tmp/sts-cco-docker-${NAMESPACE}"
+          export DOCKER_CONFIG
+          mkdir -p "${DOCKER_CONFIG}"
+          trap 'rm -f "${API_RESPONSE}" "${PULLED_IMAGE}"; rm -rf "${DOCKER_CONFIG}"' EXIT
+
+          echo "Waiting for the Quay API..."
+          for attempt in $(seq 1 60); do
+            if curl -skf "${ENDPOINT}/api/v1/discovery" >/dev/null; then
+              break
+            fi
+            [ "${attempt}" -lt 60 ] || {
+              echo "ERROR: Quay API did not become available"
+              exit 1
+            }
+            sleep 5
+          done
+
+          HTTP_CODE=$(curl -sk -o "${API_RESPONSE}" -w '%{http_code}' \
+            -X POST "${ENDPOINT}/api/v1/user/initialize" \
+            -H 'Content-Type: application/json' \
+            -d "{\"username\":\"${USERNAME}\",\"password\":\"${PASSWORD}\",\"email\":\"admin@test.invalid\",\"access_token\":true}")
+          case "${HTTP_CODE}" in
+            200|201) ;;
+            *) echo "ERROR: user initialization returned HTTP ${HTTP_CODE}"; exit 1 ;;
+          esac
+          TOKEN=$(jq -r '.access_token // empty' "${API_RESPONSE}")
+          [ -n "${TOKEN}" ] || {
+            echo "ERROR: user initialization did not return an access token"
+            exit 1
+          }
+          rm -f "${API_RESPONSE}"
+
+          crane auth login --insecure "${REGISTRY}" -u "${USERNAME}" -p "${PASSWORD}"
+          SOURCE_IMAGE=quay.io/quay/busybox:latest
+          TARGET_IMAGE="${REGISTRY}/${USERNAME}/sts-e2e:latest"
+
+          echo "Copying an image into the STS-backed registry..."
+          crane copy --insecure --platform linux/amd64 "${SOURCE_IMAGE}" "${TARGET_IMAGE}"
+          PUSH_DIGEST=$(crane digest --insecure "${TARGET_IMAGE}")
+          crane pull --insecure "${TARGET_IMAGE}" "${PULLED_IMAGE}"
+          [ -s "${PULLED_IMAGE}" ] || {
+            echo "ERROR: pulled image archive is empty"
+            exit 1
+          }
+          [ "${PUSH_DIGEST}" = "$(crane digest --insecure "${TARGET_IMAGE}")" ] || {
+            echo "ERROR: pushed image digest changed after pull"
+            exit 1
+          }
+
+          api_request() {
+            local method=$1
+            local path=$2
+            local data=${3:-}
+            local code
+            if [ -n "${data}" ]; then
+              code=$(curl -sk -o "${API_RESPONSE}" -w '%{http_code}' \
+                -X "${method}" "${ENDPOINT}${path}" -H "Authorization: Bearer ${TOKEN}" \
+                -H 'Content-Type: application/json' -d "${data}")
+            else
+              code=$(curl -sk -o "${API_RESPONSE}" -w '%{http_code}' \
+                -X "${method}" "${ENDPOINT}${path}" -H "Authorization: Bearer ${TOKEN}")
+            fi
+            case "${code}" in
+              200|201|202|204) ;;
+              *) echo "ERROR: ${method} ${path} returned HTTP ${code}"; return 1 ;;
+            esac
+          }
+
+          echo "Configuring a repository mirror..."
+          api_request PUT /api/v1/user/robots/stsmirror '{}'
+          api_request POST /api/v1/repository \
+            '{"repository":"sts-mirror","namespace":"admin","visibility":"private","description":"STS E2E mirror"}'
+          START_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          MIRROR_CONFIG=$(jq -nc --arg start "${START_DATE}" '{
+            is_enabled: true,
+            external_reference: "quay.io/quay/busybox",
+            external_registry_username: null,
+            external_registry_password: null,
+            sync_interval: 86400,
+            skopeo_timeout_interval: 300,
+            sync_start_date: $start,
+            root_rule: {rule_kind: "tag_glob_csv", rule_value: ["latest"]},
+            robot_username: "admin+stsmirror",
+            external_registry_config: {verify_tls: true}
+          }')
+          api_request POST /api/v1/repository/admin/sts-mirror/mirror "${MIRROR_CONFIG}"
+          api_request POST /api/v1/repository/admin/sts-mirror/mirror/sync-now
+
+          echo "Waiting for the mirror worker to copy the image..."
+          for attempt in $(seq 1 90); do
+            api_request GET /api/v1/repository/admin/sts-mirror/mirror
+            MIRROR_STATUS=$(jq -r '.sync_status // empty' "${API_RESPONSE}")
+            if [ "${MIRROR_STATUS}" = "SUCCESS" ]; then
+              break
+            fi
+            [ "${attempt}" -lt 90 ] || {
+              echo "ERROR: repository mirror did not succeed; final status=${MIRROR_STATUS:-unknown}"
+              exit 1
+            }
+            sleep 10
+          done
+
+          rm -f "${PULLED_IMAGE}"
+          crane pull --insecure "${REGISTRY}/admin/sts-mirror:latest" "${PULLED_IMAGE}"
+          [ -s "${PULLED_IMAGE}" ] || {
+            echo "ERROR: mirrored image archive is empty"
+            exit 1
+          }
+          echo "PASS: CCO provisioning, STS-backed push/pull, and repository mirroring succeeded"

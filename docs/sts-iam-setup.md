@@ -138,7 +138,6 @@ DISTRIBUTED_STORAGE_CONFIG:
       port: 443
       s3_bucket: example-quay-bucket
       storage_path: /datastorage/registry
-      is_secure: true
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
   - default
 DISTRIBUTED_STORAGE_PREFERENCE:
