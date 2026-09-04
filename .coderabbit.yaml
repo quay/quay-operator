@@ -178,20 +178,41 @@ reviews:
         Unit and integration tests.
 
         Review checklist:
-        - Test framework: this project uses Ginkgo v2 with Gomega matchers
-          for controller tests, and standard testing package elsewhere. Verify
-          correct framework usage.
-        - envtest: controller tests use envtest (sigs.k8s.io/controller-runtime/pkg/envtest).
-          Verify proper test environment setup and teardown.
-        - Cleanup: resources created in tests must be cleaned up via defer or
-          AfterEach. Flag leaked resources.
-        - No time.Sleep: use gomega.Eventually/Consistently with timeout and
-          polling interval instead of time.Sleep for async assertions.
-        - Assertion messages: Gomega assertions should include meaningful
-          context via .WithOffset() or descriptive wrappers.
+        - Test framework: the framework follows what a test exercises, not the
+          directory it lives in. Controller INTEGRATION tests that drive the
+          full reconcile loop against a live API server use Ginkgo v2 with
+          Gomega matchers; they belong to the suite bootstrapped by
+          controllers/quay/suite_test.go and today consist of the
+          Describe("Reconciling a QuayRegistry") block in
+          controllers/quay/quayregistry_controller_test.go. Everything else
+          uses standard testing.T with table-driven subtests — including
+          utility and pure-function tests that live under controllers/quay/
+          (tls_test.go, features_test.go) and the fake-client testing.T tests
+          that sit alongside the Ginkgo block in
+          quayregistry_controller_test.go. Standard testing.T is the correct
+          and preferred choice for those; do not ask for conversion to
+          Ginkgo/Gomega on that basis alone.
+        - envtest: only the Ginkgo controller suite uses envtest
+          (sigs.k8s.io/controller-runtime/pkg/envtest). Verify proper test
+          environment setup and teardown there. Unit tests should keep using
+          sigs.k8s.io/controller-runtime/pkg/client/fake rather than standing
+          up an API server.
+        - Cleanup: resources created in tests must be cleaned up via defer,
+          t.Cleanup, or AfterEach. Flag leaked resources.
+        - No time.Sleep for asynchronous assertions: in the Ginkgo controller
+          suite use Eventually/Consistently with an explicit timeout and
+          polling interval. Flag time.Sleep that waits for asynchronous
+          behaviour; do not raise it against standard testing.T utility or
+          fake-client tests, which have nothing to wait on.
+        - Assertion quality: Gomega assertions should carry meaningful context
+          through descriptive failure messages or wrappers. .WithOffset() (and
+          the *WithOffset variants) does not add context — it only attributes
+          a failure to the caller of a shared helper, so only ask for it on
+          that basis. testing.T failures should name the case and report got
+          vs. want.
         - Table-driven tests: for functions with many input/output combinations,
-          prefer table-driven patterns (DescribeTable in Ginkgo, or
-          []struct{} loops in standard tests).
+          prefer table-driven patterns ([]struct{} loops in standard tests,
+          DescribeTable in Ginkgo).
 
     # RBAC manifests
     - path: "config/rbac/**/*.yaml"
