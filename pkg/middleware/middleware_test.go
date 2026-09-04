@@ -1291,3 +1291,141 @@ func TestProcessPostgresDeploymentCAHashAnnotation(t *testing.T) {
 		}
 	})
 }
+
+func TestProcessMirrorDeploymentInitContainerResources(t *testing.T) {
+	defaultResources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("50m"),
+			corev1.ResourceMemory: resource.MustParse("64Mi"),
+		},
+		Limits: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("200m"),
+			corev1.ResourceMemory: resource.MustParse("128Mi"),
+		},
+	}
+
+	makeMirrorDep := func() *appsv1.Deployment {
+		return &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-quay-mirror",
+				Labels:      map[string]string{"quay-component": "quay-mirror"},
+				Annotations: map[string]string{"quay-component": "mirror"},
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "quay-mirror",
+								Resources: corev1.ResourceRequirements{
+									Requests: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("500m"),
+										corev1.ResourceMemory: resource.MustParse("512Mi"),
+									},
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("1000m"),
+										corev1.ResourceMemory: resource.MustParse("2Gi"),
+									},
+								},
+							},
+						},
+						InitContainers: []corev1.Container{
+							{
+								Name:      "quay-mirror-init",
+								Resources: defaultResources,
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	t.Run("resource override applies to init containers", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: v1.ComponentMirror, Managed: true, Overrides: &v1.Override{
+						Resources: &v1.Resources{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("2"),
+								corev1.ResourceMemory: resource.MustParse("4Gi"),
+							},
+						},
+					}},
+				},
+			},
+		}
+		dep := makeMirrorDep()
+		qctx := quaycontext.NewQuayRegistryContext()
+
+		result, err := Process(quay, qctx, dep, false)
+		assert.NoError(t, err)
+
+		processed := result.(*appsv1.Deployment)
+
+		// Main container should have overridden resources
+		assert.Equal(t, resource.MustParse("1"), processed.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU])
+		assert.Equal(t, resource.MustParse("1Gi"), processed.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceMemory])
+
+		// Init container should also have overridden resources
+		assert.Len(t, processed.Spec.Template.Spec.InitContainers, 1)
+		assert.Equal(t, resource.MustParse("1"), processed.Spec.Template.Spec.InitContainers[0].Resources.Requests[corev1.ResourceCPU])
+		assert.Equal(t, resource.MustParse("1Gi"), processed.Spec.Template.Spec.InitContainers[0].Resources.Requests[corev1.ResourceMemory])
+		assert.Equal(t, resource.MustParse("2"), processed.Spec.Template.Spec.InitContainers[0].Resources.Limits[corev1.ResourceCPU])
+		assert.Equal(t, resource.MustParse("4Gi"), processed.Spec.Template.Spec.InitContainers[0].Resources.Limits[corev1.ResourceMemory])
+	})
+
+	t.Run("skipres clears init container resources", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: v1.ComponentMirror, Managed: true},
+				},
+			},
+		}
+		dep := makeMirrorDep()
+		qctx := quaycontext.NewQuayRegistryContext()
+
+		result, err := Process(quay, qctx, dep, true)
+		assert.NoError(t, err)
+
+		processed := result.(*appsv1.Deployment)
+
+		// Init container resources should be cleared
+		assert.Len(t, processed.Spec.Template.Spec.InitContainers, 1)
+		assert.Empty(t, processed.Spec.Template.Spec.InitContainers[0].Resources.Requests)
+		assert.Empty(t, processed.Spec.Template.Spec.InitContainers[0].Resources.Limits)
+	})
+
+	t.Run("init container retains defaults without override", func(t *testing.T) {
+		quay := &v1.QuayRegistry{
+			Spec: v1.QuayRegistrySpec{
+				Components: []v1.Component{
+					{Kind: v1.ComponentMirror, Managed: true},
+				},
+			},
+		}
+		dep := makeMirrorDep()
+		qctx := quaycontext.NewQuayRegistryContext()
+
+		result, err := Process(quay, qctx, dep, false)
+		assert.NoError(t, err)
+
+		processed := result.(*appsv1.Deployment)
+
+		// Init container should retain its default resources
+		assert.Len(t, processed.Spec.Template.Spec.InitContainers, 1)
+		assert.Equal(t, resource.MustParse("50m"), processed.Spec.Template.Spec.InitContainers[0].Resources.Requests[corev1.ResourceCPU])
+		assert.Equal(t, resource.MustParse("64Mi"), processed.Spec.Template.Spec.InitContainers[0].Resources.Requests[corev1.ResourceMemory])
+		assert.Equal(t, resource.MustParse("200m"), processed.Spec.Template.Spec.InitContainers[0].Resources.Limits[corev1.ResourceCPU])
+		assert.Equal(t, resource.MustParse("128Mi"), processed.Spec.Template.Spec.InitContainers[0].Resources.Limits[corev1.ResourceMemory])
+	})
+}
