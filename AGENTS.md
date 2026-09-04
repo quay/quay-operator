@@ -31,6 +31,40 @@ make fmt && make vet
 make generate && make manifests
 ```
 
+## Local Development (KinD)
+
+For local development without an existing cluster:
+
+```bash
+# Create a local KinD cluster with all dependencies
+make local-dev-up
+
+# Start the operator (in a separate terminal)
+SKIP_RESOURCE_REQUESTS=true make run
+
+# Check environment status
+make local-dev-status
+
+# Tear down when done
+make local-dev-down
+```
+
+Prerequisites: `go`, `podman` (or `docker`), `kind`, `openssl`.
+The setup creates a 3-node KinD cluster with Garage S3 for object
+storage, self-signed TLS, and a ready-to-use QuayRegistry CR.
+After running the operator, Quay is accessible at `https://127.0.0.1:30443`.
+
+Optional auth providers can be added with `LOCAL_DEV_OPTS`:
+
+```bash
+# With LDAP (389 Directory Server) and Keycloak (OIDC)
+LOCAL_DEV_OPTS="--ldap --keycloak" make local-dev-up
+```
+
+**LDAP users** (password: `password`): admin, user1, quayadmin, readonly, testuser, admin\_ldap, testuser\_ldap, readonly\_ldap.
+**Keycloak OIDC users** (password: `password`): admin\_oidc, testuser\_oidc, readonly\_oidc.
+Keycloak admin console: `http://127.0.0.1:30080` (admin/admin).
+
 ## Project Structure
 
 ```

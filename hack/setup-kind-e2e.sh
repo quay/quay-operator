@@ -151,8 +151,8 @@ KEY_OUTPUT=$(garage_exec key create "${KEY_NAME}")
 echo "Key output: ${KEY_OUTPUT}"
 
 # Parse key ID and secret from output
-ACCESS_KEY=$(echo "${KEY_OUTPUT}" | grep -oP 'Key ID: \K\S+' || echo "${KEY_OUTPUT}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('accessKeyId',''))" 2>/dev/null || true)
-SECRET_KEY=$(echo "${KEY_OUTPUT}" | grep -oP 'Secret key: \K\S+' || echo "${KEY_OUTPUT}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('secretAccessKey',''))" 2>/dev/null || true)
+ACCESS_KEY=$(echo "${KEY_OUTPUT}" | grep "Key ID:" | sed 's/.*Key ID: //' | awk '{print $1}')
+SECRET_KEY=$(echo "${KEY_OUTPUT}" | grep "Secret key:" | sed 's/.*Secret key: //' | awk '{print $1}')
 
 if [ -z "${ACCESS_KEY}" ] || [ -z "${SECRET_KEY}" ]; then
   echo "ERROR: Failed to parse access key from output"

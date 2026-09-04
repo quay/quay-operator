@@ -1,0 +1,280 @@
+# 389 Directory Server for Quay LDAP authentication testing.
+# Deploys into the quay namespace; Quay reaches it at ldap.quay.svc.cluster.local:3389.
+#
+# Test users (password: "password" for all):
+#   admin, user1, quayadmin, readonly, testuser,
+#   admin_ldap, testuser_ldap, readonly_ldap
+#
+# Admin bind DN: cn=Directory Manager / password: admin
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ldap-config
+data:
+  base.ldif: |
+    dn: dc=example,dc=org
+    objectClass: top
+    objectClass: domain
+    dc: example
+
+    dn: ou=users,dc=example,dc=org
+    objectClass: organizationalUnit
+    ou: users
+
+    dn: uid=admin,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    uid: admin
+    sn: Admin
+    givenName: Admin
+    cn: Admin User
+    displayName: Admin User
+    uidNumber: 10000
+    gidNumber: 10000
+    userPassword: password
+    loginShell: /bin/bash
+    homeDirectory: /home/admin
+    mail: admin@example.com
+
+    dn: uid=user1,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    uid: user1
+    sn: One
+    givenName: User
+    cn: User One
+    displayName: User One
+    uidNumber: 10001
+    gidNumber: 10001
+    userPassword: password
+    loginShell: /bin/bash
+    homeDirectory: /home/user1
+    mail: user1@example.com
+
+    dn: uid=quayadmin,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    uid: quayadmin
+    sn: Admin
+    givenName: Quay
+    cn: Quay Admin
+    displayName: Quay Admin
+    uidNumber: 10002
+    gidNumber: 10002
+    userPassword: password
+    loginShell: /bin/bash
+    homeDirectory: /home/quayadmin
+    mail: quayadmin@example.com
+
+    dn: uid=readonly,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    uid: readonly
+    sn: Only
+    givenName: Read
+    cn: Read Only
+    displayName: Read Only
+    uidNumber: 10003
+    gidNumber: 10003
+    userPassword: password
+    loginShell: /bin/bash
+    homeDirectory: /home/readonly
+    mail: readonly@example.com
+
+    dn: uid=testuser,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    uid: testuser
+    sn: User
+    givenName: Test
+    cn: Test User
+    displayName: Test User
+    uidNumber: 10004
+    gidNumber: 10004
+    userPassword: password
+    loginShell: /bin/bash
+    homeDirectory: /home/testuser
+    mail: testuser@example.com
+
+    dn: uid=admin_ldap,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    objectClass: quayUser
+    uid: admin_ldap
+    sn: Ldap
+    givenName: Admin
+    cn: Admin Ldap
+    displayName: Admin Ldap
+    uidNumber: 10005
+    gidNumber: 10005
+    userPassword: password
+    loginShell: /bin/bash
+    homeDirectory: /home/admin_ldap
+    mail: admin_ldap@example.com
+    quayMemberOf: cn=test_ldap_group,ou=groups,dc=example,dc=org
+
+    dn: uid=testuser_ldap,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    objectClass: quayUser
+    uid: testuser_ldap
+    sn: Ldap
+    givenName: Testuser
+    cn: Testuser Ldap
+    displayName: Testuser Ldap
+    uidNumber: 10006
+    gidNumber: 10006
+    userPassword: password
+    loginShell: /bin/bash
+    homeDirectory: /home/testuser_ldap
+    mail: testuser_ldap@example.com
+    quayMemberOf: cn=test_ldap_group,ou=groups,dc=example,dc=org
+
+    dn: uid=readonly_ldap,ou=users,dc=example,dc=org
+    objectClass: inetOrgPerson
+    objectClass: posixAccount
+    objectClass: shadowAccount
+    uid: readonly_ldap
+    sn: Ldap
+    givenName: Readonly
+    cn: Readonly Ldap
+    displayName: Readonly Ldap
+    uidNumber: 10007
+    gidNumber: 10007
+    userPassword: password
+    loginShell: /bin/bash
+    homeDirectory: /home/readonly_ldap
+    mail: readonly_ldap@example.com
+
+    dn: ou=groups,dc=example,dc=org
+    objectClass: organizationalUnit
+    ou: groups
+
+    dn: cn=test_ldap_group,ou=groups,dc=example,dc=org
+    objectClass: groupOfUniqueNames
+    cn: test_ldap_group
+    uniqueMember: uid=testuser_ldap,ou=users,dc=example,dc=org
+    uniqueMember: uid=admin_ldap,ou=users,dc=example,dc=org
+
+  init-389ds.sh: |
+    #!/bin/bash
+    set -e
+    LDAPI_URI="ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket"
+    echo "Waiting for 389 DS to start..."
+    timeout=30
+    while [ $timeout -gt 0 ]; do
+        if ldapsearch -x -H ldap://localhost:3389 -b "" -s base &>/dev/null; then
+            echo "389 DS is ready!"
+            break
+        fi
+        sleep 1
+        timeout=$((timeout - 1))
+    done
+    if [ $timeout -eq 0 ]; then
+        echo "ERROR: 389 DS failed to start"
+        exit 1
+    fi
+    if dsconf localhost backend suffix list | grep -q "dc=example,dc=org"; then
+        echo "Backend already exists, skipping creation"
+    else
+        echo "Creating backend for dc=example,dc=org..."
+        dsconf localhost backend create --suffix "dc=example,dc=org" --be-name userroot
+    fi
+    echo "Adding custom schema for Quay group membership queries..."
+    ldapmodify -H "$LDAPI_URI" -Y EXTERNAL 2>&1 << 'SCHEMA_EOF' | grep -v "^SASL" || true
+    dn: cn=schema
+    changetype: modify
+    add: attributeTypes
+    attributeTypes: ( 1.3.6.1.4.1.99999.1 NAME 'quayMemberOf' DESC 'Quay group membership reference' EQUALITY distinguishedNameMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
+    -
+    add: objectClasses
+    objectClasses: ( 1.3.6.1.4.1.99999.2 NAME 'quayUser' DESC 'Quay user auxiliary class' SUP top AUXILIARY MAY ( quayMemberOf ) )
+    SCHEMA_EOF
+    if ldapsearch -x -H ldap://localhost:3389 -b "dc=example,dc=org" -s base &>/dev/null; then
+        echo "Base DN already exists, skipping LDIF import"
+    else
+        echo "Importing LDIF from /data/ldif/base.ldif..."
+        ldapadd -H "$LDAPI_URI" -Y EXTERNAL -f /data/ldif/base.ldif 2>&1 | grep -v "^SASL" || true
+        echo "LDIF imported successfully!"
+    fi
+    echo "389 DS initialization complete!"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ldap
+  labels:
+    app: ldap
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ldap
+  template:
+    metadata:
+      labels:
+        app: ldap
+    spec:
+      containers:
+      - name: dirsrv
+        image: docker.io/389ds/dirsrv:latest
+        env:
+        - name: DS_DM_PASSWORD
+          value: "admin"
+        ports:
+        - name: ldap
+          containerPort: 3389
+        volumeMounts:
+        - name: config
+          mountPath: /data/ldif/base.ldif
+          subPath: base.ldif
+        - name: config
+          mountPath: /data/init-389ds.sh
+          subPath: init-389ds.sh
+        command:
+        - bash
+        - -c
+        - |
+          /usr/lib/dirsrv/dscontainer -r &
+          sleep 10
+          bash /data/init-389ds.sh
+          wait
+        readinessProbe:
+          exec:
+            command:
+            - ldapsearch
+            - -x
+            - -H
+            - ldap://localhost:3389
+            - -b
+            - ""
+            - -s
+            - base
+          initialDelaySeconds: 15
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: ldap-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ldap
+  labels:
+    app: ldap
+spec:
+  selector:
+    app: ldap
+  ports:
+  - name: ldap
+    port: 3389
+    targetPort: 3389
