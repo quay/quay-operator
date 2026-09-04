@@ -58,13 +58,42 @@ Consult these files when working on specific areas:
 ## Contributing
 
 All changes require a referenced [PROJQUAY Jira](https://issues.redhat.com/projects/PROJQUAY/issues).
+Use `NO-ISSUE:` as the prefix when no Jira ticket applies.
 
-Commit message format:
+### PR title format
+
+The PR title **must** follow the same Jira-first format used in commit
+messages. The Prow/Jira integration validates this prefix.
+
 ```
-<subsystem>: <what changed> (PROJQUAY-####)
+PROJQUAY-####: <subsystem>: <what changed>
+```
+
+For changes without a Jira ticket:
+
+```
+NO-ISSUE: <subsystem>: <what changed>
+```
+
+### Commit message format
+
+```
+PROJQUAY-####: <subsystem>: <what changed>
 
 <why this change was made>
 ```
+
+For changes without a Jira ticket:
+
+```
+NO-ISSUE: <subsystem>: <what changed>
+
+<why this change was made>
+```
+
+The Jira reference **must** come first — this is required by the Prow
+Jira bot. The subsystem prefix (e.g. `operator`, `tls`, `docs`, `ci`)
+is required in both PR titles and commit messages.
 
 ## Key Conventions
 
