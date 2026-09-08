@@ -157,12 +157,21 @@ spec:
           echo "PASS: no postgres NetworkPolicy (component is unmanaged)"
 
           # Default policies must still be present
-          kubectl get networkpolicy unmanaged-egress-default-deny-all -n $NAMESPACE >/dev/null \
-            || { echo "FAIL: default-deny-all missing"; exit 1; }
-          echo "PASS: default-deny-all present"
-          kubectl get networkpolicy unmanaged-egress-default-allow-dns-egress -n $NAMESPACE >/dev/null \
-            || { echo "FAIL: default-allow-dns-egress missing"; exit 1; }
-          echo "PASS: default-allow-dns-egress present"
+          echo "waiting for default-deny-all..."
+          for i in $(seq 1 30); do
+            kubectl get networkpolicy unmanaged-egress-default-deny-all -n $NAMESPACE &>/dev/null \
+            && { echo "PASS: default-deny-all present"; break; }
+            [ "$i" -eq 30 ] && { echo "FAIL: default-deny-all missing after 30 seconds"; exit 1; }
+            sleep 1
+          done
+
+          echo "Waiting for default-allow-dns-egress..."
+          for i in $(seq 1 30); do
+            kubectl get networkpolicy unmanaged-egress-default-allow-dns-egress -n $NAMESPACE &>/dev/null \
+              && { echo "PASS: default-allow-dns-egress present"; break; }
+            [ "$i" -eq 30 ] && { echo "FAIL: default-allow-dns-egress missing after 30s"; exit 1; }
+            sleep 1
+          done
 
           # quay-app must reach the external postgres on the non-default port
           echo "Waiting for quay-app to have ready replicas (proves non-default-port egress works)..."
@@ -208,7 +217,6 @@ spec:
                 securityContext:
                   runAsNonRoot: true
                   runAsUser: 1000
-                  allowPrivilegeEscalation: false
                 containers:
                 - name: probe
                   image: busybox:stable

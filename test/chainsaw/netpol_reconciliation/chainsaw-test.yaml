@@ -127,7 +127,7 @@ spec:
           echo "Waiting for owned NetworkPolicies to be garbage-collected (up to 3 minutes)..."
           for i in $(seq 1 18); do
             COUNT=$(kubectl get networkpolicy -n $NAMESPACE -o name 2>/dev/null \
-              | grep -c "netpol-reconcile" || echo 0)
+              | grep -c "netpol-reconcile" || true)
             [ "${COUNT}" -eq 0 ] \
               && { echo "PASS: all NetworkPolicies removed after QuayRegistry deletion"; break; }
             [ "$i" -eq 18 ] && {
