@@ -1472,6 +1472,77 @@ func findVolumeMountByName(deployment *appsv1.Deployment, containerName, name st
 	return nil
 }
 
+func TestInflateReadOnlyConfig(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{
+		ReadOnlyPhase:         string(v1.ReadOnlyPhaseEnteringReadOnly),
+		ReadOnlyMountEnabled:  true,
+		ReadOnlyRegistryState: true,
+		ReadOnlySecretName:    "test-readonly-service-key",
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true},
+				{Kind: "redis", Managed: true},
+				{Kind: "objectstorage", Managed: false},
+				{Kind: "mirror", Managed: false},
+				{Kind: "horizontalpodautoscaler", Managed: false},
+			},
+		},
+		Status: v1.QuayRegistryStatus{CurrentVersion: v1.QuayVersionCurrent},
+	}
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quay, configBundle, log, false)
+	require.NoError(t, err)
+
+	config := renderedQuayConfig(t, pieces)
+	assert.Equal(t, true, config["INSTANCE_SERVICE_KEY_IMPORT_FROM_FILES"])
+	assert.Equal(t, float64(ReadOnlyKeyExpiration), config["INSTANCE_SERVICE_KEY_EXPIRATION"])
+	assert.Equal(t, ReadOnlyKIDPath, config["INSTANCE_SERVICE_KEY_KID_LOCATION"])
+	assert.Equal(t, ReadOnlyPEMPath, config["INSTANCE_SERVICE_KEY_LOCATION"])
+	assert.Equal(t, ReadOnlyRegistryState, config["REGISTRY_STATE"])
+}
+
+func TestInflateReadOnlyDefersUpgradeOverlay(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{
+		ReadOnlyDeferUpgrade: true,
+	}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true},
+				{Kind: "redis", Managed: true},
+				{Kind: "objectstorage", Managed: false},
+				{Kind: "mirror", Managed: false},
+				{Kind: "horizontalpodautoscaler", Managed: false},
+			},
+		},
+		Status: v1.QuayRegistryStatus{CurrentVersion: "3.18.0"},
+	}
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quay, configBundle, log, false)
+	require.NoError(t, err)
+	for _, obj := range pieces {
+		if job, ok := obj.(*batchv1.Job); ok && strings.Contains(job.Name, "quay-app-upgrade") {
+			t.Fatalf("upgrade job should not be rendered while read-only defers upgrades")
+		}
+	}
+}
+
 func TestInflateTLSCertGeneration(t *testing.T) {
 	log := testlogr.NewTestLogger(t)
 

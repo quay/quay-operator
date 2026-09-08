@@ -724,42 +724,6 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
-	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
-	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentPostgres) {
-		err, scaledDown := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
-		if err != nil {
-			return r.reconcileWithCondition(
-				ctx,
-				&quay,
-				v1.ConditionTypeRolloutBlocked,
-				metav1.ConditionTrue,
-				v1.ConditionReasonPostgresUpgradeFailed,
-				fmt.Sprintf("error checking for pg upgrade: %s", err),
-			)
-		}
-		if !scaledDown {
-			return r.Requeue, nil
-		}
-	}
-
-	// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade
-	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentClairPostgres) {
-		err, scaledDown := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
-		if err != nil {
-			return r.reconcileWithCondition(
-				ctx,
-				&quay,
-				v1.ConditionTypeRolloutBlocked,
-				metav1.ConditionTrue,
-				v1.ConditionReasonPostgresUpgradeFailed,
-				fmt.Sprintf("error checking for pg upgrade: %s", err),
-			)
-		}
-		if !scaledDown {
-			return r.Requeue, nil
-		}
-	}
-
 	r.checkManagedDatabaseReady(ctx, quayContext, updatedQuay)
 
 	if err := r.checkBuildManagerAvailable(quayContext, cbundle); err != nil {
@@ -896,6 +860,50 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	readOnlyIntent, readOnlyDecision := r.prepareReadOnlyLifecycle(ctx, updatedQuay, quayContext, usercfg, cbundle, log)
+	if readOnlyDecision.Stop || readOnlyDecision.Err != nil {
+		return readOnlyDecision.Result, readOnlyDecision.Err
+	}
+
+	if !quayContext.ReadOnlyDeferUpgrade {
+		// Populate the QuayContext with whether or not the QuayRegistry needs an upgrade.
+		// This helper can scale database Deployments down, so read-only deferral must be
+		// decided before it runs.
+		if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentPostgres) {
+			err, scaledDown := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentPostgres)
+			if err != nil {
+				return r.reconcileWithCondition(
+					ctx,
+					&quay,
+					v1.ConditionTypeRolloutBlocked,
+					metav1.ConditionTrue,
+					v1.ConditionReasonPostgresUpgradeFailed,
+					fmt.Sprintf("error checking for pg upgrade: %s", err),
+				)
+			}
+			if !scaledDown {
+				return r.Requeue, nil
+			}
+		}
+
+		if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentClairPostgres) {
+			err, scaledDown := r.checkNeedsPostgresUpgradeForComponent(ctx, quayContext, updatedQuay, v1.ComponentClairPostgres)
+			if err != nil {
+				return r.reconcileWithCondition(
+					ctx,
+					&quay,
+					v1.ConditionTypeRolloutBlocked,
+					metav1.ConditionTrue,
+					v1.ConditionReasonPostgresUpgradeFailed,
+					fmt.Sprintf("error checking for pg upgrade: %s", err),
+				)
+			}
+			if !scaledDown {
+				return r.Requeue, nil
+			}
+		}
+	}
+
 	log.Info("inflating QuayRegistry into Kubernetes objects")
 	deploymentObjects, err := kustomize.Inflate(
 		quayContext, updatedQuay, cbundle, log, r.SkipResourceRequests,
@@ -1025,11 +1033,11 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// new secret before we remove the old one, eliminating the FailedMount warning
 	// described in PROJQUAY-9157.
 	if len(previousSecrets) > 0 {
-		rolledOut, err := r.quayAppDeploymentRolledOut(ctx, updatedQuay)
+		rolledOut, err := r.readOnlyDeploymentsRolledOut(ctx, updatedQuay)
 		if err != nil {
-			log.Error(err, "could not check quay-app rollout status, deferring old config secret cleanup")
+			log.Error(err, "could not check config-consuming workload rollout status, deferring old config secret cleanup")
 		} else if !rolledOut {
-			log.Info("quay-app rollout in progress, deferring old config secret cleanup")
+			log.Info("config-consuming workload rollout in progress, deferring old config secret cleanup")
 		} else {
 			if err := r.cleanupPreviousSecrets(log, ctx, &quay, previousSecrets); err != nil {
 				return r.reconcileWithCondition(
@@ -1042,6 +1050,11 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				)
 			}
 		}
+	}
+
+	readOnlyDecision = r.observeReadOnlyLifecycle(ctx, updatedQuay, quayContext, readOnlyIntent, cbundle, log)
+	if readOnlyDecision.Stop || readOnlyDecision.Err != nil {
+		return readOnlyDecision.Result, readOnlyDecision.Err
 	}
 
 	rolloutBlocked := v1.GetCondition(
@@ -1093,7 +1106,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// if postgres needs to be updated, then we need to wait until the upgrade job
-	if quayContext.NeedsPgUpgrade || quayContext.NeedsClairPgUpgrade {
+	if !quayContext.ReadOnlyDeferUpgrade && (quayContext.NeedsPgUpgrade || quayContext.NeedsClairPgUpgrade) {
 		if err := r.updateWithCondition(
 			ctx,
 			updatedQuay,
@@ -1110,7 +1123,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// if the version differ then it means that the operator was upgraded and we need
 	// to wait until the database upgrade job finishes. sets a condition here and
 	// returns.
-	if updatedQuay.Status.CurrentVersion != v1.QuayVersionCurrent {
+	if !quayContext.ReadOnlyDeferUpgrade && updatedQuay.Status.CurrentVersion != v1.QuayVersionCurrent {
 		if err := r.updateWithCondition(
 			ctx,
 			updatedQuay,
@@ -1403,6 +1416,23 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 	reason v1.ConditionReason,
 	msg string,
 ) error {
+	eventType := corev1.EventTypeNormal
+	if cstatus == metav1.ConditionTrue {
+		eventType = corev1.EventTypeWarning
+	}
+	return r.updateWithConditionEventType(ctx, quay, ctype, cstatus, reason, msg, eventType, true)
+}
+
+func (r *QuayRegistryReconciler) updateWithConditionEventType(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+	ctype v1.ConditionType,
+	cstatus metav1.ConditionStatus,
+	reason v1.ConditionReason,
+	msg string,
+	eventType string,
+	emitEvent bool,
+) error {
 	condition := v1.Condition{
 		Type:               ctype,
 		Status:             cstatus,
@@ -1415,13 +1445,60 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 	quay.Status.Conditions = v1.SetCondition(quay.Status.Conditions, condition)
 	quay.Status.LastUpdate = time.Now().UTC().String()
 
-	eventType := corev1.EventTypeNormal
-	if cstatus == metav1.ConditionTrue {
-		eventType = corev1.EventTypeWarning
+	if emitEvent && r.EventRecorder != nil {
+		r.EventRecorder.Event(quay, eventType, string(reason), msg)
 	}
-	r.EventRecorder.Event(quay, eventType, string(reason), msg)
 
 	return r.Status().Update(ctx, quay)
+}
+
+func (r *QuayRegistryReconciler) updateReadOnlyCondition(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+	status metav1.ConditionStatus,
+	reason v1.ConditionReason,
+	msg string,
+) error {
+	existing := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeReadOnly)
+	if existing != nil &&
+		existing.Status == status &&
+		existing.Reason == reason &&
+		existing.Message == msg {
+		return r.updateWithConditionEventType(
+			ctx,
+			quay,
+			v1.ConditionTypeReadOnly,
+			status,
+			reason,
+			msg,
+			readOnlyEventType(status, reason),
+			false,
+		)
+	}
+
+	eventType := readOnlyEventType(status, reason)
+	return r.updateWithConditionEventType(
+		ctx,
+		quay,
+		v1.ConditionTypeReadOnly,
+		status,
+		reason,
+		msg,
+		eventType,
+		true,
+	)
+}
+
+func readOnlyEventType(status metav1.ConditionStatus, reason v1.ConditionReason) string {
+	switch reason {
+	case v1.ConditionReasonReadOnlyActive,
+		v1.ConditionReasonReadOnlyDisabled,
+		v1.ConditionReasonReadOnlyTransitioning,
+		v1.ConditionReasonReadOnlyDeferred:
+		return corev1.EventTypeNormal
+	default:
+		return corev1.EventTypeWarning
+	}
 }
 
 func (r *QuayRegistryReconciler) cleanupPreviousSecrets(log logr.Logger, ctx context.Context, quay *v1.QuayRegistry, previousSecrets []corev1.Secret) error {

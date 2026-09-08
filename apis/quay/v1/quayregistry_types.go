@@ -154,7 +154,20 @@ type QuayRegistrySpec struct {
 	ConfigBundleSecret string `json:"configBundleSecret,omitempty"`
 	// Components declare how the Operator should handle backing Quay services.
 	Components []Component `json:"components,omitempty"`
+	// ReadOnly controls the operator-managed read-only lifecycle for the registry.
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
+
+// ReadOnlyPhase describes the operator-managed read-only lifecycle phase.
+type ReadOnlyPhase string
+
+const (
+	ReadOnlyPhaseNormal           ReadOnlyPhase = ""
+	ReadOnlyPhasePreparingKey     ReadOnlyPhase = "PreparingKey"
+	ReadOnlyPhaseEnteringReadOnly ReadOnlyPhase = "EnteringReadOnly"
+	ReadOnlyPhaseReadOnly         ReadOnlyPhase = "ReadOnly"
+	ReadOnlyPhaseExitingReadOnly  ReadOnlyPhase = "ExitingReadOnly"
+)
 
 // Component describes how the Operator should handle a backing Quay service.
 // +kubebuilder:validation:XValidation:rule="self.managed || !has(self.overrides)",message="cannot set overrides on unmanaged component"
@@ -226,6 +239,7 @@ const (
 	ComponentMirrorReady        ConditionType = "ComponentMirrorReady"
 	ComponentMonitoringReady    ConditionType = "ComponentMonitoringReady"
 	ComponentTLSReady           ConditionType = "ComponentTLSReady"
+	ConditionTypeReadOnly       ConditionType = "ReadOnly"
 )
 
 type ConditionReason string
@@ -256,6 +270,14 @@ const (
 	ConditionReasonComponentOverrideInvalid              ConditionReason = "ComponentOverrideInvalid"
 	ConditionReasonPVCPending                            ConditionReason = "PVCPending"
 	ConditionReasonPVCProvisioningFailed                 ConditionReason = "PVCProvisioningFailed"
+	ConditionReasonReadOnlyTransitioning                 ConditionReason = "ReadOnlyTransitioning"
+	ConditionReasonReadOnlyActive                        ConditionReason = "ReadOnlyActive"
+	ConditionReasonReadOnlyDisabled                      ConditionReason = "ReadOnlyDisabled"
+	ConditionReasonReadOnlyDeferred                      ConditionReason = "ReadOnlyDeferred"
+	ConditionReasonReadOnlyDegraded                      ConditionReason = "ReadOnlyDegraded"
+	ConditionReasonOverrideConflict                      ConditionReason = "OverrideConflict"
+	ConditionReasonUnsupportedVersion                    ConditionReason = "UnsupportedVersion"
+	ConditionReasonManualMigrationRequired               ConditionReason = "ManualMigrationRequired"
 )
 
 // Condition is a single condition of a QuayRegistry.
@@ -277,6 +299,12 @@ type QuayRegistryStatus struct {
 	CurrentVersion QuayVersion `json:"currentVersion,omitempty"`
 	// RegistryEndpoint is the external access point for the Quay registry.
 	RegistryEndpoint string `json:"registryEndpoint,omitempty"`
+	// ReadOnlyPhase is the current phase of the operator-managed read-only lifecycle.
+	ReadOnlyPhase ReadOnlyPhase `json:"readOnlyPhase,omitempty"`
+	// ReadOnlyKeyID is the key ID of the operator-managed read-only service key.
+	ReadOnlyKeyID string `json:"readOnlyKeyID,omitempty"`
+	// ReadOnlyUnsupportedImage records a Quay image that lacks required read-only hooks.
+	ReadOnlyUnsupportedImage string `json:"readOnlyUnsupportedImage,omitempty"`
 	// LastUpdate is the timestamp when the Operator last processed this instance.
 	LastUpdate string `json:"lastUpdated,omitempty"`
 	// Conditions represent the conditions that a QuayRegistry can have.
@@ -1052,6 +1080,7 @@ func RemoveUnusedConditions(quay *QuayRegistry) {
 		ComponentMonitoringReady,
 		ComponentTLSReady,
 		ComponentCacheReady,
+		ConditionTypeReadOnly,
 	}
 
 	newconds := []Condition{}
