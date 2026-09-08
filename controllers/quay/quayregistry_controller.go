@@ -1416,11 +1416,23 @@ func (r *QuayRegistryReconciler) updateWithCondition(
 	reason v1.ConditionReason,
 	msg string,
 ) error {
-	eventType := corev1.EventTypeNormal
-	if cstatus == metav1.ConditionTrue {
-		eventType = corev1.EventTypeWarning
-	}
+	eventType := conditionEventType(ctype, cstatus, reason)
 	return r.updateWithConditionEventType(ctx, quay, ctype, cstatus, reason, msg, eventType, true)
+}
+
+func conditionEventType(ctype v1.ConditionType, cstatus metav1.ConditionStatus, reason v1.ConditionReason) string {
+	if cstatus == metav1.ConditionTrue {
+		return corev1.EventTypeWarning
+	}
+	if ctype == v1.ConditionComponentsCreated {
+		switch reason {
+		case v1.ConditionReasonPostgresUpgradeFailed,
+			v1.ConditionReasonMigrationsFailed,
+			v1.ConditionReasonMigrationsJobMissing:
+			return corev1.EventTypeWarning
+		}
+	}
+	return corev1.EventTypeNormal
 }
 
 func (r *QuayRegistryReconciler) updateWithConditionEventType(
@@ -1464,16 +1476,7 @@ func (r *QuayRegistryReconciler) updateReadOnlyCondition(
 		existing.Status == status &&
 		existing.Reason == reason &&
 		existing.Message == msg {
-		return r.updateWithConditionEventType(
-			ctx,
-			quay,
-			v1.ConditionTypeReadOnly,
-			status,
-			reason,
-			msg,
-			readOnlyEventType(status, reason),
-			false,
-		)
+		return nil
 	}
 
 	eventType := readOnlyEventType(status, reason)
