@@ -499,11 +499,11 @@ func bigIntBytes(v int) []byte {
 }
 
 func ownedByQuay(obj client.Object, quay *v1.QuayRegistry) bool {
+	if quay.UID == "" {
+		return false
+	}
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.UID != "" && quay.UID != "" && ref.UID == quay.UID {
-			return true
-		}
-		if ref.Kind == "QuayRegistry" && ref.Name == quay.GetName() {
+		if ref.Kind == "QuayRegistry" && ref.UID == quay.UID {
 			return true
 		}
 	}
