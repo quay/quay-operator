@@ -38,6 +38,39 @@ func TestReadOnlyServiceKeySecretGeneration(t *testing.T) {
 	assert.Equal(t, kid, gotKID)
 }
 
+func TestOwnedByQuayRequiresMatchingUID(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      readOnlySecretName(quay),
+			Namespace: "ns",
+			OwnerReferences: []metav1.OwnerReference{{
+				Kind: "QuayRegistry",
+				Name: "registry",
+				UID:  types.UID("quay-uid"),
+			}},
+		},
+	}
+	assert.True(t, ownedByQuay(secret, quay))
+
+	secret.OwnerReferences[0].UID = types.UID("other-uid")
+	assert.False(t, ownedByQuay(secret, quay))
+
+	secret.OwnerReferences[0].UID = ""
+	assert.False(t, ownedByQuay(secret, quay))
+
+	quay.UID = ""
+	secret.OwnerReferences[0].UID = types.UID("quay-uid")
+	assert.False(t, ownedByQuay(secret, quay))
+}
+
 func TestReadOnlyOperatorConfigConflictDetectsFragments(t *testing.T) {
 	source, err := yaml.Marshal(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"})
 	require.NoError(t, err)
