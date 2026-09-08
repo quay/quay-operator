@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,6 +70,63 @@ func TestOwnedByQuayRequiresMatchingUID(t *testing.T) {
 	quay.UID = ""
 	secret.OwnerReferences[0].UID = types.UID("quay-uid")
 	assert.False(t, ownedByQuay(secret, quay))
+}
+
+func TestConditionEventTypeWarnsForComponentCreationFailures(t *testing.T) {
+	for _, reason := range []v1.ConditionReason{
+		v1.ConditionReasonPostgresUpgradeFailed,
+		v1.ConditionReasonMigrationsFailed,
+		v1.ConditionReasonMigrationsJobMissing,
+	} {
+		t.Run(string(reason), func(t *testing.T) {
+			assert.Equal(t, corev1.EventTypeWarning, conditionEventType(v1.ConditionComponentsCreated, metav1.ConditionFalse, reason))
+		})
+	}
+
+	assert.Equal(
+		t,
+		corev1.EventTypeNormal,
+		conditionEventType(v1.ConditionComponentsCreated, metav1.ConditionFalse, v1.ConditionReasonComponentsCreationSuccess),
+	)
+	assert.Equal(
+		t,
+		corev1.EventTypeWarning,
+		conditionEventType(v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue, v1.ConditionReasonComponentCreationFailed),
+	)
+}
+
+func TestUpdateReadOnlyConditionSkipsUnchangedCondition(t *testing.T) {
+	lastUpdate := metav1.NewTime(time.Date(2026, 9, 8, 1, 2, 3, 0, time.UTC))
+	lastTransition := metav1.NewTime(time.Date(2026, 9, 8, 1, 0, 0, 0, time.UTC))
+	quay := &v1.QuayRegistry{
+		Status: v1.QuayRegistryStatus{
+			LastUpdate: "unchanged",
+			Conditions: []v1.Condition{{
+				Type:               v1.ConditionTypeReadOnly,
+				Status:             metav1.ConditionTrue,
+				Reason:             v1.ConditionReasonReadOnlyActive,
+				Message:            "operator-managed read-only mode is active",
+				LastUpdateTime:     lastUpdate,
+				LastTransitionTime: lastTransition,
+			}},
+		},
+	}
+	reconciler := &QuayRegistryReconciler{}
+
+	err := reconciler.updateReadOnlyCondition(
+		context.Background(),
+		quay,
+		metav1.ConditionTrue,
+		v1.ConditionReasonReadOnlyActive,
+		"operator-managed read-only mode is active",
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, "unchanged", quay.Status.LastUpdate)
+	condition := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeReadOnly)
+	require.NotNil(t, condition)
+	assert.Equal(t, lastUpdate, condition.LastUpdateTime)
+	assert.Equal(t, lastTransition, condition.LastTransitionTime)
 }
 
 func TestReadOnlyOperatorConfigConflictDetectsFragments(t *testing.T) {
