@@ -1,0 +1,100 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: netpol-reconciliation
+spec:
+  concurrent: false
+  steps:
+  - name: create-registry
+    try:
+    - script:
+        content: |
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift: skipping bundle creation"
+            exit 0
+          fi
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="FEATURE_MAILING: false" 2>/dev/null || true
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Waiting for postgres NetworkPolicy to be created..."
+          for i in $(seq 1 60); do
+            kubectl get networkpolicy netpol-reconcile-postgres-allow-access-only-from-quay-and-upgrade \
+              -n $NAMESPACE &>/dev/null && { echo "PASS: postgres NetworkPolicy exists"; break; }
+            [ "$i" -eq 60 ] && { echo "FAIL: postgres NetworkPolicy not created"; exit 1; }
+            sleep 5
+          done
+          echo "Waiting for default-deny-all NetworkPolicy..."
+          for i in $(seq 1 60); do
+            kubectl get networkpolicy netpol-reconcile-default-deny-all \
+              -n $NAMESPACE &>/dev/null && { echo "PASS: default-deny-all exists"; break; }
+            [ "$i" -eq 60 ] && { echo "FAIL: default-deny-all not created"; exit 1; }
+            sleep 5
+          done
+
+  - name: policy-delete-and-recreate
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          NP="netpol-reconcile-postgres-allow-access-only-from-quay-and-upgrade"
+          kubectl delete networkpolicy "$NP" -n $NAMESPACE
+          # The operator does not currently watch NetworkPolicy objects directly, so
+          # recreation waits for the next periodic reconcile (up to ~2 minutes).
+          echo "Waiting for operator to recreate the deleted NetworkPolicy (up to 5 minutes)..."
+          for i in $(seq 1 60); do
+            kubectl get networkpolicy "$NP" -n $NAMESPACE &>/dev/null \
+              && { echo "PASS: NetworkPolicy recreated after deletion (${i}x5s elapsed)"; break; }
+            [ "$i" -eq 60 ] && { echo "FAIL: NetworkPolicy not recreated in time"; exit 1; }
+            sleep 5
+          done
+
+  - name: policy-mutation-and-restore
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          NP="netpol-reconcile-postgres-allow-access-only-from-quay-and-upgrade"
+          echo "Patching NetworkPolicy to ingress: - {} (allow-all)..."
+          kubectl patch networkpolicy "$NP" -n $NAMESPACE \
+            --type=json -p='[{"op":"replace","path":"/spec/ingress","value":[{}]}]'
+          echo "Waiting for operator to restore restrictive ingress (up to 5 minutes)..."
+          for i in $(seq 1 60); do
+            FROM=$(kubectl get networkpolicy "$NP" -n $NAMESPACE \
+              -o jsonpath='{.spec.ingress[0].from}' 2>/dev/null || echo "")
+            [ -n "$FROM" ] \
+              && { echo "PASS: restrictive ingress restored after ${i}x5s"; break; }
+            [ "$i" -eq 60 ] && { echo "FAIL: operator did not restore restrictive ingress"; exit 1; }
+            sleep 5
+          done
+
+  - name: registry-delete-and-cleanup
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Deleting QuayRegistry and waiting for it to be removed..."
+          kubectl delete quayregistry netpol-reconcile -n $NAMESPACE \
+            --wait=true --timeout=180s
+          echo "Waiting for owned NetworkPolicies to be garbage-collected (up to 3 minutes)..."
+          for i in $(seq 1 18); do
+            COUNT=$(kubectl get networkpolicy -n $NAMESPACE -o name 2>/dev/null \
+              | grep -c "netpol-reconcile" || echo 0)
+            [ "${COUNT}" -eq 0 ] \
+              && { echo "PASS: all NetworkPolicies removed after QuayRegistry deletion"; break; }
+            [ "$i" -eq 18 ] && {
+              echo "FAIL: ${COUNT} NetworkPolicies still exist:"
+              kubectl get networkpolicy -n $NAMESPACE | grep "netpol-reconcile" || true
+              exit 1
+            }
+            sleep 10
+          done

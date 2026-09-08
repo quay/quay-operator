@@ -19,7 +19,7 @@ jobs:
   e2e-kind:
     name: E2E Tests on KinD
     runs-on: quay-003-medium-ubuntu-24-x64
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       SKIP_RESOURCE_REQUESTS: "true"
       QUAY_VERSION: dev
@@ -64,7 +64,7 @@ jobs:
             CHAINSAW_REPORT_FORMAT=JUNIT-STEP \
             CHAINSAW_REPORT_PATH=/tmp/e2e-reports \
             CHAINSAW_EXTRA_ARGS="--skip-delete"
-        timeout-minutes: 50
+        timeout-minutes: 100
 
       - name: Stop operator
         if: always()

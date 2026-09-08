@@ -1,0 +1,184 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: netpol-traffic-matrix
+spec:
+  concurrent: false
+  steps:
+  - name: create-registry
+    try:
+    - script:
+        content: |
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            exit 0
+          fi
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="FEATURE_MAILING: false" 2>/dev/null || true
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Waiting for postgres deployment to roll out..."
+          kubectl rollout status deployment/netpol-matrix-quay-database -n $NAMESPACE --timeout=300s
+          echo "Waiting for redis deployment to roll out..."
+          kubectl rollout status deployment/netpol-matrix-quay-redis -n $NAMESPACE --timeout=300s
+          echo "Waiting for clair-postgres deployment to roll out..."
+          kubectl rollout status deployment/netpol-matrix-clair-postgres -n $NAMESPACE --timeout=300s
+
+  - name: positive-controls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          REG="netpol-matrix"
+          NS="$NAMESPACE"
+
+          # Helper: create a probe Job that must successfully connect to host:port.
+          # The pod carries src_component + quay-operator/quayregistry labels so the
+          # matching allow policy grants it the required egress and the target's ingress
+          # policy recognises it as an authorised peer.
+          create_allow_probe() {
+            local name="$1" host="$2" port="$3" component="$4"
+            kubectl apply -f - <<JOBEOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: ${name}
+            namespace: ${NS}
+          spec:
+            backoffLimit: 0
+            ttlSecondsAfterFinished: 120
+            template:
+              metadata:
+                labels:
+                  quay-component: ${component}
+                  quay-operator/quayregistry: ${REG}
+              spec:
+                restartPolicy: Never
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  allowPrivilegeEscalation: false
+                containers:
+                - name: probe
+                  image: busybox:stable
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop: [ALL]
+                  command:
+                  - sh
+                  - -c
+                  - |
+                    nc -z -w 5 ${host} ${port} \
+                      && echo "PASS: ${component} reached ${host}:${port}" \
+                      || { echo "FAIL: ${component} could not reach ${host}:${port}"; exit 1; }
+          JOBEOF
+          }
+
+          create_allow_probe "probe-quayapp-postgres"    "${REG}-quay-database"  5432 quay-app
+          create_allow_probe "probe-quayapp-redis"       "${REG}-quay-redis"     6379 quay-app
+          create_allow_probe "probe-mirror-postgres"     "${REG}-quay-database"  5432 quay-mirror
+          create_allow_probe "probe-mirror-redis"        "${REG}-quay-redis"     6379 quay-mirror
+          create_allow_probe "probe-upgrade-postgres"    "${REG}-quay-database"  5432 quay-app-upgrade
+          create_allow_probe "probe-upgrade-redis"       "${REG}-quay-redis"     6379 quay-app-upgrade
+          create_allow_probe "probe-clair-clairpostgres" "${REG}-clair-postgres" 5432 clair-app
+
+          # quay-app → clair is conditional: skip on KinD where clair may not be configured
+          if kubectl rollout status deployment/${REG}-clair-app -n ${NS} --timeout=60s 2>/dev/null; then
+            create_allow_probe "probe-quayapp-clair-8080" "${REG}-clair-app" 8080 quay-app
+            create_allow_probe "probe-quayapp-clair-8089" "${REG}-clair-app" 8089 quay-app
+            CLAIR_JOBS="probe-quayapp-clair-8080 probe-quayapp-clair-8089"
+          else
+            echo "Clair not available; skipping clair ingress positive probes"
+            CLAIR_JOBS=""
+          fi
+
+          echo "Waiting for positive-control jobs to complete (allow expected)..."
+          for job in probe-quayapp-postgres probe-quayapp-redis \
+                     probe-mirror-postgres probe-mirror-redis \
+                     probe-upgrade-postgres probe-upgrade-redis \
+                     probe-clair-clairpostgres ${CLAIR_JOBS}; do
+            kubectl wait job/${job} -n ${NS} --for=condition=complete --timeout=90s \
+              || {
+                echo "FAIL: ${job} did not complete (connection unexpectedly denied)"
+                kubectl logs job/${job} -n ${NS} 2>/dev/null || true
+                exit 1
+              }
+            echo "PASS: ${job}"
+          done
+
+  - name: negative-controls
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          REG="netpol-matrix"
+          NS="$NAMESPACE"
+
+          # Untrusted probe: carries NO quay-component or quay-operator/quayregistry labels.
+          # With no label the default-deny-all policy does not select it, so the pod has
+          # free egress. However, each target's ingress NetworkPolicy only admits pods
+          # carrying specific (quay-component, quay-operator/quayregistry) label pairs —
+          # the untrusted probe is rejected by the target's ingress rule.
+          create_deny_probe() {
+            local name="$1" host="$2" port="$3"
+            kubectl apply -f - <<JOBEOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: ${name}
+            namespace: ${NS}
+          spec:
+            backoffLimit: 0
+            ttlSecondsAfterFinished: 120
+            template:
+              metadata:
+                labels:
+                  netpol-test: untrusted
+              spec:
+                restartPolicy: Never
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  allowPrivilegeEscalation: false
+                containers:
+                - name: probe
+                  image: busybox:stable
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop: [ALL]
+                  command:
+                  - sh
+                  - -c
+                  - |
+                    nc -z -w 5 ${host} ${port} \
+                      && { echo "FAIL: untrusted pod reached ${host}:${port} (expected deny)"; exit 1; } \
+                      || echo "PASS: correctly denied to ${host}:${port}"
+          JOBEOF
+          }
+
+          create_deny_probe "probe-deny-postgres"    "${REG}-quay-database"  5432
+          create_deny_probe "probe-deny-redis"       "${REG}-quay-redis"     6379
+          create_deny_probe "probe-deny-clairpg"     "${REG}-clair-postgres" 5432
+          create_deny_probe "probe-deny-clair-8080"  "${REG}-clair-app"      8080
+          create_deny_probe "probe-deny-clair-8089"  "${REG}-clair-app"      8089
+
+          echo "Waiting for negative-control jobs to complete (deny expected)..."
+          for job in probe-deny-postgres probe-deny-redis probe-deny-clairpg \
+                     probe-deny-clair-8080 probe-deny-clair-8089; do
+            kubectl wait job/${job} -n ${NS} --for=condition=complete --timeout=90s \
+              || {
+                echo "FAIL: ${job} did not complete (ingress policy may be too permissive)"
+                kubectl logs job/${job} -n ${NS} 2>/dev/null || true
+                exit 1
+              }
+            echo "PASS: ${job}"
+          done
