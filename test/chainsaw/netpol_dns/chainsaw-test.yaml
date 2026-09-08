@@ -14,8 +14,47 @@ spec:
           if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
             exit 0
           fi
+          echo "KinD detected, creating config bundle..."
+          ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+          SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+          BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+          ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          FEATURE_PROXY_STORAGE: true
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
           kubectl create secret generic reconcile-config -n $NAMESPACE \
-            --from-literal=config.yaml="FEATURE_MAILING: false" 2>/dev/null || true
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+            --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          echo "Config bundle created in $NAMESPACE"
     - apply:
         file: 00-create-quay-registry.yaml
     - script:
@@ -111,16 +150,21 @@ spec:
                && echo 'PASS: TCP DNS (port 53) reachable' \
                || { echo 'FAIL: TCP DNS unreachable'; exit 1; }"
 
-          # 3. Non-DNS egress denied: the Kubernetes API server listens on 443.
-          #    DNS resolution of the name uses port 53 (allowed), but the TCP
-          #    connection to port 443 is not DNS and must be blocked by default-deny-all.
-          create_probe "probe-deny-non-dns" \
-            "nc -z -w 5 kubernetes.default.svc.cluster.local 443 \
-               && { echo 'FAIL: non-DNS egress reached kubernetes:443 (policy too permissive)'; exit 1; } \
-               || echo 'PASS: non-DNS egress correctly blocked'"
+          # 3. Non-DNS egress denied — only verifiable where NetworkPolicy is enforced.
+          #    kindnet (KinD default CNI) does not enforce NetworkPolicy, so skip on KinD.
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            create_probe "probe-deny-non-dns" \
+              "nc -z -w 5 kubernetes.default.svc.cluster.local 443 \
+                 && { echo 'FAIL: non-DNS egress reached kubernetes:443 (policy too permissive)'; exit 1; } \
+                 || echo 'PASS: non-DNS egress correctly blocked'"
+            DENY_JOBS="probe-deny-non-dns"
+          else
+            echo "KinD detected — skipping probe-deny-non-dns (kindnet does not enforce NetworkPolicy)"
+            DENY_JOBS=""
+          fi
 
           echo "Waiting for DNS probes to complete..."
-          for job in probe-udp-dns probe-tcp-dns probe-deny-non-dns; do
+          for job in probe-udp-dns probe-tcp-dns ${DENY_JOBS}; do
             kubectl wait job/${job} -n ${NS} --for=condition=complete --timeout=60s \
               || {
                 echo "FAIL: ${job} did not complete as expected"
