@@ -11,6 +11,8 @@ spec:
     try:
     - apply:
         file: 00-deploy-postgres.yaml
+    - assert:
+        file: 00-assert-postgres.yaml
     - script:
         shell: /bin/bash
         content: |

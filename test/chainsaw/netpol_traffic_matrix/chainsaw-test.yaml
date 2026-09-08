@@ -22,12 +22,22 @@ spec:
         shell: /bin/bash
         content: |
           set -euo pipefail
-          echo "Waiting for postgres deployment to roll out..."
-          kubectl rollout status deployment/netpol-matrix-quay-database -n $NAMESPACE --timeout=300s
-          echo "Waiting for redis deployment to roll out..."
-          kubectl rollout status deployment/netpol-matrix-quay-redis -n $NAMESPACE --timeout=300s
-          echo "Waiting for clair-postgres deployment to roll out..."
-          kubectl rollout status deployment/netpol-matrix-clair-postgres -n $NAMESPACE --timeout=300s
+
+          wait_for_deployment() {
+            local name="$1"
+            echo "Waiting for ${name} to be created by the operator..."
+            for i in $(seq 1 60); do
+              kubectl get deployment "${name}" -n $NAMESPACE &>/dev/null && break
+              [ "$i" -eq 60 ] && { echo "ERROR: ${name} not created in time"; exit 1; }
+              sleep 5
+            done
+            echo "Waiting for ${name} to roll out..."
+            kubectl rollout status deployment/"${name}" -n $NAMESPACE --timeout=300s
+          }
+
+          wait_for_deployment netpol-matrix-quay-database
+          wait_for_deployment netpol-matrix-quay-redis
+          wait_for_deployment netpol-matrix-clair-postgres
 
   - name: positive-controls
     try:

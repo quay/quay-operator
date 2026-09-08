@@ -24,11 +24,22 @@ spec:
         shell: /bin/bash
         content: |
           set -euo pipefail
+
+          wait_for_deployment() {
+            local name="$1"
+            echo "Waiting for ${name} to be created by the operator..."
+            for i in $(seq 1 60); do
+              kubectl get deployment "${name}" -n $NAMESPACE &>/dev/null && break
+              [ "$i" -eq 60 ] && { echo "ERROR: ${name} not created in time"; exit 1; }
+              sleep 5
+            done
+            kubectl rollout status deployment/"${name}" -n $NAMESPACE --timeout=300s
+          }
+
           for reg in registry-a registry-b; do
-            echo "Waiting for ${reg} postgres deployment..."
-            kubectl rollout status deployment/${reg}-quay-database -n $NAMESPACE --timeout=300s
-            echo "Waiting for ${reg} redis deployment..."
-            kubectl rollout status deployment/${reg}-quay-redis -n $NAMESPACE --timeout=300s
+            echo "Waiting for ${reg} deployments..."
+            wait_for_deployment ${reg}-quay-database
+            wait_for_deployment ${reg}-quay-redis
           done
 
   - name: cross-registry-isolation
