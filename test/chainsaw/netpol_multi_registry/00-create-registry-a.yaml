@@ -1,0 +1,29 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: registry-a
+spec:
+  configBundleSecret: ($values.configBundle)
+  components:
+  - kind: quay
+    managed: true
+  - kind: clair
+    managed: false
+  - kind: postgres
+    managed: true
+  - kind: redis
+    managed: true
+  - kind: mirror
+    managed: false
+  - kind: clairpostgres
+    managed: false
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: objectstorage
+    managed: false
+  - kind: route
+    managed: false
+  - kind: monitoring
+    managed: false
+  - kind: tls
+    managed: false

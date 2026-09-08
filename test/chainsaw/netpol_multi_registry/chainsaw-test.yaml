@@ -1,0 +1,113 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: netpol-multi-registry
+spec:
+  concurrent: false
+  steps:
+  - name: create-registries
+    try:
+    - script:
+        content: |
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            exit 0
+          fi
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="FEATURE_MAILING: false" 2>/dev/null || true
+    - apply:
+        file: 00-create-registry-a.yaml
+    - apply:
+        file: 00-create-registry-b.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          for reg in registry-a registry-b; do
+            echo "Waiting for ${reg} postgres deployment..."
+            kubectl rollout status deployment/${reg}-quay-database -n $NAMESPACE --timeout=300s
+            echo "Waiting for ${reg} redis deployment..."
+            kubectl rollout status deployment/${reg}-quay-redis -n $NAMESPACE --timeout=300s
+          done
+
+  - name: cross-registry-isolation
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          NS="$NAMESPACE"
+
+          # Kustomize injects quay-operator/quayregistry: <name> into every
+          # spec.ingress[].from[].podSelector via commonLabels. This means
+          # postgres-a's ingress rule requires BOTH quay-component=quay-app AND
+          # quay-operator/quayregistry=registry-a. A quay-app pod from registry-b
+          # (which carries quay-operator/quayregistry=registry-b) is therefore denied.
+
+          create_probe() {
+            local name="$1" src_reg="$2" host="$3" port="$4" expect_allow="$5"
+            local cmd
+            if [ "$expect_allow" = "true" ]; then
+              cmd="nc -z -w 5 ${host} ${port} && echo PASS || { echo FAIL; exit 1; }"
+            else
+              cmd="nc -z -w 5 ${host} ${port} && { echo FAIL; exit 1; } || echo PASS"
+            fi
+            kubectl apply -f - <<JOBEOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: ${name}
+            namespace: ${NS}
+          spec:
+            backoffLimit: 0
+            ttlSecondsAfterFinished: 120
+            template:
+              metadata:
+                labels:
+                  quay-component: quay-app
+                  quay-operator/quayregistry: ${src_reg}
+              spec:
+                restartPolicy: Never
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  allowPrivilegeEscalation: false
+                containers:
+                - name: probe
+                  image: busybox:stable
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop: [ALL]
+                  command: ["sh", "-c", "${cmd}"]
+          JOBEOF
+          }
+
+          # Positive controls: each registry's quay-app can reach its own postgres/redis
+          create_probe "probe-a-to-pg-a"    registry-a registry-a-quay-database 5432 true
+          create_probe "probe-b-to-pg-b"    registry-b registry-b-quay-database 5432 true
+          create_probe "probe-a-to-redis-a" registry-a registry-a-quay-redis    6379 true
+          create_probe "probe-b-to-redis-b" registry-b registry-b-quay-redis    6379 true
+
+          # Isolation checks: cross-registry access must be denied
+          create_probe "probe-a-to-pg-b"    registry-a registry-b-quay-database 5432 false
+          create_probe "probe-b-to-pg-a"    registry-b registry-a-quay-database 5432 false
+          create_probe "probe-a-to-redis-b" registry-a registry-b-quay-redis    6379 false
+          create_probe "probe-b-to-redis-a" registry-b registry-a-quay-redis    6379 false
+
+          echo "Waiting for all probes to complete..."
+          for job in \
+              probe-a-to-pg-a    probe-b-to-pg-b    \
+              probe-a-to-redis-a probe-b-to-redis-b  \
+              probe-a-to-pg-b    probe-b-to-pg-a    \
+              probe-a-to-redis-b probe-b-to-redis-a; do
+            kubectl wait job/${job} -n ${NS} --for=condition=complete --timeout=90s \
+              || {
+                echo "FAIL: ${job}"
+                kubectl logs job/${job} -n ${NS} 2>/dev/null || true
+                exit 1
+              }
+            RESULT=$(kubectl logs job/${job} -n ${NS} 2>/dev/null || echo "no logs")
+            echo "${job}: ${RESULT}"
+          done

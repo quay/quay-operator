@@ -1,0 +1,132 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: netpol-dns
+spec:
+  concurrent: false
+  steps:
+  - name: create-registry
+    try:
+    - script:
+        content: |
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            exit 0
+          fi
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="FEATURE_MAILING: false" 2>/dev/null || true
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Waiting for default-deny-all NetworkPolicy..."
+          for i in $(seq 1 60); do
+            kubectl get networkpolicy dns-test-default-deny-all \
+              -n $NAMESPACE &>/dev/null && { echo "PASS: default-deny-all exists"; break; }
+            [ "$i" -eq 60 ] && { echo "FAIL: default-deny-all not created"; exit 1; }
+            sleep 5
+          done
+          echo "Waiting for default-allow-dns-egress NetworkPolicy..."
+          for i in $(seq 1 60); do
+            kubectl get networkpolicy dns-test-default-allow-dns-egress \
+              -n $NAMESPACE &>/dev/null && { echo "PASS: default-allow-dns-egress exists"; break; }
+            [ "$i" -eq 60 ] && { echo "FAIL: default-allow-dns-egress not created"; exit 1; }
+            sleep 5
+          done
+
+  - name: dns-isolation-probes
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          NS="$NAMESPACE"
+          REG="dns-test"
+
+          # Locate the cluster DNS service IP (handles both plain Kubernetes and OpenShift).
+          KUBE_DNS_IP=$(kubectl get svc kube-dns -n kube-system \
+            -o jsonpath='{.spec.clusterIP}' 2>/dev/null \
+            || kubectl get svc dns-default -n openshift-dns \
+            -o jsonpath='{.spec.clusterIP}' 2>/dev/null \
+            || echo "")
+          if [ -z "${KUBE_DNS_IP}" ]; then
+            echo "ERROR: could not determine cluster DNS service IP"
+            exit 1
+          fi
+          echo "Cluster DNS IP: ${KUBE_DNS_IP}"
+
+          # All probe Jobs carry quay-operator/quayregistry: dns-test but NO quay-component label.
+          # This places them under:
+          #   default-deny-all      → no ingress, no egress
+          #   default-allow-dns-egress → egress allowed on TCP+UDP port 53 only
+          # Any non-DNS egress must therefore be blocked.
+
+          create_probe() {
+            local name="$1" cmd="$2"
+            kubectl apply -f - <<JOBEOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: ${name}
+            namespace: ${NS}
+          spec:
+            backoffLimit: 0
+            ttlSecondsAfterFinished: 120
+            template:
+              metadata:
+                labels:
+                  quay-operator/quayregistry: ${REG}
+                  netpol-test: dns-probe
+              spec:
+                restartPolicy: Never
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 1000
+                  allowPrivilegeEscalation: false
+                containers:
+                - name: probe
+                  image: busybox:stable
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop: [ALL]
+                  command: ["sh", "-c", "${cmd}"]
+          JOBEOF
+          }
+
+          # 1. UDP DNS: nslookup uses UDP port 53 by default.
+          #    default-allow-dns-egress permits this; resolution must succeed.
+          create_probe "probe-udp-dns" \
+            "nslookup kubernetes.default.svc.cluster.local \
+               && echo 'PASS: UDP DNS resolution succeeded' \
+               || { echo 'FAIL: UDP DNS resolution failed'; exit 1; }"
+
+          # 2. TCP DNS: explicit TCP connection to cluster-dns:53.
+          #    default-allow-dns-egress permits TCP port 53; connection must succeed.
+          create_probe "probe-tcp-dns" \
+            "nc -z -w 5 ${KUBE_DNS_IP} 53 \
+               && echo 'PASS: TCP DNS (port 53) reachable' \
+               || { echo 'FAIL: TCP DNS unreachable'; exit 1; }"
+
+          # 3. Non-DNS egress denied: the Kubernetes API server listens on 443.
+          #    DNS resolution of the name uses port 53 (allowed), but the TCP
+          #    connection to port 443 is not DNS and must be blocked by default-deny-all.
+          create_probe "probe-deny-non-dns" \
+            "nc -z -w 5 kubernetes.default.svc.cluster.local 443 \
+               && { echo 'FAIL: non-DNS egress reached kubernetes:443 (policy too permissive)'; exit 1; } \
+               || echo 'PASS: non-DNS egress correctly blocked'"
+
+          echo "Waiting for DNS probes to complete..."
+          for job in probe-udp-dns probe-tcp-dns probe-deny-non-dns; do
+            kubectl wait job/${job} -n ${NS} --for=condition=complete --timeout=60s \
+              || {
+                echo "FAIL: ${job} did not complete as expected"
+                kubectl logs job/${job} -n ${NS} 2>/dev/null || true
+                exit 1
+              }
+            RESULT=$(kubectl logs job/${job} -n ${NS} 2>/dev/null || echo "no logs")
+            echo "${job}: ${RESULT}"
+          done
