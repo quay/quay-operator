@@ -188,3 +188,26 @@ spec:
               exit 1
             }
           kubectl logs job/probe-quayapp-ext-postgres-5433 -n ${NS}
+
+  - name: registry-delete-and-cleanup
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Deleting QuayRegistry and waiting for it to be removed..."
+          kubectl delete quayregistry unmanaged-egress -n $NAMESPACE \
+            --wait=true --timeout=180s
+          echo "Waiting for owned NetworkPolicies to be garbage-collected (up to 3 minutes)..."
+          for i in $(seq 1 18); do
+            COUNT=$(kubectl get networkpolicy -n $NAMESPACE -o name 2>/dev/null \
+              | grep -c "unmanaged-egress" || true)
+            [ "${COUNT}" -eq 0 ] \
+              && { echo "PASS: all NetworkPolicies removed after QuayRegistry deletion"; break; }
+            [ "$i" -eq 18 ] && {
+              echo "FAIL: ${COUNT} NetworkPolicies still exist:"
+              kubectl get networkpolicy -n $NAMESPACE | grep "unmanaged-egress" || true
+              exit 1
+            }
+            sleep 10
+          done
