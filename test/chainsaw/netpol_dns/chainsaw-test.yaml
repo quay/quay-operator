@@ -92,7 +92,7 @@ spec:
           if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
             RUN_AS_USER=""
           else
-            RUN_AS_USER=$'\n                  runAsUser: 1000'
+            RUN_AS_USER=$'\n                runAsUser: 1000'
           fi
 
           # Locate the cluster DNS service IP (handles both plain Kubernetes and OpenShift).
