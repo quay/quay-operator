@@ -85,6 +85,16 @@ spec:
           NS="$NAMESPACE"
           REG="dns-test"
 
+          # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
+          # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
+          # OpenShift the restricted SCC assigns a UID from the namespace range and a
+          # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            RUN_AS_USER=""
+          else
+            RUN_AS_USER=$'\n                  runAsUser: 1000'
+          fi
+
           # Locate the cluster DNS service IP (handles both plain Kubernetes and OpenShift).
           KUBE_DNS_IP=$(kubectl get svc kube-dns -n kube-system \
             -o jsonpath='{.spec.clusterIP}' 2>/dev/null \
@@ -122,8 +132,9 @@ spec:
               spec:
                 restartPolicy: Never
                 securityContext:
-                  runAsNonRoot: true
-                  runAsUser: 1000
+                  runAsNonRoot: true${RUN_AS_USER}
+                  seccompProfile:
+                    type: RuntimeDefault
                 containers:
                 - name: probe
                   image: busybox:stable
