@@ -11,6 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -70,6 +71,55 @@ func TestOwnedByQuayRequiresMatchingUID(t *testing.T) {
 	quay.UID = ""
 	secret.OwnerReferences[0].UID = types.UID("quay-uid")
 	assert.False(t, ownedByQuay(secret, quay))
+}
+
+func TestDeleteReadOnlySecretRequiresOwnership(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+	}
+
+	unowned := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      readOnlySecretName(quay),
+			Namespace: "ns",
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(s).WithObjects(quay, unowned).Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+
+	err := reconciler.deleteReadOnlySecret(context.Background(), quay)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not owned by this QuayRegistry")
+
+	var got corev1.Secret
+	require.NoError(t, client.Get(context.Background(), types.NamespacedName{Name: unowned.Name, Namespace: unowned.Namespace}, &got))
+
+	owned := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      readOnlySecretName(quay),
+			Namespace: "ns",
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: v1.GroupVersion.String(),
+				Kind:       "QuayRegistry",
+				Name:       "registry",
+				UID:        types.UID("quay-uid"),
+			}},
+		},
+	}
+	client = fake.NewClientBuilder().WithScheme(s).WithObjects(quay, owned).Build()
+	reconciler = &QuayRegistryReconciler{Client: client}
+
+	require.NoError(t, reconciler.deleteReadOnlySecret(context.Background(), quay))
+	err = client.Get(context.Background(), types.NamespacedName{Name: owned.Name, Namespace: owned.Namespace}, &got)
+	assert.True(t, errors.IsNotFound(err))
 }
 
 func TestConditionEventTypeWarnsForComponentCreationFailures(t *testing.T) {
