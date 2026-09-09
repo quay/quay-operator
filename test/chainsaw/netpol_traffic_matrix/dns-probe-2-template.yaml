@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${NAME}
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 120
+  template:
+    metadata:
+      labels:
+        netpol-test: untrusted
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: ${RUN_AS_USER}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: probe
+        image: busybox:stable
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+        command:
+        - sh
+        - -c
+        - |
+          nc -z -w 5 ${HOST} ${PORT} \
+            && { echo "FAIL: untrusted pod reached ${HOST}:${PORT} (expected deny)"; exit 1; } \
+            || echo "PASS: correctly denied to ${HOST}:${PORT}"

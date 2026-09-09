@@ -49,17 +49,18 @@ spec:
         shell: /bin/bash
         content: |
           set -euo pipefail
-          REG="netpol-matrix"
+          export REG="netpol-matrix"
           NS="$NAMESPACE"
+          TEMPLATE_FILE=dns-probe-1-template.yaml
 
           # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
           # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
           # OpenShift the restricted SCC assigns a UID from the namespace range and a
           # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
           if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
-            RUN_AS_USER=""
+            export RUN_AS_USER=""
           else
-            RUN_AS_USER=$'\n                  runAsUser: 1000'
+            export RUN_AS_USER=1000
           fi
 
           # Helper: create a probe Job that must successfully connect to host:port.
@@ -67,42 +68,11 @@ spec:
           # matching allow policy grants it the required egress and the target's ingress
           # policy recognises it as an authorised peer.
           create_allow_probe() {
-            local name="$1" host="$2" port="$3" component="$4"
-            kubectl apply -f - <<JOBEOF
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: ${name}
-            namespace: ${NS}
-          spec:
-            backoffLimit: 0
-            ttlSecondsAfterFinished: 120
-            template:
-              metadata:
-                labels:
-                  quay-component: ${component}
-                  quay-operator/quayregistry: ${REG}
-              spec:
-                restartPolicy: Never
-                securityContext:
-                  runAsNonRoot: true${RUN_AS_USER}
-                  seccompProfile:
-                    type: RuntimeDefault
-                containers:
-                - name: probe
-                  image: busybox:stable
-                  securityContext:
-                    allowPrivilegeEscalation: false
-                    capabilities:
-                      drop: [ALL]
-                  command:
-                  - sh
-                  - -c
-                  - |
-                    nc -z -w 5 ${host} ${port} \
-                      && echo "PASS: ${component} reached ${host}:${port}" \
-                      || { echo "FAIL: ${component} could not reach ${host}:${port}"; exit 1; }
-          JOBEOF
+            export NAME="$1" 
+            export HOST="$2" 
+            export PORT="$3" 
+            export COMPONENT="$4"
+            envsubst '${NAME} ${REG} ${RUN_AS_USER} ${HOST} ${PORT} ${COMPONENT}' < "${TEMPLATE_FILE}" | kubectl apply -f - -n $NAMESPACE
           }
 
           create_allow_probe "probe-quayapp-postgres"    "${REG}-quay-database"  5432 quay-app
@@ -145,6 +115,7 @@ spec:
           set -euo pipefail
           REG="netpol-matrix"
           NS="$NAMESPACE"
+          TEMPLATE_FILE=dns-probe-2-template.yaml
 
           # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
           # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
@@ -153,7 +124,7 @@ spec:
           if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
             RUN_AS_USER=""
           else
-            RUN_AS_USER=$'\n                  runAsUser: 1000'
+            RUN_AS_USER=1000
           fi
 
           # Untrusted probe: carries NO quay-component or quay-operator/quayregistry labels.
@@ -162,41 +133,10 @@ spec:
           # carrying specific (quay-component, quay-operator/quayregistry) label pairs —
           # the untrusted probe is rejected by the target's ingress rule.
           create_deny_probe() {
-            local name="$1" host="$2" port="$3"
-            kubectl apply -f - <<JOBEOF
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: ${name}
-            namespace: ${NS}
-          spec:
-            backoffLimit: 0
-            ttlSecondsAfterFinished: 120
-            template:
-              metadata:
-                labels:
-                  netpol-test: untrusted
-              spec:
-                restartPolicy: Never
-                securityContext:
-                  runAsNonRoot: true${RUN_AS_USER}
-                  seccompProfile:
-                    type: RuntimeDefault
-                containers:
-                - name: probe
-                  image: busybox:stable
-                  securityContext:
-                    allowPrivilegeEscalation: false
-                    capabilities:
-                      drop: [ALL]
-                  command:
-                  - sh
-                  - -c
-                  - |
-                    nc -z -w 5 ${host} ${port} \
-                      && { echo "FAIL: untrusted pod reached ${host}:${port} (expected deny)"; exit 1; } \
-                      || echo "PASS: correctly denied to ${host}:${port}"
-          JOBEOF
+            export NAME="$1" 
+            export HOST="$2" 
+            export PORT="$3"
+            envsubst '${NAME} ${RUN_AS_USER} ${HOST} ${PORT}' < "${TEMPLATE_FILE}" | kubectl apply -f - -n $NAMESPACE    
           }
 
           create_deny_probe "probe-deny-postgres"    "${REG}-quay-database"  5432

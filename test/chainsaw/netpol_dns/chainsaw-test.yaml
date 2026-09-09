@@ -83,16 +83,17 @@ spec:
         content: |
           set -euo pipefail
           NS="$NAMESPACE"
-          REG="dns-test"
+          export REG="dns-test"
+          TEMPLATE_FILE=probe-template.yaml
 
           # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
           # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
           # OpenShift the restricted SCC assigns a UID from the namespace range and a
           # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
           if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
-            RUN_AS_USER=""
+            export RUN_AS_USER=""
           else
-            RUN_AS_USER=$'\n                runAsUser: 1000'
+            export RUN_AS_USER=1000
           fi
 
           # Locate the cluster DNS service IP (handles both plain Kubernetes and OpenShift).
@@ -114,36 +115,9 @@ spec:
           # Any non-DNS egress must therefore be blocked.
 
           create_probe() {
-            local name="$1" cmd="$2"
-            kubectl apply -f - <<JOBEOF
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: ${name}
-            namespace: ${NS}
-          spec:
-            backoffLimit: 0
-            ttlSecondsAfterFinished: 120
-            template:
-              metadata:
-                labels:
-                  quay-operator/quayregistry: ${REG}
-                  netpol-test: dns-probe
-              spec:
-                restartPolicy: Never
-                securityContext:
-                  runAsNonRoot: true${RUN_AS_USER}
-                  seccompProfile:
-                    type: RuntimeDefault
-                containers:
-                - name: probe
-                  image: busybox:stable
-                  securityContext:
-                    allowPrivilegeEscalation: false
-                    capabilities:
-                      drop: [ALL]
-                  command: ["sh", "-c", "${cmd}"]
-          JOBEOF
+            export NAME="$1"
+            export CMD="$2"
+            envsubst '${NAME} ${CMD} ${REG} ${RUN_AS_USER}' < "${TEMPLATE_FILE}" | kubectl apply -f - -n $NAMESPACE
           }
 
           # 1. UDP DNS: nslookup uses UDP port 53 by default.

@@ -54,15 +54,16 @@ spec:
         content: |
           set -euo pipefail
           NS="$NAMESPACE"
+          TEMPLATE_FILE=dns-probe-template.yaml
 
           # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
           # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
           # OpenShift the restricted SCC assigns a UID from the namespace range and a
           # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
           if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
-            RUN_AS_USER=""
+            export RUN_AS_USER=""
           else
-            RUN_AS_USER=$'\n                  runAsUser: 1000'
+            export RUN_AS_USER=1000
           fi
 
           # Kustomize injects quay-operator/quayregistry: <name> into every
@@ -72,42 +73,19 @@ spec:
           # (which carries quay-operator/quayregistry=registry-b) is therefore denied.
 
           create_probe() {
-            local name="$1" src_reg="$2" host="$3" port="$4" expect_allow="$5"
-            local cmd
-            if [ "$expect_allow" = "true" ]; then
-              cmd="nc -z -w 5 ${host} ${port} && echo PASS || { echo FAIL; exit 1; }"
+            export NAME="$1" 
+            export SRC_REG="$2" 
+            export HOST="$3" 
+            export PORT="$4" 
+            export EXPECT_ALLOW="$5"
+            export CMD
+            if [ "$EXPECT_ALLOW" = "true" ]; then
+              CMD="nc -z -w 5 ${HOST} ${PORT} && echo PASS || { echo FAIL; exit 1; }"
             else
-              cmd="nc -z -w 5 ${host} ${port} && { echo FAIL; exit 1; } || echo PASS"
+              CMD="nc -z -w 5 ${HOST} ${PORT} && { echo FAIL; exit 1; } || echo PASS"
             fi
-            kubectl apply -f - <<JOBEOF
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: ${name}
-            namespace: ${NS}
-          spec:
-            backoffLimit: 0
-            ttlSecondsAfterFinished: 120
-            template:
-              metadata:
-                labels:
-                  quay-component: quay-app
-                  quay-operator/quayregistry: ${src_reg}
-              spec:
-                restartPolicy: Never
-                securityContext:
-                  runAsNonRoot: true${RUN_AS_USER}
-                  seccompProfile:
-                    type: RuntimeDefault
-                containers:
-                - name: probe
-                  image: busybox:stable
-                  securityContext:
-                    allowPrivilegeEscalation: false
-                    capabilities:
-                      drop: [ALL]
-                  command: ["sh", "-c", "${cmd}"]
-          JOBEOF
+            
+            envsubst '${NAME} ${SRC_REG} ${RUN_AS_USER} $CMD' < ${TEMPLATE_FILE} | kubectl apply -f - -n $NAMESPACE
           }
 
           # Positive controls: each registry's quay-app can reach its own postgres/redis
