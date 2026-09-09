@@ -695,9 +695,17 @@ func applySTSCredentials(dep *appsv1.Deployment, qctx *quaycontext.QuayRegistryC
 		ReadOnly:  true,
 	}
 
-	envVar := corev1.EnvVar{
-		Name:  "AWS_SHARED_CREDENTIALS_FILE",
-		Value: "/aws-sts/credentials",
+	// The Go AWS SDK requires shared config loading to resolve the CCO profile's
+	// role_arn and web_identity_token_file fields. Boto3 reads the same profile.
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "AWS_SHARED_CREDENTIALS_FILE",
+			Value: "/aws-sts/credentials",
+		},
+		{
+			Name:  "AWS_SDK_LOAD_CONFIG",
+			Value: "true",
+		},
 	}
 
 	dep.Spec.Template.Spec.Volumes = upsertVolume(dep.Spec.Template.Spec.Volumes, credVolume)
@@ -707,7 +715,9 @@ func applySTSCredentials(dep *appsv1.Deployment, qctx *quaycontext.QuayRegistryC
 		ref := &dep.Spec.Template.Spec.Containers[i]
 		ref.VolumeMounts = upsertVolumeMount(ref.VolumeMounts, credMount)
 		ref.VolumeMounts = upsertVolumeMount(ref.VolumeMounts, tokenMount)
-		UpsertContainerEnv(ref, envVar)
+		for _, envVar := range envVars {
+			UpsertContainerEnv(ref, envVar)
+		}
 	}
 }
 
