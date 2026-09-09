@@ -11,11 +11,16 @@ spec:
     try:
     - script:
         content: |
-          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+          # This test is OpenShift-only (excluded from KinD in the Makefile): deploying
+          # two full registries in one namespace is beyond KinD's resource budget, and
+          # each unmanaged-storage registry would additionally need its own object-storage
+          # backend. On OpenShift object storage is operator-managed (managedObjectStorage:
+          # true, configBundle: ""), so no config bundle needs to be created here.
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            echo "OpenShift detected: object storage is managed, no config bundle needed"
             exit 0
           fi
-          kubectl create secret generic reconcile-config -n $NAMESPACE \
-            --from-literal=config.yaml="FEATURE_MAILING: false" 2>/dev/null || true
+          echo "OpenShift-only test (excluded from KinD): no unmanaged-storage bundle created"
     - apply:
         file: 00-create-registry-a.yaml
     - apply:
@@ -50,6 +55,16 @@ spec:
           set -euo pipefail
           NS="$NAMESPACE"
 
+          # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
+          # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
+          # OpenShift the restricted SCC assigns a UID from the namespace range and a
+          # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            RUN_AS_USER=""
+          else
+            RUN_AS_USER=$'\n                  runAsUser: 1000'
+          fi
+
           # Kustomize injects quay-operator/quayregistry: <name> into every
           # spec.ingress[].from[].podSelector via commonLabels. This means
           # postgres-a's ingress rule requires BOTH quay-component=quay-app AND
@@ -81,9 +96,9 @@ spec:
               spec:
                 restartPolicy: Never
                 securityContext:
-                  runAsNonRoot: true
-                  runAsUser: 1000
-                  allowPrivilegeEscalation: false
+                  runAsNonRoot: true${RUN_AS_USER}
+                  seccompProfile:
+                    type: RuntimeDefault
                 containers:
                 - name: probe
                   image: busybox:stable

@@ -106,39 +106,8 @@ spec:
               --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
           fi
           echo "Config bundle created"
-
-          kubectl apply -f - <<REGEOF
-          apiVersion: quay.redhat.com/v1
-          kind: QuayRegistry
-          metadata:
-            name: unmanaged-egress
-            namespace: ${NAMESPACE}
-          spec:
-            configBundleSecret: unmanaged-egress-config
-            components:
-            - kind: quay
-              managed: true
-            - kind: clair
-              managed: false
-            - kind: postgres
-              managed: false
-            - kind: clairpostgres
-              managed: false
-            - kind: redis
-              managed: true
-            - kind: mirror
-              managed: false
-            - kind: horizontalpodautoscaler
-              managed: false
-            - kind: objectstorage
-              managed: false
-            - kind: route
-              managed: false
-            - kind: monitoring
-              managed: false
-            - kind: tls
-              managed: false
-          REGEOF
+    - apply:
+        file: 01-create-quay-registry.yaml
 
   - name: assert-netpol-lifecycle
     try:
@@ -195,6 +164,16 @@ spec:
           NS="$NAMESPACE"
           REG="unmanaged-egress"
 
+          # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
+          # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
+          # OpenShift the restricted SCC assigns a UID from the namespace range and a
+          # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            RUN_AS_USER=""
+          else
+            RUN_AS_USER=$'\n                  runAsUser: 1000'
+          fi
+
           # Explicit probe: a pod carrying quay-app labels attempts to reach the
           # external postgres on non-default port 5433.  quay-app-allow-all gives it
           # unrestricted egress so this must succeed.
@@ -215,8 +194,9 @@ spec:
               spec:
                 restartPolicy: Never
                 securityContext:
-                  runAsNonRoot: true
-                  runAsUser: 1000
+                  runAsNonRoot: true${RUN_AS_USER}
+                  seccompProfile:
+                    type: RuntimeDefault
                 containers:
                 - name: probe
                   image: busybox:stable

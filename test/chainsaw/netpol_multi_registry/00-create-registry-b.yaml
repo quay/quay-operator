@@ -20,10 +20,10 @@ spec:
   - kind: horizontalpodautoscaler
     managed: false
   - kind: objectstorage
-    managed: false
+    managed: ($values.managedObjectStorage)
   - kind: route
-    managed: false
+    managed: ($values.managedRoute)
   - kind: monitoring
-    managed: false
+    managed: ($values.managedMonitoring)
   - kind: tls
-    managed: false
+    managed: ($values.managedTLS)
