@@ -1033,11 +1033,11 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// new secret before we remove the old one, eliminating the FailedMount warning
 	// described in PROJQUAY-9157.
 	if len(previousSecrets) > 0 {
-		rolledOut, err := r.readOnlyDeploymentsRolledOut(ctx, updatedQuay)
+		rolledOut, err := r.quayAppDeploymentRolledOut(ctx, updatedQuay)
 		if err != nil {
-			log.Error(err, "could not check config-consuming workload rollout status, deferring old config secret cleanup")
+			log.Error(err, "could not check quay-app rollout status, deferring old config secret cleanup")
 		} else if !rolledOut {
-			log.Info("config-consuming workload rollout in progress, deferring old config secret cleanup")
+			log.Info("quay-app rollout in progress, deferring old config secret cleanup")
 		} else {
 			if err := r.cleanupPreviousSecrets(log, ctx, &quay, previousSecrets); err != nil {
 				return r.reconcileWithCondition(
