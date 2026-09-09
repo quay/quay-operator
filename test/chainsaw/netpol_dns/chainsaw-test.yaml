@@ -158,3 +158,26 @@ spec:
             RESULT=$(kubectl logs job/${job} -n ${NS} 2>/dev/null || echo "no logs")
             echo "${job}: ${RESULT}"
           done
+
+  - name: registry-delete-and-cleanup
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Deleting QuayRegistry and waiting for it to be removed..."
+          kubectl delete quayregistry dns-test -n $NAMESPACE \
+            --wait=true --timeout=180s
+          echo "Waiting for owned NetworkPolicies to be garbage-collected (up to 3 minutes)..."
+          for i in $(seq 1 18); do
+            COUNT=$(kubectl get networkpolicy -n $NAMESPACE -o name 2>/dev/null \
+              | grep -c "dns-test" || true)
+            [ "${COUNT}" -eq 0 ] \
+              && { echo "PASS: all NetworkPolicies removed after QuayRegistry deletion"; break; }
+            [ "$i" -eq 18 ] && {
+              echo "FAIL: ${COUNT} NetworkPolicies still exist:"
+              kubectl get networkpolicy -n $NAMESPACE | grep "dns-test" || true
+              exit 1
+            }
+            sleep 10
+          done
