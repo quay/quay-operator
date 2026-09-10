@@ -204,7 +204,7 @@ func (r *QuayRegistryReconciler) observeReadOnlyLifecycle(
 		if err := r.verifyReadOnlyKey(ctx, quay); err != nil {
 			return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDegraded, err.Error(), true)
 		}
-		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionTrue, v1.ConditionReasonReadOnlyActive, "operator-managed read-only mode is active", false)
+		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionTrue, v1.ConditionReasonReadOnlyActive, readOnlyActiveConditionMessage(quay, qctx), false)
 	case v1.ReadOnlyPhaseExitingReadOnly:
 		return r.observeExitingReadOnly(ctx, quay, qctx, log)
 	default:
@@ -258,7 +258,7 @@ func (r *QuayRegistryReconciler) observeEnteringReadOnly(
 	}
 
 	quay.Status.ReadOnlyPhase = v1.ReadOnlyPhaseReadOnly
-	return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionTrue, v1.ConditionReasonReadOnlyActive, "operator-managed read-only mode is active", true)
+	return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionTrue, v1.ConditionReasonReadOnlyActive, readOnlyActiveConditionMessage(quay, qctx), true)
 }
 
 func (r *QuayRegistryReconciler) observeExitingReadOnly(
@@ -355,6 +355,22 @@ func (r *QuayRegistryReconciler) readOnlyStatusDecision(ctx context.Context, qua
 		return readOnlyDecision{Stop: true, Result: r.Requeue, Err: err}
 	}
 	return readOnlyDecision{Stop: true, Result: r.Requeue}
+}
+
+func readOnlyActiveConditionMessage(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext) string {
+	const activeMessage = "operator-managed read-only mode is active"
+	if qctx == nil ||
+		!qctx.ReadOnlyDeferUpgrade ||
+		quay.Status.CurrentVersion == "" ||
+		v1.QuayVersionCurrent == "" ||
+		quay.Status.CurrentVersion == v1.QuayVersionCurrent {
+		return activeMessage
+	}
+	return fmt.Sprintf(
+		"operator upgrade from %s to %s deferred while operator-managed read-only mode is active",
+		quay.Status.CurrentVersion,
+		v1.QuayVersionCurrent,
+	)
 }
 
 func readOnlySecretName(quay *v1.QuayRegistry) string {

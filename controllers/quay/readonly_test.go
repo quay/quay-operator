@@ -179,6 +179,39 @@ func TestUpdateReadOnlyConditionSkipsUnchangedCondition(t *testing.T) {
 	assert.Equal(t, lastTransition, condition.LastTransitionTime)
 }
 
+func TestReadOnlyActiveConditionMessageReportsDeferredUpgrade(t *testing.T) {
+	originalVersion := v1.QuayVersionCurrent
+	v1.QuayVersionCurrent = "v3.20.0"
+	defer func() {
+		v1.QuayVersionCurrent = originalVersion
+	}()
+
+	quay := &v1.QuayRegistry{
+		Status: v1.QuayRegistryStatus{
+			CurrentVersion: "v3.19.0",
+		},
+	}
+
+	assert.Equal(
+		t,
+		"operator-managed read-only mode is active",
+		readOnlyActiveConditionMessage(quay, &quaycontext.QuayRegistryContext{}),
+	)
+
+	assert.Equal(
+		t,
+		"operator upgrade from v3.19.0 to v3.20.0 deferred while operator-managed read-only mode is active",
+		readOnlyActiveConditionMessage(quay, &quaycontext.QuayRegistryContext{ReadOnlyDeferUpgrade: true}),
+	)
+
+	quay.Status.CurrentVersion = "v3.20.0"
+	assert.Equal(
+		t,
+		"operator-managed read-only mode is active",
+		readOnlyActiveConditionMessage(quay, &quaycontext.QuayRegistryContext{ReadOnlyDeferUpgrade: true}),
+	)
+}
+
 func TestReadOnlyOperatorConfigConflictDetectsFragments(t *testing.T) {
 	source, err := yaml.Marshal(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"})
 	require.NoError(t, err)
