@@ -72,7 +72,11 @@ spec:
             export HOST="$2" 
             export PORT="$3" 
             export COMPONENT="$4"
-            envsubst '${NAME} ${REG} ${RUN_AS_USER} ${HOST} ${PORT} ${COMPONENT}' < "${TEMPLATE_FILE}" | kubectl apply -f - -n $NAMESPACE
+
+            # since we don't have envsubst available in Prow, use python3 to expand
+            # env. variables
+            python3 -c "import string, os; print(string.Template(open('${TEMPLATE_FILE}').read()).safe_substitute(os.environ));" \
+              | kubectl apply -f - -n $NAMESPACE
           }
 
           create_allow_probe "probe-quayapp-postgres"    "${REG}-quay-database"  5432 quay-app
@@ -122,9 +126,9 @@ spec:
           # OpenShift the restricted SCC assigns a UID from the namespace range and a
           # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
           if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
-            RUN_AS_USER=""
+            export RUN_AS_USER=""
           else
-            RUN_AS_USER=1000
+            export RUN_AS_USER=1000
           fi
 
           # Untrusted probe: carries NO quay-component or quay-operator/quayregistry labels.
@@ -136,7 +140,11 @@ spec:
             export NAME="$1" 
             export HOST="$2" 
             export PORT="$3"
-            envsubst '${NAME} ${RUN_AS_USER} ${HOST} ${PORT}' < "${TEMPLATE_FILE}" | kubectl apply -f - -n $NAMESPACE    
+
+            # since we don't have envsubst available in Prow, use python3 to expand
+            # env. variables
+            python3 -c "import string, os; print(string.Template(open('${TEMPLATE_FILE}').read()).safe_substitute(os.environ));" \
+              | kubectl apply -f - -n $NAMESPACE   
           }
 
           create_deny_probe "probe-deny-postgres"    "${REG}-quay-database"  5432

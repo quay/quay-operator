@@ -117,7 +117,9 @@ spec:
           create_probe() {
             export NAME="$1"
             export CMD="$2"
-            envsubst '${NAME} ${CMD} ${REG} ${RUN_AS_USER}' < "${TEMPLATE_FILE}" | kubectl apply -f - -n $NAMESPACE
+            # since we don't have envsubst available in Prow, use python3 to expand env. variables
+            python3 -c "import string, os; print(string.Template(open('${TEMPLATE_FILE}').read()).safe_substitute(os.environ));" \
+              | kubectl apply -f - -n $NAMESPACE
           }
 
           # 1. UDP DNS: nslookup uses UDP port 53 by default.
