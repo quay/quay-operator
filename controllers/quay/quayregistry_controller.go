@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -55,7 +56,9 @@ import (
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
+	"github.com/quay/quay-operator/pkg/credentialsrequest"
 	"github.com/quay/quay-operator/pkg/kustomize"
+	"github.com/quay/quay-operator/pkg/middleware"
 )
 
 const (
@@ -84,10 +87,11 @@ type QuayRegistryReconciler struct {
 	Requeue              ctrl.Result
 	SkipResourceRequests bool
 
-	// Cached route discovery results (write-once, read-many)
-	supportsRoutes      bool
-	clusterHostname     atomic.Pointer[string]
-	clusterWildcardCert atomic.Pointer[[]byte]
+	// Cached API discovery results (write-once, read-many)
+	supportsRoutes             bool
+	supportsCredentialsRequest bool
+	clusterHostname            atomic.Pointer[string]
+	clusterWildcardCert        atomic.Pointer[[]byte]
 }
 
 // manageQuayDeletion makes sure that we process a QuayRegistry once it is flagged for
@@ -506,6 +510,239 @@ func (r *QuayRegistryReconciler) cleanupProgrammaticBootstrapTokenResources(
 	return nil
 }
 
+const (
+	stsCredentialRequestSuffix    = "aws-credentials"
+	stsCredentialSecretSuffix     = "aws-sts-credentials"
+	stsCloudTokenPath             = "/var/run/secrets/openshift/serviceaccount/token"
+	stsProvisionTimeout           = 5 * time.Minute
+	stsRequestTimestampAnnotation = "quay.redhat.com/sts-requested-at"
+)
+
+// ensureCredentialsRequest creates or updates the CredentialsRequest for STS
+// authentication and checks whether CCO has provisioned the resulting Secret.
+func (r *QuayRegistryReconciler) ensureCredentialsRequest(
+	ctx context.Context,
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+) (ctrl.Result, error) {
+	if !qctx.StorageSTSEnabled {
+		return ctrl.Result{}, nil
+	}
+
+	crName := fmt.Sprintf("%s-%s", quay.GetName(), stsCredentialRequestSuffix)
+	secretName := fmt.Sprintf("%s-%s", quay.GetName(), stsCredentialSecretSuffix)
+	saName := fmt.Sprintf("%s-quay-app", quay.GetName())
+
+	desired, err := credentialsrequest.NewCredentialsRequest(
+		crName, quay.GetNamespace(),
+		secretName, quay.GetNamespace(),
+		qctx.STSRoleARN, stsCloudTokenPath,
+		[]string{saName}, qctx.STSStorageBuckets,
+	)
+	if err != nil {
+		return r.Requeue, fmt.Errorf("unable to build CredentialsRequest: %w", err)
+	}
+
+	desired.SetOwnerReferences([]metav1.OwnerReference{credentialsRequestOwnerReference(quay)})
+	desired.SetAnnotations(map[string]string{
+		stsRequestTimestampAnnotation: time.Now().UTC().Format(time.RFC3339Nano),
+	})
+
+	var existing unstructured.Unstructured
+	existing.SetGroupVersionKind(credentialsrequest.CredentialsRequestGVK)
+	err = r.Get(ctx, types.NamespacedName{Name: crName, Namespace: quay.GetNamespace()}, &existing)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return r.Requeue, fmt.Errorf("unable to get CredentialsRequest: %w", err)
+		}
+
+		r.Log.Info("creating CredentialsRequest for STS", "name", crName)
+		if err := r.Create(ctx, desired); err != nil {
+			return r.Requeue, fmt.Errorf("unable to create CredentialsRequest: %w", err)
+		}
+
+		qctx.STSCredentialProvisioned = false
+		return r.Requeue, nil
+	}
+
+	if !credentialsRequestOwnedBy(&existing, quay) {
+		return r.Requeue, fmt.Errorf("CredentialsRequest %s/%s already exists and is not owned by this QuayRegistry", quay.GetNamespace(), crName)
+	}
+
+	// Update the CredentialsRequest if its spec has changed.
+	existingSpec, _, _ := unstructured.NestedMap(existing.Object, "spec")
+	desiredSpec, _, _ := unstructured.NestedMap(desired.Object, "spec")
+	if !reflect.DeepEqual(existingSpec, desiredSpec) {
+		r.Log.Info("updating CredentialsRequest spec", "name", crName)
+		existing.Object["spec"] = desired.Object["spec"]
+		annotations := existing.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		annotations[stsRequestTimestampAnnotation] = time.Now().UTC().Format(time.RFC3339Nano)
+		existing.SetAnnotations(annotations)
+		if err := r.Update(ctx, &existing); err != nil {
+			return r.Requeue, fmt.Errorf("unable to update CredentialsRequest: %w", err)
+		}
+		return r.Requeue, nil
+	}
+
+	provisioned, _, err := unstructured.NestedBool(existing.Object, "status", "provisioned")
+	if err != nil {
+		return r.Requeue, fmt.Errorf("unable to read CredentialsRequest provisioned status: %w", err)
+	}
+	lastSyncGeneration, _, err := unstructured.NestedInt64(existing.Object, "status", "lastSyncGeneration")
+	if err != nil {
+		return r.Requeue, fmt.Errorf("unable to read CredentialsRequest sync generation: %w", err)
+	}
+	if !provisioned || lastSyncGeneration != existing.GetGeneration() {
+		return r.waitForSTSCredentials(ctx, quay, &existing,
+			"Cloud Credential Operator has not provisioned the current CredentialsRequest generation")
+	}
+
+	var ccoSecret corev1.Secret
+	err = r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: quay.GetNamespace()}, &ccoSecret)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return r.Requeue, fmt.Errorf("unable to check CCO Secret: %w", err)
+		}
+		return r.waitForSTSCredentials(ctx, quay, &existing,
+			"Cloud Credential Operator has not created the requested Secret")
+	}
+
+	credentialsData, ok := ccoSecret.Data["credentials"]
+	if !ok {
+		return r.reconcileWithCondition(
+			ctx, quay,
+			v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
+			v1.ConditionReasonCredentialRequestNotProvisioned,
+			"CCO Secret exists but does not contain a 'credentials' key",
+		)
+	}
+	if err := validateSTSSharedCredentials(credentialsData, qctx.STSRoleARN, stsCloudTokenPath); err != nil {
+		return r.reconcileWithCondition(
+			ctx, quay,
+			v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
+			v1.ConditionReasonCredentialRequestNotProvisioned,
+			fmt.Sprintf("CCO Secret does not contain valid STS web identity credentials: %s", err),
+		)
+	}
+
+	qctx.STSCredentialSecretName = secretName
+	qctx.STSCredentialProvisioned = true
+	r.Log.Info("STS credentials provisioned by CCO", "secret", secretName)
+	return ctrl.Result{}, nil
+}
+
+func credentialsRequestOwnerReference(quay *v1.QuayRegistry) metav1.OwnerReference {
+	return metav1.OwnerReference{
+		APIVersion: v1.GroupVersion.String(),
+		Kind:       "QuayRegistry",
+		Name:       quay.GetName(),
+		UID:        quay.GetUID(),
+	}
+}
+
+func credentialsRequestOwnedBy(request metav1.Object, quay *v1.QuayRegistry) bool {
+	desired := credentialsRequestOwnerReference(quay)
+	for _, owner := range request.GetOwnerReferences() {
+		if owner.APIVersion == desired.APIVersion && owner.Kind == desired.Kind &&
+			owner.Name == desired.Name && owner.UID == desired.UID {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *QuayRegistryReconciler) waitForSTSCredentials(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+	request metav1.Object,
+	detail string,
+) (ctrl.Result, error) {
+	requestedAt := request.GetCreationTimestamp().Time
+	if value := request.GetAnnotations()[stsRequestTimestampAnnotation]; value != "" {
+		if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+			requestedAt = parsed
+		}
+	}
+	elapsed := time.Since(requestedAt)
+	if elapsed > stsProvisionTimeout {
+		return r.reconcileWithCondition(
+			ctx, quay,
+			v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
+			v1.ConditionReasonCredentialRequestNotProvisioned,
+			detail+". Verify CCO is running in Manual mode on an AWS STS cluster. See operator logs for details.",
+		)
+	}
+
+	r.Log.Info("waiting for CCO to provision STS credentials", "elapsed", elapsed.Round(time.Second), "detail", detail)
+	if err := r.updateWithCondition(
+		ctx, quay,
+		v1.ConditionTypeRolloutBlocked, metav1.ConditionTrue,
+		v1.ConditionReasonCredentialRequestPending,
+		"Waiting for Cloud Credential Operator to provision AWS credentials for STS authentication",
+	); err != nil {
+		return r.Requeue, fmt.Errorf("unable to update pending STS condition: %w", err)
+	}
+	return r.Requeue, nil
+}
+
+func validateSTSSharedCredentials(data []byte, roleARN, tokenPath string) error {
+	if len(bytes.TrimSpace(data)) == 0 {
+		return fmt.Errorf("credentials file is empty")
+	}
+
+	values := map[string]string{}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "[") {
+			continue
+		}
+		key, value, found := strings.Cut(line, "=")
+		if found {
+			values[strings.TrimSpace(key)] = strings.TrimSpace(value)
+		}
+	}
+	if values["aws_access_key_id"] != "" || values["aws_secret_access_key"] != "" {
+		return fmt.Errorf("credentials file contains static AWS access keys")
+	}
+	if values["role_arn"] != roleARN {
+		return fmt.Errorf("role_arn does not match the configured ROLEARN")
+	}
+	if values["web_identity_token_file"] != tokenPath {
+		return fmt.Errorf("web_identity_token_file does not match the projected service account token path")
+	}
+	return nil
+}
+
+func (r *QuayRegistryReconciler) cleanupCredentialsRequest(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+) error {
+	if !r.supportsCredentialsRequest {
+		return nil
+	}
+	request := &unstructured.Unstructured{}
+	request.SetGroupVersionKind(credentialsrequest.CredentialsRequestGVK)
+	requestName := fmt.Sprintf("%s-%s", quay.GetName(), stsCredentialRequestSuffix)
+	if err := r.Get(ctx, types.NamespacedName{Name: requestName, Namespace: quay.GetNamespace()}, request); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("unable to check for stale CredentialsRequest: %w", err)
+	}
+	if !credentialsRequestOwnedBy(request, quay) {
+		r.Log.Info("leaving same-name CredentialsRequest that is not owned by this QuayRegistry", "name", requestName)
+		return nil
+	}
+	r.Log.Info("deleting CredentialsRequest because STS no longer applies", "name", requestName)
+	if err := r.Delete(ctx, request); err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("unable to delete stale CredentialsRequest: %w", err)
+	}
+	return nil
+}
+
 // quayAppDeploymentRolledOut returns true when the quay-app Deployment has fully
 // rolled out — that is, every desired replica is both updated and available. It is
 // used to gate the deletion of old rendered config secrets so that no running pod
@@ -556,7 +793,9 @@ func (r *QuayRegistryReconciler) quayAppDeploymentRolledOut(
 // +kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get
+// +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers;authentications;infrastructures,verbs=get
+// +kubebuilder:rbac:groups=operator.openshift.io,resources=cloudcredentials,verbs=get
+// +kubebuilder:rbac:groups=cloudcredential.openshift.io,resources=credentialsrequests,verbs=create;delete;get;list;patch;update;watch
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
@@ -879,6 +1118,83 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			v1.ConditionReasonConfigInvalid,
 			err.Error(),
 		)
+	}
+
+	stsUserConfig := usercfg
+	if strings.TrimSpace(os.Getenv("ROLEARN")) != "" &&
+		!v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentObjectStorage) {
+		stsBundle, err := middleware.FlattenSecret(cbundle)
+		if err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				fmt.Sprintf("unable to inspect flattened config for STS: %s", err),
+			)
+		}
+		var flattenedCfg map[string]interface{}
+		if err := yaml.Unmarshal(stsBundle.Data["config.yaml"], &flattenedCfg); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				fmt.Sprintf("unable to parse flattened config for STS: %s", err),
+			)
+		}
+		if flattenedCfg == nil {
+			flattenedCfg = make(map[string]interface{})
+		}
+		stsUserConfig = flattenedCfg
+	}
+
+	stsErr := r.checkSTSCapability(ctx, quayContext, updatedQuay, stsUserConfig)
+	if stsErr != nil {
+		reason := v1.ConditionReasonConfigInvalid
+		if goerrors.Is(stsErr, errSTSConflictingCredentials) {
+			reason = v1.ConditionReasonConflictingCredentials
+		}
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			reason,
+			stsErr.Error(),
+		)
+	}
+
+	if !quayContext.StorageSTSEnabled {
+		if err := r.cleanupCredentialsRequest(ctx, updatedQuay); err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonCredentialRequestNotProvisioned,
+				fmt.Sprintf("unable to clean up STS credential request: %s", err),
+			)
+		}
+	}
+
+	if quayContext.StorageSTSEnabled {
+		result, err := r.ensureCredentialsRequest(ctx, quayContext, updatedQuay)
+		if err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonCredentialRequestNotProvisioned,
+				fmt.Sprintf("STS credential request error: %s", err),
+			)
+		}
+		if !quayContext.STSCredentialProvisioned {
+			return result, nil
+		}
 	}
 
 	updatedQuay.Status.Conditions = v1.RemoveCondition(
@@ -1490,6 +1806,16 @@ func (r *QuayRegistryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		r.Log.Info("Route API detected at startup")
 	} else {
 		r.Log.Info("Route API not available, running in non-OpenShift mode")
+	}
+
+	_, err = mgr.GetRESTMapper().RESTMapping(
+		schema.GroupKind{Group: "cloudcredential.openshift.io", Kind: "CredentialsRequest"},
+	)
+	r.supportsCredentialsRequest = (err == nil)
+	if r.supportsCredentialsRequest {
+		r.Log.Info("CredentialsRequest API detected at startup")
+	} else {
+		r.Log.Info("CredentialsRequest API not available, STS support disabled")
 	}
 
 	genChanged := builder.WithPredicates(predicate.GenerationChangedPredicate{})

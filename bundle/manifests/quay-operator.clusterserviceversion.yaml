@@ -8,7 +8,7 @@ metadata:
     containerImage: quay.io/projectquay/quay-operator:v3.99.0-dev
     createdAt: 2021-04-23T10:04:00Z
     support: Project Quay
-    description: Opinionated deployment of Quay on Kubernetes.
+    description: Opinionated deployment of Quay on Kubernetes, including AWS STS authentication for unmanaged S3 storage. See https://github.com/quay/quay-operator/blob/master/docs/sts-iam-setup.md.
     quay-version: v3.99.0-dev
     repository: https://github.com/quay/quay-operator
     tectonic-visibility: ocs
@@ -42,7 +42,7 @@ metadata:
     features.operators.openshift.io/fips-compliant: "true"
     features.operators.openshift.io/proxy-aware: "true"
     features.operators.openshift.io/tls-profiles: "false"
-    features.operators.openshift.io/token-auth-aws: "false"
+    features.operators.openshift.io/token-auth-aws: "true"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
   name: quay-operator.v3.99.0-dev
@@ -108,7 +108,7 @@ spec:
             description: Externally accessible URL for container pull/push and web frontend.
             x-descriptors:
               - 'urn:alm:descriptor:org.w3:link'
-  description: Opinionated deployment of Quay on Kubernetes.
+  description: Opinionated deployment of Quay on Kubernetes. AWS STS setup for unmanaged S3 storage is documented at https://github.com/quay/quay-operator/blob/master/docs/sts-iam-setup.md.
   displayName: Quay
   install:
     spec:
@@ -175,6 +175,14 @@ spec:
                 - config.openshift.io
               resources:
                 - apiservers
+                - authentications
+                - infrastructures
+              verbs:
+                - get
+            - apiGroups:
+                - operator.openshift.io
+              resources:
+                - cloudcredentials
               verbs:
                 - get
             - apiGroups:
@@ -186,6 +194,18 @@ spec:
                 - delete
                 - update
                 - patch
+            - apiGroups:
+                - cloudcredential.openshift.io
+              resources:
+                - credentialsrequests
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
           serviceAccountName: quay-operator
       permissions:
         - rules:

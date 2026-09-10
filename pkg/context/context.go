@@ -71,6 +71,13 @@ type QuayRegistryContext struct {
 	ClairPostgresUseServiceCA bool
 	PostgresSSLRootCert       string
 	ClairPostgresSSLRootCert  string
+
+	// STS/CCO (Cloud Credential Operator)
+	StorageSTSEnabled        bool
+	STSRoleARN               string
+	STSStorageBuckets        []string
+	STSCredentialSecretName  string
+	STSCredentialProvisioned bool
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.

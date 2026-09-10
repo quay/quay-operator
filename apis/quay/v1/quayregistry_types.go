@@ -254,6 +254,9 @@ const (
 	ConditionReasonMonitoringComponentDependencyError    ConditionReason = "MonitoringComponentDependencyError"
 	ConditionReasonConfigInvalid                         ConditionReason = "ConfigInvalid"
 	ConditionReasonComponentOverrideInvalid              ConditionReason = "ComponentOverrideInvalid"
+	ConditionReasonCredentialRequestPending              ConditionReason = "CredentialRequestPending"
+	ConditionReasonCredentialRequestNotProvisioned       ConditionReason = "CredentialRequestNotProvisioned"
+	ConditionReasonConflictingCredentials                ConditionReason = "ConflictingCredentials"
 	ConditionReasonPVCPending                            ConditionReason = "PVCPending"
 	ConditionReasonPVCProvisioningFailed                 ConditionReason = "PVCProvisioningFailed"
 )
