@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -301,6 +302,131 @@ func TestEnsureReadOnlyHPAPin(t *testing.T) {
 	assert.Equal(t, replicas, got.Spec.MaxReplicas)
 	assert.Equal(t, "1", got.Annotations[readOnlyOriginalMinReplicasAnnotation])
 	assert.Equal(t, "10", got.Annotations[readOnlyOriginalMaxReplicasAnnotation])
+}
+
+func TestCollectReadOnlyFrozenImagesPersistsState(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry", Namespace: "ns", UID: types.UID("quay-uid")},
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      readOnlySecretName(quay),
+			Namespace: "ns",
+			OwnerReferences: []metav1.OwnerReference{{
+				Kind: "QuayRegistry",
+				Name: "registry",
+				UID:  types.UID("quay-uid"),
+			}},
+		},
+	}
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry-quay-app", Namespace: "ns"},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{Name: "init", Image: "quay-init@sha256:frozen"}},
+					Containers:     []corev1.Container{{Name: "quay-app", Image: "quay@sha256:frozen"}},
+				},
+			},
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(s).WithObjects(quay, secret, dep).Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+	qctx := &quaycontext.QuayRegistryContext{}
+
+	require.NoError(t, reconciler.collectReadOnlyFrozenImages(context.Background(), quay, qctx, true))
+	assert.Equal(t, "quay-init@sha256:frozen", qctx.ReadOnlyFrozenImages["registry-quay-app/initContainers/init"])
+	assert.Equal(t, "quay@sha256:frozen", qctx.ReadOnlyFrozenImages["registry-quay-app/containers/quay-app"])
+
+	var got corev1.Secret
+	require.NoError(t, client.Get(context.Background(), types.NamespacedName{Name: readOnlySecretName(quay), Namespace: "ns"}, &got))
+	var persisted map[string]string
+	require.NoError(t, json.Unmarshal([]byte(got.Annotations[readOnlyFrozenImagesAnnotation]), &persisted))
+	assert.Equal(t, qctx.ReadOnlyFrozenImages, persisted)
+}
+
+func TestCollectReadOnlyFrozenImagesUsesPersistedStateWhenDeploymentMissing(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry", Namespace: "ns", UID: types.UID("quay-uid")},
+	}
+	images := map[string]string{
+		"registry-quay-app/containers/quay-app": "quay@sha256:frozen",
+	}
+	raw, err := json.Marshal(images)
+	require.NoError(t, err)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      readOnlySecretName(quay),
+			Namespace: "ns",
+			Annotations: map[string]string{
+				readOnlyFrozenImagesAnnotation: string(raw),
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				Kind: "QuayRegistry",
+				Name: "registry",
+				UID:  types.UID("quay-uid"),
+			}},
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(s).WithObjects(quay, secret).Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+	qctx := &quaycontext.QuayRegistryContext{}
+
+	require.NoError(t, reconciler.collectReadOnlyFrozenImages(context.Background(), quay, qctx, true))
+	assert.Equal(t, images, qctx.ReadOnlyFrozenImages)
+}
+
+func TestCollectReadOnlyFrozenImagesDoesNotOverwritePersistedState(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry", Namespace: "ns", UID: types.UID("quay-uid")},
+	}
+	images := map[string]string{
+		"registry-quay-app/containers/quay-app": "quay@sha256:frozen",
+	}
+	raw, err := json.Marshal(images)
+	require.NoError(t, err)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      readOnlySecretName(quay),
+			Namespace: "ns",
+			Annotations: map[string]string{
+				readOnlyFrozenImagesAnnotation: string(raw),
+			},
+			OwnerReferences: []metav1.OwnerReference{{
+				Kind: "QuayRegistry",
+				Name: "registry",
+				UID:  types.UID("quay-uid"),
+			}},
+		},
+	}
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry-quay-app", Namespace: "ns"},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "quay-app", Image: "quay@sha256:new"}},
+				},
+			},
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(s).WithObjects(quay, secret, dep).Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+	qctx := &quaycontext.QuayRegistryContext{}
+
+	require.NoError(t, reconciler.collectReadOnlyFrozenImages(context.Background(), quay, qctx, true))
+	assert.Equal(t, "quay@sha256:frozen", qctx.ReadOnlyFrozenImages["registry-quay-app/containers/quay-app"])
 }
 
 func TestManualReadOnlyConfiguredFromLiteralOverride(t *testing.T) {

@@ -41,6 +41,7 @@ const (
 
 	readOnlyOriginalMinReplicasAnnotation = "quay.redhat.com/readonly-original-min-replicas"
 	readOnlyOriginalMaxReplicasAnnotation = "quay.redhat.com/readonly-original-max-replicas"
+	readOnlyFrozenImagesAnnotation        = "quay.redhat.com/readonly-frozen-images"
 )
 
 var readOnlyHTTPClient = &http.Client{Timeout: 5 * time.Second}
@@ -788,30 +789,125 @@ func (r *QuayRegistryReconciler) collectReadOnlyFrozenImages(
 	if qctx.ReadOnlyFrozenImages == nil {
 		qctx.ReadOnlyFrozenImages = map[string]string{}
 	}
+	hasSecret, err := r.loadReadOnlyFrozenImages(ctx, quay, qctx)
+	if err != nil {
+		return err
+	}
+
 	targets := []string{quay.GetName() + "-quay-app"}
 	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentMirror) {
 		targets = append(targets, quay.GetName()+"-quay-mirror")
 	}
+	changed := false
 	for _, target := range targets {
 		var dep appsv1.Deployment
 		if err := r.Get(ctx, types.NamespacedName{Name: target, Namespace: quay.GetNamespace()}, &dep); err != nil {
-			if !require && errors.IsNotFound(err) {
-				continue
+			if errors.IsNotFound(err) {
+				if hasReadOnlyFrozenImagesForTarget(qctx.ReadOnlyFrozenImages, target) || !require {
+					continue
+				}
+				return fmt.Errorf("cannot freeze images for %s: deployment missing and no persisted frozen image state exists: %w", target, err)
 			}
 			return fmt.Errorf("cannot freeze images for %s: %w", target, err)
 		}
 		for _, container := range dep.Spec.Template.Spec.InitContainers {
-			qctx.ReadOnlyFrozenImages[readOnlyFrozenImageKey(dep.Name, "initContainers", container.Name)] = container.Image
+			if setReadOnlyFrozenImage(qctx.ReadOnlyFrozenImages, dep.Name, "initContainers", container.Name, container.Image) {
+				changed = true
+			}
 		}
 		for _, container := range dep.Spec.Template.Spec.Containers {
-			qctx.ReadOnlyFrozenImages[readOnlyFrozenImageKey(dep.Name, "containers", container.Name)] = container.Image
+			if setReadOnlyFrozenImage(qctx.ReadOnlyFrozenImages, dep.Name, "containers", container.Name, container.Image) {
+				changed = true
+			}
 		}
+	}
+	if changed && hasSecret {
+		return r.persistReadOnlyFrozenImages(ctx, quay, qctx.ReadOnlyFrozenImages)
 	}
 	return nil
 }
 
 func readOnlyFrozenImageKey(deploymentName, containerGroup, containerName string) string {
 	return deploymentName + "/" + containerGroup + "/" + containerName
+}
+
+func setReadOnlyFrozenImage(images map[string]string, deploymentName, containerGroup, containerName, image string) bool {
+	key := readOnlyFrozenImageKey(deploymentName, containerGroup, containerName)
+	if _, ok := images[key]; ok {
+		return false
+	}
+	images[key] = image
+	return true
+}
+
+func hasReadOnlyFrozenImagesForTarget(images map[string]string, target string) bool {
+	prefix := target + "/"
+	for key := range images {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *QuayRegistryReconciler) loadReadOnlyFrozenImages(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+	qctx *quaycontext.QuayRegistryContext,
+) (bool, error) {
+	var secret corev1.Secret
+	if err := r.Get(ctx, types.NamespacedName{Name: readOnlySecretName(quay), Namespace: quay.GetNamespace()}, &secret); err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("could not load read-only frozen image state: %w", err)
+	}
+	if !ownedByQuay(&secret, quay) {
+		return false, fmt.Errorf("read-only service key Secret %q exists but is not owned by this QuayRegistry", secret.Name)
+	}
+
+	raw := secret.Annotations[readOnlyFrozenImagesAnnotation]
+	if raw == "" {
+		return true, nil
+	}
+
+	var images map[string]string
+	if err := json.Unmarshal([]byte(raw), &images); err != nil {
+		return false, fmt.Errorf("read-only frozen image state is malformed: %w", err)
+	}
+	for key, image := range images {
+		qctx.ReadOnlyFrozenImages[key] = image
+	}
+	return true, nil
+}
+
+func (r *QuayRegistryReconciler) persistReadOnlyFrozenImages(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+	images map[string]string,
+) error {
+	var secret corev1.Secret
+	if err := r.Get(ctx, types.NamespacedName{Name: readOnlySecretName(quay), Namespace: quay.GetNamespace()}, &secret); err != nil {
+		return fmt.Errorf("could not persist read-only frozen image state: %w", err)
+	}
+	if !ownedByQuay(&secret, quay) {
+		return fmt.Errorf("read-only service key Secret %q exists but is not owned by this QuayRegistry", secret.Name)
+	}
+
+	raw, err := json.Marshal(images)
+	if err != nil {
+		return err
+	}
+	if secret.Annotations != nil && secret.Annotations[readOnlyFrozenImagesAnnotation] == string(raw) {
+		return nil
+	}
+
+	patch := client.MergeFrom(secret.DeepCopy())
+	if secret.Annotations == nil {
+		secret.Annotations = map[string]string{}
+	}
+	secret.Annotations[readOnlyFrozenImagesAnnotation] = string(raw)
+	return r.Patch(ctx, &secret, patch)
 }
 
 func (r *QuayRegistryReconciler) readOnlyDeploymentsRolledOut(ctx context.Context, quay *v1.QuayRegistry) (bool, error) {
