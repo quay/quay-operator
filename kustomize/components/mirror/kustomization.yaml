@@ -4,6 +4,7 @@ kind: Component
 resources:
   - ./mirror.deployment.yaml
   - ./mirror-pushgateway.service.yaml
+  - ./mirror.networkpolicy.yaml
 vars:
   - name: QUAY_APP_SERVICE_HOST
     objref:

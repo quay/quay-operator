@@ -1,0 +1,217 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: netpol-unmanaged-egress
+spec:
+  concurrent: false
+  steps:
+  - name: deploy-external-postgres
+    try:
+    - apply:
+        file: 00-deploy-postgres.yaml
+    - assert:
+        file: 00-assert-postgres.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Waiting for external postgres (port 5433 Service) to accept connections..."
+          for i in $(seq 1 60); do
+            POD=$(kubectl get pod -n $NAMESPACE -l app=external-postgres \
+              -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+            if [ -n "${POD}" ]; then
+              if kubectl exec -n $NAMESPACE "${POD}" -- \
+                psql -U quay -d quay -c "SELECT 1" >/dev/null 2>&1; then
+                echo "External postgres is accepting connections"
+                break
+              fi
+            fi
+            [ "$i" -eq 60 ] && { echo "ERROR: postgres not ready"; exit 1; }
+            sleep 3
+          done
+
+          kubectl exec -n $NAMESPACE "${POD}" -- \
+            psql -U quay -d quay -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+          echo "pg_trgm extension created"
+
+  - name: create-registry
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Quay connects to port 5433 (Service) which routes to the container's 5432.
+          # This validates that quay-app-allow-all's egress: - {} allows arbitrary ports.
+          DB_URI="postgresql://quay:quaypass@external-postgres.${NAMESPACE}.svc.cluster.local:5433/quay"
+
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected"
+            CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          DB_URI: ${DB_URI}
+          DB_CONNECTION_ARGS:
+            autorollback: true
+            threadlocals: true
+          CFGEOF
+          )
+            kubectl create secret generic unmanaged-egress-config -n $NAMESPACE \
+              --from-literal=config.yaml="${CONFIG}"
+          else
+            echo "KinD detected, creating config bundle..."
+            ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+            SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+            BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+            ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+            openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+              -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+              -subj "/O=Quay E2E" \
+              -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+            CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          FEATURE_PROXY_STORAGE: true
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          DB_URI: ${DB_URI}
+          DB_CONNECTION_ARGS:
+            autorollback: true
+            threadlocals: true
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+            kubectl create secret generic unmanaged-egress-config -n $NAMESPACE \
+              --from-literal=config.yaml="${CONFIG}" \
+              --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+              --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+              --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          fi
+          echo "Config bundle created"
+    - apply:
+        file: 01-create-quay-registry.yaml
+
+  - name: assert-netpol-lifecycle
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Postgres is unmanaged: the per-component NetworkPolicy must not exist
+          if kubectl get networkpolicy -n $NAMESPACE -l quay-component=postgres \
+            -o name 2>/dev/null | grep -q .; then
+            echo "FAIL: postgres NetworkPolicy found but postgres is unmanaged"
+            kubectl get networkpolicy -n $NAMESPACE -l quay-component=postgres
+            exit 1
+          fi
+          echo "PASS: no postgres NetworkPolicy (component is unmanaged)"
+
+          # Default policies must still be present
+          echo "waiting for default-deny-all..."
+          for i in $(seq 1 30); do
+            kubectl get networkpolicy unmanaged-egress-default-deny-all -n $NAMESPACE &>/dev/null \
+            && { echo "PASS: default-deny-all present"; break; }
+            [ "$i" -eq 30 ] && { echo "FAIL: default-deny-all missing after 30 seconds"; exit 1; }
+            sleep 1
+          done
+
+          echo "Waiting for default-allow-dns-egress..."
+          for i in $(seq 1 30); do
+            kubectl get networkpolicy unmanaged-egress-default-allow-dns-egress -n $NAMESPACE &>/dev/null \
+              && { echo "PASS: default-allow-dns-egress present"; break; }
+            [ "$i" -eq 30 ] && { echo "FAIL: default-allow-dns-egress missing after 30s"; exit 1; }
+            sleep 1
+          done
+
+          # quay-app must reach the external postgres on the non-default port
+          echo "Waiting for quay-app to have ready replicas (proves non-default-port egress works)..."
+          for i in $(seq 1 60); do
+            READY=$(kubectl get deployment unmanaged-egress-quay-app -n $NAMESPACE \
+              -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+            if [ "${READY:-0}" -ge 1 ]; then
+              echo "PASS: quay-app has ${READY} ready replicas — connected to postgres on port 5433"
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "FAIL: quay-app has no ready replicas after 3m"; exit 1; }
+            sleep 3
+          done
+
+  - name: explicit-egress-probe
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          export NS="$NAMESPACE"
+          export REG="unmanaged-egress"
+          TEMPLATE_FILE=egress-probe-dns-template.yaml
+
+          # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
+          # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
+          # OpenShift the restricted SCC assigns a UID from the namespace range and a
+          # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            export RUN_AS_USER=""
+          else
+            export RUN_AS_USER=1000
+          fi
+
+          # Explicit probe: a pod carrying quay-app labels attempts to reach the
+          # external postgres on non-default port 5433.  quay-app-allow-all gives it
+          # unrestricted egress so this must succeed.
+          
+          # since we don't have envsubst available in Prow, use python3 to expand
+          # env. variables
+          python3 -c "import string, os; print(string.Template(open('${TEMPLATE_FILE}').read()).safe_substitute(os.environ));" \
+            | kubectl apply -f - -n $NAMESPACE
+
+          kubectl wait job/probe-quayapp-ext-postgres-5433 -n ${NS} \
+            --for=condition=complete --timeout=60s \
+            || {
+              echo "FAIL: probe did not complete successfully"
+              kubectl logs job/probe-quayapp-ext-postgres-5433 -n ${NS} 2>/dev/null || true
+              exit 1
+            }
+          kubectl logs job/probe-quayapp-ext-postgres-5433 -n ${NS}
+
+  - name: registry-delete-and-cleanup
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          echo "Deleting QuayRegistry and waiting for it to be removed..."
+          kubectl delete quayregistry unmanaged-egress -n $NAMESPACE \
+            --wait=true --timeout=180s
+          echo "Waiting for owned NetworkPolicies to be garbage-collected (up to 3 minutes)..."
+          for i in $(seq 1 18); do
+            COUNT=$(kubectl get networkpolicy -n $NAMESPACE -o name 2>/dev/null \
+              | grep -c "unmanaged-egress" || true)
+            [ "${COUNT}" -eq 0 ] \
+              && { echo "PASS: all NetworkPolicies removed after QuayRegistry deletion"; break; }
+            [ "$i" -eq 18 ] && {
+              echo "FAIL: ${COUNT} NetworkPolicies still exist:"
+              kubectl get networkpolicy -n $NAMESPACE | grep "unmanaged-egress" || true
+              exit 1
+            }
+            sleep 10
+          done

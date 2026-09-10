@@ -5,5 +5,6 @@ resources:
   - ./clair.serviceaccount.yaml
   - ./clair.deployment.yaml
   - ./clair.service.yaml
+  - ./clair.networkpolicy.yaml
 secretGenerator:
   - name: clair-config-secret

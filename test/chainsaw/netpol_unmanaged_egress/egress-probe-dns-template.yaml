@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: probe-quayapp-ext-postgres-5433
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 120
+  template:
+    metadata:
+      labels:
+        quay-component: quay-app
+        quay-operator/quayregistry: ${REG}
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: ${RUN_AS_USER}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: probe
+        image: busybox:stable
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+        command:
+        - sh
+        - -c
+        - |
+          nc -z -w 5 external-postgres 5433 \
+            && echo "PASS: quay-app reached external-postgres:5433 (non-default port)" \
+            || { echo "FAIL: could not reach external-postgres:5433"; exit 1; }

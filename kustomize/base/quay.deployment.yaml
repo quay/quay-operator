@@ -10,11 +10,13 @@ spec:
   selector:
     matchLabels:
       quay-component: quay-app
+      app: quay
   template:
     metadata:
       labels:
         quay-monitor: "true"
         quay-component: quay-app
+        app: quay
     spec:
       serviceAccountName: quay-app
       volumes:

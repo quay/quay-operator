@@ -1,0 +1,120 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: netpol-multi-registry
+spec:
+  concurrent: false
+  steps:
+  - name: create-registries
+    try:
+    - script:
+        content: |
+          # This test is OpenShift-only (excluded from KinD in the Makefile): deploying
+          # two full registries in one namespace is beyond KinD's resource budget, and
+          # each unmanaged-storage registry would additionally need its own object-storage
+          # backend. On OpenShift object storage is operator-managed (managedObjectStorage:
+          # true, configBundle: ""), so no config bundle needs to be created here.
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            echo "OpenShift detected: object storage is managed, no config bundle needed"
+            exit 0
+          fi
+          echo "OpenShift-only test (excluded from KinD): no unmanaged-storage bundle created"
+    - apply:
+        file: 00-create-registry-a.yaml
+    - apply:
+        file: 00-create-registry-b.yaml
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          wait_for_deployment() {
+            local name="$1"
+            echo "Waiting for ${name} to be created by the operator..."
+            for i in $(seq 1 60); do
+              kubectl get deployment "${name}" -n $NAMESPACE &>/dev/null && break
+              [ "$i" -eq 60 ] && { echo "ERROR: ${name} not created in time"; exit 1; }
+              sleep 5
+            done
+            kubectl rollout status deployment/"${name}" -n $NAMESPACE --timeout=300s
+          }
+
+          for reg in registry-a registry-b; do
+            echo "Waiting for ${reg} deployments..."
+            wait_for_deployment ${reg}-quay-database
+            wait_for_deployment ${reg}-quay-redis
+          done
+
+  - name: cross-registry-isolation
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+          NS="$NAMESPACE"
+          TEMPLATE_FILE=dns-probe-template.yaml
+
+          # busybox runs as root by default. On KinD/plain Kubernetes there is no SCC
+          # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
+          # OpenShift the restricted SCC assigns a UID from the namespace range and a
+          # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
+          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+            export RUN_AS_USER=""
+          else
+            export RUN_AS_USER=1000
+          fi
+
+          # Kustomize injects quay-operator/quayregistry: <name> into every
+          # spec.ingress[].from[].podSelector via commonLabels. This means
+          # postgres-a's ingress rule requires BOTH quay-component=quay-app AND
+          # quay-operator/quayregistry=registry-a. A quay-app pod from registry-b
+          # (which carries quay-operator/quayregistry=registry-b) is therefore denied.
+
+          create_probe() {
+            export NAME="$1" 
+            export SRC_REG="$2" 
+            export HOST="$3" 
+            export PORT="$4" 
+            export EXPECT_ALLOW="$5"
+            export CMD
+            if [ "$EXPECT_ALLOW" = "true" ]; then
+              CMD="nc -z -w 5 ${HOST} ${PORT} && echo PASS || { echo FAIL; exit 1; }"
+            else
+              CMD="nc -z -w 5 ${HOST} ${PORT} && { echo FAIL; exit 1; } || echo PASS"
+            fi
+            
+            # since we don't have envsubst available in Prow, use python3 to expand
+            # env. variables
+            python3 -c "import string, os; print(string.Template(open('${TEMPLATE_FILE}').read()).safe_substitute(os.environ));" \
+              | kubectl apply -f - -n $NAMESPACE
+          }
+
+          # Positive controls: each registry's quay-app can reach its own postgres/redis
+          create_probe "probe-a-to-pg-a"    registry-a registry-a-quay-database 5432 true
+          create_probe "probe-b-to-pg-b"    registry-b registry-b-quay-database 5432 true
+          create_probe "probe-a-to-redis-a" registry-a registry-a-quay-redis    6379 true
+          create_probe "probe-b-to-redis-b" registry-b registry-b-quay-redis    6379 true
+
+          # Isolation checks: cross-registry access must be denied
+          create_probe "probe-a-to-pg-b"    registry-a registry-b-quay-database 5432 false
+          create_probe "probe-b-to-pg-a"    registry-b registry-a-quay-database 5432 false
+          create_probe "probe-a-to-redis-b" registry-a registry-b-quay-redis    6379 false
+          create_probe "probe-b-to-redis-a" registry-b registry-a-quay-redis    6379 false
+
+          echo "Waiting for all probes to complete..."
+          for job in \
+              probe-a-to-pg-a    probe-b-to-pg-b    \
+              probe-a-to-redis-a probe-b-to-redis-b  \
+              probe-a-to-pg-b    probe-b-to-pg-a    \
+              probe-a-to-redis-b probe-b-to-redis-a; do
+            kubectl wait job/${job} -n ${NS} --for=condition=complete --timeout=90s \
+              || {
+                echo "FAIL: ${job}"
+                kubectl logs job/${job} -n ${NS} 2>/dev/null || true
+                exit 1
+              }
+            RESULT=$(kubectl logs job/${job} -n ${NS} 2>/dev/null || echo "no logs")
+            echo "${job}: ${RESULT}"
+          done
