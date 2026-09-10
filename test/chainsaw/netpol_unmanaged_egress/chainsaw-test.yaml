@@ -178,7 +178,11 @@ spec:
           # Explicit probe: a pod carrying quay-app labels attempts to reach the
           # external postgres on non-default port 5433.  quay-app-allow-all gives it
           # unrestricted egress so this must succeed.
-          envsubst '${REG} ${RUN_AS_USER}' < "${TEMPLATE_FILE}" | kubectl apply -f - -n $NAMESPACE
+          
+          # since we don't have envsubst available in Prow, use python3 to expand
+          # env. variables
+          python3 -c "import string, os; print(string.Template(open('${TEMPLATE_FILE}').read()).safe_substitute(os.environ));" \
+            | kubectl apply -f - -n $NAMESPACE
 
           kubectl wait job/probe-quayapp-ext-postgres-5433 -n ${NS} \
             --for=condition=complete --timeout=60s \

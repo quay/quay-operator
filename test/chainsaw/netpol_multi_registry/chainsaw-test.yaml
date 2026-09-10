@@ -85,7 +85,10 @@ spec:
               CMD="nc -z -w 5 ${HOST} ${PORT} && { echo FAIL; exit 1; } || echo PASS"
             fi
             
-            envsubst '${NAME} ${SRC_REG} ${RUN_AS_USER} $CMD' < ${TEMPLATE_FILE} | kubectl apply -f - -n $NAMESPACE
+            # since we don't have envsubst available in Prow, use python3 to expand
+            # env. variables
+            python3 -c "import string, os; print(string.Template(open('${TEMPLATE_FILE}').read()).safe_substitute(os.environ));" \
+              | kubectl apply -f - -n $NAMESPACE
           }
 
           # Positive controls: each registry's quay-app can reach its own postgres/redis
