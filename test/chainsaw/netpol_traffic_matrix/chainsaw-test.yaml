@@ -95,7 +95,7 @@ spec:
 
           # quay-app → clair is conditional: skip on KinD where clair may not be configured
           if kubectl rollout status deployment/${REG}-clair-app -n ${NS} --timeout=60s 2>/dev/null; then
-            create_allow_probe "probe-quayapp-clair-8080" "${REG}-clair-app" 8080 quay-app
+            create_allow_probe "probe-quayapp-clair-8080" "${REG}-clair-app" 80 quay-app
             create_allow_probe "probe-quayapp-clair-8089" "${REG}-clair-app" 8089 quay-app
             CLAIR_JOBS="probe-quayapp-clair-8080 probe-quayapp-clair-8089"
           else
@@ -159,7 +159,7 @@ spec:
           create_deny_probe "probe-deny-postgres"    "${REG}-quay-database"  5432
           create_deny_probe "probe-deny-redis"       "${REG}-quay-redis"     6379
           create_deny_probe "probe-deny-clairpg"     "${REG}-clair-postgres" 5432
-          create_deny_probe "probe-deny-clair-8080"  "${REG}-clair-app"      8080
+          create_deny_probe "probe-deny-clair-8080"  "${REG}-clair-app"      80
           create_deny_probe "probe-deny-clair-8089"  "${REG}-clair-app"      8089
 
           echo "Waiting for negative-control jobs to complete (deny expected)..."
