@@ -57,6 +57,14 @@ const (
 	bootstrapTokenResourceSuffix = "bootstrap-token"
 	bootstrapTokenVolumeName     = "bootstrap-token"
 
+	ReadOnlyMountPath     = "/conf/readonly"
+	ReadOnlyKIDKey        = "quay-readonly.kid"
+	ReadOnlyPEMKey        = "quay-readonly.pem"
+	ReadOnlyKIDPath       = ReadOnlyMountPath + "/" + ReadOnlyKIDKey
+	ReadOnlyPEMPath       = ReadOnlyMountPath + "/" + ReadOnlyPEMKey
+	ReadOnlyKeyExpiration = 10080
+	ReadOnlyRegistryState = "readonly"
+
 	componentImagePrefix = "RELATED_IMAGE_COMPONENT_"
 )
 
@@ -1036,6 +1044,7 @@ func Inflate(
 	if programmaticBootstrapEnabled {
 		injectProgrammaticBootstrapTokenConfig(quay, parsedUserConfig)
 	}
+	injectReadOnlyConfig(ctx, parsedUserConfig)
 
 	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentMirror) {
 		if _, ok := parsedUserConfig["PROMETHEUS_PUSHGATEWAY_URL"]; !ok {
@@ -1070,7 +1079,7 @@ func Inflate(
 	ctx.TLSKey = tlsKey
 
 	var overlay string
-	if quay.Status.CurrentVersion != v1.QuayVersionCurrent || dbCfgHasChanged {
+	if !ctx.ReadOnlyDeferUpgrade && (quay.Status.CurrentVersion != v1.QuayVersionCurrent || dbCfgHasChanged) {
 		// we render the upgrade overlay directory only if the operator version or the
 		// database configuration has changed. this scales down quay and runs a job to
 		// migrate the database.
@@ -1117,6 +1126,26 @@ func Inflate(
 	}
 
 	return filteredResources, err
+}
+
+func injectReadOnlyConfig(ctx *quaycontext.QuayRegistryContext, config map[string]interface{}) {
+	if ctx.ReadOnlyMountEnabled {
+		config["INSTANCE_SERVICE_KEY_IMPORT_FROM_FILES"] = true
+		config["INSTANCE_SERVICE_KEY_EXPIRATION"] = ReadOnlyKeyExpiration
+		config["INSTANCE_SERVICE_KEY_KID_LOCATION"] = ReadOnlyKIDPath
+		config["INSTANCE_SERVICE_KEY_LOCATION"] = ReadOnlyPEMPath
+	} else if ctx.ReadOnlyPhase == string(v1.ReadOnlyPhaseExitingReadOnly) {
+		delete(config, "INSTANCE_SERVICE_KEY_IMPORT_FROM_FILES")
+		delete(config, "INSTANCE_SERVICE_KEY_EXPIRATION")
+		delete(config, "INSTANCE_SERVICE_KEY_KID_LOCATION")
+		delete(config, "INSTANCE_SERVICE_KEY_LOCATION")
+	}
+
+	if ctx.ReadOnlyRegistryState {
+		config["REGISTRY_STATE"] = ReadOnlyRegistryState
+	} else if ctx.ReadOnlyPhase == string(v1.ReadOnlyPhaseExitingReadOnly) {
+		delete(config, "REGISTRY_STATE")
+	}
 }
 
 func operatorServiceEndpoint() string {

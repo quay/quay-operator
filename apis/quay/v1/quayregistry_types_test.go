@@ -1104,3 +1104,40 @@ func resourcePtr(s string) *resource.Quantity {
 	q := resource.MustParse(s)
 	return &q
 }
+
+func TestReadOnlyFieldsAndConditionPreserved(t *testing.T) {
+	readOnly := true
+	quay := &QuayRegistry{
+		Spec: QuayRegistrySpec{
+			ReadOnly: &readOnly,
+		},
+		Status: QuayRegistryStatus{
+			ReadOnlyPhase:            ReadOnlyPhaseReadOnly,
+			ReadOnlyKeyID:            "kid",
+			ReadOnlyUnsupportedImage: "quay:test",
+			Conditions: []Condition{
+				{
+					Type:    ConditionTypeReadOnly,
+					Status:  metav1.ConditionTrue,
+					Reason:  ConditionReasonReadOnlyActive,
+					Message: "active",
+				},
+				{
+					Type:   ConditionType("OldCondition"),
+					Status: metav1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	copy := quay.DeepCopy()
+	assert.NotSame(t, quay.Spec.ReadOnly, copy.Spec.ReadOnly)
+	assert.Equal(t, readOnly, *copy.Spec.ReadOnly)
+	assert.Equal(t, ReadOnlyPhaseReadOnly, copy.Status.ReadOnlyPhase)
+	assert.Equal(t, "kid", copy.Status.ReadOnlyKeyID)
+	assert.Equal(t, "quay:test", copy.Status.ReadOnlyUnsupportedImage)
+
+	RemoveUnusedConditions(copy)
+	assert.NotNil(t, GetCondition(copy.Status.Conditions, ConditionTypeReadOnly))
+	assert.Nil(t, GetCondition(copy.Status.Conditions, ConditionType("OldCondition")))
+}
