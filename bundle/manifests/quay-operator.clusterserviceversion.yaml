@@ -179,12 +179,16 @@ spec:
                 - infrastructures
               verbs:
                 - get
+                - list
+                - watch
             - apiGroups:
                 - operator.openshift.io
               resources:
                 - cloudcredentials
               verbs:
                 - get
+                - list
+                - watch
             - apiGroups:
                 - networking.k8s.io
               resources:

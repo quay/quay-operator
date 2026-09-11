@@ -88,6 +88,8 @@ rules:
   - infrastructures
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -119,6 +121,8 @@ rules:
   - cloudcredentials
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - quay.redhat.com
   resources:

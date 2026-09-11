@@ -159,6 +159,9 @@ spec:
                 any(.env[]?;
                   .name == "AWS_SHARED_CREDENTIALS_FILE" and .value == "/aws-sts/credentials")) and
               all(.spec.template.spec.containers[];
+                any(.env[]?;
+                  .name == "AWS_SDK_LOAD_CONFIG" and .value == "true")) and
+              all(.spec.template.spec.containers[];
                 any(.volumeMounts[]?;
                   .name == "aws-sts-credentials" and .mountPath == "/aws-sts" and .readOnly == true)) and
               all(.spec.template.spec.containers[];
@@ -174,7 +177,9 @@ spec:
                 .metadata.name != "sts-cco-quay-app" and
                 .metadata.name != "sts-cco-quay-mirror");
                 all(.spec.template.spec.containers[]?;
-                  all(.env[]?; .name != "AWS_SHARED_CREDENTIALS_FILE")) and
+                  all(.env[]?;
+                    .name != "AWS_SHARED_CREDENTIALS_FILE" and
+                    .name != "AWS_SDK_LOAD_CONFIG")) and
                 all(.spec.template.spec.volumes[]?;
                   .name != "aws-sts-credentials" and .name != "bound-sa-token"))
             ' >/dev/null

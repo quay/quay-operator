@@ -1332,13 +1332,12 @@ func TestProcessSTSCredentialsTargetsOnlyQuayWorkloads(t *testing.T) {
 			processed, err := Process(quay, qctx, dep, false)
 			assert.NoError(t, err)
 			result := processed.(*appsv1.Deployment)
-			found := false
+			envValues := map[string]string{}
 			for _, env := range result.Spec.Template.Spec.Containers[0].Env {
-				if env.Name == "AWS_SHARED_CREDENTIALS_FILE" {
-					found = true
-				}
+				envValues[env.Name] = env.Value
 			}
-			assert.Equal(t, tt.wantSTS, found)
+			assert.Equal(t, tt.wantSTS, envValues["AWS_SHARED_CREDENTIALS_FILE"] == "/aws-sts/credentials")
+			assert.Equal(t, tt.wantSTS, envValues["AWS_SDK_LOAD_CONFIG"] == "true")
 			if tt.withInit {
 				assert.Empty(t, result.Spec.Template.Spec.InitContainers[0].Env)
 				assert.Empty(t, result.Spec.Template.Spec.InitContainers[0].VolumeMounts)
@@ -1409,26 +1408,26 @@ func TestApplySTSCredentials(t *testing.T) {
 		assert.True(t, tokenMountFound, "bound-sa-token mount not found")
 	})
 
-	t.Run("sets AWS_SHARED_CREDENTIALS_FILE env var", func(t *testing.T) {
+	t.Run("sets AWS credential environment", func(t *testing.T) {
 		container := dep.Spec.Template.Spec.Containers[0]
-		found := false
-		for _, e := range container.Env {
-			if e.Name == "AWS_SHARED_CREDENTIALS_FILE" {
-				found = true
-				assert.Equal(t, "/aws-sts/credentials", e.Value)
-			}
+		envValues := map[string]string{}
+		for _, env := range container.Env {
+			envValues[env.Name] = env.Value
 		}
-		assert.True(t, found, "AWS_SHARED_CREDENTIALS_FILE env not found")
+		assert.Equal(t, "/aws-sts/credentials", envValues["AWS_SHARED_CREDENTIALS_FILE"])
+		assert.Equal(t, "true", envValues["AWS_SDK_LOAD_CONFIG"])
 	})
 
 	t.Run("idempotent on second call", func(t *testing.T) {
 		volCountBefore := len(dep.Spec.Template.Spec.Volumes)
 		mountCountBefore := len(dep.Spec.Template.Spec.Containers[0].VolumeMounts)
+		envCountBefore := len(dep.Spec.Template.Spec.Containers[0].Env)
 
 		applySTSCredentials(dep, qctx)
 
 		assert.Equal(t, volCountBefore, len(dep.Spec.Template.Spec.Volumes))
 		assert.Equal(t, mountCountBefore, len(dep.Spec.Template.Spec.Containers[0].VolumeMounts))
+		assert.Equal(t, envCountBefore, len(dep.Spec.Template.Spec.Containers[0].Env))
 	})
 
 	t.Run("replaces conflicting volume definition", func(t *testing.T) {
