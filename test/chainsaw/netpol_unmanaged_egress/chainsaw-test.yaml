@@ -169,7 +169,10 @@ spec:
           # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
           # OpenShift the restricted SCC assigns a UID from the namespace range and a
           # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
-          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+          UID_RANGE=$(kubectl get ns "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' \
+            2>/dev/null || true)
+          if [ -n "${UID_RANGE}" ]; then
             export RUN_AS_USER=""
           else
             export RUN_AS_USER=1000

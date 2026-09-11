@@ -11,7 +11,10 @@ spec:
     try:
     - script:
         content: |
-          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+          UID_RANGE=$(kubectl get ns "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' \
+            2>/dev/null || true)
+          if [ -n "${UID_RANGE}" ]; then
             exit 0
           fi
           echo "KinD detected, creating config bundle..."
@@ -90,7 +93,10 @@ spec:
           # to assign a non-root UID, so we must pin one to satisfy runAsNonRoot. On
           # OpenShift the restricted SCC assigns a UID from the namespace range and a
           # hard-coded runAsUser: 1000 would fail SCC admission — so leave it unset there.
-          if kubectl api-resources 2>/dev/null | grep -q route.openshift.io; then
+          UID_RANGE=$(kubectl get ns "$NAMESPACE" \
+            -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' \
+            2>/dev/null || true)
+          if [ -n "${UID_RANGE}" ]; then
             export RUN_AS_USER=""
           else
             export RUN_AS_USER=1000
@@ -138,7 +144,7 @@ spec:
 
           # 3. Non-DNS egress denied — only verifiable where NetworkPolicy is enforced.
           #    kindnet (KinD default CNI) does not enforce NetworkPolicy, so skip on KinD.
-          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+          if [ -n "${UID_RANGE}" ]; then
             create_probe "probe-deny-non-dns" \
               "nc -z -w 5 kubernetes.default.svc.cluster.local 443 \
                  && { echo 'FAIL: non-DNS egress reached kubernetes:443 (policy too permissive)'; exit 1; } \
