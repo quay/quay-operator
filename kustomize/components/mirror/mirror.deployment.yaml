@@ -83,6 +83,13 @@ spec:
           env:
             - name: QUAY_APP_SERVICE_HOST
               value: $(QUAY_APP_SERVICE_HOST)
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
       containers:
         - name: quay-mirror
           securityContext:
