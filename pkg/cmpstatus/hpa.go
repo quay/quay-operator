@@ -39,7 +39,15 @@ func (h *HPA) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, e
 		}, nil
 	}
 
-	for _, hpasuffix := range []string{"quay-app", "clair-app", "quay-mirror"} {
+	hpaSuffixes := []string{"quay-app"}
+	if qv1.ComponentIsManaged(reg.Spec.Components, qv1.ComponentClair) {
+		hpaSuffixes = append(hpaSuffixes, "clair-app")
+	}
+	if qv1.ComponentIsManaged(reg.Spec.Components, qv1.ComponentMirror) {
+		hpaSuffixes = append(hpaSuffixes, "quay-mirror")
+	}
+
+	for _, hpasuffix := range hpaSuffixes {
 		nsn := types.NamespacedName{
 			Namespace: reg.Namespace,
 			Name:      fmt.Sprintf("%s-%s", reg.Name, hpasuffix),
@@ -52,7 +60,7 @@ func (h *HPA) Check(ctx context.Context, reg qv1.QuayRegistry) (qv1.Condition, e
 					Type:           qv1.ComponentHPAReady,
 					Status:         metav1.ConditionFalse,
 					Reason:         qv1.ConditionReasonComponentNotReady,
-					Message:        "Horizontal pod autoscaler not found",
+					Message:        fmt.Sprintf("Horizontal pod autoscaler %s not found", nsn.Name),
 					LastUpdateTime: metav1.NewTime(time.Now()),
 				}, nil
 			}
