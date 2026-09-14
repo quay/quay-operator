@@ -194,6 +194,7 @@ spec:
               resources:
                 - quayregistries
                 - quayregistries/status
+                - quayregistries/finalizers
               verbs:
                 - '*'
             - apiGroups:
