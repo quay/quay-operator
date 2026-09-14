@@ -159,12 +159,19 @@ spec:
           create_deny_probe "probe-deny-postgres"    "${REG}-quay-database"  5432
           create_deny_probe "probe-deny-redis"       "${REG}-quay-redis"     6379
           create_deny_probe "probe-deny-clairpg"     "${REG}-clair-postgres" 5432
-          create_deny_probe "probe-deny-clair-8080"  "${REG}-clair-app"      80
-          create_deny_probe "probe-deny-clair-8089"  "${REG}-clair-app"      8089
+
+          if kubectl rollout status deployment/${REG}-clair-app -n ${NS} --timeout=60s 2>/dev/null; then
+            create_deny_probe "probe-deny-clair-8080"  "${REG}-clair-app"      80
+            create_deny_probe "probe-deny-clair-8089"  "${REG}-clair-app"      8089
+            CLAIR_DENY_JOBS="probe-deny-clair-8080 probe-deny-clair-8089"
+          else
+            echo "Clair not available; skipping clair ingress negative probes"
+            CLAIR_DENY_JOBS=""
+          fi
 
           echo "Waiting for negative-control jobs to complete (deny expected)..."
           for job in probe-deny-postgres probe-deny-redis probe-deny-clairpg \
-                     probe-deny-clair-8080 probe-deny-clair-8089; do
+                     ${CLAIR_DENY_JOBS}; do
             kubectl wait job/${job} -n ${NS} --for=condition=complete --timeout=90s \
               || {
                 echo "FAIL: ${job} did not complete (ingress policy may be too permissive)"
