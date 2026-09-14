@@ -1390,6 +1390,10 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 		client.ForceOwnership,
 		client.FieldOwner("quay-operator"),
 	}
+	if err := r.clearRollingUpdateForRecreate(ctx, obj, log); err != nil {
+		return false, err
+	}
+
 	err := r.Patch(ctx, obj, client.Apply, opts...)
 	rdferr := &apiutil.ErrResourceDiscoveryFailed{}
 	if goerrors.As(err, &rdferr) && gvk == hpaGVK {
@@ -1407,6 +1411,35 @@ func (r *QuayRegistryReconciler) createOrUpdateObject(
 
 	log.Info("finished creating/updating object")
 	return false, nil
+}
+
+func (r *QuayRegistryReconciler) clearRollingUpdateForRecreate(ctx context.Context, obj client.Object, log logr.Logger) error {
+	dep, ok := obj.(*appsv1.Deployment)
+	if !ok || dep.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
+		return nil
+	}
+
+	var current appsv1.Deployment
+	key := types.NamespacedName{Name: dep.GetName(), Namespace: dep.GetNamespace()}
+	if err := r.Get(ctx, key, &current); err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if current.Spec.Strategy.RollingUpdate == nil {
+		return nil
+	}
+
+	patch := client.RawPatch(
+		types.MergePatchType,
+		[]byte(`{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}`),
+	)
+	if err := r.Patch(ctx, &current, patch); err != nil {
+		log.Error(err, "failed to clear rollingUpdate before applying Recreate deployment strategy")
+		return err
+	}
+	return nil
 }
 
 func (r *QuayRegistryReconciler) updateWithCondition(
