@@ -228,6 +228,17 @@ reviews:
           environment variables, not mutable tags like :latest.
 
   # ---------------------------------------------------------------------------
+  # Tools — static analysis integrations
+  # ---------------------------------------------------------------------------
+  tools:
+    # golangci-lint — no project-level config file; uses pre-commit default settings.
+    golangci-lint:
+      enabled: true
+    # gitleaks — scan for leaked secrets/credentials in diffs.
+    gitleaks:
+      enabled: true
+
+  # ---------------------------------------------------------------------------
   # Pre-merge checks — automated validation rules
   # ---------------------------------------------------------------------------
   pre_merge_checks:
@@ -291,17 +302,6 @@ knowledge_base:
       - "GEMINI.md"
   learnings:
     scope: local
-
-# -----------------------------------------------------------------------------
-# Tools — static analysis integrations
-# -----------------------------------------------------------------------------
-tools:
-  # golangci-lint — no project-level config file; uses pre-commit default settings.
-  golangci-lint:
-    enabled: true
-  # gitleaks — scan for leaked secrets/credentials in diffs.
-  gitleaks:
-    enabled: true
 
 # -----------------------------------------------------------------------------
 # Chat — auto-reply to @coderabbitai mentions
