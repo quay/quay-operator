@@ -116,16 +116,7 @@ spec:
         content: |
           set -euo pipefail
 
-          # Postgres is unmanaged: the per-component NetworkPolicy must not exist
-          if kubectl get networkpolicy -n $NAMESPACE -l quay-component=postgres \
-            -o name 2>/dev/null | grep -q .; then
-            echo "FAIL: postgres NetworkPolicy found but postgres is unmanaged"
-            kubectl get networkpolicy -n $NAMESPACE -l quay-component=postgres
-            exit 1
-          fi
-          echo "PASS: no postgres NetworkPolicy (component is unmanaged)"
-
-          # Default policies must still be present
+          # Default policies must be present before checking component-level policy absence
           echo "waiting for default-deny-all..."
           for i in $(seq 1 30); do
             kubectl get networkpolicy unmanaged-egress-default-deny-all -n $NAMESPACE &>/dev/null \
@@ -154,6 +145,16 @@ spec:
             [ "$i" -eq 60 ] && { echo "FAIL: quay-app has no ready replicas after 3m"; exit 1; }
             sleep 3
           done
+
+          # Check postgres policy absence after reconciliation is confirmed complete.
+          # Checking before quay-app is ready risks a false PASS during early reconciliation.
+          if kubectl get networkpolicy -n $NAMESPACE -l quay-component=postgres \
+            -o name 2>/dev/null | grep -q .; then
+            echo "FAIL: postgres NetworkPolicy found but postgres is unmanaged"
+            kubectl get networkpolicy -n $NAMESPACE -l quay-component=postgres
+            exit 1
+          fi
+          echo "PASS: no postgres NetworkPolicy (component is unmanaged)"
 
   - name: explicit-egress-probe
     try:

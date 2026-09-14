@@ -107,11 +107,14 @@ spec:
             --type=json -p='[{"op":"replace","path":"/spec/ingress","value":[{}]}]'
           echo "Waiting for operator to restore restrictive ingress (up to 5 minutes)..."
           for i in $(seq 1 60); do
-            FROM=$(kubectl get networkpolicy "$NP" -n $NAMESPACE \
-              -o jsonpath='{.spec.ingress[0].from}' 2>/dev/null || echo "")
-            [ -n "$FROM" ] \
-              && { echo "PASS: restrictive ingress restored after ${i}x5s"; break; }
-            [ "$i" -eq 60 ] && { echo "FAIL: operator did not restore restrictive ingress"; exit 1; }
+            FROM_COMPONENT=$(kubectl get networkpolicy "$NP" -n $NAMESPACE \
+              -o jsonpath='{.spec.ingress[0].from[0].podSelector.matchLabels.quay-component}' \
+              2>/dev/null || echo "")
+            PORT=$(kubectl get networkpolicy "$NP" -n $NAMESPACE \
+              -o jsonpath='{.spec.ingress[0].ports[0].port}' 2>/dev/null || echo "")
+            [ "$FROM_COMPONENT" = "quay-app" ] && [ "$PORT" = "5432" ] \
+              && { echo "PASS: restrictive ingress restored (quay-component=quay-app, port=5432) after ${i}x5s"; break; }
+            [ "$i" -eq 60 ] && { echo "FAIL: operator did not restore restrictive ingress (from=${FROM_COMPONENT}, port=${PORT})"; exit 1; }
             sleep 5
           done
 
