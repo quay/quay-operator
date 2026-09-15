@@ -253,8 +253,7 @@ func (r *QuayRegistryReconciler) observeEnteringReadOnly(
 	if restored, err := r.restoreReadOnlyHPAs(ctx, quay, qctx); err != nil {
 		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDeferred, err.Error(), true)
 	} else if !restored {
-		log.Info("restored read-only transition HPA pins, waiting for next reconcile")
-		return readOnlyDecision{Stop: true, Result: r.Requeue}
+		log.Info("restored read-only transition HPA pins")
 	}
 
 	quay.Status.ReadOnlyPhase = v1.ReadOnlyPhaseReadOnly
@@ -277,8 +276,7 @@ func (r *QuayRegistryReconciler) observeExitingReadOnly(
 	if restored, err := r.restoreReadOnlyHPAs(ctx, quay, qctx); err != nil {
 		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDegraded, err.Error(), true)
 	} else if !restored {
-		log.Info("restored read-only exit HPA pins, waiting for next reconcile")
-		return readOnlyDecision{Stop: true, Result: r.Requeue}
+		log.Info("restored read-only exit HPA pins")
 	}
 	if err := r.deleteReadOnlySecret(ctx, quay); err != nil {
 		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDegraded, err.Error(), true)
