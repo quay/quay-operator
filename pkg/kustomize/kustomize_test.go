@@ -1633,6 +1633,38 @@ func TestInflateReadOnlyDefersUpgradeOverlay(t *testing.T) {
 	}
 }
 
+func TestInflateQuayAppHasExplicitRollingUpdateStrategy(t *testing.T) {
+	log := testlogr.NewTestLogger(t)
+	ctx := quaycontext.QuayRegistryContext{}
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test-ns"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: "postgres", Managed: true},
+				{Kind: "redis", Managed: true},
+				{Kind: "objectstorage", Managed: false},
+				{Kind: "mirror", Managed: false},
+				{Kind: "horizontalpodautoscaler", Managed: false},
+			},
+		},
+		Status: v1.QuayRegistryStatus{CurrentVersion: v1.QuayVersionCurrent},
+	}
+	configBundle := &corev1.Secret{
+		Data: map[string][]byte{
+			"config.yaml": encode(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}),
+		},
+	}
+
+	pieces, err := Inflate(&ctx, quay, configBundle, log, false)
+	require.NoError(t, err)
+	deployment := findDeploymentByName(pieces, "test-quay-app")
+	require.NotNil(t, deployment)
+	assert.Equal(t, appsv1.RollingUpdateDeploymentStrategyType, deployment.Spec.Strategy.Type)
+	require.NotNil(t, deployment.Spec.Strategy.RollingUpdate)
+	assert.Equal(t, "25%", deployment.Spec.Strategy.RollingUpdate.MaxSurge.String())
+	assert.Equal(t, "25%", deployment.Spec.Strategy.RollingUpdate.MaxUnavailable.String())
+}
+
 func TestInflateTLSCertGeneration(t *testing.T) {
 	log := testlogr.NewTestLogger(t)
 
