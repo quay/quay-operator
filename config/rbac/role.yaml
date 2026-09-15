@@ -69,11 +69,27 @@ rules:
   - update
   - watch
 - apiGroups:
+  - cloudcredential.openshift.io
+  resources:
+  - credentialsrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - config.openshift.io
   resources:
   - apiservers
+  - authentications
+  - infrastructures
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -110,6 +126,14 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - operator.openshift.io
+  resources:
+  - cloudcredentials
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - quay.redhat.com
