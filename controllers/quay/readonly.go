@@ -533,7 +533,9 @@ func (r *QuayRegistryReconciler) deleteReadOnlySecret(ctx context.Context, quay 
 	if !ownedByQuay(&secret, quay) {
 		return fmt.Errorf("read-only service key Secret %q exists but is not owned by this QuayRegistry", secret.Name)
 	}
-	if err := r.Delete(ctx, &secret); err != nil && !errors.IsNotFound(err) {
+	uid := secret.GetUID()
+	resourceVersion := secret.GetResourceVersion()
+	if err := r.Delete(ctx, &secret, client.Preconditions{UID: &uid, ResourceVersion: &resourceVersion}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	return nil

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/yaml"
 
@@ -141,8 +142,10 @@ func TestDeleteReadOnlySecretRequiresOwnership(t *testing.T) {
 
 	owned := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      readOnlySecretName(quay),
-			Namespace: "ns",
+			Name:            readOnlySecretName(quay),
+			Namespace:       "ns",
+			UID:             types.UID("secret-uid"),
+			ResourceVersion: "1",
 			OwnerReferences: []metav1.OwnerReference{{
 				APIVersion: v1.GroupVersion.String(),
 				Kind:       "QuayRegistry",
@@ -157,6 +160,71 @@ func TestDeleteReadOnlySecretRequiresOwnership(t *testing.T) {
 	require.NoError(t, reconciler.deleteReadOnlySecret(context.Background(), quay))
 	err = client.Get(context.Background(), types.NamespacedName{Name: owned.Name, Namespace: owned.Namespace}, &got)
 	assert.True(t, errors.IsNotFound(err))
+}
+
+type replacingSecretAfterGetClient struct {
+	client.Client
+	replacement *corev1.Secret
+	replaced    bool
+}
+
+func (c *replacingSecretAfterGetClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	err := c.Client.Get(ctx, key, obj, opts...)
+	if err != nil || c.replaced || key.Name != c.replacement.Name || key.Namespace != c.replacement.Namespace {
+		return err
+	}
+
+	c.replaced = true
+	replacement := c.replacement.DeepCopy()
+	replacement.ResourceVersion = obj.GetResourceVersion()
+	return c.Update(ctx, replacement)
+}
+
+func TestDeleteReadOnlySecretUsesPreconditions(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+	}
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            readOnlySecretName(quay),
+			Namespace:       "ns",
+			UID:             types.UID("validated-secret-uid"),
+			ResourceVersion: "1",
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: v1.GroupVersion.String(),
+				Kind:       "QuayRegistry",
+				Name:       "registry",
+				UID:        types.UID("quay-uid"),
+			}},
+		},
+	}
+	replacement := secret.DeepCopy()
+	replacement.UID = types.UID("replacement-secret-uid")
+	replacement.ResourceVersion = "2"
+
+	baseClient := fake.NewClientBuilder().WithScheme(s).WithObjects(quay, secret).Build()
+	reconciler := &QuayRegistryReconciler{
+		Client: &replacingSecretAfterGetClient{
+			Client:      baseClient,
+			replacement: replacement,
+		},
+	}
+
+	err := reconciler.deleteReadOnlySecret(context.Background(), quay)
+	require.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
+
+	var got corev1.Secret
+	require.NoError(t, baseClient.Get(context.Background(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, &got))
+	assert.Equal(t, types.UID("replacement-secret-uid"), got.UID)
 }
 
 func TestConditionEventTypeWarnsForComponentCreationFailures(t *testing.T) {
