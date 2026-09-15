@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/yaml"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -393,9 +392,7 @@ func (r *QuayRegistryReconciler) ensureReadOnlyServiceKeySecret(
 		if err != nil {
 			return "", false, err
 		}
-		if err := controllerutil.SetControllerReference(quay, generated, r.Scheme); err != nil {
-			return "", false, err
-		}
+		v1.EnsureOwnerReference(quay, generated)
 		if err := r.Create(ctx, generated); err != nil {
 			return "", false, err
 		}

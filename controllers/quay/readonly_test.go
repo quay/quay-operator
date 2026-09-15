@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -41,6 +42,36 @@ func TestReadOnlyServiceKeySecretGeneration(t *testing.T) {
 	gotKID, err := validateReadOnlySecret(secret)
 	require.NoError(t, err)
 	assert.Equal(t, kid, gotKID)
+}
+
+func TestEnsureReadOnlyServiceKeySecretUsesNonBlockingOwnerReference(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(s).WithObjects(quay).Build()
+	reconciler := &QuayRegistryReconciler{Client: client, Scheme: s}
+
+	kid, stop, err := reconciler.ensureReadOnlyServiceKeySecret(context.Background(), quay, logr.Discard())
+	require.NoError(t, err)
+	assert.False(t, stop)
+	assert.NotEmpty(t, kid)
+
+	var secret corev1.Secret
+	require.NoError(t, client.Get(context.Background(), types.NamespacedName{Name: readOnlySecretName(quay), Namespace: quay.Namespace}, &secret))
+	require.Len(t, secret.OwnerReferences, 1)
+	assert.Equal(t, v1.GroupVersion.String(), secret.OwnerReferences[0].APIVersion)
+	assert.Equal(t, "QuayRegistry", secret.OwnerReferences[0].Kind)
+	assert.Equal(t, "registry", secret.OwnerReferences[0].Name)
+	assert.Equal(t, types.UID("quay-uid"), secret.OwnerReferences[0].UID)
+	assert.Nil(t, secret.OwnerReferences[0].BlockOwnerDeletion)
 }
 
 func TestOwnedByQuayRequiresMatchingUID(t *testing.T) {
