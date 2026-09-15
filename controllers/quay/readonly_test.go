@@ -5,6 +5,9 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -337,6 +340,66 @@ func TestEnsureReadOnlyHPAPin(t *testing.T) {
 	assert.Equal(t, "10", got.Annotations[readOnlyOriginalMaxReplicasAnnotation])
 }
 
+func TestObserveEnteringReadOnlyAdvancesAfterRestoringHPAs(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry", Namespace: "ns", UID: types.UID("quay-uid")},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentHPA, Managed: true},
+				{Kind: v1.ComponentMirror, Managed: true},
+			},
+		},
+		Status: v1.QuayRegistryStatus{ReadOnlyPhase: v1.ReadOnlyPhaseEnteringReadOnly},
+	}
+	secret, kid, err := generateReadOnlySecret(quay)
+	require.NoError(t, err)
+	v1.EnsureOwnerReference(quay, secret)
+	quay.Status.ReadOnlyKeyID = kid
+
+	replicas := int32(2)
+	app := rolledOutReadOnlyDeployment("registry-quay-app", replicas)
+	mirror := rolledOutReadOnlyDeployment("registry-quay-mirror", replicas)
+	appHPA := pinnedReadOnlyHPA("registry-quay-app", replicas, "1", "20")
+	mirrorHPA := pinnedReadOnlyHPA("registry-quay-mirror", replicas, "1", "20")
+
+	client := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(quay, secret, app, mirror, appHPA, mirrorHPA).
+		WithStatusSubresource(&v1.QuayRegistry{}).
+		Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+
+	privateKey, err := parseReadOnlyPrivateKey(secret.Data[kustomize.ReadOnlyPEMKey])
+	require.NoError(t, err)
+	jwk := publicJWK(&privateKey.PublicKey)
+	oldClient := readOnlyHTTPClient
+	readOnlyHTTPClient = &http.Client{Transport: readOnlyRoundTripper{
+		kid:            kid,
+		expirationDate: time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+		jwk:            jwk,
+	}}
+	defer func() {
+		readOnlyHTTPClient = oldClient
+	}()
+
+	decision := reconciler.observeEnteringReadOnly(context.Background(), quay, &quaycontext.QuayRegistryContext{ReadOnlyDeferUpgrade: true}, logr.Discard())
+	require.NoError(t, decision.Err)
+	assert.True(t, decision.Stop)
+	assert.Equal(t, v1.ReadOnlyPhaseReadOnly, quay.Status.ReadOnlyPhase)
+
+	var got autoscalingv2.HorizontalPodAutoscaler
+	require.NoError(t, client.Get(context.Background(), types.NamespacedName{Name: "registry-quay-app", Namespace: "ns"}, &got))
+	require.NotNil(t, got.Spec.MinReplicas)
+	assert.Equal(t, int32(1), *got.Spec.MinReplicas)
+	assert.Equal(t, int32(20), got.Spec.MaxReplicas)
+	assert.NotContains(t, got.Annotations, readOnlyOriginalMinReplicasAnnotation)
+	assert.NotContains(t, got.Annotations, readOnlyOriginalMaxReplicasAnnotation)
+}
+
 func TestCollectReadOnlyFrozenImagesPersistsState(t *testing.T) {
 	s := runtime.NewScheme()
 	require.NoError(t, scheme.AddToScheme(s))
@@ -380,6 +443,67 @@ func TestCollectReadOnlyFrozenImagesPersistsState(t *testing.T) {
 	var persisted map[string]string
 	require.NoError(t, json.Unmarshal([]byte(got.Annotations[readOnlyFrozenImagesAnnotation]), &persisted))
 	assert.Equal(t, qctx.ReadOnlyFrozenImages, persisted)
+}
+
+func rolledOutReadOnlyDeployment(name string, replicas int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       name,
+			Namespace:  "ns",
+			Generation: 1,
+		},
+		Spec: appsv1.DeploymentSpec{Replicas: &replicas},
+		Status: appsv1.DeploymentStatus{
+			ObservedGeneration: 1,
+			Replicas:           replicas,
+			UpdatedReplicas:    replicas,
+			AvailableReplicas:  replicas,
+		},
+	}
+}
+
+func pinnedReadOnlyHPA(name string, replicas int32, originalMin, originalMax string) *autoscalingv2.HorizontalPodAutoscaler {
+	return &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "ns",
+			Annotations: map[string]string{
+				readOnlyOriginalMinReplicasAnnotation: originalMin,
+				readOnlyOriginalMaxReplicasAnnotation: originalMax,
+			},
+		},
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{Name: name},
+			MinReplicas:    &replicas,
+			MaxReplicas:    replicas,
+		},
+	}
+}
+
+type readOnlyRoundTripper struct {
+	kid            string
+	expirationDate string
+	jwk            readOnlyPublicJWK
+}
+
+func (rt readOnlyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	body := ""
+	if strings.HasSuffix(req.URL.Path, "/status") {
+		body = fmt.Sprintf(
+			`{"kid":%q,"service":"quay","operator_managed":true,"expiration_date":%q}`,
+			rt.kid,
+			rt.expirationDate,
+		)
+	} else {
+		raw, _ := json.Marshal(rt.jwk)
+		body = string(raw)
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     http.Header{},
+		Request:    req,
+	}, nil
 }
 
 func TestCollectReadOnlyFrozenImagesUsesPersistedStateWhenDeploymentMissing(t *testing.T) {
