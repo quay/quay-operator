@@ -1,11 +1,11 @@
 # Base assumes all other services (including database) are externally managed and only includes the Quay app itself.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-commonLabels:
-  app: quay
 resources:
   - ./quay.serviceaccount.yaml
   - ./quay.deployment.yaml
   - ./quay.service.yaml
   - ./cluster-service-ca.configmap.yaml
   - ./cluster-trusted-ca.configmap.yaml
+  - ./quay.networkpolicy.yaml
+

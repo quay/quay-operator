@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quay-app-allow-all
+  labels:
+    quay-component: quay-app
+  annotations:
+    quay-component: quay-app
+    quay-operator/network-policy: open
+    quay-operator/network-policy-reason: "Quay requires unrestricted egress and ingress due to proxying of upstream registries, as well as for accessing unmanaged components (if any)"
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: quay-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - {}
+  egress:
+  - {}
