@@ -92,12 +92,8 @@ func (r *QuayRegistryReconciler) prepareReadOnlyLifecycle(
 		if blocked, decision := r.readOnlyCompatibilityBlocked(ctx, quay); blocked || decision.Stop {
 			return readOnlyIntent{}, decision
 		}
-		if conflict := readOnlyOperatorConfigConflict(cbundle); conflict != "" {
-			msg := fmt.Sprintf("operator-managed read-only is blocked by lifecycle config in %s", conflict)
-			return readOnlyIntent{}, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonManualMigrationRequired, msg, false)
-		}
-		if conflict := readOnlyOverrideConflict(quay); conflict != "" {
-			return readOnlyIntent{}, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonOverrideConflict, conflict, false)
+		if blocked, decision := r.readOnlyConfigConflictBlocked(ctx, quay, cbundle, false); blocked {
+			return readOnlyIntent{}, decision
 		}
 
 		kid, stop, err := r.ensureReadOnlyServiceKeySecret(ctx, quay, log)
@@ -117,6 +113,12 @@ func (r *QuayRegistryReconciler) prepareReadOnlyLifecycle(
 			"preparing operator-managed read-only service key",
 			true,
 		)
+	}
+
+	if requested && phase != v1.ReadOnlyPhaseNormal && phase != v1.ReadOnlyPhaseExitingReadOnly {
+		if blocked, decision := r.readOnlyConfigConflictBlocked(ctx, quay, cbundle, true); blocked {
+			return readOnlyIntent{}, decision
+		}
 	}
 
 	if exitRequested && phase != v1.ReadOnlyPhaseExitingReadOnly {
@@ -329,6 +331,22 @@ func (r *QuayRegistryReconciler) readOnlyCompatibilityBlocked(ctx context.Contex
 	if currentVersion.LessThan(minVersion) {
 		msg := fmt.Sprintf("status.currentVersion %s is less than required read-only version %s", currentVersion, minVersion)
 		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonUnsupportedVersion, msg, false)
+	}
+	return false, readOnlyDecision{}
+}
+
+func (r *QuayRegistryReconciler) readOnlyConfigConflictBlocked(
+	ctx context.Context,
+	quay *v1.QuayRegistry,
+	cbundle *corev1.Secret,
+	stop bool,
+) (bool, readOnlyDecision) {
+	if conflict := readOnlyOperatorConfigConflict(cbundle); conflict != "" {
+		msg := fmt.Sprintf("operator-managed read-only is blocked by lifecycle config in %s", conflict)
+		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonManualMigrationRequired, msg, stop)
+	}
+	if conflict := readOnlyOverrideConflict(quay); conflict != "" {
+		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonOverrideConflict, conflict, stop)
 	}
 	return false, readOnlyDecision{}
 }
