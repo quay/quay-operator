@@ -260,7 +260,7 @@ func TestUpdateReadOnlyConditionSkipsUnchangedCondition(t *testing.T) {
 				Type:               v1.ConditionTypeReadOnly,
 				Status:             metav1.ConditionTrue,
 				Reason:             v1.ConditionReasonReadOnlyActive,
-				Message:            "operator-managed read-only mode is active",
+				Message:            "Registry is in operator-managed read-only mode.",
 				LastUpdateTime:     lastUpdate,
 				LastTransitionTime: lastTransition,
 			}},
@@ -273,7 +273,7 @@ func TestUpdateReadOnlyConditionSkipsUnchangedCondition(t *testing.T) {
 		quay,
 		metav1.ConditionTrue,
 		v1.ConditionReasonReadOnlyActive,
-		"operator-managed read-only mode is active",
+		"Registry is in operator-managed read-only mode.",
 	)
 
 	require.NoError(t, err)
@@ -299,20 +299,20 @@ func TestReadOnlyActiveConditionMessageReportsDeferredUpgrade(t *testing.T) {
 
 	assert.Equal(
 		t,
-		"operator-managed read-only mode is active",
+		"Registry is in operator-managed read-only mode.",
 		readOnlyActiveConditionMessage(quay, &quaycontext.QuayRegistryContext{}),
 	)
 
 	assert.Equal(
 		t,
-		"operator upgrade from v3.19.0 to v3.20.0 deferred while operator-managed read-only mode is active",
+		"Operator upgrade from v3.19.0 to v3.20.0 is deferred while operator-managed read-only mode is active.",
 		readOnlyActiveConditionMessage(quay, &quaycontext.QuayRegistryContext{ReadOnlyDeferUpgrade: true}),
 	)
 
 	quay.Status.CurrentVersion = "v3.20.0"
 	assert.Equal(
 		t,
-		"operator-managed read-only mode is active",
+		"Registry is in operator-managed read-only mode.",
 		readOnlyActiveConditionMessage(quay, &quaycontext.QuayRegistryContext{ReadOnlyDeferUpgrade: true}),
 	)
 }

@@ -110,7 +110,7 @@ func (r *QuayRegistryReconciler) prepareReadOnlyLifecycle(
 			quay,
 			metav1.ConditionUnknown,
 			v1.ConditionReasonReadOnlyTransitioning,
-			"preparing operator-managed read-only service key",
+			"Preparing operator-managed read-only service key.",
 			true,
 		)
 	}
@@ -128,7 +128,7 @@ func (r *QuayRegistryReconciler) prepareReadOnlyLifecycle(
 			quay,
 			metav1.ConditionUnknown,
 			v1.ConditionReasonReadOnlyTransitioning,
-			"exiting operator-managed read-only mode",
+			"Exiting operator-managed read-only mode.",
 			true,
 		)
 	}
@@ -220,7 +220,7 @@ func (r *QuayRegistryReconciler) observePreparingKey(ctx context.Context, quay *
 		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDeferred, err.Error(), true)
 	}
 	if !rolledOut {
-		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionUnknown, v1.ConditionReasonReadOnlyTransitioning, "waiting for read-only service key mount rollout", true)
+		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionUnknown, v1.ConditionReasonReadOnlyTransitioning, "Waiting for read-only service key mount rollout.", true)
 	}
 	if err := r.verifyReadOnlyKey(ctx, quay); err != nil {
 		if isReadOnlyUnsupportedError(err) {
@@ -233,7 +233,7 @@ func (r *QuayRegistryReconciler) observePreparingKey(ctx context.Context, quay *
 	}
 
 	quay.Status.ReadOnlyPhase = v1.ReadOnlyPhaseEnteringReadOnly
-	return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionUnknown, v1.ConditionReasonReadOnlyTransitioning, "entering operator-managed read-only mode", true)
+	return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionUnknown, v1.ConditionReasonReadOnlyTransitioning, "Entering operator-managed read-only mode.", true)
 }
 
 func (r *QuayRegistryReconciler) observeEnteringReadOnly(
@@ -247,7 +247,7 @@ func (r *QuayRegistryReconciler) observeEnteringReadOnly(
 		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDeferred, err.Error(), true)
 	}
 	if !rolledOut {
-		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionUnknown, v1.ConditionReasonReadOnlyTransitioning, "waiting for read-only rollout", true)
+		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionUnknown, v1.ConditionReasonReadOnlyTransitioning, "Waiting for read-only rollout.", true)
 	}
 	if err := r.verifyReadOnlyKey(ctx, quay); err != nil {
 		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDeferred, err.Error(), true)
@@ -273,7 +273,7 @@ func (r *QuayRegistryReconciler) observeExitingReadOnly(
 		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDegraded, err.Error(), true)
 	}
 	if !rolledOut {
-		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionUnknown, v1.ConditionReasonReadOnlyTransitioning, "waiting for normal no-mount rollout", true)
+		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionUnknown, v1.ConditionReasonReadOnlyTransitioning, "Waiting for normal no-mount rollout.", true)
 	}
 	if restored, err := r.restoreReadOnlyHPAs(ctx, quay, qctx); err != nil {
 		return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDegraded, err.Error(), true)
@@ -286,7 +286,7 @@ func (r *QuayRegistryReconciler) observeExitingReadOnly(
 
 	quay.Status.ReadOnlyPhase = v1.ReadOnlyPhaseNormal
 	quay.Status.ReadOnlyKeyID = ""
-	return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDisabled, "operator-managed read-only mode is disabled", true)
+	return r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDisabled, "Operator-managed read-only mode is disabled.", true)
 }
 
 func (r *QuayRegistryReconciler) applyReadOnlyIntent(
@@ -319,17 +319,17 @@ func (r *QuayRegistryReconciler) readOnlyCompatibilityBlocked(ctx context.Contex
 	}
 
 	if quay.Status.CurrentVersion == "" {
-		msg := fmt.Sprintf("waiting for status.currentVersion before starting read-only; required version is >= %s", readOnlyMinimumQuayVersion)
+		msg := fmt.Sprintf("Waiting for status.currentVersion before starting read-only; required version is >= %s.", readOnlyMinimumQuayVersion)
 		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDeferred, msg, false)
 	}
 	currentVersion, err := semver.NewVersion(string(quay.Status.CurrentVersion))
 	if err != nil {
-		msg := fmt.Sprintf("status.currentVersion must be a valid semver value greater than or equal to %s", readOnlyMinimumQuayVersion)
+		msg := fmt.Sprintf("The status.currentVersion value must be a valid semver value greater than or equal to %s.", readOnlyMinimumQuayVersion)
 		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonUnsupportedVersion, msg, false)
 	}
 	minVersion := semver.MustParse(readOnlyMinimumQuayVersion)
 	if currentVersion.LessThan(minVersion) {
-		msg := fmt.Sprintf("status.currentVersion %s is less than required read-only version %s", currentVersion, minVersion)
+		msg := fmt.Sprintf("The status.currentVersion value %s is less than required read-only version %s.", currentVersion, minVersion)
 		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonUnsupportedVersion, msg, false)
 	}
 	return false, readOnlyDecision{}
@@ -342,7 +342,7 @@ func (r *QuayRegistryReconciler) readOnlyConfigConflictBlocked(
 	stop bool,
 ) (bool, readOnlyDecision) {
 	if conflict := readOnlyOperatorConfigConflict(cbundle); conflict != "" {
-		msg := fmt.Sprintf("operator-managed read-only is blocked by lifecycle config in %s", conflict)
+		msg := fmt.Sprintf("Operator-managed read-only is blocked by lifecycle config in %s.", conflict)
 		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonManualMigrationRequired, msg, stop)
 	}
 	if conflict := readOnlyOverrideConflict(quay); conflict != "" {
@@ -374,7 +374,7 @@ func (r *QuayRegistryReconciler) readOnlyStatusDecision(ctx context.Context, qua
 }
 
 func readOnlyActiveConditionMessage(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext) string {
-	const activeMessage = "operator-managed read-only mode is active"
+	const activeMessage = "Registry is in operator-managed read-only mode."
 	if qctx == nil ||
 		!qctx.ReadOnlyDeferUpgrade ||
 		quay.Status.CurrentVersion == "" ||
@@ -383,7 +383,7 @@ func readOnlyActiveConditionMessage(quay *v1.QuayRegistry, qctx *quaycontext.Qua
 		return activeMessage
 	}
 	return fmt.Sprintf(
-		"operator upgrade from %s to %s deferred while operator-managed read-only mode is active",
+		"Operator upgrade from %s to %s is deferred while operator-managed read-only mode is active.",
 		quay.Status.CurrentVersion,
 		v1.QuayVersionCurrent,
 	)
@@ -584,15 +584,15 @@ func readOnlyOverrideConflict(quay *v1.QuayRegistry) string {
 				continue
 			}
 			if env.ValueFrom != nil {
-				return fmt.Sprintf("%s override QUAY_OVERRIDE_CONFIG uses valueFrom, which cannot be validated for operator-managed read-only", kind)
+				return fmt.Sprintf("The %s override QUAY_OVERRIDE_CONFIG uses valueFrom, which cannot be validated for operator-managed read-only.", kind)
 			}
 			var cfg map[string]interface{}
 			if err := json.Unmarshal([]byte(env.Value), &cfg); err != nil {
-				return fmt.Sprintf("%s override QUAY_OVERRIDE_CONFIG is not valid JSON", kind)
+				return fmt.Sprintf("The %s override QUAY_OVERRIDE_CONFIG is not valid JSON.", kind)
 			}
 			for _, key := range readOnlyLifecycleConfigKeys() {
 				if _, ok := cfg[key]; ok {
-					return fmt.Sprintf("%s override QUAY_OVERRIDE_CONFIG contains read-only lifecycle key %s", kind, key)
+					return fmt.Sprintf("The %s override QUAY_OVERRIDE_CONFIG contains read-only lifecycle key %s.", kind, key)
 				}
 			}
 		}
