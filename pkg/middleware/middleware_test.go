@@ -7,6 +7,7 @@ import (
 	route "github.com/openshift/api/route/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1k8s "k8s.io/api/batch/v1"
@@ -1290,4 +1291,116 @@ func TestProcessPostgresDeploymentCAHashAnnotation(t *testing.T) {
 			t.Errorf("template annotation %s = %q, want %q", v1.ClusterServiceCAName, got, "abc12345")
 		}
 	})
+}
+
+func TestProcessReadOnlyDeploymentIntent(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentMirror, Managed: true},
+			},
+		},
+	}
+	qctx := &quaycontext.QuayRegistryContext{
+		ReadOnlyPhase:        string(v1.ReadOnlyPhaseEnteringReadOnly),
+		ReadOnlyMountEnabled: true,
+		ReadOnlySecretName:   "registry-readonly-service-key",
+		ReadOnlyFrozenImages: map[string]string{
+			"registry-quay-app/containers/quay-app": "quay@sha256:frozen",
+		},
+	}
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "registry-quay-app",
+			Labels:      map[string]string{"quay-component": "quay-app"},
+			Annotations: map[string]string{"quay-component": "quay-app"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "quay-app", Image: "quay:latest"}},
+				},
+			},
+		},
+	}
+
+	processed, err := Process(quay, qctx, dep, false)
+	require.NoError(t, err)
+	got := processed.(*appsv1.Deployment)
+
+	volume := findVolumeByName(got, readOnlyVolumeName)
+	require.NotNil(t, volume)
+	assert.Equal(t, "registry-readonly-service-key", volume.Secret.SecretName)
+	mount := findVolumeMountByName(got, "quay-app", readOnlyVolumeName)
+	require.NotNil(t, mount)
+	assert.Equal(t, readOnlyMountPath, mount.MountPath)
+	assert.True(t, mount.ReadOnly)
+	assert.Equal(t, appsv1.RecreateDeploymentStrategyType, got.Spec.Strategy.Type)
+	assert.Nil(t, got.Spec.Strategy.RollingUpdate)
+	assert.Equal(t, "quay@sha256:frozen", got.Spec.Template.Spec.Containers[0].Image)
+}
+
+func TestProcessReadOnlyHPAPin(t *testing.T) {
+	replicas := int32(3)
+	quay := &v1.QuayRegistry{
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentHPA, Managed: true},
+			},
+		},
+	}
+	qctx := &quaycontext.QuayRegistryContext{
+		ReadOnlyHPAPins: map[string]int32{"registry-quay-app": replicas},
+	}
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "registry-quay-app",
+			Annotations: map[string]string{"quay-component": "horizontalpodautoscaler"},
+		},
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+				Name: "registry-quay-app",
+			},
+			MaxReplicas: 10,
+		},
+	}
+
+	processed, err := Process(quay, qctx, hpa, false)
+	require.NoError(t, err)
+	got := processed.(*autoscalingv2.HorizontalPodAutoscaler)
+	require.NotNil(t, got.Spec.MinReplicas)
+	assert.Equal(t, replicas, *got.Spec.MinReplicas)
+	assert.Equal(t, replicas, got.Spec.MaxReplicas)
+}
+
+func findVolumeByName(deployment *appsv1.Deployment, name string) *corev1.Volume {
+	for index := range deployment.Spec.Template.Spec.Volumes {
+		if deployment.Spec.Template.Spec.Volumes[index].Name == name {
+			return &deployment.Spec.Template.Spec.Volumes[index]
+		}
+	}
+	return nil
+}
+
+func findVolumeMountByName(deployment *appsv1.Deployment, containerName, name string) *corev1.VolumeMount {
+	for containerIndex := range deployment.Spec.Template.Spec.Containers {
+		container := &deployment.Spec.Template.Spec.Containers[containerIndex]
+		if container.Name != containerName {
+			continue
+		}
+		for mountIndex := range container.VolumeMounts {
+			if container.VolumeMounts[mountIndex].Name == name {
+				return &container.VolumeMounts[mountIndex]
+			}
+		}
+	}
+	return nil
 }

@@ -71,6 +71,16 @@ type QuayRegistryContext struct {
 	ClairPostgresUseServiceCA bool
 	PostgresSSLRootCert       string
 	ClairPostgresSSLRootCert  string
+
+	// Read-only render intent
+	ReadOnlyPhase         string
+	ReadOnlyKeyID         string
+	ReadOnlySecretName    string
+	ReadOnlyMountEnabled  bool
+	ReadOnlyRegistryState bool
+	ReadOnlyDeferUpgrade  bool
+	ReadOnlyHPAPins       map[string]int32
+	ReadOnlyFrozenImages  map[string]string
 }
 
 // NewQuayRegistryContext returns a fresh context for reconciling a `QuayRegistry`.

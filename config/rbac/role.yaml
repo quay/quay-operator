@@ -126,6 +126,12 @@ rules:
 - apiGroups:
   - quay.redhat.com
   resources:
+  - quayregistries/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - quay.redhat.com
+  resources:
   - quayregistries/status
   verbs:
   - get
