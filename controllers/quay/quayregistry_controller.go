@@ -34,6 +34,7 @@ import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -482,6 +483,29 @@ func (r *QuayRegistryReconciler) GetOldConfigBundleSecrets(
 	return oldConfigBundleSecrets, nil
 }
 
+func (r *QuayRegistryReconciler) cleanupProgrammaticBootstrapTokenResources(
+	ctx context.Context, quay *v1.QuayRegistry, log logr.Logger,
+) error {
+	name := kustomize.BootstrapTokenSecretName(quay)
+	objects := []struct {
+		kind string
+		obj  client.Object
+	}{
+		{kind: "Secret", obj: &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}}},
+		{kind: "Role", obj: &rbacv1.Role{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}}},
+		{kind: "RoleBinding", obj: &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: quay.GetNamespace()}}},
+	}
+
+	for _, object := range objects {
+		if err := r.Delete(ctx, object.obj); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "could not delete stale programmatic bootstrap token resource", "kind", object.kind, "name", object.obj.GetName())
+			return err
+		}
+	}
+
+	return nil
+}
+
 // quayAppDeploymentRolledOut returns true when the quay-app Deployment has fully
 // rolled out — that is, every desired replica is both updated and available. It is
 // used to gate the deletion of old rendered config secrets so that no running pod
@@ -531,6 +555,7 @@ func (r *QuayRegistryReconciler) quayAppDeploymentRolledOut(
 // +kubebuilder:rbac:groups=autoscaling,resources=horizontalpodautoscalers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=objectbucket.io,resources=objectbucketclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=prometheusrules;servicemonitors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get
 
@@ -779,6 +804,19 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.Requeue, err
 	}
 
+	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentCache) {
+		if !v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentRedis) {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonCacheComponentDependencyError,
+				"cache set as managed, but redis is unmanaged",
+			)
+		}
+	}
+
 	if err := v1.ValidateOverrides(updatedQuay); err != nil {
 		return r.reconcileWithCondition(
 			ctx,
@@ -825,6 +863,23 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if usercfg == nil {
 		usercfg = make(map[string]interface{})
+	}
+
+	if !kustomize.ProgrammaticBootstrapEnabled(usercfg) {
+		if err := r.cleanupProgrammaticBootstrapTokenResources(ctx, updatedQuay, log); err != nil {
+			log.Error(err, "could not clean up stale programmatic bootstrap token resources, continuing reconciliation")
+		}
+	}
+
+	if err := kustomize.ValidateProgrammaticBootstrapConfig(usercfg); err != nil {
+		return r.reconcileWithCondition(
+			ctx,
+			&quay,
+			v1.ConditionTypeRolloutBlocked,
+			metav1.ConditionTrue,
+			v1.ConditionReasonConfigInvalid,
+			err.Error(),
+		)
 	}
 
 	updatedQuay.Status.Conditions = v1.RemoveCondition(

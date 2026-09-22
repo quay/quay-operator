@@ -72,6 +72,7 @@ spec:
                       - mirror
                       - monitoring
                       - tls
+                      - cache
                       type: string
                     managed:
                       description: |-

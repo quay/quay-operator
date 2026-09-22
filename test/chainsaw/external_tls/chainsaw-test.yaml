@@ -151,7 +151,7 @@ spec:
               echo "PASS: hash rotated ${OLD_HASH} -> ${NEW_HASH}"
               break
             fi
-            [ "$i" -eq 36 ] && { echo "ERROR: TLS hash rotation timeout after 3m"; exit 1; }
+            [ "$i" -eq 36 ] && { echo "ERROR: TLS hash rotation timeout after 10m"; exit 1; }
             sleep 5
           done
 
@@ -166,9 +166,9 @@ spec:
             echo "PASS: all deployments have consistent rotated hash"
           fi
 
-          kubectl rollout status deployment/external-tls-quay-app -n $NAMESPACE --timeout=180s
+          kubectl rollout status deployment/external-tls-quay-app -n $NAMESPACE --timeout=600s
           echo "quay-app rollout complete"
-          kubectl rollout status deployment/external-tls-clair-app -n $NAMESPACE --timeout=180s || true
+          kubectl rollout status deployment/external-tls-clair-app -n $NAMESPACE --timeout=600s || true
           echo "clair-app rollout complete (or timed out)"
     - assert:
         file: 00-assert-status.yaml

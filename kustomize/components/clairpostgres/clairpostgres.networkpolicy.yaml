@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clair-postgres-allow-only-from-clair
+  labels:
+    quay-component: clair-postgres
+  annotations:
+    quay-component: clair-postgres
+    quay-operator/network-policy: restrictive
+    quay-operator/network-policy-reason: "Allow access to the PostgreSQL database only from Clair pods"
+spec:
+  podSelector:
+    matchLabels:
+      quay-component: clair-postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          quay-component: clair-app
+    ports:
+    - protocol: TCP
+      port: 5432

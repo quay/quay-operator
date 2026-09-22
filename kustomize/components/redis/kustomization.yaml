@@ -5,3 +5,5 @@ resources:
   - ./redis.serviceaccount.yaml
   - ./redis.deployment.yaml
   - ./redis.service.yaml
+  - ./redis.networkpolicy.yaml
+

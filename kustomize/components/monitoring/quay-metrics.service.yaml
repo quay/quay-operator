@@ -16,5 +16,5 @@ spec:
       targetPort: 9091
       protocol: TCP
   selector:
-    quay-component: quay-app
+    quay-monitor: "true"
   type: ClusterIP

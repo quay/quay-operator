@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/quay/clair/config"
+	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/cache"
 	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/database"
 	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
 	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
@@ -39,6 +40,7 @@ func quayRegistry(name string) *v1.QuayRegistry {
 				{Kind: "clair", Managed: true},
 				{Kind: "redis", Managed: true},
 				{Kind: "objectstorage", Managed: true},
+				{Kind: "cache", Managed: true},
 			},
 		},
 	}
@@ -78,6 +80,27 @@ var fieldGroupForTests = []struct {
 			UserEventsRedis: &redis.UserEventsRedisStruct{
 				Host: "test-quay-redis",
 				Port: 6379,
+			},
+		},
+	},
+	{
+		"cache",
+		"cache",
+		quayRegistry("test"),
+		quaycontext.QuayRegistryContext{},
+		&cache.CacheFieldGroup{
+			DataModelCache: &cache.DataModelCacheStruct{
+				Engine:                 "redis",
+				RepositoryBlobCacheTTL: "120s",
+				CatalogPageCacheTTL:    "120s",
+				ActiveRepoTagsCacheTTL: "120s",
+				ValueSizeLimit:         "2MiB",
+				RedisConfig: cache.RedisConfigGroup{
+					Primary: &cache.RedisNodeConfig{
+						Host: "test-quay-redis",
+						Port: 6379,
+					},
+				},
 			},
 		},
 	},
@@ -389,6 +412,30 @@ var containsComponentConfigTests = []struct {
 		managed:   false,
 		cfgbundle: map[string][]byte{
 			"clair-config.yaml": []byte(``),
+		},
+		expected:      false,
+		expectedError: nil,
+	},
+	{
+		name:      "ContainsCacheSetup",
+		component: "cache",
+		managed:   false,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(`
+DATA_MODEL_CACHE_CONFIG:
+  engine: memcached
+  endpoint: [somehost, 12345]
+`),
+		},
+		expected:      true,
+		expectedError: nil,
+	},
+	{
+		name:      "DoesNotContainCacheSetup",
+		component: "cache",
+		managed:   false,
+		cfgbundle: map[string][]byte{
+			"config.yaml": []byte(``),
 		},
 		expected:      false,
 		expectedError: nil,

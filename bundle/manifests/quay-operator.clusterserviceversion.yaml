@@ -177,6 +177,15 @@ spec:
                 - apiservers
               verbs:
                 - get
+            - apiGroups:
+                - networking.k8s.io
+              resources:
+                - networkpolicies
+              verbs:
+                - create
+                - delete
+                - update
+                - patch
           serviceAccountName: quay-operator
       permissions:
         - rules:

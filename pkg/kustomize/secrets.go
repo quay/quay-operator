@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/quay/clair/config"
+	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/cache"
 	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/database"
 	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/distributedstorage"
 	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
@@ -67,14 +68,40 @@ func FieldGroupFor(
 			return nil, err
 		}
 
+		redisHost := fmt.Sprintf("%s-quay-redis", quay.GetName())
+
 		fieldGroup.BuildlogsRedis = &redis.BuildlogsRedisStruct{
-			Host: fmt.Sprintf("%s-quay-redis", quay.GetName()),
+			Host: redisHost,
 			Port: 6379,
 		}
 		fieldGroup.UserEventsRedis = &redis.UserEventsRedisStruct{
-			Host: fmt.Sprintf("%s-quay-redis", quay.GetName()),
+			Host: redisHost,
 			Port: 6379,
 		}
+
+		return fieldGroup, nil
+
+	case v1.ComponentCache:
+		fieldGroup, err := cache.NewCacheFieldGroup(map[string]any{})
+		if err != nil {
+			return nil, err
+		}
+
+		redisHost := fmt.Sprintf("%s-quay-redis", quay.GetName())
+		fieldGroup.DataModelCache = &cache.DataModelCacheStruct{
+			Engine: "redis",
+			RedisConfig: cache.RedisConfigGroup{
+				Primary: &cache.RedisNodeConfig{
+					Host: redisHost,
+					Port: 6379,
+				},
+			},
+			ActiveRepoTagsCacheTTL: "120s",
+			CatalogPageCacheTTL:    "120s",
+			RepositoryBlobCacheTTL: "120s",
+			ValueSizeLimit:         "2MiB",
+		}
+
 		return fieldGroup, nil
 
 	case v1.ComponentPostgres:
@@ -258,6 +285,9 @@ func ContainsComponentConfig(
 
 	case v1.ComponentRedis:
 		fields = (&redis.RedisFieldGroup{}).Fields()
+
+	case v1.ComponentCache:
+		fields = (&cache.CacheFieldGroup{}).Fields()
 
 	case v1.ComponentObjectStorage:
 		fields = (&distributedstorage.DistributedStorageFieldGroup{}).Fields()

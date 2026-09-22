@@ -13,6 +13,7 @@ This is the full list of components ([code](https://github.com/quay/quay-operato
 - `mirror`
 - `route`
 - `monitoring`
+- `cache`
 
 ### API
 
@@ -61,3 +62,32 @@ spec:
 ```
 
 The deployed Quay application will now use the external database.
+
+### Note on the cache component
+If 
+
+```yaml
+spec:
+  components:
+  - kind: redis
+    managed: false
+  - kind: cache
+    managed: true
+```
+
+is set in the `QuayRegistry` custom resource (`cache` managed, `redis` unmanaged), then the operator will not reconcile properly as `cache` component is only meant to be managed by the operator if internal Redis instance is used. When external Redis instance is in place (`redis` component is unmanaged), then `cache` must be set to unmanaged for reconciliation to continue. Caching can then be configured by adding the configuration to the init config bundle's `config.yaml` file. An example for external Redis:
+
+```yaml
+DATA_MODEL_CACHE_CONFIG:
+  engine: redis
+  redis_config:
+    primary:
+      host: redis-hostname
+      port: 6379
+      password: redis-password
+      ssl: true
+  repository_blob_cache_ttl: 120s
+  catalog_page_cache_ttl: 120s
+  active_repo_tags_cache_ttl: 120s
+  value_size_limit: 2MiB
+```

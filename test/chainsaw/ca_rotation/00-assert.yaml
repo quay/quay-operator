@@ -20,6 +20,8 @@ spec:
       managed: true
     - kind: redis
       managed: true
+    - kind: cache
+      managed: true
     - kind: objectstorage
       managed: true
     - kind: route
@@ -36,6 +38,9 @@ status:
     status: "True"
   - type: ComponentMonitoringReady
     reason: ComponentNotManaged
+    status: "True"
+  - type: ComponentCacheReady
+    reason: ComponentReady
     status: "True"
   - type: ComponentPostgresReady
     reason: ComponentReady

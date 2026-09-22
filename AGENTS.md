@@ -72,3 +72,19 @@ Commit message format:
 - Run `make fmt` before committing
 - Keep CRD backward compatible
 - Test component changes with e2e tests in `e2e/`
+
+## Contextification Addendum
+
+Low-token routing:
+
+- API type: `apis/quay/v1/`
+- Reconciler: `controllers/quay/`
+- Manifest generation: `pkg/kustomize/`
+- Component status: `pkg/cmpstatus/`
+- Runtime context: `pkg/context/`
+- Chainsaw tests: `test/chainsaw/`
+- Deeper docs: `agent_docs/`
+
+Commands: `make manager`, `make run`, `make test`, `make fmt && make vet`, `make generate && make manifests`.
+
+Guardrails: keep reconcile logic idempotent and preserve existing `QuayRegistry` compatibility.

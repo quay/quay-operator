@@ -31,6 +31,7 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 		&HPA{Client: c},
 		&Route{Client: c},
 		&Monitoring{Client: c},
+		&Cache{Client: c},
 	} {
 		cond, err := component.Check(ctx, q)
 		if err != nil {

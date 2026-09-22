@@ -35,6 +35,7 @@ Components can be `managed: true` (operator handles lifecycle) or `managed: fals
 | `horizontalpodautoscaler` | HPA for Quay/Clair/Mirror | No | managed |
 | `mirror` | Repository mirroring | No | managed |
 | `monitoring` | Prometheus metrics | No | managed (if Prometheus API available) |
+| `cache` | Model cache configuration | No | managed (if Redis is managed by the operator) |
 
 ## Component Overrides
 
@@ -52,6 +53,8 @@ Overrides customize managed component resources.
 | `resources` | Yes | Yes | Yes | Yes | Yes | - |
 | `labels` | Yes | Yes | Yes | Yes | Yes | Yes |
 | `annotations` | Yes | Yes | Yes | Yes | Yes | Yes |
+
+Component `cache` does not support overrides.
 
 ### Override Examples
 
@@ -125,4 +128,16 @@ DISTRIBUTED_STORAGE_CONFIG:
     - S3Storage
     - host: s3.amazonaws.com
       # ... S3 config
+
+# for unmanaged cache component (optional, if omitted, Quay falls 
+# back to using internal Memcached instance for caching purposes)
+DATA_MODEL_CACHE_CONFIG:
+  engine: redis
+  redis_config:
+    host: redishost
+    port: redisport
+  active_repo_tags_cache_ttl: 120s
+  catalog_page_cache_ttl: 120s
+  repository_blob_cache_ttl: 120s
+  value_size_limit: 2MiB
 ```

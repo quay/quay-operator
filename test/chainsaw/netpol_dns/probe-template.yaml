@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${NAME}
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 120
+  template:
+    metadata:
+      labels:
+        quay-operator/quayregistry: ${REG}
+        netpol-test: dns-probe
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: ${RUN_AS_USER}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: probe
+        image: busybox:stable
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+        command: ["sh", "-c", "${CMD}"]

@@ -1,0 +1,32 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: unmanaged-egress
+spec:
+  configBundleSecret: unmanaged-egress-config
+  components:
+  - kind: quay
+    managed: true
+  - kind: clair
+    managed: false
+  - kind: postgres
+    managed: false
+  - kind: clairpostgres
+    managed: false
+  - kind: redis
+    managed: true
+  - kind: mirror
+    managed: false
+  - kind: horizontalpodautoscaler
+    managed: false
+  # Object storage is unmanaged on KinD (the config bundle carries a Garage-backed
+  # DISTRIBUTED_STORAGE_CONFIG) but managed on OpenShift (no storage in the bundle,
+  # so the operator must provision it — otherwise reconciliation stops at ConfigInvalid).
+  - kind: objectstorage
+    managed: ($values.managedObjectStorage)
+  - kind: route
+    managed: ($values.managedRoute)
+  - kind: monitoring
+    managed: ($values.managedMonitoring)
+  - kind: tls
+    managed: ($values.managedTLS)

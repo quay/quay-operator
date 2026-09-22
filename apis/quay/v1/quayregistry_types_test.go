@@ -36,6 +36,7 @@ var ensureDefaultComponentsTests = []struct {
 					{Kind: "horizontalpodautoscaler", Managed: true},
 					{Kind: "mirror", Managed: true},
 					{Kind: "monitoring", Managed: true},
+					{Kind: "cache", Managed: true},
 				},
 			},
 		},
@@ -56,6 +57,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
 			{Kind: "monitoring", Managed: true},
+			{Kind: "cache", Managed: true},
 		},
 		nil,
 	},
@@ -74,6 +76,7 @@ var ensureDefaultComponentsTests = []struct {
 					{Kind: "tls", Managed: true},
 					{Kind: "horizontalpodautoscaler", Managed: true},
 					{Kind: "mirror", Managed: true},
+					{Kind: "cache", Managed: true},
 				},
 			},
 		},
@@ -89,6 +92,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "tls", Managed: true},
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
+			{Kind: "cache", Managed: true},
 		},
 		errors.New("cannot use `objectstorage` component when `ObjectBucketClaims` API not available"),
 	},
@@ -108,6 +112,7 @@ var ensureDefaultComponentsTests = []struct {
 					{Kind: "horizontalpodautoscaler", Managed: true},
 					{Kind: "mirror", Managed: true},
 					{Kind: "monitoring", Managed: true},
+					{Kind: "cache", Managed: true},
 				},
 			},
 		},
@@ -128,6 +133,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
 			{Kind: "monitoring", Managed: true},
+			{Kind: "cache", Managed: true},
 		},
 		errors.New("cannot use `route` component when `Route` API not available"),
 	},
@@ -147,6 +153,7 @@ var ensureDefaultComponentsTests = []struct {
 					{Kind: "horizontalpodautoscaler", Managed: true},
 					{Kind: "mirror", Managed: true},
 					{Kind: "monitoring", Managed: true},
+					{Kind: "cache", Managed: true},
 				},
 			},
 		},
@@ -167,6 +174,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
 			{Kind: "monitoring", Managed: true},
+			{Kind: "cache", Managed: true},
 		},
 		errors.New("cannot use `tls` component when `Route` API not available or TLS cert/key pair is provided"),
 	},
@@ -188,6 +196,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
 			{Kind: "monitoring", Managed: false},
+			{Kind: "cache", Managed: true},
 		},
 		nil,
 	},
@@ -213,6 +222,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
 			{Kind: "monitoring", Managed: true},
+			{Kind: "cache", Managed: true},
 		},
 		nil,
 	},
@@ -240,6 +250,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
 			{Kind: "monitoring", Managed: false},
+			{Kind: "cache", Managed: true},
 		},
 		nil,
 	},
@@ -271,6 +282,7 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
 			{Kind: "monitoring", Managed: true},
+			{Kind: "cache", Managed: true},
 		},
 		nil,
 	},
@@ -304,6 +316,38 @@ var ensureDefaultComponentsTests = []struct {
 			{Kind: "horizontalpodautoscaler", Managed: true},
 			{Kind: "mirror", Managed: true},
 			{Kind: "monitoring", Managed: true},
+			{Kind: "cache", Managed: true},
+		},
+		nil,
+	},
+	{
+		"RedisUnmanagedImpliesCacheUnmanaged",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "redis", Managed: false},
+				},
+			},
+		},
+		quaycontext.QuayRegistryContext{
+			SupportsRoutes:           true,
+			SupportsMonitoring:       true,
+			SupportsObjectStorage:    true,
+			ObjectStorageInitialized: true,
+		},
+		[]Component{
+			{Kind: "quay", Managed: true},
+			{Kind: "postgres", Managed: true},
+			{Kind: "redis", Managed: false},
+			{Kind: "clair", Managed: true},
+			{Kind: "clairpostgres", Managed: true},
+			{Kind: "objectstorage", Managed: true},
+			{Kind: "route", Managed: true},
+			{Kind: "tls", Managed: true},
+			{Kind: "horizontalpodautoscaler", Managed: true},
+			{Kind: "mirror", Managed: true},
+			{Kind: "monitoring", Managed: true},
+			{Kind: "cache", Managed: false},
 		},
 		nil,
 	},
@@ -1119,6 +1163,15 @@ func TestComponentSupportsSecretRefOverride(t *testing.T) {
 		t.Run(string(tt.kind), func(t *testing.T) {
 			assert.Equal(t, tt.expected, ComponentSupportsOverride(tt.kind, "secretRef"))
 		})
+func TestExceptionLabel(t *testing.T) {
+	protected := []string{"quay-component", "app", "quay-operator/quayregistry", "quay-monitor"}
+	for _, label := range protected {
+		assert.True(t, ExceptionLabel(label), "expected %q to be protected from overrides", label)
+	}
+
+	allowed := []string{"custom-label", "team", "environment", "quay-monitoring"}
+	for _, label := range allowed {
+		assert.False(t, ExceptionLabel(label), "expected %q to be allowed as an override", label)
 	}
 }
 
