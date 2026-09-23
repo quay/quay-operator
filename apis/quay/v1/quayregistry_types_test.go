@@ -1163,6 +1163,9 @@ func TestComponentSupportsSecretRefOverride(t *testing.T) {
 		t.Run(string(tt.kind), func(t *testing.T) {
 			assert.Equal(t, tt.expected, ComponentSupportsOverride(tt.kind, "secretRef"))
 		})
+		}
+}
+
 func TestExceptionLabel(t *testing.T) {
 	protected := []string{"quay-component", "app", "quay-operator/quayregistry", "quay-monitor"}
 	for _, label := range protected {
