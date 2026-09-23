@@ -206,10 +206,7 @@ spec:
                 - create
                 - delete
                 - get
-                - list
-                - patch
                 - update
-                - watch
           serviceAccountName: quay-operator
       permissions:
         - rules:

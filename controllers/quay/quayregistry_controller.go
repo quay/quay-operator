@@ -796,7 +796,7 @@ func (r *QuayRegistryReconciler) quayAppDeploymentRolledOut(
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=config.openshift.io,resources=apiservers;authentications;infrastructures,verbs=get
 // +kubebuilder:rbac:groups=operator.openshift.io,resources=cloudcredentials,verbs=get
-// +kubebuilder:rbac:groups=cloudcredential.openshift.io,resources=credentialsrequests,verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups=cloudcredential.openshift.io,resources=credentialsrequests,verbs=create;delete;get;update
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
