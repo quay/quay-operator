@@ -87,7 +87,7 @@ func TestEvaluate(t *testing.T) {
 					Type:    qv1.ComponentHPAReady,
 					Status:  metav1.ConditionFalse,
 					Reason:  qv1.ConditionReasonComponentNotReady,
-					Message: "Horizontal pod autoscaler not found",
+					Message: "Horizontal pod autoscaler registry-quay-app not found",
 				},
 				{
 					Type:    qv1.ComponentRouteReady,
