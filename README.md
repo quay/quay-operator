@@ -20,6 +20,8 @@ This Operator can be installed on any Kubernetes cluster running the [Operator L
 
 You can find the latest operator release on [operatorhub.io](https://operatorhub.io/operator/project-quay).
 
+For AWS clusters using short-lived credentials, see [AWS STS authentication for unmanaged S3 storage](docs/sts-iam-setup.md).
+
 The fastest way to get started is by deploying the operator in an OCP/OKD cluster
 using the setup scripts provided in the `hack` directory:
 

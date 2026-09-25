@@ -10,10 +10,12 @@ import (
 	"encoding/pem"
 	err "errors"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -927,4 +929,158 @@ func (r *QuayRegistryReconciler) checkPostgresTLSSecrets(
 	}
 
 	return nil
+}
+
+var (
+	errSTSConflictingCredentials = fmt.Errorf(
+		"ROLEARN is set but configBundleSecret contains static AWS credentials " +
+			"(s3_access_key/s3_secret_key in DISTRIBUTED_STORAGE_CONFIG). " +
+			"Remove static credentials from your storage config to enable STS authentication",
+	)
+	errSTSCRDNotAvailable = fmt.Errorf(
+		"ROLEARN is set but CredentialsRequest CRD is not available. " +
+			"STS authentication requires OpenShift 4.14+ with Cloud Credential Operator",
+	)
+)
+
+// checkSTSCapability detects whether the operator is configured for AWS STS
+// authentication via the ROLEARN env var. STS is enabled only for unmanaged
+// S3Storage on an AWS cluster using CCO's timed-token configuration.
+func (r *QuayRegistryReconciler) checkSTSCapability(
+	ctx context.Context,
+	qctx *quaycontext.QuayRegistryContext,
+	quay *v1.QuayRegistry,
+	usercfg map[string]interface{},
+) error {
+	roleARN := strings.TrimSpace(os.Getenv("ROLEARN"))
+	if roleARN == "" {
+		return nil
+	}
+
+	if v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentObjectStorage) {
+		r.Log.Info("ROLEARN is set but objectstorage is managed; STS only applies to unmanaged objectstorage pointing at AWS S3")
+		return nil
+	}
+
+	buckets, staticCredentials, err := s3StorageConfiguration(usercfg)
+	if err != nil {
+		return err
+	}
+	if len(buckets) == 0 {
+		r.Log.Info("ROLEARN is set but no unmanaged S3Storage backend is configured; skipping STS")
+		return nil
+	}
+	if staticCredentials {
+		return errSTSConflictingCredentials
+	}
+
+	if !r.supportsCredentialsRequest {
+		return errSTSCRDNotAvailable
+	}
+	if err := r.checkAWSTimedTokenCluster(ctx); err != nil {
+		return err
+	}
+
+	qctx.StorageSTSEnabled = true
+	qctx.STSRoleARN = roleARN
+	qctx.STSStorageBuckets = buckets
+	r.Log.Info("STS authentication enabled", "roleARN", roleARN, "buckets", buckets)
+	return nil
+}
+
+// checkAWSTimedTokenCluster mirrors the capability checks used by CCO for
+// short-lived tokens and additionally restricts this AWS-specific flow to AWS.
+func (r *QuayRegistryReconciler) checkAWSTimedTokenCluster(ctx context.Context) error {
+	var infrastructure configv1.Infrastructure
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, &infrastructure); err != nil {
+		return fmt.Errorf("unable to determine infrastructure platform for STS: %w", err)
+	}
+
+	var platform configv1.PlatformType
+	if infrastructure.Status.PlatformStatus != nil {
+		platform = infrastructure.Status.PlatformStatus.Type
+	}
+	if platform != configv1.AWSPlatformType {
+		return fmt.Errorf("ROLEARN is set but the cluster platform is %q; AWS STS requires an AWS cluster", platform)
+	}
+
+	cloudCredential := &unstructured.Unstructured{}
+	cloudCredential.SetGroupVersionKind(schema.GroupVersionKind{
+		Group: "operator.openshift.io", Version: "v1", Kind: "CloudCredential",
+	})
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, cloudCredential); err != nil {
+		return fmt.Errorf("unable to determine Cloud Credential Operator mode for STS: %w", err)
+	}
+	mode, _, err := unstructured.NestedString(cloudCredential.Object, "spec", "credentialsMode")
+	if err != nil {
+		return fmt.Errorf("unable to read Cloud Credential Operator mode for STS: %w", err)
+	}
+	if mode != "Manual" {
+		return fmt.Errorf("ROLEARN is set but Cloud Credential Operator mode is %q; AWS STS requires Manual mode", mode)
+	}
+
+	var authentication configv1.Authentication
+	if err := r.Get(ctx, types.NamespacedName{Name: "cluster"}, &authentication); err != nil {
+		return fmt.Errorf("unable to determine service account issuer for STS: %w", err)
+	}
+	if strings.TrimSpace(authentication.Spec.ServiceAccountIssuer) == "" {
+		return fmt.Errorf("ROLEARN is set but the cluster service account issuer is empty; AWS STS requires a configured OIDC issuer")
+	}
+
+	return nil
+}
+
+// s3StorageConfiguration returns the buckets used by S3Storage entries and
+// whether any of those entries contain static AWS credentials. Other storage
+// drivers, including the legacy STSS3Storage driver, are intentionally ignored.
+func s3StorageConfiguration(usercfg map[string]interface{}) ([]string, bool, error) {
+	dsc, ok := usercfg["DISTRIBUTED_STORAGE_CONFIG"]
+	if !ok {
+		return nil, false, nil
+	}
+
+	storageMap, ok := dsc.(map[string]interface{})
+	if !ok {
+		return nil, false, fmt.Errorf("DISTRIBUTED_STORAGE_CONFIG must be a map")
+	}
+
+	bucketSet := map[string]struct{}{}
+	staticCredentials := false
+	for location, entry := range storageMap {
+		entryList, ok := entry.([]interface{})
+		if !ok || len(entryList) < 2 {
+			continue
+		}
+		storageType, ok := entryList[0].(string)
+		if !ok || storageType != "S3Storage" {
+			continue
+		}
+		args, ok := entryList[1].(map[string]interface{})
+		if !ok {
+			return nil, false, fmt.Errorf("S3Storage location %q must contain a configuration map", location)
+		}
+		bucket, ok := args["s3_bucket"].(string)
+		bucket = strings.TrimSpace(bucket)
+		if !ok || bucket == "" {
+			return nil, false, fmt.Errorf("S3Storage location %q is missing s3_bucket", location)
+		}
+		bucketSet[bucket] = struct{}{}
+		for _, key := range []string{"s3_access_key", "s3_secret_key"} {
+			if value, ok := args[key].(string); ok && strings.TrimSpace(value) != "" {
+				staticCredentials = true
+			}
+		}
+	}
+
+	buckets := make([]string, 0, len(bucketSet))
+	for bucket := range bucketSet {
+		buckets = append(buckets, bucket)
+	}
+	slices.Sort(buckets)
+	return buckets, staticCredentials, nil
+}
+
+func hasStaticAWSStorageKeys(usercfg map[string]interface{}) bool {
+	_, hasStatic, _ := s3StorageConfiguration(usercfg)
+	return hasStatic
 }
