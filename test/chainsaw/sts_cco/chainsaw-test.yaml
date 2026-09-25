@@ -143,6 +143,18 @@ spec:
           set -euo pipefail
 
           for deployment in sts-cco-quay-app sts-cco-quay-mirror; do
+            echo "Waiting for ${deployment} to be created..."
+            for attempt in $(seq 1 120); do
+              if kubectl get deployment "${deployment}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+                break
+              fi
+              [ "${attempt}" -lt 120 ] || {
+                echo "ERROR: deployment ${deployment} was not created"
+                exit 1
+              }
+              sleep 10
+            done
+
             echo "Waiting for ${deployment} rollout..."
             kubectl rollout status deployment/"${deployment}" -n "${NAMESPACE}" --timeout=15m
 
