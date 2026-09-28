@@ -780,6 +780,59 @@ func TestProcessDeploymentSecurityContextOverride(t *testing.T) {
 	}
 }
 
+func TestProcessDeploymentAffinityOverride(t *testing.T) {
+	requiredAntiAffinity := &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					TopologyKey: "kubernetes.io/hostname",
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"quay-component": "quay-app"},
+					},
+				},
+			},
+		},
+	}
+
+	quay := &v1.QuayRegistry{
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentQuay, Managed: true, Overrides: &v1.Override{Affinity: requiredAntiAffinity}},
+			},
+		},
+	}
+
+	// mirrors the real quay-app Deployment's metadata annotations set in
+	// kustomize/base/quay.deployment.yaml
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "quay-app",
+			Labels:      map[string]string{"quay-component": "quay"},
+			Annotations: map[string]string{"quay-component": "quay"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "quay-app"},
+					},
+				},
+			},
+		},
+	}
+
+	qctx := quaycontext.NewQuayRegistryContext()
+	result, err := Process(quay, qctx, dep, false)
+	assert.NoError(t, err)
+
+	resultDep, ok := result.(*appsv1.Deployment)
+	assert.True(t, ok)
+	assert.Equal(t, requiredAntiAffinity, resultDep.Spec.Template.Spec.Affinity)
+}
+
 func TestProcessJobSecurityContextOverride(t *testing.T) {
 	overrideSC := &corev1.SecurityContext{
 		RunAsNonRoot:             boolPtr(false),
