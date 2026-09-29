@@ -1,12 +1,9 @@
 approvers:
-- BillDett
 - HammerMeetNail
 - LiZhang19817
-- SeanZhao-redhat
 - aroyoredhat
+- bcaton85
 - cubismod
-- dongboyan77
-- huweihua-redhat
 - jbpratt
 - kleesc
 - lechuk47
@@ -15,3 +12,7 @@ approvers:
 - Marcusk19
 - harishsurf
 - shaonrh
+- sridipta
+- ibazulic
+- sudipshil9862
+- nasonawa
