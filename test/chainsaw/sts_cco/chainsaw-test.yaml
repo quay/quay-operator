@@ -299,7 +299,7 @@ spec:
           api_request PUT /api/v1/user/robots/stsmirror '{}'
           api_request POST /api/v1/repository \
             '{"repository":"sts-mirror","namespace":"admin","visibility":"private","description":"STS E2E mirror"}'
-          START_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          START_DATE=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
           MIRROR_CONFIG=$(jq -nc --arg start "${START_DATE}" '{
             is_enabled: true,
             external_reference: "quay.io/quay/busybox",
