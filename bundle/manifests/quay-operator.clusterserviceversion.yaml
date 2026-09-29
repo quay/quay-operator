@@ -148,7 +148,7 @@ spec:
                           fieldRef:
                             fieldPath: metadata.annotations['quay-version']
                       - name: QUAY_DEFAULT_BRANDING
-                        value: upstream
+                        value: redhat
                       - name: RELATED_IMAGE_COMPONENT_QUAY
                         value: quay.io/projectquay/quay:latest
                       - name: RELATED_IMAGE_COMPONENT_CLAIR
