@@ -1,5 +1,5 @@
 packageName: quay-operator
 channels:
 - name: stable-3.18
-  currentCSV: quay-operator.3.18.2
+  currentCSV: quay-operator.3.18.1
 defaultChannel: stable-3.18
