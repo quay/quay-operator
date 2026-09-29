@@ -3,13 +3,13 @@ updates:
   - file: "manifests/quay-operator.clusterserviceversion.yaml"
     update_list:
       - search: "olm.skipRange: \">=3.5.x <3.99.0-dev\""
-        replace: "olm.skipRange: \">=3.14.x <3.18.2\""
+        replace: "olm.skipRange: \">=3.14.x <3.18.1\""
       - search: "quay-version: v3.99.0-dev"
-        replace: "quay-version: v3.18.2"
+        replace: "quay-version: v3.18.1"
       - search: "name: quay-operator.v3.99.0-dev"
-        replace: "name: quay-operator.v3.18.2"
+        replace: "name: quay-operator.v3.18.1"
       - search: "version: 3.99.0-dev"
-        replace: "version: 3.18.2"
+        replace: "version: 3.18.1"
 external-images:
   - search: "quay.io/sclorg/postgresql-13-c9s:latest"
     replace: "registry.redhat.io/rhel9/postgresql-13:latest"
