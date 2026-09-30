@@ -165,6 +165,9 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			for i := range dep.Spec.Template.Spec.Containers {
 				dep.Spec.Template.Spec.Containers[i].Resources = noresources
 			}
+			for i := range dep.Spec.Template.Spec.InitContainers {
+				dep.Spec.Template.Spec.InitContainers[i].Resources = noresources
+			}
 		}
 
 		if olabels := v1.GetLabelsOverrideForComponent(quay, kind); olabels != nil {
@@ -187,6 +190,11 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			ref := &dep.Spec.Template.Spec.Containers[0]
 			ref.Resources.Requests = oresources.Requests
 			ref.Resources.Limits = oresources.Limits
+			for i := range dep.Spec.Template.Spec.InitContainers {
+				iref := &dep.Spec.Template.Spec.InitContainers[i]
+				iref.Resources.Requests = oresources.Requests
+				iref.Resources.Limits = oresources.Limits
+			}
 		}
 
 		if osecctx := v1.GetSecurityContextOverrideForComponent(quay, kind); osecctx != nil {
