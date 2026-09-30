@@ -108,9 +108,11 @@ spec:
         content: |
           set -euo pipefail
 
-          # Delete the valid registry first
+          # Delete the valid registry first, then wait for its owned PVCs to be
+          # garbage-collected before creating the invalid-SC registry.
           kubectl delete quayregistry custom-sc -n $NAMESPACE --timeout=5m 2>/dev/null || true
-          sleep 10
+          kubectl wait --for=delete pvc/custom-sc-quay-postgres-13 -n $NAMESPACE --timeout=60s 2>/dev/null || true
+          kubectl wait --for=delete pvc/custom-sc-clair-postgres-15 -n $NAMESPACE --timeout=60s 2>/dev/null || true
 
           # Clean up the valid StorageClass
           kubectl delete sc quay-e2e-sc 2>/dev/null || true
@@ -133,8 +135,19 @@ spec:
             sleep 10
           done
 
-          # Give a moment for any provisioner to attempt binding
-          sleep 30
+          # Confirm the PVCs stay Pending rather than transitioning to Bound
+          # once a provisioner has had a chance to attempt binding.
+          echo "Confirming PVCs remain Pending (invalid StorageClass)..."
+          for i in $(seq 1 6); do
+            for PVC in invalid-sc-quay-postgres-13 invalid-sc-clair-postgres-15; do
+              PHASE=$(kubectl get pvc "${PVC}" -n $NAMESPACE -o jsonpath='{.status.phase}' 2>/dev/null || echo "not-found")
+              if [ "${PHASE}" = "Bound" ]; then
+                echo "FAIL: ${PVC} unexpectedly Bound with invalid StorageClass"
+                exit 1
+              fi
+            done
+            sleep 5
+          done
 
           # Verify PVCs are in Pending state
           QUAY_PVC_PHASE=$(kubectl get pvc invalid-sc-quay-postgres-13 -n $NAMESPACE \

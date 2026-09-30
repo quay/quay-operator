@@ -8,6 +8,17 @@ spec:
   - kind: quay
     managed: true
     overrides:
+      replicas: 2
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchExpressions:
+              - key: quay-component
+                operator: In
+                values:
+                - quay-app
       resources:
         limits:
           cpu: "3"

@@ -125,11 +125,7 @@ spec:
           echo "Clair postgres PVC size: ${CLAIR_PVC_SIZE}"
           [ "${CLAIR_PVC_SIZE}" = "${EXPECTED_SIZE}" ] || { echo "FAIL: clair-postgres PVC ${CLAIR_PVC_SIZE} != ${EXPECTED_SIZE}"; exit 1; }
           echo "PASS: clair-postgres PVC size matches"
-  # NOTE: OCP-53302 (requiredDuringScheduling anti-affinity overrides) is skipped.
-  # The operator middleware resolves component kind from the deployment's
-  # quay-component annotation (e.g. "quay-app" → "quayapp") which doesn't match
-  # ComponentKind "quay", so GetAffinityForComponent() never matches and the
-  # override is silently dropped. The preferred anti-affinity in the reconcile
-  # test comes from the kustomize base, not the override mechanism.
-  # This is a pre-existing operator bug — file a PROJQUAY ticket to fix the
-  # annotation-to-ComponentKind mapping in pkg/middleware/middleware.go:88.
+  - name: verify-affinity-override
+    try:
+    - assert:
+        file: 00-assert-affinity.yaml

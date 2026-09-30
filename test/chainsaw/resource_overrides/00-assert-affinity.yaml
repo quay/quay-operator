@@ -1,0 +1,22 @@
+# OCP-53302: a required podAntiAffinity override on the quay component must
+# reach the quay-app Deployment, and quay-app pods must still schedule and
+# become Ready under it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-override-quay-app
+spec:
+  template:
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchExpressions:
+              - key: quay-component
+                operator: In
+                values:
+                - quay-app
+status:
+  readyReplicas: 2
