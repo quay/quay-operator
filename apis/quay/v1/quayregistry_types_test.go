@@ -1011,6 +1011,75 @@ func TestGetSecurityContextOverrideForComponent(t *testing.T) {
 	}
 }
 
+func TestGetReplicasOverrideForComponent(t *testing.T) {
+	tests := []struct {
+		name     string
+		quay     *QuayRegistry
+		kind     ComponentKind
+		expected *int32
+	}{
+		{
+			name: "NoOverridesReturnsDefault",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentQuay, Managed: true},
+					},
+				},
+			},
+			kind:     ComponentQuay,
+			expected: ptr.To[int32](2),
+		},
+		{
+			name: "OverridesWithoutReplicasReturnsDefault",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentQuay, Managed: true, Overrides: &Override{
+							SecurityContext: &corev1.SecurityContext{RunAsNonRoot: ptr.To(true)},
+						}},
+					},
+				},
+			},
+			kind:     ComponentQuay,
+			expected: ptr.To[int32](2),
+		},
+		{
+			name: "ExplicitReplicasReturnsOverride",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentQuay, Managed: true, Overrides: &Override{
+							Replicas: ptr.To[int32](5),
+						}},
+					},
+				},
+			},
+			kind:     ComponentQuay,
+			expected: ptr.To[int32](5),
+		},
+		{
+			name: "ComponentNotFoundReturnsNil",
+			quay: &QuayRegistry{
+				Spec: QuayRegistrySpec{
+					Components: []Component{
+						{Kind: ComponentQuay, Managed: true},
+					},
+				},
+			},
+			kind:     ComponentMirror,
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetReplicasOverrideForComponent(tt.quay, tt.kind)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestGetTLSOverrideForComponent(t *testing.T) {
 	tests := []struct {
 		name     string
