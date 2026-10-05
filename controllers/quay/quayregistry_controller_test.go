@@ -174,6 +174,42 @@ func TestCreateOrUpdateObject_Job(t *testing.T) {
 	}
 }
 
+func TestClearRollingUpdateForRecreate(t *testing.T) {
+	existing := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-deployment",
+			Namespace: "default",
+		},
+		Spec: appsv1.DeploymentSpec{
+			Strategy: appsv1.DeploymentStrategy{
+				Type:          appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{},
+			},
+		},
+	}
+	desired := existing.DeepCopy()
+	desired.Spec.Strategy.Type = appsv1.RecreateDeploymentStrategyType
+	desired.Spec.Strategy.RollingUpdate = nil
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(existing).Build()
+	reconciler := &QuayRegistryReconciler{Client: fakeClient}
+
+	if err := reconciler.clearRollingUpdateForRecreate(context.Background(), desired, testLogger); err != nil {
+		t.Fatalf("clearRollingUpdateForRecreate returned error: %v", err)
+	}
+
+	var got appsv1.Deployment
+	if err := fakeClient.Get(context.Background(), types.NamespacedName{Name: existing.Name, Namespace: existing.Namespace}, &got); err != nil {
+		t.Fatalf("expected deployment to exist: %v", err)
+	}
+	if got.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
+		t.Fatalf("strategy type = %q, want %q", got.Spec.Strategy.Type, appsv1.RecreateDeploymentStrategyType)
+	}
+	if got.Spec.Strategy.RollingUpdate != nil {
+		t.Fatal("expected rollingUpdate to be cleared")
+	}
+}
+
 func TestCleanupProgrammaticBootstrapTokenResources(t *testing.T) {
 	quay := newQuayRegistry("test-registry", "default")
 	name := kustomize.BootstrapTokenSecretName(quay)
