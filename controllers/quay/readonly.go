@@ -322,6 +322,13 @@ func (r *QuayRegistryReconciler) readOnlyCompatibilityBlocked(ctx context.Contex
 		msg := fmt.Sprintf("Waiting for status.currentVersion before starting read-only; required version is >= %s.", readOnlyMinimumQuayVersion)
 		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDeferred, msg, false)
 	}
+	if v1.QuayVersionCurrent != "" && quay.Status.CurrentVersion != v1.QuayVersionCurrent {
+		msg := fmt.Sprintf(
+			"Cannot enter read-only while an operator upgrade is in progress (current version %s, operator version %s).",
+			quay.Status.CurrentVersion, v1.QuayVersionCurrent,
+		)
+		return true, r.readOnlyConditionDecision(ctx, quay, metav1.ConditionFalse, v1.ConditionReasonReadOnlyDeferred, msg, false)
+	}
 	currentVersion, err := semver.NewVersion(string(quay.Status.CurrentVersion))
 	if err != nil {
 		msg := fmt.Sprintf("The status.currentVersion value must be a valid semver value greater than or equal to %s.", readOnlyMinimumQuayVersion)

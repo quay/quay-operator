@@ -678,6 +678,58 @@ func TestManualReadOnlyConfiguredFromLiteralOverride(t *testing.T) {
 	assert.True(t, manualReadOnlyConfigured(map[string]interface{}{}, secret, quay))
 }
 
+func TestPrepareReadOnlyLifecycleBlocksDuringUpgrade(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	saved := v1.QuayVersionCurrent
+	defer func() { v1.QuayVersionCurrent = saved }()
+	v1.QuayVersionCurrent = "3.20.0"
+
+	readOnly := true
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+		Spec: v1.QuayRegistrySpec{
+			ReadOnly: &readOnly,
+		},
+		Status: v1.QuayRegistryStatus{
+			CurrentVersion: "3.19.0",
+		},
+	}
+	config, err := yaml.Marshal(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"})
+	require.NoError(t, err)
+	cbundle := &corev1.Secret{Data: map[string][]byte{"config.yaml": config}}
+	client := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(quay).
+		WithStatusSubresource(&v1.QuayRegistry{}).
+		Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+
+	_, decision := reconciler.prepareReadOnlyLifecycle(
+		context.Background(),
+		quay,
+		&quaycontext.QuayRegistryContext{},
+		map[string]interface{}{"SERVER_HOSTNAME": "quay.io"},
+		cbundle,
+		logr.Discard(),
+	)
+
+	require.NoError(t, decision.Err)
+	assert.False(t, decision.Stop, "stop must be false so the reconcile continues into the normal upgrade gates")
+	condition := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeReadOnly)
+	require.NotNil(t, condition)
+	assert.Equal(t, metav1.ConditionFalse, condition.Status)
+	assert.Equal(t, v1.ConditionReasonReadOnlyDeferred, condition.Reason)
+	assert.Contains(t, condition.Message, "operator upgrade is in progress")
+	assert.Equal(t, v1.ReadOnlyPhaseNormal, quay.Status.ReadOnlyPhase, "phase must stay Normal when blocked")
+}
+
 func TestPrepareReadOnlyLifecycleBlocksActiveOverrideConflict(t *testing.T) {
 	s := runtime.NewScheme()
 	require.NoError(t, scheme.AddToScheme(s))
