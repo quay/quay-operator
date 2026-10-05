@@ -7,11 +7,13 @@ import (
 	route "github.com/openshift/api/route/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/quay/quay-operator/apis/quay/v1"
@@ -251,6 +253,145 @@ func parseResourceString(s string) *resource.Quantity {
 	return &resourceSize
 }
 
+func newClairDeployment() *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test-clair-app",
+			Labels:      map[string]string{"quay-component": "clair-app"},
+			Annotations: map[string]string{"quay-component": "clair"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "clair-app"},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "indexer-layer-storage",
+							VolumeSource: corev1.VolumeSource{
+								Ephemeral: &corev1.EphemeralVolumeSource{
+									VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+										Spec: corev1.PersistentVolumeClaimSpec{
+											AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+											Resources: corev1.ResourceRequirements{
+												Requests: corev1.ResourceList{
+													corev1.ResourceStorage: resource.MustParse("20Gi"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestProcessClairEphemeralVolumeOverrides(t *testing.T) {
+	tests := []struct {
+		name                 string
+		quay                 *v1.QuayRegistry
+		expectedStorage      string
+		expectedStorageClass *string
+	}{
+		{
+			name: "NoOverrides",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentClair, Managed: true},
+					},
+				},
+			},
+			expectedStorage:      "20Gi",
+			expectedStorageClass: nil,
+		},
+		{
+			name: "VolumeSizeOverride",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentClair, Managed: true, Overrides: &v1.Override{
+							VolumeSize: parseResourceString("50Gi"),
+						}},
+					},
+				},
+			},
+			expectedStorage:      "50Gi",
+			expectedStorageClass: nil,
+		},
+		{
+			name: "StorageClassOverride",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentClair, Managed: true, Overrides: &v1.Override{
+							StorageClassName: ptr.To("fast-storage"),
+						}},
+					},
+				},
+			},
+			expectedStorage:      "20Gi",
+			expectedStorageClass: ptr.To("fast-storage"),
+		},
+		{
+			name: "BothOverrides",
+			quay: &v1.QuayRegistry{
+				Spec: v1.QuayRegistrySpec{
+					Components: []v1.Component{
+						{Kind: v1.ComponentClair, Managed: true, Overrides: &v1.Override{
+							VolumeSize:       parseResourceString("100Gi"),
+							StorageClassName: ptr.To("premium-storage"),
+						}},
+					},
+				},
+			},
+			expectedStorage:      "100Gi",
+			expectedStorageClass: ptr.To("premium-storage"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := newClairDeployment()
+			qctx := quaycontext.NewQuayRegistryContext()
+
+			result, err := Process(tt.quay, qctx, dep, false)
+			assert.NoError(t, err)
+
+			processedDep, ok := result.(*appsv1.Deployment)
+			assert.True(t, ok)
+
+			var found bool
+			for _, vol := range processedDep.Spec.Template.Spec.Volumes {
+				if vol.Name != "indexer-layer-storage" {
+					continue
+				}
+				found = true
+				vct := vol.Ephemeral.VolumeClaimTemplate.Spec
+				actualStorage := vct.Resources.Requests[corev1.ResourceStorage]
+				assert.Equal(t, tt.expectedStorage, actualStorage.String(),
+					"volume size mismatch")
+
+				if tt.expectedStorageClass == nil {
+					assert.Nil(t, vct.StorageClassName, "expected no storageClassName")
+				} else {
+					assert.NotNil(t, vct.StorageClassName, "expected storageClassName to be set")
+					assert.Equal(t, *tt.expectedStorageClass, *vct.StorageClassName)
+				}
+			}
+			assert.True(t, found, "indexer-layer-storage volume not found")
+		})
+	}
+}
+
 func TestHPAWithUnmanagedMirrorAndClair(t *testing.T) {
 	quayRegistry := &v1.QuayRegistry{
 		Spec: v1.QuayRegistrySpec{
@@ -285,9 +426,6 @@ func TestHPAWithUnmanagedMirrorAndClair(t *testing.T) {
 }
 
 func TestProcessPVCStorageClassNameOverride(t *testing.T) {
-	// Helper for getting string pointers
-	strPtr := func(s string) *string { return &s }
-
 	tests := []struct {
 		name                   string
 		componentKind          v1.ComponentKind
@@ -300,8 +438,8 @@ func TestProcessPVCStorageClassNameOverride(t *testing.T) {
 			name:                 "Postgres with StorageClassName override",
 			componentKind:        v1.ComponentPostgres,
 			componentLabel:       "postgres",
-			storageClassName:     strPtr("my-fast-storage"),
-			expectedStorageClass: strPtr("my-fast-storage"),
+			storageClassName:     ptr.To("my-fast-storage"),
+			expectedStorageClass: ptr.To("my-fast-storage"),
 		},
 		{
 			name:                 "Postgres without StorageClassName override",
@@ -314,30 +452,30 @@ func TestProcessPVCStorageClassNameOverride(t *testing.T) {
 			name:                 "ClairPostgres with StorageClassName override",
 			componentKind:        v1.ComponentClairPostgres,
 			componentLabel:       "clair-postgres",
-			storageClassName:     strPtr("clair-storage"),
-			expectedStorageClass: strPtr("clair-storage"),
+			storageClassName:     ptr.To("clair-storage"),
+			expectedStorageClass: ptr.To("clair-storage"),
 		},
 		{
 			name:                   "Postgres with initial StorageClassName and no override",
 			componentKind:          v1.ComponentPostgres,
 			componentLabel:         "postgres",
 			storageClassName:       nil,
-			initialPVCStorageClass: strPtr("default-storage"),
-			expectedStorageClass:   strPtr("default-storage"),
+			initialPVCStorageClass: ptr.To("default-storage"),
+			expectedStorageClass:   ptr.To("default-storage"),
 		},
 		{
 			name:                   "Postgres with initial StorageClassName and different override",
 			componentKind:          v1.ComponentPostgres,
 			componentLabel:         "postgres",
-			storageClassName:       strPtr("override-storage"),
-			initialPVCStorageClass: strPtr("initial-storage"),
-			expectedStorageClass:   strPtr("override-storage"),
+			storageClassName:       ptr.To("override-storage"),
+			initialPVCStorageClass: ptr.To("initial-storage"),
+			expectedStorageClass:   ptr.To("override-storage"),
 		},
 		{
 			name:                 "Irrelevant component (redis) with override, postgres PVC without",
 			componentKind:        v1.ComponentRedis,       // Override set for Redis
 			componentLabel:       "postgres",              // PVC is for Postgres
-			storageClassName:     strPtr("redis-storage"), // This should not apply to the postgres PVC
+			storageClassName:     ptr.To("redis-storage"), // This should not apply to the postgres PVC
 			expectedStorageClass: nil,                     // Postgres PVC should not get redis-storage
 		},
 	}
