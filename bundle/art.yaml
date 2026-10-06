@@ -1,0 +1,21 @@
+---
+updates:
+  - file: "manifests/quay-operator.clusterserviceversion.yaml"
+    update_list:
+      - search: "olm.skipRange: \">=3.5.x <3.99.0-dev\""
+        replace: "olm.skipRange: \">=3.14.x <3.15.9\""
+      - search: "quay-version: v3.99.0-dev"
+        replace: "quay-version: v3.15.9"
+      - search: "name: quay-operator.v3.99.0-dev"
+        replace: "name: quay-operator.v3.15.9"
+      - search: "version: 3.99.0-dev"
+        replace: "version: 3.15.9"
+external-images:
+  - search: "quay.io/sclorg/postgresql-13-c9s:latest"
+    replace: "registry.redhat.io/rhel8/postgresql-13:latest"
+  - search: "centos/postgresql-10-centos7:latest"
+    replace: "registry.redhat.io/rhel8/postgresql-10:latest"
+  - search: "quay.io/sclorg/postgresql-15-c9s:latest"
+    replace: "registry.redhat.io/rhel8/postgresql-15:latest"
+  - search: "docker.io/library/redis:7.0"
+    replace: "registry.redhat.io/rhel8/redis-7:latest"
