@@ -859,3 +859,215 @@ B19XK1As+kH1UJcTMz8I107nTELCyEgDdUJjAxjR7d4fk2wbkrhEiQ==
 		"jwkThumbprint output must match the known vector; "+
 			"a change here breaks Python authlib verification in boot.py")
 }
+
+func TestManualReadOnlySetsCondition(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+		Status: v1.QuayRegistryStatus{
+			CurrentVersion: v1.QuayVersionCurrent,
+		},
+	}
+	usercfg := map[string]interface{}{
+		"SERVER_HOSTNAME": "quay.io",
+		"REGISTRY_STATE":  "readonly",
+	}
+	config, err := yaml.Marshal(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"})
+	require.NoError(t, err)
+	cbundle := &corev1.Secret{Data: map[string][]byte{"config.yaml": config}}
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry-quay-app", Namespace: "ns"},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "quay-app", Image: "quay:latest"}},
+				},
+			},
+		},
+	}
+	client := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(quay, dep).
+		WithStatusSubresource(&v1.QuayRegistry{}).
+		Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+	qctx := &quaycontext.QuayRegistryContext{}
+
+	_, decision := reconciler.prepareReadOnlyLifecycle(
+		context.Background(),
+		quay,
+		qctx,
+		usercfg,
+		cbundle,
+		logr.Discard(),
+	)
+
+	require.NoError(t, decision.Err)
+	assert.False(t, decision.Stop, "reconcile must continue for manual read-only")
+	assert.True(t, qctx.ReadOnlyDeferUpgrade, "manual readonly must still defer upgrades")
+	assert.Equal(t, v1.ReadOnlyPhaseNormal, quay.Status.ReadOnlyPhase,
+		"manual readonly must not change the phase")
+
+	condition := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeReadOnly)
+	require.NotNil(t, condition, "ReadOnly condition must be set")
+	assert.Equal(t, metav1.ConditionTrue, condition.Status)
+	assert.Equal(t, v1.ConditionReasonManualReadOnlyDetected, condition.Reason)
+	assert.Contains(t, condition.Message, "REGISTRY_STATE")
+	assert.Contains(t, condition.Message, "spec.readOnly")
+}
+
+func TestManualReadOnlyConditionClearedWhenRemoved(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+		Status: v1.QuayRegistryStatus{
+			CurrentVersion: v1.QuayVersionCurrent,
+			Conditions: []v1.Condition{
+				{
+					Type:   v1.ConditionTypeReadOnly,
+					Status: metav1.ConditionTrue,
+					Reason: v1.ConditionReasonManualReadOnlyDetected,
+				},
+			},
+		},
+	}
+	usercfg := map[string]interface{}{
+		"SERVER_HOSTNAME": "quay.io",
+	}
+	config, err := yaml.Marshal(map[string]interface{}{"SERVER_HOSTNAME": "quay.io"})
+	require.NoError(t, err)
+	cbundle := &corev1.Secret{Data: map[string][]byte{"config.yaml": config}}
+	client := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(quay).
+		WithStatusSubresource(&v1.QuayRegistry{}).
+		Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+
+	_, decision := reconciler.prepareReadOnlyLifecycle(
+		context.Background(),
+		quay,
+		&quaycontext.QuayRegistryContext{},
+		usercfg,
+		cbundle,
+		logr.Discard(),
+	)
+
+	require.NoError(t, decision.Err)
+	condition := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeReadOnly)
+	assert.Nil(t, condition, "ManualReadOnlyDetected condition must be removed when REGISTRY_STATE is not readonly")
+}
+
+func TestOperatorManagedReadOnlyUnaffectedByManualCondition(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	readOnly := true
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+		Spec: v1.QuayRegistrySpec{
+			ReadOnly: &readOnly,
+		},
+		Status: v1.QuayRegistryStatus{
+			CurrentVersion: v1.QuayVersionCurrent,
+		},
+	}
+	usercfg := map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}
+	config, err := yaml.Marshal(usercfg)
+	require.NoError(t, err)
+	cbundle := &corev1.Secret{Data: map[string][]byte{"config.yaml": config}}
+	client := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(quay).
+		WithStatusSubresource(&v1.QuayRegistry{}).
+		Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+
+	_, decision := reconciler.prepareReadOnlyLifecycle(
+		context.Background(),
+		quay,
+		&quaycontext.QuayRegistryContext{},
+		usercfg,
+		cbundle,
+		logr.Discard(),
+	)
+
+	// The operator-managed path is entered — readOnlyCompatibilityBlocked or
+	// ensureReadOnlyServiceKeySecret run and set an operator-managed condition.
+	// The key regression check: we must never see ManualReadOnlyDetected when
+	// spec.readOnly is set.
+	require.NoError(t, decision.Err)
+	condition := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeReadOnly)
+	require.NotNil(t, condition, "operator-managed readonly must set a ReadOnly condition")
+	assert.NotEqual(t, v1.ConditionReasonManualReadOnlyDetected, condition.Reason,
+		"operator-managed readonly must NOT use ManualReadOnlyDetected reason")
+	assert.Equal(t, v1.ReadOnlyPhaseNormal, quay.Status.ReadOnlyPhase,
+		"phase stays Normal until compatibility checks pass")
+}
+
+func TestManualReadOnlyConditionNotClearedByOperatorManagedReasons(t *testing.T) {
+	s := runtime.NewScheme()
+	require.NoError(t, scheme.AddToScheme(s))
+	require.NoError(t, v1.AddToScheme(s))
+
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "registry",
+			Namespace: "ns",
+			UID:       types.UID("quay-uid"),
+		},
+		Status: v1.QuayRegistryStatus{
+			CurrentVersion: v1.QuayVersionCurrent,
+			Conditions: []v1.Condition{
+				{
+					Type:   v1.ConditionTypeReadOnly,
+					Status: metav1.ConditionFalse,
+					Reason: v1.ConditionReasonReadOnlyDisabled,
+				},
+			},
+		},
+	}
+	usercfg := map[string]interface{}{"SERVER_HOSTNAME": "quay.io"}
+	config, err := yaml.Marshal(usercfg)
+	require.NoError(t, err)
+	cbundle := &corev1.Secret{Data: map[string][]byte{"config.yaml": config}}
+	client := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(quay).
+		WithStatusSubresource(&v1.QuayRegistry{}).
+		Build()
+	reconciler := &QuayRegistryReconciler{Client: client}
+
+	_, decision := reconciler.prepareReadOnlyLifecycle(
+		context.Background(),
+		quay,
+		&quaycontext.QuayRegistryContext{},
+		usercfg,
+		cbundle,
+		logr.Discard(),
+	)
+
+	require.NoError(t, decision.Err)
+	condition := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeReadOnly)
+	require.NotNil(t, condition, "ReadOnlyDisabled condition must NOT be removed by manual cleanup logic")
+	assert.Equal(t, v1.ConditionReasonReadOnlyDisabled, condition.Reason)
+}
