@@ -84,13 +84,15 @@ func (r *QuayRegistryReconciler) prepareReadOnlyLifecycle(
 			if err := r.collectReadOnlyFrozenImages(ctx, quay, qctx, false); err != nil {
 				log.Error(err, "could not collect read-only image freeze state for manual read-only config")
 			}
-			_ = r.updateReadOnlyCondition(
+			if err := r.updateReadOnlyCondition(
 				ctx, quay, metav1.ConditionTrue,
 				v1.ConditionReasonManualReadOnlyDetected,
 				"Registry is in read-only mode via user config (REGISTRY_STATE). "+
 					"Operator upgrades are deferred. Consider using spec.readOnly "+
 					"for full operator-managed lifecycle.",
-			)
+			); err != nil {
+				log.Error(err, "failed to set ManualReadOnlyDetected condition")
+			}
 			return readOnlyIntent{}, readOnlyDecision{}
 		}
 		if existing := v1.GetCondition(quay.Status.Conditions, v1.ConditionTypeReadOnly); existing != nil &&
