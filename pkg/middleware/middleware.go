@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
@@ -24,6 +25,9 @@ import (
 const (
 	configSecretPrefix    = "quay-config-secret"
 	fieldGroupsAnnotation = "quay-managed-fieldgroups"
+
+	readOnlyVolumeName = "readonly-service-key"
+	readOnlyMountPath  = "/conf/readonly"
 )
 
 // Process applies any additional middleware steps to a managed k8s object that cannot be
@@ -232,6 +236,14 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			return dep, nil
 		}
 
+		if qctx.StorageSTSEnabled && qctx.STSCredentialProvisioned {
+			if strings.HasSuffix(dep.Name, "quay-app") || strings.HasSuffix(dep.Name, "quay-mirror") {
+				applySTSCredentials(dep, qctx)
+			}
+		}
+
+		applyReadOnlyDeploymentIntent(quay, qctx, dep)
+
 		fgns, err := v1.FieldGroupNamesForManagedComponents(quay)
 		if err != nil {
 			return nil, err
@@ -285,7 +297,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		return cm, nil
 	}
 
-	if _, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
+	if hpa, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler); ok {
 		componentMap := map[string]v1.ComponentKind{
 			"mirror": v1.ComponentMirror,
 			"clair":  v1.ComponentClair,
@@ -295,6 +307,10 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			if !v1.ComponentIsManaged(quay.Spec.Components, component) {
 				return nil, nil
 			}
+		}
+		if replicas, ok := readOnlyHPAPinFor(qctx, hpa); ok {
+			hpa.Spec.MinReplicas = ptr.To(replicas)
+			hpa.Spec.MaxReplicas = replicas
 		}
 		return obj, nil
 	}
@@ -370,6 +386,112 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 		}
 	}
 	return rt, nil
+}
+
+func applyReadOnlyDeploymentIntent(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, dep *appsv1.Deployment) {
+	if !isReadOnlyTargetDeployment(quay, dep) {
+		return
+	}
+
+	if qctx.ReadOnlyMountEnabled && qctx.ReadOnlySecretName != "" {
+		ensureReadOnlyMount(dep, qctx.ReadOnlySecretName)
+	}
+
+	if qctx.ReadOnlyPhase == string(v1.ReadOnlyPhaseEnteringReadOnly) ||
+		qctx.ReadOnlyPhase == string(v1.ReadOnlyPhaseExitingReadOnly) {
+		dep.Spec.Strategy.Type = appsv1.RecreateDeploymentStrategyType
+		dep.Spec.Strategy.RollingUpdate = nil
+	}
+
+	applyReadOnlyFrozenImages(qctx, dep)
+}
+
+func isReadOnlyTargetDeployment(quay *v1.QuayRegistry, dep *appsv1.Deployment) bool {
+	if dep.Name == quay.GetName()+"-quay-app" {
+		return true
+	}
+	return dep.Name == quay.GetName()+"-quay-mirror" &&
+		v1.ComponentIsManaged(quay.Spec.Components, v1.ComponentMirror)
+}
+
+func ensureReadOnlyMount(dep *appsv1.Deployment, secretName string) {
+	for i := range dep.Spec.Template.Spec.Volumes {
+		if dep.Spec.Template.Spec.Volumes[i].Name != readOnlyVolumeName {
+			continue
+		}
+		dep.Spec.Template.Spec.Volumes[i].VolumeSource = corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: secretName},
+		}
+		addReadOnlyMounts(dep)
+		return
+	}
+
+	dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+		Name: readOnlyVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: secretName},
+		},
+	})
+	addReadOnlyMounts(dep)
+}
+
+func addReadOnlyMounts(dep *appsv1.Deployment) {
+	for i := range dep.Spec.Template.Spec.InitContainers {
+		upsertReadOnlyVolumeMount(&dep.Spec.Template.Spec.InitContainers[i])
+	}
+	for i := range dep.Spec.Template.Spec.Containers {
+		upsertReadOnlyVolumeMount(&dep.Spec.Template.Spec.Containers[i])
+	}
+}
+
+func upsertReadOnlyVolumeMount(container *corev1.Container) {
+	for i := range container.VolumeMounts {
+		if container.VolumeMounts[i].Name != readOnlyVolumeName {
+			continue
+		}
+		container.VolumeMounts[i].MountPath = readOnlyMountPath
+		container.VolumeMounts[i].ReadOnly = true
+		container.VolumeMounts[i].SubPath = ""
+		return
+	}
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      readOnlyVolumeName,
+		MountPath: readOnlyMountPath,
+		ReadOnly:  true,
+	})
+}
+
+func applyReadOnlyFrozenImages(qctx *quaycontext.QuayRegistryContext, dep *appsv1.Deployment) {
+	if len(qctx.ReadOnlyFrozenImages) == 0 {
+		return
+	}
+	for i := range dep.Spec.Template.Spec.InitContainers {
+		container := &dep.Spec.Template.Spec.InitContainers[i]
+		if image, ok := qctx.ReadOnlyFrozenImages[readOnlyFrozenImageKey(dep.Name, "initContainers", container.Name)]; ok {
+			container.Image = image
+		}
+	}
+	for i := range dep.Spec.Template.Spec.Containers {
+		container := &dep.Spec.Template.Spec.Containers[i]
+		if image, ok := qctx.ReadOnlyFrozenImages[readOnlyFrozenImageKey(dep.Name, "containers", container.Name)]; ok {
+			container.Image = image
+		}
+	}
+}
+
+func readOnlyFrozenImageKey(deploymentName, containerGroup, containerName string) string {
+	return deploymentName + "/" + containerGroup + "/" + containerName
+}
+
+func readOnlyHPAPinFor(qctx *quaycontext.QuayRegistryContext, hpa *autoscalingv2.HorizontalPodAutoscaler) (int32, bool) {
+	if len(qctx.ReadOnlyHPAPins) == 0 {
+		return 0, false
+	}
+	if replicas, ok := qctx.ReadOnlyHPAPins[hpa.Name]; ok {
+		return replicas, true
+	}
+	replicas, ok := qctx.ReadOnlyHPAPins[hpa.Spec.ScaleTargetRef.Name]
+	return replicas, ok
 }
 
 // UpsertContainerEnv updates or inserts an environment variable into provided container.
@@ -649,4 +771,88 @@ func clairPostgresCASecretName(quay *v1.QuayRegistry, override *v1.TLSOverride) 
 		return override.SecretRef.Name
 	}
 	return quay.GetName() + "-clairpostgres-ca"
+}
+
+func applySTSCredentials(dep *appsv1.Deployment, qctx *quaycontext.QuayRegistryContext) {
+	credVolume := corev1.Volume{
+		Name: "aws-sts-credentials",
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: qctx.STSCredentialSecretName,
+			},
+		},
+	}
+
+	tokenVolume := corev1.Volume{
+		Name: "bound-sa-token",
+		VolumeSource: corev1.VolumeSource{
+			Projected: &corev1.ProjectedVolumeSource{
+				Sources: []corev1.VolumeProjection{
+					{
+						ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
+							Path:     "token",
+							Audience: "openshift",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	credMount := corev1.VolumeMount{
+		Name:      "aws-sts-credentials",
+		MountPath: "/aws-sts",
+		ReadOnly:  true,
+	}
+
+	tokenMount := corev1.VolumeMount{
+		Name:      "bound-sa-token",
+		MountPath: "/var/run/secrets/openshift/serviceaccount",
+		ReadOnly:  true,
+	}
+
+	// The Go AWS SDK requires shared config loading to resolve the CCO profile's
+	// role_arn and web_identity_token_file fields. Boto3 reads the same profile.
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "AWS_SHARED_CREDENTIALS_FILE",
+			Value: "/aws-sts/credentials",
+		},
+		{
+			Name:  "AWS_SDK_LOAD_CONFIG",
+			Value: "true",
+		},
+	}
+
+	dep.Spec.Template.Spec.Volumes = upsertVolume(dep.Spec.Template.Spec.Volumes, credVolume)
+	dep.Spec.Template.Spec.Volumes = upsertVolume(dep.Spec.Template.Spec.Volumes, tokenVolume)
+
+	for i := range dep.Spec.Template.Spec.Containers {
+		ref := &dep.Spec.Template.Spec.Containers[i]
+		ref.VolumeMounts = upsertVolumeMount(ref.VolumeMounts, credMount)
+		ref.VolumeMounts = upsertVolumeMount(ref.VolumeMounts, tokenMount)
+		for _, envVar := range envVars {
+			UpsertContainerEnv(ref, envVar)
+		}
+	}
+}
+
+func upsertVolume(volumes []corev1.Volume, vol corev1.Volume) []corev1.Volume {
+	for i, v := range volumes {
+		if v.Name == vol.Name {
+			volumes[i] = vol
+			return volumes
+		}
+	}
+	return append(volumes, vol)
+}
+
+func upsertVolumeMount(mounts []corev1.VolumeMount, mount corev1.VolumeMount) []corev1.VolumeMount {
+	for i, m := range mounts {
+		if m.Name == mount.Name {
+			mounts[i] = mount
+			return mounts
+		}
+	}
+	return append(mounts, mount)
 }

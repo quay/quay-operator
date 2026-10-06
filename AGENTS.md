@@ -40,7 +40,7 @@ pkg/kustomize/         # Manifest generation from Kustomize
 pkg/cmpstatus/         # Component health evaluation
 pkg/context/           # Runtime state (cluster capabilities, TLS, storage)
 kustomize/             # Base Kustomize manifests by component
-e2e/                   # E2E tests using kuttl
+test/chainsaw/         # E2E tests using Chainsaw
 hack/                  # Deployment and utility scripts
 ```
 
@@ -51,7 +51,7 @@ Consult these files when working on specific areas:
 | Topic | File | When to Read |
 |-------|------|--------------|
 | Architecture | `agent_docs/architecture.md` | Understanding reconciliation flow, controllers, status evaluation |
-| Testing | `agent_docs/testing.md` | Running tests, writing e2e tests, kuttl patterns |
+| Testing | `agent_docs/testing.md` | Running tests, writing e2e tests, Chainsaw patterns |
 | Deployment | `agent_docs/deployment.md` | CRD management, OpenShift deployment, image building |
 | Components | `agent_docs/components.md` | Managed components, overrides, adding new components |
 
@@ -71,7 +71,7 @@ Commit message format:
 - Maintain existing code style
 - Run `make fmt` before committing
 - Keep CRD backward compatible
-- Test component changes with e2e tests in `e2e/`
+- Test component changes with e2e tests in `test/chainsaw/`
 
 ## Contextification Addendum
 

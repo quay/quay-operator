@@ -7,6 +7,7 @@ import (
 	route "github.com/openshift/api/route/v1"
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	batchv1k8s "k8s.io/api/batch/v1"
@@ -780,6 +781,59 @@ func TestProcessDeploymentSecurityContextOverride(t *testing.T) {
 	}
 }
 
+func TestProcessDeploymentAffinityOverride(t *testing.T) {
+	requiredAntiAffinity := &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					TopologyKey: "kubernetes.io/hostname",
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"quay-component": "quay-app"},
+					},
+				},
+			},
+		},
+	}
+
+	quay := &v1.QuayRegistry{
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentQuay, Managed: true, Overrides: &v1.Override{Affinity: requiredAntiAffinity}},
+			},
+		},
+	}
+
+	// mirrors the real quay-app Deployment's metadata annotations set in
+	// kustomize/base/quay.deployment.yaml
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "quay-app",
+			Labels:      map[string]string{"quay-component": "quay"},
+			Annotations: map[string]string{"quay-component": "quay"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "quay-app"},
+					},
+				},
+			},
+		},
+	}
+
+	qctx := quaycontext.NewQuayRegistryContext()
+	result, err := Process(quay, qctx, dep, false)
+	assert.NoError(t, err)
+
+	resultDep, ok := result.(*appsv1.Deployment)
+	assert.True(t, ok)
+	assert.Equal(t, requiredAntiAffinity, resultDep.Spec.Template.Spec.Affinity)
+}
+
 func TestProcessJobSecurityContextOverride(t *testing.T) {
 	overrideSC := &corev1.SecurityContext{
 		RunAsNonRoot:             boolPtr(false),
@@ -1290,4 +1344,305 @@ func TestProcessPostgresDeploymentCAHashAnnotation(t *testing.T) {
 			t.Errorf("template annotation %s = %q, want %q", v1.ClusterServiceCAName, got, "abc12345")
 		}
 	})
+}
+
+func TestProcessSTSCredentialsTargetsOnlyQuayWorkloads(t *testing.T) {
+	quay := &v1.QuayRegistry{Spec: v1.QuayRegistrySpec{Components: []v1.Component{
+		{Kind: v1.ComponentQuay, Managed: true},
+		{Kind: v1.ComponentMirror, Managed: true},
+		{Kind: v1.ComponentClair, Managed: true},
+	}}}
+	qctx := &quaycontext.QuayRegistryContext{
+		StorageSTSEnabled:        true,
+		STSCredentialProvisioned: true,
+		STSCredentialSecretName:  "test-aws-sts-credentials",
+	}
+
+	for _, tt := range []struct {
+		name      string
+		component string
+		wantSTS   bool
+		withInit  bool
+	}{
+		{name: "test-quay-app", component: "quay", wantSTS: true},
+		{name: "test-quay-mirror", component: "mirror", wantSTS: true, withInit: true},
+		{name: "test-clair-app", component: "clair"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: tt.name, Labels: map[string]string{"quay-component": tt.component},
+					Annotations: map[string]string{"quay-component": tt.component},
+				},
+				Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+					Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: tt.name}}},
+				}},
+			}
+			if tt.withInit {
+				dep.Spec.Template.Spec.InitContainers = []corev1.Container{{Name: "init"}}
+			}
+
+			processed, err := Process(quay, qctx, dep, false)
+			assert.NoError(t, err)
+			result := processed.(*appsv1.Deployment)
+			envValues := map[string]string{}
+			for _, env := range result.Spec.Template.Spec.Containers[0].Env {
+				envValues[env.Name] = env.Value
+			}
+			assert.Equal(t, tt.wantSTS, envValues["AWS_SHARED_CREDENTIALS_FILE"] == "/aws-sts/credentials")
+			assert.Equal(t, tt.wantSTS, envValues["AWS_SDK_LOAD_CONFIG"] == "true")
+			if tt.withInit {
+				assert.Empty(t, result.Spec.Template.Spec.InitContainers[0].Env)
+				assert.Empty(t, result.Spec.Template.Spec.InitContainers[0].VolumeMounts)
+			}
+		})
+	}
+}
+
+func TestApplySTSCredentials(t *testing.T) {
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app"},
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Name: "quay-app"},
+					},
+				},
+			},
+		},
+	}
+
+	qctx := &quaycontext.QuayRegistryContext{
+		StorageSTSEnabled:        true,
+		STSCredentialProvisioned: true,
+		STSCredentialSecretName:  "test-aws-sts-credentials",
+	}
+
+	applySTSCredentials(dep, qctx)
+
+	t.Run("adds CCO Secret volume", func(t *testing.T) {
+		found := false
+		for _, v := range dep.Spec.Template.Spec.Volumes {
+			if v.Name == "aws-sts-credentials" {
+				found = true
+				assert.Equal(t, "test-aws-sts-credentials", v.Secret.SecretName)
+			}
+		}
+		assert.True(t, found, "aws-sts-credentials volume not found")
+	})
+
+	t.Run("adds bound-sa-token volume", func(t *testing.T) {
+		found := false
+		for _, v := range dep.Spec.Template.Spec.Volumes {
+			if v.Name == "bound-sa-token" {
+				found = true
+				assert.NotNil(t, v.Projected)
+				assert.Equal(t, "token", v.Projected.Sources[0].ServiceAccountToken.Path)
+				assert.Equal(t, "openshift", v.Projected.Sources[0].ServiceAccountToken.Audience)
+			}
+		}
+		assert.True(t, found, "bound-sa-token volume not found")
+	})
+
+	t.Run("adds volume mounts to container", func(t *testing.T) {
+		container := dep.Spec.Template.Spec.Containers[0]
+		credMountFound := false
+		tokenMountFound := false
+		for _, m := range container.VolumeMounts {
+			if m.Name == "aws-sts-credentials" && m.MountPath == "/aws-sts" {
+				credMountFound = true
+			}
+			if m.Name == "bound-sa-token" && m.MountPath == "/var/run/secrets/openshift/serviceaccount" {
+				tokenMountFound = true
+			}
+		}
+		assert.True(t, credMountFound, "aws-sts-credentials mount not found")
+		assert.True(t, tokenMountFound, "bound-sa-token mount not found")
+	})
+
+	t.Run("sets AWS credential environment", func(t *testing.T) {
+		container := dep.Spec.Template.Spec.Containers[0]
+		envValues := map[string]string{}
+		for _, env := range container.Env {
+			envValues[env.Name] = env.Value
+		}
+		assert.Equal(t, "/aws-sts/credentials", envValues["AWS_SHARED_CREDENTIALS_FILE"])
+		assert.Equal(t, "true", envValues["AWS_SDK_LOAD_CONFIG"])
+	})
+
+	t.Run("idempotent on second call", func(t *testing.T) {
+		volCountBefore := len(dep.Spec.Template.Spec.Volumes)
+		mountCountBefore := len(dep.Spec.Template.Spec.Containers[0].VolumeMounts)
+		envCountBefore := len(dep.Spec.Template.Spec.Containers[0].Env)
+
+		applySTSCredentials(dep, qctx)
+
+		assert.Equal(t, volCountBefore, len(dep.Spec.Template.Spec.Volumes))
+		assert.Equal(t, mountCountBefore, len(dep.Spec.Template.Spec.Containers[0].VolumeMounts))
+		assert.Equal(t, envCountBefore, len(dep.Spec.Template.Spec.Containers[0].Env))
+	})
+
+	t.Run("replaces conflicting volume definition", func(t *testing.T) {
+		staleSecret := "old-stale-secret"
+		conflictDep := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app"},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Volumes: []corev1.Volume{
+							{
+								Name: "aws-sts-credentials",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName: staleSecret,
+									},
+								},
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name: "quay-app",
+								VolumeMounts: []corev1.VolumeMount{
+									{Name: "aws-sts-credentials", MountPath: "/old-path"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		applySTSCredentials(conflictDep, qctx)
+
+		for _, v := range conflictDep.Spec.Template.Spec.Volumes {
+			if v.Name == "aws-sts-credentials" {
+				assert.Equal(t, "test-aws-sts-credentials", v.Secret.SecretName,
+					"stale Secret name should be replaced")
+			}
+		}
+
+		for _, m := range conflictDep.Spec.Template.Spec.Containers[0].VolumeMounts {
+			if m.Name == "aws-sts-credentials" {
+				assert.Equal(t, "/aws-sts", m.MountPath,
+					"stale mount path should be replaced")
+			}
+		}
+
+		assert.Equal(t, 2, len(conflictDep.Spec.Template.Spec.Volumes),
+			"should have exactly 2 volumes (replaced + new)")
+	})
+}
+
+func TestProcessReadOnlyDeploymentIntent(t *testing.T) {
+	quay := &v1.QuayRegistry{
+		ObjectMeta: metav1.ObjectMeta{Name: "registry"},
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentMirror, Managed: true},
+			},
+		},
+	}
+	qctx := &quaycontext.QuayRegistryContext{
+		ReadOnlyPhase:        string(v1.ReadOnlyPhaseEnteringReadOnly),
+		ReadOnlyMountEnabled: true,
+		ReadOnlySecretName:   "registry-readonly-service-key",
+		ReadOnlyFrozenImages: map[string]string{
+			"registry-quay-app/containers/quay-app": "quay@sha256:frozen",
+		},
+	}
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "registry-quay-app",
+			Labels:      map[string]string{"quay-component": "quay-app"},
+			Annotations: map[string]string{"quay-component": "quay-app"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Strategy: appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{Name: "quay-app", Image: "quay:latest"}},
+				},
+			},
+		},
+	}
+
+	processed, err := Process(quay, qctx, dep, false)
+	require.NoError(t, err)
+	got := processed.(*appsv1.Deployment)
+
+	volume := findVolumeByName(got, readOnlyVolumeName)
+	require.NotNil(t, volume)
+	assert.Equal(t, "registry-readonly-service-key", volume.Secret.SecretName)
+	mount := findVolumeMountByName(got, "quay-app", readOnlyVolumeName)
+	require.NotNil(t, mount)
+	assert.Equal(t, readOnlyMountPath, mount.MountPath)
+	assert.True(t, mount.ReadOnly)
+	assert.Equal(t, appsv1.RecreateDeploymentStrategyType, got.Spec.Strategy.Type)
+	assert.Nil(t, got.Spec.Strategy.RollingUpdate)
+	assert.Equal(t, "quay@sha256:frozen", got.Spec.Template.Spec.Containers[0].Image)
+}
+
+func TestProcessReadOnlyHPAPin(t *testing.T) {
+	replicas := int32(3)
+	quay := &v1.QuayRegistry{
+		Spec: v1.QuayRegistrySpec{
+			Components: []v1.Component{
+				{Kind: v1.ComponentHPA, Managed: true},
+			},
+		},
+	}
+	qctx := &quaycontext.QuayRegistryContext{
+		ReadOnlyHPAPins: map[string]int32{"registry-quay-app": replicas},
+	}
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "registry-quay-app",
+			Annotations: map[string]string{"quay-component": "horizontalpodautoscaler"},
+		},
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+				Name: "registry-quay-app",
+			},
+			MaxReplicas: 10,
+		},
+	}
+
+	processed, err := Process(quay, qctx, hpa, false)
+	require.NoError(t, err)
+	got := processed.(*autoscalingv2.HorizontalPodAutoscaler)
+	require.NotNil(t, got.Spec.MinReplicas)
+	assert.Equal(t, replicas, *got.Spec.MinReplicas)
+	assert.Equal(t, replicas, got.Spec.MaxReplicas)
+}
+
+func findVolumeByName(deployment *appsv1.Deployment, name string) *corev1.Volume {
+	for index := range deployment.Spec.Template.Spec.Volumes {
+		if deployment.Spec.Template.Spec.Volumes[index].Name == name {
+			return &deployment.Spec.Template.Spec.Volumes[index]
+		}
+	}
+	return nil
+}
+
+func findVolumeMountByName(deployment *appsv1.Deployment, containerName, name string) *corev1.VolumeMount {
+	for containerIndex := range deployment.Spec.Template.Spec.Containers {
+		container := &deployment.Spec.Template.Spec.Containers[containerIndex]
+		if container.Name != containerName {
+			continue
+		}
+		for mountIndex := range container.VolumeMounts {
+			if container.VolumeMounts[mountIndex].Name == name {
+				return &container.VolumeMounts[mountIndex]
+			}
+		}
+	}
+	return nil
 }

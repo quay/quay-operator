@@ -32,6 +32,7 @@ test/chainsaw/
 ├── values-openshift.yaml       # Values for OpenShift (all components managed)
 ├── values-kind.yaml            # Values for KinD (route/objectstorage/monitoring/tls unmanaged)
 ├── reconcile/                  # Core reconcile lifecycle (create, mutate, delete, recover)
+├── sts_cco/                    # AWS STS/CCO provisioning and real S3 operations
 ├── hpa/                        # HorizontalPodAutoscaler management
 ├── resource_overrides/         # Resource requests/limits and PVC volume overrides
 ├── ca_rotation/                # CA certificate rotation (destructive, OpenShift only)
@@ -54,6 +55,18 @@ make test-e2e-destructive
 # KinD — excludes OpenShift-only tests (ca-rotation, hpa, unmanaged-route)
 hack/setup-kind-e2e.sh && make test-e2e-kind
 ```
+
+The STS/CCO scenario is intentionally excluded from the standard OpenShift and KinD targets. It requires an AWS OpenShift cluster installed for STS, CCO in `Manual` mode, an S3 bucket, and an Operator installation configured with the test role. The role trust policy must allow `system:serviceaccount:<namespace>:sts-cco-quay-app` with audience `openshift`.
+
+```bash
+STS_TEST_NAMESPACE=quay-sts-e2e \
+STS_S3_BUCKET=example-quay-sts-e2e \
+STS_S3_REGION=us-east-1 \
+STS_ROLE_ARN=arn:aws:iam::123456789012:role/example-quay-sts \
+make test-e2e-sts
+```
+
+The test verifies the generated `CredentialsRequest`, CCO credentials, projected token and workload mounts, absence of static S3 keys, a real image push/pull, and repository mirroring. It creates the namespace if needed; use a dedicated empty namespace matching the IAM trust policy.
 
 Override parallelism and pass extra args:
 ```bash
