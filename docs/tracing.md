@@ -30,6 +30,9 @@ All traces are sampled by default. Use the standard sampler variables to change 
 | `kustomize.Inflate` | Rendering the QuayRegistry into Kubernetes objects. |
 | `apply` | Creating or updating the rendered objects. |
 | `cmpstatus.Check` | One component status check. |
+| `HTTP <method>` | One Kubernetes API request, nested under the span that made it. |
+
+API client spans cover uncached requests only: reads served from the controller-runtime cache make no request and have no span. Informer list/watch and leader election requests are traced too, as their own root spans. Trace context is propagated on these requests with W3C TraceContext headers.
 
 ## Attributes
 

@@ -82,7 +82,8 @@ func main() {
 
 	ctrl.Log.Info("Starting the Quay Operator", "namespace", namespace)
 
-	shutdownTracing, err := tracing.Setup(context.Background())
+	restConfig := ctrl.GetConfigOrDie()
+	shutdownTracing, err := tracing.Setup(context.Background(), restConfig)
 	if err != nil {
 		setupLog.Error(err, "unable to set up tracing, continuing without it")
 		shutdownTracing = func(context.Context) error { return nil }
@@ -137,7 +138,7 @@ func main() {
 
 	webhookServer := webhook.NewServer(webhookServerOptions)
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
 		Cache:                  cacheOptions,
 		Client:                 clientOptions,

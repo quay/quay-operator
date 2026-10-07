@@ -9,9 +9,11 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace/noop"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -19,12 +21,16 @@ func TestSetupDisabledWithoutEndpoint(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
 
-	shutdown, err := Setup(context.Background())
+	cfg := &rest.Config{}
+	shutdown, err := Setup(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("Setup: %v", err)
 	}
 	if _, ok := otel.GetTracerProvider().(*sdktrace.TracerProvider); ok {
 		t.Fatal("global tracer provider is an SDK provider, want no-op")
+	}
+	if cfg.WrapTransport != nil {
+		t.Fatal("rest config transport wrapped, want untouched")
 	}
 	if err := shutdown(context.Background()); err != nil {
 		t.Fatalf("shutdown: %v", err)
@@ -37,14 +43,24 @@ func TestSetupEnabledWithEndpoint(t *testing.T) {
 			t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 			t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
 			t.Setenv(env, "http://127.0.0.1:4318")
-			t.Cleanup(func() { otel.SetTracerProvider(noop.NewTracerProvider()) })
+			t.Cleanup(func() {
+				otel.SetTracerProvider(noop.NewTracerProvider())
+				otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator())
+			})
 
-			shutdown, err := Setup(context.Background())
+			cfg := &rest.Config{}
+			shutdown, err := Setup(context.Background(), cfg)
 			if err != nil {
 				t.Fatalf("Setup: %v", err)
 			}
 			if _, ok := otel.GetTracerProvider().(*sdktrace.TracerProvider); !ok {
 				t.Fatalf("global tracer provider is %T, want SDK provider", otel.GetTracerProvider())
+			}
+			if cfg.WrapTransport == nil {
+				t.Fatal("rest config transport not wrapped")
+			}
+			if _, ok := otel.GetTextMapPropagator().(propagation.TraceContext); !ok {
+				t.Fatalf("global propagator is %T, want TraceContext", otel.GetTextMapPropagator())
 			}
 			if err := shutdown(context.Background()); err != nil {
 				t.Fatalf("shutdown: %v", err)

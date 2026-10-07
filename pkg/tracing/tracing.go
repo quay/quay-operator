@@ -3,17 +3,21 @@ package tracing
 
 import (
 	"context"
+	"net/http"
 	"os"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 	"go.opentelemetry.io/otel/trace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
@@ -38,8 +42,9 @@ const (
 
 // Setup installs a global OTLP/HTTP tracer provider when an OTLP endpoint is configured
 // through the standard OTEL_* environment variables. Without one the global no-op provider
-// is left in place. The returned function flushes and stops the provider.
-func Setup(ctx context.Context) (func(context.Context) error, error) {
+// is left in place and cfg is not modified. Otherwise cfg's transport is wrapped so
+// Kubernetes API requests are traced. The returned function flushes and stops the provider.
+func Setup(ctx context.Context, cfg *rest.Config) (func(context.Context) error, error) {
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" &&
 		os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		return func(context.Context) error { return nil }, nil
@@ -66,6 +71,10 @@ func Setup(ctx context.Context) (func(context.Context) error, error) {
 		sdktrace.WithResource(res),
 	)
 	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		return otelhttp.NewTransport(rt)
+	})
 	return tp.Shutdown, nil
 }
 
