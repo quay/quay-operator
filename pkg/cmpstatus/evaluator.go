@@ -24,7 +24,11 @@ type Checker interface {
 func check(ctx context.Context, c Checker, q qv1.QuayRegistry) (qv1.Condition, error) {
 	ctx, span := tracing.Start(ctx, "cmpstatus.Check", tracing.KeyComponent.String(c.Name()))
 	defer span.End()
-	return c.Check(ctx, q)
+	cond, err := c.Check(ctx, q)
+	if err != nil {
+		tracing.RecordError(ctx, err)
+	}
+	return cond, err
 }
 
 // Evaluate attempts to evaluate the status of all components of a quay registry instace. It

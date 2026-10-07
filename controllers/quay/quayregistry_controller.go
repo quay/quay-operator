@@ -1242,10 +1242,13 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	log.Info("inflating QuayRegistry into Kubernetes objects")
-	_, inflateSpan := tracing.Start(ctx, "kustomize.Inflate")
+	inflateCtx, inflateSpan := tracing.Start(ctx, "kustomize.Inflate")
 	deploymentObjects, err := kustomize.Inflate(
 		quayContext, updatedQuay, cbundle, log, r.SkipResourceRequests,
 	)
+	if err != nil {
+		tracing.RecordError(inflateCtx, err)
+	}
 	inflateSpan.End()
 	if err != nil {
 		return r.reconcileWithCondition(
@@ -1330,6 +1333,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if quayContext.SupportsMonitoring && isGrafanaConfigMap(obj) {
 			obj.SetNamespace(grafanaDashboardConfigNamespace)
 			if err = updateGrafanaDashboardData(obj, updatedQuay); err != nil {
+				tracing.RecordError(applyCtx, err)
 				return r.reconcileWithCondition(
 					ctx,
 					&quay,
@@ -1343,6 +1347,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		requeue, err := r.createOrUpdateObject(applyCtx, obj, quay, log)
 		if err != nil {
+			tracing.RecordError(applyCtx, err)
 			return r.reconcileWithCondition(
 				ctx,
 				&quay,
