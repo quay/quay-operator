@@ -80,10 +80,10 @@ func TestEndReconcile(t *testing.T) {
 				t.Fatalf("got %d spans, want 1", len(spans))
 			}
 			attrs := attribute.NewSet(spans[0].Attributes...)
-			if got, _ := attrs.Value("outcome"); got.AsString() != tc.want {
+			if got, _ := attrs.Value("quay.reconcile.outcome"); got.AsString() != tc.want {
 				t.Errorf("outcome = %q, want %q", got.AsString(), tc.want)
 			}
-			if got, _ := attrs.Value("requeue_after_ms"); got.AsInt64() != tc.wantMs {
+			if got, _ := attrs.Value("quay.reconcile.requeue_after_ms"); got.AsInt64() != tc.wantMs {
 				t.Errorf("requeue_after_ms = %d, want %d", got.AsInt64(), tc.wantMs)
 			}
 			if wantErr := tc.err != nil; (spans[0].Status.Code == codes.Error) != wantErr {

@@ -30,7 +30,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/tidwall/sjson"
-	"go.opentelemetry.io/otel/attribute"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -1321,7 +1320,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		"clairDatabaseInitialized", quayContext.ClairDatabaseInitialized,
 	)
 
-	_, applySpan := tracing.Start(ctx, "apply", attribute.Bool("defer_workloads", deferWorkloads))
+	applyCtx, applySpan := tracing.Start(ctx, "apply", tracing.KeyDeferWorkloads.Bool(deferWorkloads))
 	// Only the first End takes effect: the deferred one covers early returns from the loop.
 	defer applySpan.End()
 	for _, obj := range filterDeferredWorkloads(kustomize.EnsureCreationOrder(deploymentObjects), deferWorkloads) {
@@ -1342,7 +1341,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 
-		requeue, err := r.createOrUpdateObject(ctx, obj, quay, log)
+		requeue, err := r.createOrUpdateObject(applyCtx, obj, quay, log)
 		if err != nil {
 			return r.reconcileWithCondition(
 				ctx,
@@ -1930,7 +1929,7 @@ func (r *QuayRegistryReconciler) reconcileWithCondition(
 	reason v1.ConditionReason,
 	msg string,
 ) (ctrl.Result, error) {
-	tracing.SetWaitReason(ctx, "rollout_blocked", attribute.String("condition_reason", string(reason)))
+	tracing.SetWaitReason(ctx, "rollout_blocked", tracing.KeyConditionReason.String(string(reason)))
 	err := r.updateWithCondition(ctx, quay, ctype, cstatus, reason, msg)
 	return r.Requeue, err
 }

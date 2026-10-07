@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -23,7 +22,7 @@ type Checker interface {
 
 // check runs a Checker inside its own span so per-component readiness time is visible.
 func check(ctx context.Context, c Checker, q qv1.QuayRegistry) (qv1.Condition, error) {
-	ctx, span := tracing.Start(ctx, "cmpstatus.Check", attribute.String("component", c.Name()))
+	ctx, span := tracing.Start(ctx, "cmpstatus.Check", tracing.KeyComponent.String(c.Name()))
 	defer span.End()
 	return c.Check(ctx, q)
 }

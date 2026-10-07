@@ -20,6 +20,22 @@ import (
 
 const tracerName = "github.com/quay/quay-operator"
 
+// Span attribute keys. Trace queries depend on these names.
+const (
+	keyRegistryNamespace = attribute.Key("quay.registry.namespace")
+	keyRegistryName      = attribute.Key("quay.registry.name")
+	keyRegistryUID       = attribute.Key("quay.registry.uid")
+	keyRegistryGen       = attribute.Key("quay.registry.generation")
+	keyReconcileID       = attribute.Key("quay.reconcile.id")
+	keyOutcome           = attribute.Key("quay.reconcile.outcome")
+	keyWaitReason        = attribute.Key("quay.reconcile.wait_reason")
+	keyRequeueAfterMs    = attribute.Key("quay.reconcile.requeue_after_ms")
+
+	KeyConditionReason = attribute.Key("quay.reconcile.condition_reason")
+	KeyDeferWorkloads  = attribute.Key("quay.apply.defer_workloads")
+	KeyComponent       = attribute.Key("quay.component")
+)
+
 // Setup installs a global OTLP/HTTP tracer provider when an OTLP endpoint is configured
 // through the standard OTEL_* environment variables. Without one the global no-op provider
 // is left in place. The returned function flushes and stops the provider.
@@ -62,23 +78,23 @@ func Start(ctx context.Context, name string, attrs ...attribute.KeyValue) (conte
 func StartReconcile(ctx context.Context, name string, req ctrl.Request) (context.Context, trace.Span) {
 	return Start(
 		ctx, name,
-		attribute.String("quay.registry.namespace", req.Namespace),
-		attribute.String("quay.registry.name", req.Name),
-		attribute.String("reconcile_id", string(controller.ReconcileIDFromContext(ctx))),
+		keyRegistryNamespace.String(req.Namespace),
+		keyRegistryName.String(req.Name),
+		keyReconcileID.String(string(controller.ReconcileIDFromContext(ctx))),
 	)
 }
 
 // SetRegistry records the identity of the reconciled object on the current span.
 func SetRegistry(ctx context.Context, obj metav1.Object) {
 	trace.SpanFromContext(ctx).SetAttributes(
-		attribute.String("quay.registry.uid", string(obj.GetUID())),
-		attribute.Int64("quay.registry.generation", obj.GetGeneration()),
+		keyRegistryUID.String(string(obj.GetUID())),
+		keyRegistryGen.Int64(obj.GetGeneration()),
 	)
 }
 
 // SetWaitReason records why the current reconcile stops early or requeues.
 func SetWaitReason(ctx context.Context, reason string, attrs ...attribute.KeyValue) {
-	trace.SpanFromContext(ctx).SetAttributes(append(attrs, attribute.String("wait_reason", reason))...)
+	trace.SpanFromContext(ctx).SetAttributes(append(attrs, keyWaitReason.String(reason))...)
 }
 
 // RecordError marks the current span as failed.
@@ -108,8 +124,8 @@ func EndReconcile(span trace.Span, outcome string, res ctrl.Result, err error) {
 		fail(span, err)
 	}
 	span.SetAttributes(
-		attribute.String("outcome", outcome),
-		attribute.Int64("requeue_after_ms", res.RequeueAfter.Milliseconds()),
+		keyOutcome.String(outcome),
+		keyRequeueAfterMs.Int64(res.RequeueAfter.Milliseconds()),
 	)
 	span.End()
 }
