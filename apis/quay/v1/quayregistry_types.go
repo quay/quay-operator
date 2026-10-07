@@ -281,6 +281,7 @@ const (
 	ConditionReasonOverrideConflict                      ConditionReason = "OverrideConflict"
 	ConditionReasonUnsupportedVersion                    ConditionReason = "UnsupportedVersion"
 	ConditionReasonManualMigrationRequired               ConditionReason = "ManualMigrationRequired"
+	ConditionReasonManualReadOnlyDetected                ConditionReason = "ManualReadOnlyDetected"
 )
 
 // Condition is a single condition of a QuayRegistry.
