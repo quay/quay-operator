@@ -18,4 +18,4 @@ external-images:
   - search: "quay.io/sclorg/postgresql-15-c9s:latest"
     replace: "registry.redhat.io/rhel8/postgresql-15:latest"
   - search: "docker.io/library/redis:7.0"
-    replace: "registry.redhat.io/rhel8/redis-7:latest"
+    replace: "registry.redhat.io/rhel8/redis-6:latest"
