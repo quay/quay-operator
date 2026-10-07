@@ -39,6 +39,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	quay "github.com/quay/quay-operator/apis/quay/v1"
 	quaycontroller "github.com/quay/quay-operator/controllers/quay"
+	"github.com/quay/quay-operator/pkg/tracing"
 	corev1 "k8s.io/api/core/v1"
 	// +kubebuilder:scaffold:imports
 )
@@ -80,6 +81,12 @@ func main() {
 	})))
 
 	ctrl.Log.Info("Starting the Quay Operator", "namespace", namespace)
+
+	shutdownTracing, err := tracing.Setup(context.Background())
+	if err != nil {
+		setupLog.Error(err, "unable to set up tracing, continuing without it")
+		shutdownTracing = func(context.Context) error { return nil }
+	}
 
 	disableHTTP2 := func(c *tls.Config) {
 		if enableHTTP2 {
@@ -192,7 +199,15 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	err = mgr.Start(ctrl.SetupSignalHandler())
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := shutdownTracing(shutdownCtx); err != nil {
+		setupLog.Error(err, "unable to flush traces")
+	}
+	cancel()
+
+	if err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

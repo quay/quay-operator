@@ -32,6 +32,7 @@ import (
 	quaycontext "github.com/quay/quay-operator/pkg/context"
 	"github.com/quay/quay-operator/pkg/kustomize"
 	quaytls "github.com/quay/quay-operator/pkg/tls"
+	"github.com/quay/quay-operator/pkg/tracing"
 	"github.com/quay/quay/config-tool/pkg/lib/fieldgroups/hostsettings"
 )
 
@@ -301,6 +302,9 @@ func (r *QuayRegistryReconciler) ensureRouteDiscovery(
 	qctx *quaycontext.QuayRegistryContext,
 	quay *v1.QuayRegistry,
 ) error {
+	ctx, span := tracing.Start(ctx, "ensureRouteDiscovery")
+	defer span.End()
+
 	// Fast path: hostname already cached from a previous reconcile.
 	if cached := r.clusterHostname.Load(); cached != nil {
 		qctx.SupportsRoutes = true
@@ -397,6 +401,9 @@ func fillServerHostname(
 func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
 ) error {
+	ctx, span := tracing.Start(ctx, "checkObjectBucketClaimsAvailable")
+	defer span.End()
+
 	dstorensn := types.NamespacedName{
 		Name:      fmt.Sprintf("%s-quay-datastore", quay.GetName()),
 		Namespace: quay.GetNamespace(),
@@ -461,6 +468,9 @@ func (r *QuayRegistryReconciler) checkObjectBucketClaimsAvailable(
 func (r *QuayRegistryReconciler) checkManagedDatabaseReady(
 	ctx context.Context, qctx *quaycontext.QuayRegistryContext, quay *v1.QuayRegistry,
 ) {
+	ctx, span := tracing.Start(ctx, "checkManagedDatabaseReady")
+	defer span.End()
+
 	log := r.Log.WithValues("QuayRegistry", quay.GetName())
 
 	checkDeployment := func(component v1.ComponentKind, suffix string) bool {

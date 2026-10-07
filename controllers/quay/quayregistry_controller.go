@@ -30,6 +30,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/tidwall/sjson"
+	"go.opentelemetry.io/otel/attribute"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -59,6 +60,7 @@ import (
 	"github.com/quay/quay-operator/pkg/credentialsrequest"
 	"github.com/quay/quay-operator/pkg/kustomize"
 	"github.com/quay/quay-operator/pkg/middleware"
+	"github.com/quay/quay-operator/pkg/tracing"
 )
 
 const (
@@ -801,7 +803,11 @@ func (r *QuayRegistryReconciler) quayAppDeploymentRolledOut(
 
 // Reconcile is called every time an update happens in a QuayRegistry object. It attempts to
 // create all needed objects to get a quay instance running.
-func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
+	ctx, span := tracing.StartReconcile(ctx, "QuayRegistryReconciler.Reconcile", req)
+	var outcome string
+	defer func() { tracing.EndReconcile(span, outcome, result, err) }()
+
 	regid := fmt.Sprintf("%s/%s", req.Namespace, req.Name)
 	log := r.Log.WithValues("quayregistry", regid)
 	log.Info("begin reconcile")
@@ -809,30 +815,38 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var quay v1.QuayRegistry
 	if err := r.Get(ctx, req.NamespacedName, &quay); err != nil {
 		if errors.IsNotFound(err) {
+			outcome = "not_found"
 			log.Info("`QuayRegistry` deleted")
 			return ctrl.Result{}, nil
 		}
 
+		outcome = "error"
+		tracing.RecordError(ctx, err)
 		log.Error(err, "unable to retrieve QuayRegistry")
 		return r.Requeue, nil
 	}
+	tracing.SetRegistry(ctx, &quay)
 
 	updatedQuay := quay.DeepCopy()
 	updatedQuay.Status.ObservedGeneration = quay.Generation
 
 	if v1.FlaggedForDeletion(updatedQuay) {
+		tracing.SetWaitReason(ctx, "deleting")
 		return r.manageQuayDeletion(ctx, updatedQuay, log)
 	}
 
 	if v1.PostgresUpgradeRunning(updatedQuay) {
+		tracing.SetWaitReason(ctx, "upgrade")
 		return r.checkPostgresUpgradeStatus(ctx, updatedQuay, log)
 	}
 
 	if v1.MigrationsRunning(updatedQuay) {
+		tracing.SetWaitReason(ctx, "migration")
 		return r.checkMigrationStatus(ctx, updatedQuay, log)
 	}
 
 	if v1.NeedsBundleSecret(updatedQuay) {
+		tracing.SetWaitReason(ctx, "initial_bundle_secret")
 		return r.createInitialBundleSecret(ctx, updatedQuay, log)
 	}
 
@@ -934,6 +948,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if needsProbe {
 			if err := r.ensureRouteDiscovery(ctx, quayContext, updatedQuay); err != nil {
 				if goerrors.Is(err, errRouteProbeInProgress) {
+					tracing.SetWaitReason(ctx, "route_pending")
 					log.Info("route probe in progress, will retry")
 					return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 				}
@@ -1033,6 +1048,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if !v1.ComponentsMatch(quay.Spec.Components, updatedQuay.Spec.Components) {
+		tracing.SetWaitReason(ctx, "spec_defaults")
 		log.Info("updating QuayRegistry `spec.components` to include defaults")
 		if err = r.Update(ctx, updatedQuay); err != nil {
 			log.Error(err, "failed to update `spec.components` to include defaults")
@@ -1159,6 +1175,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			)
 		}
 		if !quayContext.STSCredentialProvisioned {
+			tracing.SetWaitReason(ctx, "sts_pending")
 			return result, nil
 		}
 	}
@@ -1180,6 +1197,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	readOnlyIntent, readOnlyDecision := r.prepareReadOnlyLifecycle(ctx, updatedQuay, quayContext, usercfg, cbundle, log)
 	if readOnlyDecision.Stop || readOnlyDecision.Err != nil {
+		tracing.SetWaitReason(ctx, "read_only")
 		return readOnlyDecision.Result, readOnlyDecision.Err
 	}
 
@@ -1200,6 +1218,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				)
 			}
 			if !scaledDown {
+				tracing.SetWaitReason(ctx, "pg_scale_down")
 				return r.Requeue, nil
 			}
 		}
@@ -1217,15 +1236,18 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				)
 			}
 			if !scaledDown {
+				tracing.SetWaitReason(ctx, "pg_scale_down")
 				return r.Requeue, nil
 			}
 		}
 	}
 
 	log.Info("inflating QuayRegistry into Kubernetes objects")
+	_, inflateSpan := tracing.Start(ctx, "kustomize.Inflate")
 	deploymentObjects, err := kustomize.Inflate(
 		quayContext, updatedQuay, cbundle, log, r.SkipResourceRequests,
 	)
+	inflateSpan.End()
 	if err != nil {
 		return r.reconcileWithCondition(
 			ctx,
@@ -1299,6 +1321,9 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		"clairDatabaseInitialized", quayContext.ClairDatabaseInitialized,
 	)
 
+	_, applySpan := tracing.Start(ctx, "apply", attribute.Bool("defer_workloads", deferWorkloads))
+	// Only the first End takes effect: the deferred one covers early returns from the loop.
+	defer applySpan.End()
 	for _, obj := range filterDeferredWorkloads(kustomize.EnsureCreationOrder(deploymentObjects), deferWorkloads) {
 		// For metrics and dashboards to work, we need to deploy the Grafana ConfigMap
 		// in the `openshift-config-managed` namespace and add the label
@@ -1329,9 +1354,11 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			)
 		}
 		if requeue {
+			tracing.SetWaitReason(ctx, "immutable_resource")
 			return r.Requeue, nil
 		}
 	}
+	applySpan.End()
 
 	if quayContext.SupportsMonitoring {
 		if err := r.patchNamespaceForMonitoring(ctx, quay); err != nil {
@@ -1372,6 +1399,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	readOnlyDecision = r.observeReadOnlyLifecycle(ctx, updatedQuay, quayContext, readOnlyIntent, cbundle, log)
 	if readOnlyDecision.Stop || readOnlyDecision.Err != nil {
+		tracing.SetWaitReason(ctx, "read_only")
 		return readOnlyDecision.Result, readOnlyDecision.Err
 	}
 
@@ -1401,16 +1429,19 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		v1.ConditionReasonComponentsCreationSuccess,
 		"All objects created/updated successfully",
 	); err != nil {
+		tracing.SetWaitReason(ctx, "status_update_failed")
 		log.Error(err, "failed to update `conditions` of `QuayRegistry`")
 		return r.Requeue, nil
 	}
 
 	if osmanaged && !quayContext.ObjectStorageInitialized {
+		tracing.SetWaitReason(ctx, "obc_pending")
 		r.Log.Info("requeuing to populate values for managed component: `objectstorage`")
 		return r.Requeue, nil
 	}
 
 	if !quayContext.DatabaseInitialized || !quayContext.ClairDatabaseInitialized {
+		tracing.SetWaitReason(ctx, "db_pending")
 		r.Log.Info("requeuing to wait for managed database(s) to become ready")
 		return r.Requeue, nil
 	}
@@ -1418,6 +1449,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	upToDate := v1.EnsureRegistryEndpoint(quayContext, updatedQuay, usercfg)
 	if !upToDate {
 		if err = r.Status().Update(ctx, updatedQuay); err != nil {
+			tracing.SetWaitReason(ctx, "status_update_failed")
 			log.Error(err, "failed to update `registryEndpoint` of `QuayRegistry`")
 			return r.Requeue, nil
 		}
@@ -1435,6 +1467,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		); err != nil {
 			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
 		}
+		tracing.SetWaitReason(ctx, "upgrade")
 		return r.Requeue, nil
 	}
 
@@ -1452,6 +1485,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		); err != nil {
 			log.Error(err, "failed to update `conditions` of `QuayRegistry`")
 		}
+		tracing.SetWaitReason(ctx, "migration")
 		return r.Requeue, nil
 	}
 
@@ -1464,6 +1498,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	// when we get to this point all objects were created as expected and we can safely
 	// increase our reconcile delay.
+	tracing.SetWaitReason(ctx, "steady_state")
 	return ctrl.Result{RequeueAfter: time.Minute}, nil
 }
 
@@ -1895,6 +1930,7 @@ func (r *QuayRegistryReconciler) reconcileWithCondition(
 	reason v1.ConditionReason,
 	msg string,
 ) (ctrl.Result, error) {
+	tracing.SetWaitReason(ctx, "rollout_blocked", attribute.String("condition_reason", string(reason)))
 	err := r.updateWithCondition(ctx, quay, ctype, cstatus, reason, msg)
 	return r.Requeue, err
 }

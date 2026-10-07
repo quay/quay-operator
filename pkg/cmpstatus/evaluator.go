@@ -6,10 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
+	"github.com/quay/quay-operator/pkg/tracing"
 )
 
 // Checker is implemented by all status analysers in this package. it implements two functions,
@@ -17,6 +19,13 @@ import (
 type Checker interface {
 	Name() string
 	Check(context.Context, qv1.QuayRegistry) (qv1.Condition, error)
+}
+
+// check runs a Checker inside its own span so per-component readiness time is visible.
+func check(ctx context.Context, c Checker, q qv1.QuayRegistry) (qv1.Condition, error) {
+	ctx, span := tracing.Start(ctx, "cmpstatus.Check", attribute.String("component", c.Name()))
+	defer span.End()
+	return c.Check(ctx, q)
 }
 
 // Evaluate attempts to evaluate the status of all components of a quay registry instace. It
@@ -33,7 +42,7 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 		&Monitoring{Client: c},
 		&Cache{Client: c},
 	} {
-		cond, err := component.Check(ctx, q)
+		cond, err := check(ctx, component, q)
 		if err != nil {
 			return nil, err
 		}
@@ -53,7 +62,7 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 		&TLS{Client: c},
 		&Redis{Client: c},
 	} {
-		cond, err := component.Check(ctx, q)
+		cond, err := check(ctx, component, q)
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +104,7 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 	// component as faulty as well (awaiting for quay) and returns. quay condition is
 	// append to the returned slice.
 	quay := &Quay{Client: c}
-	cond, err := quay.Check(ctx, q)
+	cond, err := check(ctx, quay, q)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +128,7 @@ func Evaluate(ctx context.Context, c client.Client, q qv1.QuayRegistry) ([]qv1.C
 	// this is the last component we check the health for. it depends on quay component that
 	// in turn depends on almost all other components.
 	mirror := &Mirror{Client: c}
-	cond, err = mirror.Check(ctx, q)
+	cond, err = check(ctx, mirror, q)
 	if err != nil {
 		return nil, err
 	}
