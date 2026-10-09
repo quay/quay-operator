@@ -14,6 +14,22 @@ import (
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 )
 
+func ownedHPA(name string) *asv2.HorizontalPodAutoscaler {
+	return &asv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Kind:       "QuayRegistry",
+					Name:       "registry",
+					APIVersion: "quay.redhat.com/v1",
+					UID:        "uid",
+				},
+			},
+		},
+	}
+}
+
 func TestHPACheck(t *testing.T) {
 	for _, tt := range []struct {
 		name string
@@ -66,7 +82,7 @@ func TestHPACheck(t *testing.T) {
 				Type:    qv1.ComponentHPAReady,
 				Status:  metav1.ConditionFalse,
 				Reason:  qv1.ConditionReasonComponentNotReady,
-				Message: "Horizontal pod autoscaler not found",
+				Message: "Horizontal pod autoscaler registry-quay-app not found",
 			},
 		},
 		{
@@ -114,49 +130,128 @@ func TestHPACheck(t *testing.T) {
 							Kind:    qv1.ComponentHPA,
 							Managed: true,
 						},
+						{
+							Kind:    qv1.ComponentClair,
+							Managed: true,
+						},
+						{
+							Kind:    qv1.ComponentMirror,
+							Managed: true,
+						},
 					},
 				},
 			},
 			objs: []client.Object{
-				&asv2.HorizontalPodAutoscaler{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
+				ownedHPA("registry-quay-app"),
+				ownedHPA("registry-quay-mirror"),
+				ownedHPA("registry-clair-app"),
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentHPAReady,
+				Status:  metav1.ConditionTrue,
+				Reason:  qv1.ConditionReasonComponentReady,
+				Message: "Horizontal pod autoscaler found",
+			},
+		},
+		{
+			name: "hpa found with clair unmanaged",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+				Spec: qv1.QuayRegistrySpec{
+					ConfigBundleSecret: "config-bundle",
+					Components: []qv1.Component{
+						{
+							Kind:    qv1.ComponentHPA,
+							Managed: true,
+						},
+						{
+							Kind:    qv1.ComponentClair,
+							Managed: false,
+						},
+						{
+							Kind:    qv1.ComponentMirror,
+							Managed: true,
 						},
 					},
 				},
-				&asv2.HorizontalPodAutoscaler{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-quay-mirror",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
+			},
+			objs: []client.Object{
+				ownedHPA("registry-quay-app"),
+				ownedHPA("registry-quay-mirror"),
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentHPAReady,
+				Status:  metav1.ConditionTrue,
+				Reason:  qv1.ConditionReasonComponentReady,
+				Message: "Horizontal pod autoscaler found",
+			},
+		},
+		{
+			name: "hpa found with mirror unmanaged",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+				Spec: qv1.QuayRegistrySpec{
+					ConfigBundleSecret: "config-bundle",
+					Components: []qv1.Component{
+						{
+							Kind:    qv1.ComponentHPA,
+							Managed: true,
+						},
+						{
+							Kind:    qv1.ComponentClair,
+							Managed: true,
+						},
+						{
+							Kind:    qv1.ComponentMirror,
+							Managed: false,
 						},
 					},
 				},
-				&asv2.HorizontalPodAutoscaler{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "registry-clair-app",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Kind:       "QuayRegistry",
-								Name:       "registry",
-								APIVersion: "quay.redhat.com/v1",
-								UID:        "uid",
-							},
+			},
+			objs: []client.Object{
+				ownedHPA("registry-quay-app"),
+				ownedHPA("registry-clair-app"),
+			},
+			cond: qv1.Condition{
+				Type:    qv1.ComponentHPAReady,
+				Status:  metav1.ConditionTrue,
+				Reason:  qv1.ConditionReasonComponentReady,
+				Message: "Horizontal pod autoscaler found",
+			},
+		},
+		{
+			name: "hpa found with clair and mirror unmanaged",
+			quay: qv1.QuayRegistry{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "registry",
+					UID:  "uid",
+				},
+				Spec: qv1.QuayRegistrySpec{
+					ConfigBundleSecret: "config-bundle",
+					Components: []qv1.Component{
+						{
+							Kind:    qv1.ComponentHPA,
+							Managed: true,
+						},
+						{
+							Kind:    qv1.ComponentClair,
+							Managed: false,
+						},
+						{
+							Kind:    qv1.ComponentMirror,
+							Managed: false,
 						},
 					},
 				},
+			},
+			objs: []client.Object{
+				ownedHPA("registry-quay-app"),
 			},
 			cond: qv1.Condition{
 				Type:    qv1.ComponentHPAReady,
