@@ -1495,8 +1495,7 @@ func (r *QuayRegistryReconciler) hasNecessaryConfig(
 			}
 
 			return fmt.Errorf(
-				"%s component marked as managed, but `configBundleSecret` "+
-					"contains required fields",
+				"%s is managed; remove its fields from configBundleSecret or set managed: false",
 				cmp.Kind,
 			)
 		}
