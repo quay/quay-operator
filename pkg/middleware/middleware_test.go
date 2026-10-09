@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"testing"
 
@@ -1400,6 +1401,72 @@ func TestProcessSTSCredentialsTargetsOnlyQuayWorkloads(t *testing.T) {
 	}
 }
 
+func TestProcessSTSRoleChange(t *testing.T) {
+	const annotation = "quay.redhat.com/sts-role-hash"
+	quay := &v1.QuayRegistry{Spec: v1.QuayRegistrySpec{Components: []v1.Component{
+		{Kind: v1.ComponentQuay, Managed: true},
+		{Kind: v1.ComponentMirror, Managed: true},
+		{Kind: v1.ComponentClair, Managed: true},
+	}}}
+
+	for _, tt := range []struct {
+		name        string
+		component   string
+		enabled     bool
+		provisioned bool
+		wantRollout bool
+	}{
+		{"test-quay-app", "quay", true, true, true},
+		{"test-quay-mirror", "mirror", true, true, true},
+		{"test-clair-app", "clair", true, true, false},
+		{"pending-quay-app", "quay", true, false, false},
+		{"pending-quay-mirror", "mirror", true, false, false},
+		{"disabled-quay-app", "quay", false, true, false},
+		{"disabled-quay-mirror", "mirror", false, true, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        tt.name,
+					Labels:      map[string]string{"quay-component": tt.component},
+					Annotations: map[string]string{"quay-component": tt.component},
+				},
+				Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"example.com/existing": "keep"}},
+					Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: tt.name}}},
+				}},
+			}
+			qctx := &quaycontext.QuayRegistryContext{
+				StorageSTSEnabled:        tt.enabled,
+				STSCredentialProvisioned: tt.provisioned,
+				STSCredentialSecretName:  "test-aws-sts-credentials",
+				STSRoleARN:               "arn:aws:iam::123456789012:role/role-a",
+			}
+			render := func() corev1.PodTemplateSpec {
+				processed, err := Process(quay, qctx, dep.DeepCopy(), false)
+				require.NoError(t, err)
+				return processed.(*appsv1.Deployment).Spec.Template
+			}
+			original := render()
+			assert.Equal(t, original, render(), "unchanged role must not change the pod template")
+			qctx.STSRoleARN = "arn:aws:iam::123456789012:role/role-b"
+			updated := render()
+			assert.Equal(t, "keep", updated.Annotations["example.com/existing"])
+			if tt.wantRollout {
+				require.NotEmpty(t, original.Annotations[annotation])
+				assert.NotEqual(t, original.Annotations[annotation], updated.Annotations[annotation])
+				assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256([]byte(qctx.STSRoleARN))), updated.Annotations[annotation])
+				assert.NotEqual(t, original, updated, "role-only changes must trigger a rollout")
+				assert.Equal(t, original.Spec, updated.Spec, "only template metadata needs to change")
+			} else {
+				assert.NotContains(t, updated.Annotations, annotation)
+				assert.Equal(t, original, updated)
+			}
+			assert.Equal(t, updated, render(), "the new role must produce a stable template")
+		})
+	}
+}
+
 func TestApplySTSCredentials(t *testing.T) {
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-quay-app"},
@@ -1421,6 +1488,10 @@ func TestApplySTSCredentials(t *testing.T) {
 	}
 
 	applySTSCredentials(dep, qctx)
+
+	t.Run("initializes pod template annotations", func(t *testing.T) {
+		assert.NotEmpty(t, dep.Spec.Template.Annotations[stsRoleHashAnnotation])
+	})
 
 	t.Run("adds CCO Secret volume", func(t *testing.T) {
 		found := false
@@ -1473,12 +1544,14 @@ func TestApplySTSCredentials(t *testing.T) {
 	})
 
 	t.Run("idempotent on second call", func(t *testing.T) {
+		templateBefore := dep.Spec.Template.DeepCopy()
 		volCountBefore := len(dep.Spec.Template.Spec.Volumes)
 		mountCountBefore := len(dep.Spec.Template.Spec.Containers[0].VolumeMounts)
 		envCountBefore := len(dep.Spec.Template.Spec.Containers[0].Env)
 
 		applySTSCredentials(dep, qctx)
 
+		assert.Equal(t, *templateBefore, dep.Spec.Template)
 		assert.Equal(t, volCountBefore, len(dep.Spec.Template.Spec.Volumes))
 		assert.Equal(t, mountCountBefore, len(dep.Spec.Template.Spec.Containers[0].VolumeMounts))
 		assert.Equal(t, envCountBefore, len(dep.Spec.Template.Spec.Containers[0].Env))
