@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"regexp"
 	"strings"
@@ -25,6 +26,7 @@ import (
 const (
 	configSecretPrefix    = "quay-config-secret"
 	fieldGroupsAnnotation = "quay-managed-fieldgroups"
+	stsRoleHashAnnotation = "quay.redhat.com/sts-role-hash"
 
 	readOnlyVolumeName = "readonly-service-key"
 	readOnlyMountPath  = "/conf/readonly"
@@ -774,6 +776,12 @@ func clairPostgresCASecretName(quay *v1.QuayRegistry, override *v1.TLSOverride) 
 }
 
 func applySTSCredentials(dep *appsv1.Deployment, qctx *quaycontext.QuayRegistryContext) {
+	if dep.Spec.Template.Annotations == nil {
+		dep.Spec.Template.Annotations = map[string]string{}
+	}
+	// Restart SDK sessions when the configured IAM role changes.
+	dep.Spec.Template.Annotations[stsRoleHashAnnotation] = fmt.Sprintf("%x", sha256.Sum256([]byte(qctx.STSRoleARN)))
+
 	credVolume := corev1.Volume{
 		Name: "aws-sts-credentials",
 		VolumeSource: corev1.VolumeSource{
