@@ -1,0 +1,4 @@
+[allowlist]
+paths = [
+    '''controllers/quay/readonly_test\.go''',
+]
