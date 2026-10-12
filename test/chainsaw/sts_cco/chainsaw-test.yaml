@@ -159,6 +159,8 @@ spec:
             kubectl rollout status deployment/"${deployment}" -n "${NAMESPACE}" --timeout=15m
 
             kubectl get deployment "${deployment}" -n "${NAMESPACE}" -o json | jq -e '
+              ((.spec.template.metadata.annotations["quay.redhat.com/sts-role-hash"] // "")
+                | test("^[0-9a-f]{64}$")) and
               .spec.template.spec.serviceAccountName == "sts-cco-quay-app" and
               any(.spec.template.spec.volumes[]?;
                 .name == "aws-sts-credentials" and
@@ -188,6 +190,7 @@ spec:
               all(.items[] | select(
                 .metadata.name != "sts-cco-quay-app" and
                 .metadata.name != "sts-cco-quay-mirror");
+                .spec.template.metadata.annotations["quay.redhat.com/sts-role-hash"] == null and
                 all(.spec.template.spec.containers[]?;
                   all(.env[]?;
                     .name != "AWS_SHARED_CREDENTIALS_FILE" and
