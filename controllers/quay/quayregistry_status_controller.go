@@ -12,6 +12,7 @@ import (
 	"github.com/go-logr/logr"
 	qv1 "github.com/quay/quay-operator/apis/quay/v1"
 	"github.com/quay/quay-operator/pkg/cmpstatus"
+	"github.com/quay/quay-operator/pkg/tracing"
 )
 
 // QuayRegistryStatusReconciler updates status for QuayRegistry components. This status Reconciler
@@ -40,23 +41,33 @@ func (q *QuayRegistryStatusReconciler) SetupWithManager(mgr ctrl.Manager) error 
 // always rescheduled the same event on return, that makes this to run from time to time.
 func (q *QuayRegistryStatusReconciler) Reconcile(
 	ctx context.Context, req ctrl.Request,
-) (ctrl.Result, error) {
+) (result ctrl.Result, err error) {
+	ctx, span := tracing.StartReconcile(ctx, "QuayRegistryStatusReconciler.Reconcile", req)
+	var outcome string
+	defer func() { tracing.EndReconcile(span, outcome, result, err) }()
+
 	log := q.Log.WithValues("quayregistrystatus", req.NamespacedName)
 	reschedule := ctrl.Result{RequeueAfter: time.Minute}
 
 	var reg qv1.QuayRegistry
 	if err := q.Client.Get(ctx, req.NamespacedName, &reg); err != nil {
 		if errors.IsNotFound(err) {
+			outcome = "not_found"
 			// the QuayRegistry is no more, we can simply ignore it from now
 			// on, no need for a reschedule.
 			return ctrl.Result{}, nil
 		}
+		outcome = "error"
+		tracing.RecordError(ctx, err)
 		log.Error(err, "error getting QuayRegistry object")
 		return reschedule, nil
 	}
+	tracing.SetRegistry(ctx, &reg)
 
 	conds, err := cmpstatus.Evaluate(ctx, q.Client, reg)
 	if err != nil {
+		outcome = "error"
+		tracing.RecordError(ctx, err)
 		log.Error(err, "error retrieving QuayRegistry component conditions")
 		return reschedule, nil
 	}
@@ -66,14 +77,18 @@ func (q *QuayRegistryStatusReconciler) Reconcile(
 
 	if err := q.Client.Status().Update(ctx, &reg); err != nil {
 		if errors.IsConflict(err) {
+			tracing.SetWaitReason(ctx, "conflict")
 			log.Info("skipping status reconcile due to conflict, will retry")
 			return reschedule, nil
 		}
+		outcome = "error"
+		tracing.RecordError(ctx, err)
 		log.Error(err, "unexpected error updating component conditions")
 		return reschedule, nil
 	}
 
 	log.Info("quay components conditions reconciled")
+	tracing.SetWaitReason(ctx, "steady_state")
 	return reschedule, nil
 }
 
