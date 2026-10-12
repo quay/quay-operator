@@ -1,0 +1,181 @@
+# Keycloak for Quay OIDC authentication testing.
+# Deploys into the quay namespace.
+#
+# Quay reaches it at http://keycloak.quay.svc.cluster.local:8080/realms/quay/
+# Browser access (admin console) at http://127.0.0.1:30080
+#
+# Keycloak admin: admin / admin
+# Test users (password: "password" for all):
+#   admin_oidc, testuser_oidc, readonly_oidc
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+data:
+  quay-realm.json: |
+    {
+      "realm": "quay",
+      "enabled": true,
+      "sslRequired": "none",
+      "registrationAllowed": false,
+      "loginWithEmailAllowed": true,
+      "duplicateEmailsAllowed": false,
+      "resetPasswordAllowed": false,
+      "editUsernameAllowed": false,
+      "bruteForceProtected": false,
+      "rememberMe": false,
+      "verifyEmail": false,
+      "loginTheme": "keycloak",
+      "accessTokenLifespan": 300,
+      "clients": [
+        {
+          "clientId": "quay-ui",
+          "enabled": true,
+          "protocol": "openid-connect",
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "redirectUris": [
+            "http://localhost:8080/*",
+            "http://localhost:8080/oauth2/someoidc/callback*",
+            "http://localhost:9000/*",
+            "http://localhost:9000/oauth2/someoidc/callback*",
+            "https://127.0.0.1:30443/*",
+            "https://127.0.0.1:30443/oauth2/someoidc/callback*"
+          ],
+          "webOrigins": ["+"],
+          "attributes": {
+            "pkce.code.challenge.method": "S256",
+            "post.logout.redirect.uris": "+"
+          }
+        }
+      ],
+      "users": [
+        {
+          "username": "admin_oidc",
+          "enabled": true,
+          "emailVerified": true,
+          "email": "admin_oidc@example.com",
+          "firstName": "Admin",
+          "lastName": "OIDC",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "password",
+              "temporary": false
+            }
+          ]
+        },
+        {
+          "username": "testuser_oidc",
+          "enabled": true,
+          "emailVerified": true,
+          "email": "testuser_oidc@example.com",
+          "firstName": "Test",
+          "lastName": "OIDC",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "password",
+              "temporary": false
+            }
+          ]
+        },
+        {
+          "username": "readonly_oidc",
+          "enabled": true,
+          "emailVerified": true,
+          "email": "readonly_oidc@example.com",
+          "firstName": "Readonly",
+          "lastName": "OIDC",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "password",
+              "temporary": false
+            }
+          ]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:26.2
+        args:
+        - start-dev
+        - --import-realm
+        env:
+        - name: KC_BOOTSTRAP_ADMIN_USERNAME
+          value: "admin"
+        - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+          value: "admin"
+        - name: KC_HTTP_ENABLED
+          value: "true"
+        - name: KC_HOSTNAME_STRICT
+          value: "false"
+        ports:
+        - name: http
+          containerPort: 8080
+        volumeMounts:
+        - name: realm
+          mountPath: /opt/keycloak/data/import/quay-realm.json
+          subPath: quay-realm.json
+        readinessProbe:
+          httpGet:
+            path: /realms/quay
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: realm
+        configMap:
+          name: keycloak-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-nodeport
+  labels:
+    app: keycloak
+spec:
+  type: NodePort
+  selector:
+    app: keycloak
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    nodePort: 30080
+    protocol: TCP
