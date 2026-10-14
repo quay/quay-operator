@@ -34,6 +34,7 @@ test-e2e-sts: chainsaw ## Run STS/CCO tests against an AWS OpenShift cluster
 	@test -n "$(STS_S3_BUCKET)" || (echo "ERROR: STS_S3_BUCKET is required" && exit 1)
 	@test -n "$(STS_S3_REGION)" || (echo "ERROR: STS_S3_REGION is required" && exit 1)
 	@test -n "$(STS_ROLE_ARN)" || (echo "ERROR: STS_ROLE_ARN is required" && exit 1)
+	@test -n "$(STS_SECOND_ROLE_ARN)" || (echo "ERROR: STS_SECOND_ROLE_ARN is required" && exit 1)
 	@kubectl get namespace "$(STS_TEST_NAMESPACE)" >/dev/null 2>&1 || kubectl create namespace "$(STS_TEST_NAMESPACE)"
-	@NAMESPACE="$(STS_TEST_NAMESPACE)" STS_S3_BUCKET="$(STS_S3_BUCKET)" STS_S3_REGION="$(STS_S3_REGION)" STS_ROLE_ARN="$(STS_ROLE_ARN)" \
+	@NAMESPACE="$(STS_TEST_NAMESPACE)" STS_S3_BUCKET="$(STS_S3_BUCKET)" STS_S3_REGION="$(STS_S3_REGION)" STS_ROLE_ARN="$(STS_ROLE_ARN)" STS_SECOND_ROLE_ARN="$(STS_SECOND_ROLE_ARN)" \
 		$(CHAINSAW) test --config $(CHAINSAW_CONFIG) --test-dir $(CHAINSAW_STS_TEST_DIR) --values $(CHAINSAW_VALUES_OPENSHIFT) --namespace "$(STS_TEST_NAMESPACE)" --parallel 1 $(CHAINSAW_REPORT_FLAGS) $(CHAINSAW_EXTRA_ARGS)

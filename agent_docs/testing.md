@@ -62,11 +62,12 @@ The STS/CCO scenario is intentionally excluded from the standard OpenShift and K
 STS_TEST_NAMESPACE=quay-sts-e2e \
 STS_S3_BUCKET=example-quay-sts-e2e \
 STS_S3_REGION=us-east-1 \
-STS_ROLE_ARN=arn:aws:iam::123456789012:role/example-quay-sts \
+STS_ROLE_ARN=arn:aws:iam::123456789012:role/example-quay-sts-a \
+STS_SECOND_ROLE_ARN=arn:aws:iam::123456789012:role/example-quay-sts-b \
 make test-e2e-sts
 ```
 
-The test verifies the generated `CredentialsRequest`, CCO credentials, projected token and workload mounts, absence of static S3 keys, a real image push/pull, and repository mirroring. It creates the namespace if needed; use a dedicated empty namespace matching the IAM trust policy.
+The test verifies the generated `CredentialsRequest`, CCO credentials, projected token and workload mounts, absence of static S3 keys, a real image push/pull, repository mirroring, and a `ROLEARN` rotation from `STS_ROLE_ARN` to `STS_SECOND_ROLE_ARN`. Both roles must trust the same `system:serviceaccount:<namespace>:sts-cco-quay-app` service account and grant the same permissions to the same S3 bucket. It creates the namespace if needed; use a dedicated empty namespace matching the IAM trust policy.
 
 Override parallelism and pass extra args:
 ```bash
