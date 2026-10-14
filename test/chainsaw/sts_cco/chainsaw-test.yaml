@@ -14,7 +14,7 @@ spec:
         content: |
           set -euo pipefail
 
-          for command in kubectl jq curl crane base64; do
+          for command in kubectl jq curl crane base64 sha256sum; do
             command -v "${command}" >/dev/null || {
               echo "ERROR: ${command} is required for the STS E2E test"
               exit 1
@@ -216,11 +216,11 @@ spec:
             exit 1
           fi
 
-  - name: verify-s3-push-pull-and-mirroring
+  - name: verify-s3-push-pull-mirroring-and-role-rotation
     try:
     - script:
         shell: /bin/bash
-        timeout: 20m0s
+        timeout: 60m0s
         content: |
           set -euo pipefail
 
@@ -234,6 +234,153 @@ spec:
           export DOCKER_CONFIG
           mkdir -p "${DOCKER_CONFIG}"
           trap 'rm -f "${API_RESPONSE}" "${PULLED_IMAGE}"; rm -rf "${DOCKER_CONFIG}"' EXIT
+
+          role_hash() {
+            printf '%s' "$1" | sha256sum | awk '{print $1}'
+          }
+
+          deployment_hash() {
+            kubectl get deployment "$1" -n "${NAMESPACE}" -o json | jq -r \
+              '.spec.template.metadata.annotations["quay.redhat.com/sts-role-hash"] // ""'
+          }
+
+          deployment_pods() {
+            local deployment=$1
+            local selector
+            selector=$(kubectl get deployment "${deployment}" -n "${NAMESPACE}" -o json | jq -r \
+              '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')
+            kubectl get pods -n "${NAMESPACE}" -l "${selector}" -o json | jq -r \
+              '.items | map(.metadata.name) | sort | join(" ")'
+          }
+
+          wait_for_credentials_role() {
+            local expected_role=$1
+            local request=sts-cco-aws-credentials
+            local secret=sts-cco-aws-sts-credentials
+            echo "Waiting for CCO credentials to use the expected role..."
+            for attempt in $(seq 1 90); do
+              if kubectl get credentialsrequest "${request}" -n "${NAMESPACE}" >/dev/null 2>&1; then
+                local generation sync_generation provisioned request_role credentials file_role
+                generation=$(kubectl get credentialsrequest "${request}" -n "${NAMESPACE}" -o jsonpath='{.metadata.generation}')
+                sync_generation=$(kubectl get credentialsrequest "${request}" -n "${NAMESPACE}" -o jsonpath='{.status.lastSyncGeneration}')
+                provisioned=$(kubectl get credentialsrequest "${request}" -n "${NAMESPACE}" -o jsonpath='{.status.provisioned}')
+                request_role=$(kubectl get credentialsrequest "${request}" -n "${NAMESPACE}" -o json | jq -r '.spec.providerSpec.stsIAMRoleARN // ""')
+                credentials=$(kubectl get secret "${secret}" -n "${NAMESPACE}" -o jsonpath='{.data.credentials}' 2>/dev/null | base64 -d || true)
+                file_role=$(printf '%s\n' "${credentials}" | awk -F= '
+                  /^[[:space:]]*role_arn[[:space:]]*=/ {
+                    value=$0; sub(/^[^=]*=[[:space:]]*/, "", value); print value
+                  }')
+                if [ "${provisioned}" = "true" ] && [ "${sync_generation}" = "${generation}" ] && \
+                   [ "${request_role}" = "${expected_role}" ] && [ "${file_role}" = "${expected_role}" ]; then
+                  return 0
+                fi
+              fi
+              [ "${attempt}" -lt 90 ] || {
+                echo "ERROR: CCO credentials did not update to the expected role"
+                exit 1
+              }
+              sleep 10
+            done
+          }
+
+          wait_for_workload_hashes() {
+            local expected_hash=$1
+            for attempt in $(seq 1 120); do
+              if [ "$(deployment_hash sts-cco-quay-app)" = "${expected_hash}" ] && \
+                 [ "$(deployment_hash sts-cco-quay-mirror)" = "${expected_hash}" ]; then
+                return 0
+              fi
+              [ "${attempt}" -lt 120 ] || {
+                echo "ERROR: app/mirror deployments did not receive expected STS role hash ${expected_hash}"
+                exit 1
+              }
+              sleep 10
+            done
+          }
+
+          api_request() {
+            local method=$1
+            local path=$2
+            local data=${3:-}
+            local code
+            if [ -n "${data}" ]; then
+              code=$(curl -sk -o "${API_RESPONSE}" -w '%{http_code}' \
+                -X "${method}" "${ENDPOINT}${path}" -H "Authorization: Bearer ${TOKEN}" \
+                -H 'Content-Type: application/json' -d "${data}")
+            else
+              code=$(curl -sk -o "${API_RESPONSE}" -w '%{http_code}' \
+                -X "${method}" "${ENDPOINT}${path}" -H "Authorization: Bearer ${TOKEN}")
+            fi
+            case "${code}" in
+              200|201|202|204) ;;
+              *) echo "ERROR: ${method} ${path} returned HTTP ${code}"; return 1 ;;
+            esac
+          }
+
+          create_and_verify_mirror() {
+            local repo=$1
+            echo "Configuring repository mirror ${repo}..."
+            api_request POST /api/v1/repository \
+              "$(jq -nc --arg repo "${repo}" '{repository:$repo, namespace:"admin", visibility:"private", description:"STS E2E mirror"}')"
+            local start_date mirror_config mirror_status
+            start_date=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
+            mirror_config=$(jq -nc --arg start "${start_date}" '{
+              is_enabled: true,
+              external_reference: "quay.io/quay/busybox",
+              external_registry_username: null,
+              external_registry_password: null,
+              sync_interval: 86400,
+              skopeo_timeout_interval: 300,
+              sync_start_date: $start,
+              root_rule: {rule_kind: "tag_glob_csv", rule_value: ["latest"]},
+              robot_username: "admin+stsmirror",
+              external_registry_config: {verify_tls: true}
+            }')
+            api_request POST "/api/v1/repository/admin/${repo}/mirror" "${mirror_config}"
+            api_request POST "/api/v1/repository/admin/${repo}/mirror/sync-now"
+
+            echo "Waiting for mirror ${repo} to copy the image..."
+            for attempt in $(seq 1 90); do
+              api_request GET "/api/v1/repository/admin/${repo}/mirror"
+              mirror_status=$(jq -r '.sync_status // empty' "${API_RESPONSE}")
+              if [ "${mirror_status}" = "SUCCESS" ]; then
+                break
+              fi
+              [ "${attempt}" -lt 90 ] || {
+                echo "ERROR: repository mirror ${repo} did not succeed; final status=${mirror_status:-unknown}"
+                exit 1
+              }
+              sleep 10
+            done
+
+            rm -f "${PULLED_IMAGE}"
+            crane pull --insecure "${REGISTRY}/admin/${repo}:latest" "${PULLED_IMAGE}"
+            [ -s "${PULLED_IMAGE}" ] || {
+              echo "ERROR: mirrored image archive for ${repo} is empty"
+              exit 1
+            }
+          }
+
+          ROLE_A_HASH=$(role_hash "${STS_ROLE_ARN}")
+          ROLE_B_HASH=$(role_hash "${STS_SECOND_ROLE_ARN}")
+          [ "${STS_ROLE_ARN}" != "${STS_SECOND_ROLE_ARN}" ] || {
+            echo "ERROR: STS_ROLE_ARN and STS_SECOND_ROLE_ARN must be different"
+            exit 1
+          }
+          [ "${ROLE_A_HASH}" != "${ROLE_B_HASH}" ] || {
+            echo "ERROR: STS role hashes unexpectedly match"
+            exit 1
+          }
+          [ "$(deployment_hash sts-cco-quay-app)" = "${ROLE_A_HASH}" ] || {
+            echo "ERROR: app deployment hash does not match initial ROLEARN"
+            exit 1
+          }
+          [ "$(deployment_hash sts-cco-quay-mirror)" = "${ROLE_A_HASH}" ] || {
+            echo "ERROR: mirror deployment hash does not match initial ROLEARN"
+            exit 1
+          }
+          APP_PODS_A=$(deployment_pods sts-cco-quay-app)
+          MIRROR_PODS_A=$(deployment_pods sts-cco-quay-mirror)
 
           echo "Waiting for the Quay API..."
           for attempt in $(seq 1 60); do
@@ -266,7 +413,7 @@ spec:
           SOURCE_IMAGE=quay.io/quay/busybox:latest
           TARGET_IMAGE="${REGISTRY}/${USERNAME}/sts-e2e:latest"
 
-          echo "Copying an image into the STS-backed registry..."
+          echo "Copying an image into the STS-backed registry with the initial role..."
           crane copy --insecure --platform linux/amd64 "${SOURCE_IMAGE}" "${TARGET_IMAGE}"
           PUSH_DIGEST=$(crane digest --insecure "${TARGET_IMAGE}")
           crane pull --insecure "${TARGET_IMAGE}" "${PULLED_IMAGE}"
@@ -279,63 +426,81 @@ spec:
             exit 1
           }
 
-          api_request() {
-            local method=$1
-            local path=$2
-            local data=${3:-}
-            local code
-            if [ -n "${data}" ]; then
-              code=$(curl -sk -o "${API_RESPONSE}" -w '%{http_code}' \
-                -X "${method}" "${ENDPOINT}${path}" -H "Authorization: Bearer ${TOKEN}" \
-                -H 'Content-Type: application/json' -d "${data}")
-            else
-              code=$(curl -sk -o "${API_RESPONSE}" -w '%{http_code}' \
-                -X "${method}" "${ENDPOINT}${path}" -H "Authorization: Bearer ${TOKEN}")
-            fi
-            case "${code}" in
-              200|201|202|204) ;;
-              *) echo "ERROR: ${method} ${path} returned HTTP ${code}"; return 1 ;;
-            esac
-          }
-
-          echo "Configuring a repository mirror..."
           api_request PUT /api/v1/user/robots/stsmirror '{}'
-          api_request POST /api/v1/repository \
-            '{"repository":"sts-mirror","namespace":"admin","visibility":"private","description":"STS E2E mirror"}'
-          START_DATE=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
-          MIRROR_CONFIG=$(jq -nc --arg start "${START_DATE}" '{
-            is_enabled: true,
-            external_reference: "quay.io/quay/busybox",
-            external_registry_username: null,
-            external_registry_password: null,
-            sync_interval: 86400,
-            skopeo_timeout_interval: 300,
-            sync_start_date: $start,
-            root_rule: {rule_kind: "tag_glob_csv", rule_value: ["latest"]},
-            robot_username: "admin+stsmirror",
-            external_registry_config: {verify_tls: true}
-          }')
-          api_request POST /api/v1/repository/admin/sts-mirror/mirror "${MIRROR_CONFIG}"
-          api_request POST /api/v1/repository/admin/sts-mirror/mirror/sync-now
+          create_and_verify_mirror sts-mirror
 
-          echo "Waiting for the mirror worker to copy the image..."
-          for attempt in $(seq 1 90); do
-            api_request GET /api/v1/repository/admin/sts-mirror/mirror
-            MIRROR_STATUS=$(jq -r '.sync_status // empty' "${API_RESPONSE}")
-            if [ "${MIRROR_STATUS}" = "SUCCESS" ]; then
+          echo "Rotating the operator ROLEARN to the second test role..."
+          OPERATOR_NAMESPACE=${QUAY_STS_OPERATOR_NAMESPACE:-openshift-operators}
+          OPERATOR_DEPLOYMENT=${QUAY_STS_OPERATOR_DEPLOYMENT:-quay-operator-tng}
+          mapfile -t subscriptions < <(kubectl get subscriptions.operators.coreos.com \
+            -n "${OPERATOR_NAMESPACE}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+          [ "${#subscriptions[@]}" -eq 1 ] || {
+            echo "ERROR: expected exactly one Quay Operator Subscription"
+            exit 1
+          }
+          patch=$(jq -nc --arg role "${STS_SECOND_ROLE_ARN}" '{spec:{config:{env:[{name:"ROLEARN",value:$role}]}}}')
+          kubectl patch subscription "${subscriptions[0]}" -n "${OPERATOR_NAMESPACE}" \
+            --type=merge -p "${patch}" >/dev/null
+
+          for attempt in $(seq 1 60); do
+            configured_roles=$(kubectl get deployment "${OPERATOR_DEPLOYMENT}" -n "${OPERATOR_NAMESPACE}" \
+              -o jsonpath='{range .spec.template.spec.containers[*].env[?(@.name=="ROLEARN")]}{.value}{"\n"}{end}' \
+              2>/dev/null || true)
+            if printf '%s\n' "${configured_roles}" | grep -Fxq "${STS_SECOND_ROLE_ARN}"; then
               break
             fi
-            [ "${attempt}" -lt 90 ] || {
-              echo "ERROR: repository mirror did not succeed; final status=${MIRROR_STATUS:-unknown}"
+            [ "${attempt}" -lt 60 ] || {
+              echo "ERROR: timed out waiting for operator ROLEARN to update"
               exit 1
             }
             sleep 10
           done
+          kubectl rollout status "deployment/${OPERATOR_DEPLOYMENT}" -n "${OPERATOR_NAMESPACE}" --timeout=10m
+          kubectl annotate quayregistry sts-cco -n "${NAMESPACE}" \
+            "quay.redhat.com/sts-role-rotation-test=$(date +%s)" --overwrite >/dev/null
 
-          rm -f "${PULLED_IMAGE}"
-          crane pull --insecure "${REGISTRY}/admin/sts-mirror:latest" "${PULLED_IMAGE}"
-          [ -s "${PULLED_IMAGE}" ] || {
-            echo "ERROR: mirrored image archive is empty"
+          wait_for_credentials_role "${STS_SECOND_ROLE_ARN}"
+          wait_for_workload_hashes "${ROLE_B_HASH}"
+          kubectl rollout status deployment/sts-cco-quay-app -n "${NAMESPACE}" --timeout=15m
+          kubectl rollout status deployment/sts-cco-quay-mirror -n "${NAMESPACE}" --timeout=15m
+
+          APP_PODS_B=$(deployment_pods sts-cco-quay-app)
+          MIRROR_PODS_B=$(deployment_pods sts-cco-quay-mirror)
+          [ "${APP_PODS_A}" != "${APP_PODS_B}" ] || {
+            echo "ERROR: app pods did not change after ROLEARN rotation"
             exit 1
           }
-          echo "PASS: CCO provisioning, STS-backed push/pull, and repository mirroring succeeded"
+          [ "${MIRROR_PODS_A}" != "${MIRROR_PODS_B}" ] || {
+            echo "ERROR: mirror pods did not change after ROLEARN rotation"
+            exit 1
+          }
+
+          echo "Verifying the initial image is readable after ROLEARN rotation..."
+          [ "${PUSH_DIGEST}" = "$(crane digest --insecure "${TARGET_IMAGE}")" ] || {
+            echo "ERROR: initial image digest changed after ROLEARN rotation"
+            exit 1
+          }
+          rm -f "${PULLED_IMAGE}"
+          crane pull --insecure "${TARGET_IMAGE}" "${PULLED_IMAGE}"
+          [ -s "${PULLED_IMAGE}" ] || {
+            echo "ERROR: initial image archive is empty after ROLEARN rotation"
+            exit 1
+          }
+
+          ROLE_B_IMAGE="${REGISTRY}/${USERNAME}/sts-e2e:role-b"
+          echo "Copying an image into the STS-backed registry with the rotated role..."
+          crane copy --insecure --platform linux/amd64 "${SOURCE_IMAGE}" "${ROLE_B_IMAGE}"
+          ROLE_B_DIGEST=$(crane digest --insecure "${ROLE_B_IMAGE}")
+          rm -f "${PULLED_IMAGE}"
+          crane pull --insecure "${ROLE_B_IMAGE}" "${PULLED_IMAGE}"
+          [ -s "${PULLED_IMAGE}" ] || {
+            echo "ERROR: role-B image archive is empty"
+            exit 1
+          }
+          [ "${ROLE_B_DIGEST}" = "$(crane digest --insecure "${ROLE_B_IMAGE}")" ] || {
+            echo "ERROR: role-B image digest changed after pull"
+            exit 1
+          }
+
+          create_and_verify_mirror sts-mirror-role-b
+          echo "PASS: STS-backed push/pull and mirroring succeeded before and after ROLEARN rotation"
