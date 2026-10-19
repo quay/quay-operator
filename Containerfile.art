@@ -32,4 +32,3 @@ COPY --from=builder /workspace/manager manager
 COPY kustomize/ kustomize/
 
 ENTRYPOINT ["/workspace/manager"]
-
