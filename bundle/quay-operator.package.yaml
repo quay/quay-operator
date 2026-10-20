@@ -1,0 +1,5 @@
+packageName: quay-operator
+channels:
+- name: stable-5.1
+  currentCSV: quay-operator.5.1.0
+defaultChannel: stable-5.1
