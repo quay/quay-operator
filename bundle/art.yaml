@@ -3,7 +3,7 @@ updates:
   - file: "manifests/quay-operator.clusterserviceversion.yaml"
     update_list:
       - search: "olm.skipRange: \">=3.5.x <3.6.1\""
-        replace: "olm.skipRange: \">=3.8.x <3.9.28\""
+        replace: "olm.skipRange: \">=3.6.0 <3.9.28\""
       - search: "quay-version: v3.6.1"
         replace: "quay-version: v3.9.28"
       - search: "name: quay-operator.v3.6.1"
