@@ -840,6 +840,70 @@ var _ = Describe("Reconciling a QuayRegistry", func() {
 			Expect(v1.ComponentsMatch(updatedQuayRegistry.Spec.Components, expectedQuay.Spec.Components))
 		})
 	})
+
+	When("the cache component is omitted and the config bundle has a cache configuration", func() {
+		BeforeEach(func() {
+			quayRegistry = newQuayRegistry("test-registry", namespace)
+			quayRegistryName = types.NamespacedName{
+				Name:      quayRegistry.Name,
+				Namespace: quayRegistry.Namespace,
+			}
+			configBundle = newConfigBundle("quay-config-secret-abc123", namespace, true)
+
+			config := map[string]interface{}{}
+			Expect(yaml.Unmarshal(configBundle.Data["config.yaml"], &config)).To(Succeed())
+			config["DATA_MODEL_CACHE_CONFIG"] = map[string]interface{}{
+				"engine": "redis",
+				"redis_config": map[string]interface{}{
+					"primary": map[string]interface{}{
+						"host": "cache.example.test",
+						"port": 6379,
+					},
+				},
+			}
+			configBundle.Data["config.yaml"] = encode(config)
+			quayRegistry.Spec.ConfigBundleSecret = configBundle.GetName()
+
+			for i, component := range quayRegistry.Spec.Components {
+				if component.Kind == v1.ComponentCache {
+					quayRegistry.Spec.Components = append(
+						quayRegistry.Spec.Components[:i], quayRegistry.Spec.Components[i+1:]...,
+					)
+					break
+				}
+			}
+
+			Expect(k8sClient.Create(context.Background(), &configBundle)).Should(Succeed())
+			Expect(k8sClient.Create(context.Background(), quayRegistry)).Should(Succeed())
+
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
+		})
+
+		It("defaults cache to unmanaged while leaving Redis managed", func() {
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+
+			var updatedQuayRegistry v1.QuayRegistry
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
+			Expect(v1.ComponentIsManaged(updatedQuayRegistry.Spec.Components, v1.ComponentCache)).To(BeFalse())
+			Expect(v1.ComponentIsManaged(updatedQuayRegistry.Spec.Components, v1.ComponentRedis)).To(BeTrue())
+		})
+
+		It("accepts the persisted unmanaged cache configuration on the next reconcile", func() {
+			Expect(err).NotTo(HaveOccurred())
+
+			result, err = controller.Reconcile(context.Background(), reconcile.Request{NamespacedName: quayRegistryName})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+
+			var updatedQuayRegistry v1.QuayRegistry
+			Expect(k8sClient.Get(context.Background(), quayRegistryName, &updatedQuayRegistry)).To(Succeed())
+			condition := v1.GetCondition(updatedQuayRegistry.Status.Conditions, v1.ConditionTypeRolloutBlocked)
+			Expect(condition).NotTo(BeNil())
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse))
+		})
+	})
 })
 
 func quayWithUnmanagedComponents(unmanaged ...v1.ComponentKind) v1.QuayRegistry {

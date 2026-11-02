@@ -1003,9 +1003,38 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		)
 	}
 
+	cacheImplicitlyConfigured := !v1.ComponentIsExplicitlyDefined(
+		quay.Spec.Components, v1.ComponentCache,
+	)
+	cacheConfigProvided := false
+	if cacheImplicitlyConfigured {
+		cacheConfigProvided, err = kustomize.ContainsComponentConfig(
+			cbundle.Data, v1.Component{Kind: v1.ComponentCache},
+		)
+		if err != nil {
+			return r.reconcileWithCondition(
+				ctx,
+				&quay,
+				v1.ConditionTypeRolloutBlocked,
+				metav1.ConditionTrue,
+				v1.ConditionReasonConfigInvalid,
+				fmt.Sprintf("unable to verify cache component config: %s", err),
+			)
+		}
+	}
+
 	if err = v1.EnsureDefaultComponents(quayContext, updatedQuay); err != nil {
 		log.Error(err, "could not ensure default `spec.components`")
 		return r.Requeue, err
+	}
+
+	if cacheImplicitlyConfigured && cacheConfigProvided {
+		for i, component := range updatedQuay.Spec.Components {
+			if component.Kind == v1.ComponentCache {
+				updatedQuay.Spec.Components[i].Managed = false
+				break
+			}
+		}
 	}
 
 	if v1.ComponentIsManaged(updatedQuay.Spec.Components, v1.ComponentCache) {
