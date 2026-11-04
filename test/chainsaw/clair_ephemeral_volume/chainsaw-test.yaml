@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: clair-ephemeral-volume
+spec:
+  steps:
+  - name: create-registry-with-clair-volume-overrides
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euo pipefail
+
+          # Create config bundle for KinD (no-op on OpenShift)
+          if kubectl api-resources 2>/dev/null | grep route.openshift.io >/dev/null; then
+            echo "OpenShift detected, skipping config bundle setup"
+            exit 0
+          fi
+          echo "KinD detected, creating config bundle..."
+          ACCESS_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.access-key}')
+          SECRET_KEY=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.secret-key}')
+          BUCKET=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.bucket}')
+          ENDPOINT=$(kubectl get configmap garage-creds -n garage-system -o jsonpath='{.data.endpoint}')
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout /tmp/ssl-${NAMESPACE}.key -out /tmp/ssl-${NAMESPACE}.cert -days 1 \
+            -subj "/O=Quay E2E" \
+            -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+          CONFIG=$(cat <<CFGEOF
+          FEATURE_MAILING: false
+          FEATURE_PROXY_STORAGE: true
+          SERVER_HOSTNAME: "127.0.0.1:30443"
+          PREFERRED_URL_SCHEME: https
+          WORKER_COUNT: 1
+          WORKER_COUNT_WEB: 1
+          WORKER_COUNT_SECSCAN: 1
+          WORKER_COUNT_REGISTRY: 1
+          DB_CONNECTION_POOLING: false
+          DISTRIBUTED_STORAGE_CONFIG:
+            default:
+              - RadosGWStorage
+              - access_key: ${ACCESS_KEY}
+                secret_key: ${SECRET_KEY}
+                bucket_name: ${BUCKET}
+                hostname: ${ENDPOINT}
+                port: 3900
+                is_secure: false
+                storage_path: /datastorage/registry
+          DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+            - default
+          DISTRIBUTED_STORAGE_PREFERENCE:
+            - default
+          CFGEOF
+          )
+          kubectl create secret generic reconcile-config -n $NAMESPACE \
+            --from-literal=config.yaml="${CONFIG}" \
+            --from-file=ssl.cert=/tmp/ssl-${NAMESPACE}.cert \
+            --from-file=ssl.key=/tmp/ssl-${NAMESPACE}.key \
+            --from-file=extra_ca_cert_e2e-ca.crt=/tmp/ssl-${NAMESPACE}.cert
+          echo "Config bundle created in $NAMESPACE"
+    - apply:
+        file: 00-create-quay-registry.yaml
+    - assert:
+        file: 00-assert-status.yaml
+  - name: verify-clair-ephemeral-volume
+    try:
+    - script:
+        shell: /bin/bash
+        content: |
+          set -euxo pipefail
+
+          DEPLOY_NAME="clair-vol-clair-app"
+
+          # Verify the ephemeral volume storage size
+          STORAGE=$(kubectl get deployment "${DEPLOY_NAME}" -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="indexer-layer-storage")].ephemeral.volumeClaimTemplate.spec.resources.requests.storage}')
+          echo "Clair ephemeral volume size: ${STORAGE}"
+          [ "${STORAGE}" = "50Gi" ] || { echo "FAIL: expected 50Gi, got ${STORAGE}"; exit 1; }
+          echo "PASS: clair ephemeral volume size is 50Gi"
+
+          # Verify the volume is mounted at /var/tmp
+          MOUNT_PATH=$(kubectl get deployment "${DEPLOY_NAME}" -n $NAMESPACE \
+            -o jsonpath='{.spec.template.spec.containers[?(@.name=="clair-app")].volumeMounts[?(@.name=="indexer-layer-storage")].mountPath}')
+          echo "Clair ephemeral volume mount path: ${MOUNT_PATH}"
+          [ "${MOUNT_PATH}" = "/var/tmp" ] || { echo "FAIL: expected /var/tmp, got ${MOUNT_PATH}"; exit 1; }
+          echo "PASS: clair ephemeral volume mounted at /var/tmp"
+
+          echo "=== All clair ephemeral volume overrides verified ==="
