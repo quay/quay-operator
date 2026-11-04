@@ -12,6 +12,52 @@ updates:
         replace: "version: 3.14.10"
       - search: "  displayName: Quay\n"
         replace: "  displayName: Red Hat Quay\n"
+      - search: "    description: Opinionated deployment of Quay on Kubernetes.\n"
+        replace: "    description: Opinionated deployment of Red Hat on Kubernetes.\n    operators.openshift.io/valid-subscription: '[\"OpenShift Platform Plus\", \"Red Hat Quay\"]'\n"
+      - search: "  description: Opinionated deployment of Quay on Kubernetes.\n"
+        replace: |2
+            description: |-
+              The Red Hat Quay Operator deploys and manages a production-ready
+              [Red Hat Quay](https://www.openshift.com/products/quay) private container registry.
+              This operator provides an opinionated installation and configuration of Red Hat Quay.
+              All components required, including Clair, database, and storage, are provided in an
+              operator-managed fashion. Each component may optionally be self-managed.
+
+              ## Operator Features
+
+              * Automated installation of Red Hat Quay
+              * Provisions instance of Redis
+              * Provisions PostgreSQL to support both Quay and Clair
+              * Installation of Clair for container scanning and integration with Quay
+              * Provisions and configures ODF for supported registry object storage
+              * Enables and configures Quay's registry mirroring feature
+
+              ## Prerequisites
+
+              By default, the Red Hat Quay Operator expects ODF to be installed on the cluster to
+              provide the _ObjectBucketClaim_ API for object storage. For production deployment of
+              Red Hat OpenShift Data Foundation, please refer to the
+              [official documentation](https://access.redhat.com/documentation/en-us/red_hat_openshift_container_storage/).
+
+              ## Simplified Deployment
+
+              The following example provisions a fully operator-managed deployment of Red Hat Quay,
+              including all services necessary for production:
+
+              ```
+              apiVersion: quay.redhat.com/v1
+              kind: QuayRegistry
+              metadata:
+                name: my-registry
+              ```
+
+              ## Documentation
+
+              See the
+              [official documentation](https://access.redhat.com/documentation/en-us/red_hat_quay/3/html/deploying_the_red_hat_quay_operator_on_openshift_container_platform/index)
+              for more complex deployment scenarios and information.
+      - search: "  maintainers:\n    - email: quay-sig@googlegroups.com\n      name: Project Quay Contributors\n"
+        replace: "  maintainers:\n    - email: support@redhat.com\n      name: Red Hat\n"
       # Public artwork (Apache-2.0 repository):
       # https://github.com/quay/quay/blob/95fccd02f0af3d55fb7ae1a3329dd7c94b57ac37/web/src/assets/Technology_icon-Red_Hat-Quay-Standard-RGB.svg
       # SVG SHA-256: a91458b81dbd9cbb5fd1697cf32dcfc88a0b160440e10adf6653a86c240710e1
