@@ -108,7 +108,12 @@ spec:
             description: Externally accessible URL for container pull/push and web frontend.
             x-descriptors:
               - 'urn:alm:descriptor:org.w3:link'
-  description: Opinionated deployment of Quay on Kubernetes.
+  description: |-
+    Opinionated deployment of Quay on Kubernetes.
+
+    ## Prerequisites
+
+    By default, the Red Hat Quay Operator expects Red Hat OpenShift Data Foundation (ODF) to be installed on the cluster to provide the `ObjectBucketClaim` API for object storage. For production deployment of Red Hat OpenShift Data Foundation, see the [official documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/).
   displayName: Quay
   install:
     spec:
