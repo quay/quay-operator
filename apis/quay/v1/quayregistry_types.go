@@ -88,6 +88,7 @@ var supportsVolumeOverride = []ComponentKind{
 
 var supportsStorageClassOverride = []ComponentKind{
 	ComponentPostgres,
+	ComponentClair,
 	ComponentClairPostgres,
 }
 
@@ -523,7 +524,7 @@ func ValidateOverrides(quay *QuayRegistry) error {
 		hasreplicas := component.Overrides.Replicas != nil
 		hasresources := component.Overrides.Resources != nil
 		hasenvvar := len(component.Overrides.Env) > 0
-		hasoverride := hasaffinity || hasvolume || hasenvvar || hasreplicas
+		hasoverride := hasaffinity || hasvolume || hasstorageclass || hasenvvar || hasreplicas || hasresources
 
 		if hasoverride && !ComponentIsManaged(quay.Spec.Components, component.Kind) {
 			return fmt.Errorf("cannot set overrides on unmanaged %s", component.Kind)

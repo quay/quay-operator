@@ -501,6 +501,49 @@ var validateOverridesTests = []struct {
 		},
 		errors.New("component redis does not support storageClassName overrides"),
 	},
+	{
+		"ValidStorageClassNameOverrideOnClair",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true, Overrides: &Override{StorageClassName: ptr.To("fast-storage")}},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
+	{
+		"ValidClairVolumeSizeAndStorageClassOverride",
+		QuayRegistry{
+			Spec: QuayRegistrySpec{
+				Components: []Component{
+					{Kind: "postgres", Managed: true},
+					{Kind: "clairpostgres", Managed: true},
+					{Kind: "redis", Managed: true},
+					{Kind: "clair", Managed: true, Overrides: &Override{
+						VolumeSize:       resourcePtr("50Gi"),
+						StorageClassName: ptr.To("fast-storage"),
+					}},
+					{Kind: "objectstorage", Managed: true},
+					{Kind: "route", Managed: true},
+					{Kind: "tls", Managed: true},
+					{Kind: "horizontalpodautoscaler", Managed: true},
+					{Kind: "mirror", Managed: true},
+					{Kind: "monitoring", Managed: true},
+				},
+			},
+		},
+		nil,
+	},
 }
 
 func TestValidOverrides(t *testing.T) {
@@ -629,4 +672,9 @@ func TestEnsureRegistryEndpoint(t *testing.T) {
 		assert.Equal(test.expectedOk, ok, test.name)
 		assert.Equal(test.expected, test.quay.Status.RegistryEndpoint, test.name)
 	}
+}
+
+func resourcePtr(s string) *resource.Quantity {
+	q := resource.MustParse(s)
+	return &q
 }
