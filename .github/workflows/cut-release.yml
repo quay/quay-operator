@@ -93,7 +93,7 @@ jobs:
           tag=`basename ${{ github.ref }}`
           echo "QUAY_VERSION=${tag}" >> $GITHUB_ENV
           echo "TAG=quay.io/projectquay/quay-operator:${tag}" >> $GITHUB_ENV
-          echo "QUAY_USER=projectquay+quay_github" >> $GITHUB_ENV
+          echo "QUAY_USER=${{ secrets.QUAY_USER }}" >> $GITHUB_ENV
           echo "::add-mask::${{ secrets.QUAY_TOKEN }}"
       - name: Fetch Artifacts
         uses: actions/download-artifact@v2
