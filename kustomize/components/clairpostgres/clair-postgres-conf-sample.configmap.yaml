@@ -10,3 +10,4 @@ data:
     log_truncate_on_rotation = on
     log_rotation_age = 1d
     log_rotation_size = 0
+    password_encryption = scram-sha-256
