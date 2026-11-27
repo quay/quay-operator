@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"regexp"
 	"strings"
@@ -24,9 +23,10 @@ import (
 )
 
 const (
-	configSecretPrefix    = "quay-config-secret"
-	fieldGroupsAnnotation = "quay-managed-fieldgroups"
-	stsRoleHashAnnotation = "quay.redhat.com/sts-role-hash"
+	configSecretPrefix       = "quay-config-secret"
+	fieldGroupsAnnotation    = "quay-managed-fieldgroups"
+	stsProvisionedAnnotation = "quay.redhat.com/sts-provisioned-at"
+	stsRoleSuffixAnnotation  = "quay.redhat.com/sts-role-suffix"
 
 	readOnlyVolumeName = "readonly-service-key"
 	readOnlyMountPath  = "/conf/readonly"
@@ -238,7 +238,7 @@ func Process(quay *v1.QuayRegistry, qctx *quaycontext.QuayRegistryContext, obj c
 			return dep, nil
 		}
 
-		if qctx.StorageSTSEnabled && qctx.STSCredentialProvisioned {
+		if qctx.StorageSTSEnabled && qctx.STSCredentialProvisionedAt != "" {
 			if strings.HasSuffix(dep.Name, "quay-app") || strings.HasSuffix(dep.Name, "quay-mirror") {
 				applySTSCredentials(dep, qctx)
 			}
@@ -779,8 +779,9 @@ func applySTSCredentials(dep *appsv1.Deployment, qctx *quaycontext.QuayRegistryC
 	if dep.Spec.Template.Annotations == nil {
 		dep.Spec.Template.Annotations = map[string]string{}
 	}
-	// Restart SDK sessions when the configured IAM role changes.
-	dep.Spec.Template.Annotations[stsRoleHashAnnotation] = fmt.Sprintf("%x", sha256.Sum256([]byte(qctx.STSRoleARN)))
+	// Restart SDK sessions when new STS credentials are provisioned.
+	dep.Spec.Template.Annotations[stsProvisionedAnnotation] = qctx.STSCredentialProvisionedAt
+	dep.Spec.Template.Annotations[stsRoleSuffixAnnotation] = qctx.STSRoleARN[strings.LastIndex(qctx.STSRoleARN, "/")+1:]
 
 	credVolume := corev1.Volume{
 		Name: "aws-sts-credentials",

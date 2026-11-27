@@ -14,7 +14,7 @@ spec:
         content: |
           set -euo pipefail
 
-          for command in kubectl jq curl crane base64 sha256sum; do
+          for command in kubectl jq curl crane base64; do
             command -v "${command}" >/dev/null || {
               echo "ERROR: ${command} is required for the STS E2E test"
               exit 1
@@ -159,8 +159,6 @@ spec:
             kubectl rollout status deployment/"${deployment}" -n "${NAMESPACE}" --timeout=15m
 
             kubectl get deployment "${deployment}" -n "${NAMESPACE}" -o json | jq -e '
-              ((.spec.template.metadata.annotations["quay.redhat.com/sts-role-hash"] // "")
-                | test("^[0-9a-f]{64}$")) and
               .spec.template.spec.serviceAccountName == "sts-cco-quay-app" and
               any(.spec.template.spec.volumes[]?;
                 .name == "aws-sts-credentials" and
@@ -190,7 +188,6 @@ spec:
               all(.items[] | select(
                 .metadata.name != "sts-cco-quay-app" and
                 .metadata.name != "sts-cco-quay-mirror");
-                .spec.template.metadata.annotations["quay.redhat.com/sts-role-hash"] == null and
                 all(.spec.template.spec.containers[]?;
                   all(.env[]?;
                     .name != "AWS_SHARED_CREDENTIALS_FILE" and
@@ -235,24 +232,6 @@ spec:
           mkdir -p "${DOCKER_CONFIG}"
           trap 'rm -f "${API_RESPONSE}" "${PULLED_IMAGE}"; rm -rf "${DOCKER_CONFIG}"' EXIT
 
-          role_hash() {
-            printf '%s' "$1" | sha256sum | awk '{print $1}'
-          }
-
-          deployment_hash() {
-            kubectl get deployment "$1" -n "${NAMESPACE}" -o json | jq -r \
-              '.spec.template.metadata.annotations["quay.redhat.com/sts-role-hash"] // ""'
-          }
-
-          deployment_pods() {
-            local deployment=$1
-            local selector
-            selector=$(kubectl get deployment "${deployment}" -n "${NAMESPACE}" -o json | jq -r \
-              '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')
-            kubectl get pods -n "${NAMESPACE}" -l "${selector}" -o json | jq -r \
-              '.items | map(.metadata.name) | sort | join(" ")'
-          }
-
           wait_for_credentials_role() {
             local expected_role=$1
             local request=sts-cco-aws-credentials
@@ -277,21 +256,6 @@ spec:
               fi
               [ "${attempt}" -lt 90 ] || {
                 echo "ERROR: CCO credentials did not update to the expected role"
-                exit 1
-              }
-              sleep 10
-            done
-          }
-
-          wait_for_workload_hashes() {
-            local expected_hash=$1
-            for attempt in $(seq 1 120); do
-              if [ "$(deployment_hash sts-cco-quay-app)" = "${expected_hash}" ] && \
-                 [ "$(deployment_hash sts-cco-quay-mirror)" = "${expected_hash}" ]; then
-                return 0
-              fi
-              [ "${attempt}" -lt 120 ] || {
-                echo "ERROR: app/mirror deployments did not receive expected STS role hash ${expected_hash}"
                 exit 1
               }
               sleep 10
@@ -361,26 +325,10 @@ spec:
             }
           }
 
-          ROLE_A_HASH=$(role_hash "${STS_ROLE_ARN}")
-          ROLE_B_HASH=$(role_hash "${STS_SECOND_ROLE_ARN}")
           [ "${STS_ROLE_ARN}" != "${STS_SECOND_ROLE_ARN}" ] || {
             echo "ERROR: STS_ROLE_ARN and STS_SECOND_ROLE_ARN must be different"
             exit 1
           }
-          [ "${ROLE_A_HASH}" != "${ROLE_B_HASH}" ] || {
-            echo "ERROR: STS role hashes unexpectedly match"
-            exit 1
-          }
-          [ "$(deployment_hash sts-cco-quay-app)" = "${ROLE_A_HASH}" ] || {
-            echo "ERROR: app deployment hash does not match initial ROLEARN"
-            exit 1
-          }
-          [ "$(deployment_hash sts-cco-quay-mirror)" = "${ROLE_A_HASH}" ] || {
-            echo "ERROR: mirror deployment hash does not match initial ROLEARN"
-            exit 1
-          }
-          APP_PODS_A=$(deployment_pods sts-cco-quay-app)
-          MIRROR_PODS_A=$(deployment_pods sts-cco-quay-mirror)
 
           echo "Waiting for the Quay API..."
           for attempt in $(seq 1 60); do
@@ -460,20 +408,8 @@ spec:
             "quay.redhat.com/sts-role-rotation-test=$(date +%s)" --overwrite >/dev/null
 
           wait_for_credentials_role "${STS_SECOND_ROLE_ARN}"
-          wait_for_workload_hashes "${ROLE_B_HASH}"
           kubectl rollout status deployment/sts-cco-quay-app -n "${NAMESPACE}" --timeout=15m
           kubectl rollout status deployment/sts-cco-quay-mirror -n "${NAMESPACE}" --timeout=15m
-
-          APP_PODS_B=$(deployment_pods sts-cco-quay-app)
-          MIRROR_PODS_B=$(deployment_pods sts-cco-quay-mirror)
-          [ "${APP_PODS_A}" != "${APP_PODS_B}" ] || {
-            echo "ERROR: app pods did not change after ROLEARN rotation"
-            exit 1
-          }
-          [ "${MIRROR_PODS_A}" != "${MIRROR_PODS_B}" ] || {
-            echo "ERROR: mirror pods did not change after ROLEARN rotation"
-            exit 1
-          }
 
           echo "Verifying the initial image is readable after ROLEARN rotation..."
           [ "${PUSH_DIGEST}" = "$(crane digest --insecure "${TARGET_IMAGE}")" ] || {

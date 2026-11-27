@@ -73,11 +73,11 @@ type QuayRegistryContext struct {
 	ClairPostgresSSLRootCert  string
 
 	// STS/CCO (Cloud Credential Operator)
-	StorageSTSEnabled        bool
-	STSRoleARN               string
-	STSStorageBuckets        []string
-	STSCredentialSecretName  string
-	STSCredentialProvisioned bool
+	StorageSTSEnabled          bool
+	STSRoleARN                 string
+	STSStorageBuckets          []string
+	STSCredentialSecretName    string
+	STSCredentialProvisionedAt string
 
 	// Read-only render intent
 	ReadOnlyPhase         string
