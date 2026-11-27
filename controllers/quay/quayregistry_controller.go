@@ -561,7 +561,6 @@ func (r *QuayRegistryReconciler) ensureCredentialsRequest(
 			return r.Requeue, fmt.Errorf("unable to create CredentialsRequest: %w", err)
 		}
 
-		qctx.STSCredentialProvisioned = false
 		return r.Requeue, nil
 	}
 
@@ -629,7 +628,10 @@ func (r *QuayRegistryReconciler) ensureCredentialsRequest(
 	}
 
 	qctx.STSCredentialSecretName = secretName
-	qctx.STSCredentialProvisioned = true
+	qctx.STSCredentialProvisionedAt = existing.GetAnnotations()[stsRequestTimestampAnnotation]
+	if qctx.STSCredentialProvisionedAt == "" {
+		qctx.STSCredentialProvisionedAt = existing.GetCreationTimestamp().UTC().Format(time.RFC3339Nano)
+	}
 	r.Log.Info("STS credentials provisioned by CCO", "secret", secretName)
 	return ctrl.Result{}, nil
 }
@@ -1158,7 +1160,7 @@ func (r *QuayRegistryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				fmt.Sprintf("STS credential request error: %s", err),
 			)
 		}
-		if !quayContext.STSCredentialProvisioned {
+		if quayContext.STSCredentialProvisionedAt == "" {
 			return result, nil
 		}
 	}

@@ -213,6 +213,7 @@ func TestEnsureCredentialsRequestTimesOut(t *testing.T) {
 func TestEnsureCredentialsRequestAcceptsCurrentWebIdentitySecret(t *testing.T) {
 	quay := testQuayRegistry()
 	request := testCredentialsRequest(t, quay)
+	request.SetAnnotations(map[string]string{stsRequestTimestampAnnotation: "2026-11-26T05:46:00Z"})
 	if err := unstructured.SetNestedField(request.Object, true, "status", "provisioned"); err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +236,7 @@ func TestEnsureCredentialsRequestAcceptsCurrentWebIdentitySecret(t *testing.T) {
 	if result != (ctrl.Result{}) {
 		t.Fatalf("result = %#v, want zero result", result)
 	}
-	if !qctx.STSCredentialProvisioned || qctx.STSCredentialSecretName != secret.Name {
+	if qctx.STSCredentialProvisionedAt != "2026-11-26T05:46:00Z" || qctx.STSCredentialSecretName != secret.Name {
 		t.Fatalf("STS context not marked provisioned: %#v", qctx)
 	}
 }

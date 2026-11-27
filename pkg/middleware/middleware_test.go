@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"testing"
 
@@ -1354,9 +1353,9 @@ func TestProcessSTSCredentialsTargetsOnlyQuayWorkloads(t *testing.T) {
 		{Kind: v1.ComponentClair, Managed: true},
 	}}}
 	qctx := &quaycontext.QuayRegistryContext{
-		StorageSTSEnabled:        true,
-		STSCredentialProvisioned: true,
-		STSCredentialSecretName:  "test-aws-sts-credentials",
+		StorageSTSEnabled:          true,
+		STSCredentialProvisionedAt: "2026-11-26T05:46:00Z",
+		STSCredentialSecretName:    "test-aws-sts-credentials",
 	}
 
 	for _, tt := range []struct {
@@ -1402,7 +1401,6 @@ func TestProcessSTSCredentialsTargetsOnlyQuayWorkloads(t *testing.T) {
 }
 
 func TestProcessSTSRoleChange(t *testing.T) {
-	const annotation = "quay.redhat.com/sts-role-hash"
 	quay := &v1.QuayRegistry{Spec: v1.QuayRegistrySpec{Components: []v1.Component{
 		{Kind: v1.ComponentQuay, Managed: true},
 		{Kind: v1.ComponentMirror, Managed: true},
@@ -1436,11 +1434,15 @@ func TestProcessSTSRoleChange(t *testing.T) {
 					Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: tt.name}}},
 				}},
 			}
+			provisionedAt := ""
+			if tt.provisioned {
+				provisionedAt = "2026-11-26T05:46:00Z"
+			}
 			qctx := &quaycontext.QuayRegistryContext{
-				StorageSTSEnabled:        tt.enabled,
-				STSCredentialProvisioned: tt.provisioned,
-				STSCredentialSecretName:  "test-aws-sts-credentials",
-				STSRoleARN:               "arn:aws:iam::123456789012:role/role-a",
+				StorageSTSEnabled:          tt.enabled,
+				STSCredentialProvisionedAt: provisionedAt,
+				STSCredentialSecretName:    "test-aws-sts-credentials",
+				STSRoleARN:                 "arn:aws:iam::123456789012:role/role-a",
 			}
 			render := func() corev1.PodTemplateSpec {
 				processed, err := Process(quay, qctx, dep.DeepCopy(), false)
@@ -1448,21 +1450,24 @@ func TestProcessSTSRoleChange(t *testing.T) {
 				return processed.(*appsv1.Deployment).Spec.Template
 			}
 			original := render()
-			assert.Equal(t, original, render(), "unchanged role must not change the pod template")
+			assert.Equal(t, original, render())
+			if tt.provisioned {
+				qctx.STSCredentialProvisionedAt = "2026-11-26T06:46:00Z"
+			}
 			qctx.STSRoleARN = "arn:aws:iam::123456789012:role/role-b"
 			updated := render()
 			assert.Equal(t, "keep", updated.Annotations["example.com/existing"])
 			if tt.wantRollout {
-				require.NotEmpty(t, original.Annotations[annotation])
-				assert.NotEqual(t, original.Annotations[annotation], updated.Annotations[annotation])
-				assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256([]byte(qctx.STSRoleARN))), updated.Annotations[annotation])
-				assert.NotEqual(t, original, updated, "role-only changes must trigger a rollout")
-				assert.Equal(t, original.Spec, updated.Spec, "only template metadata needs to change")
+				assert.Equal(t, "2026-11-26T06:46:00Z", updated.Annotations[stsProvisionedAnnotation])
+				assert.Equal(t, "role-b", updated.Annotations[stsRoleSuffixAnnotation])
+				assert.NotEqual(t, original, updated)
+				assert.Equal(t, original.Spec, updated.Spec)
 			} else {
-				assert.NotContains(t, updated.Annotations, annotation)
+				assert.NotContains(t, updated.Annotations, stsProvisionedAnnotation)
+				assert.NotContains(t, updated.Annotations, stsRoleSuffixAnnotation)
 				assert.Equal(t, original, updated)
 			}
-			assert.Equal(t, updated, render(), "the new role must produce a stable template")
+			assert.Equal(t, updated, render())
 		})
 	}
 }
@@ -1482,15 +1487,17 @@ func TestApplySTSCredentials(t *testing.T) {
 	}
 
 	qctx := &quaycontext.QuayRegistryContext{
-		StorageSTSEnabled:        true,
-		STSCredentialProvisioned: true,
-		STSCredentialSecretName:  "test-aws-sts-credentials",
+		StorageSTSEnabled:          true,
+		STSCredentialProvisionedAt: "2026-11-26T05:46:00Z",
+		STSCredentialSecretName:    "test-aws-sts-credentials",
+		STSRoleARN:                 "arn:aws:iam::123456789012:role/quay-storage",
 	}
 
 	applySTSCredentials(dep, qctx)
 
-	t.Run("initializes pod template annotations", func(t *testing.T) {
-		assert.NotEmpty(t, dep.Spec.Template.Annotations[stsRoleHashAnnotation])
+	t.Run("sets STS annotations", func(t *testing.T) {
+		assert.Equal(t, qctx.STSCredentialProvisionedAt, dep.Spec.Template.Annotations[stsProvisionedAnnotation])
+		assert.Equal(t, "quay-storage", dep.Spec.Template.Annotations[stsRoleSuffixAnnotation])
 	})
 
 	t.Run("adds CCO Secret volume", func(t *testing.T) {
